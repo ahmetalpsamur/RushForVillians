@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -55,8 +53,6 @@ class _StepCounterPageState extends State<StepCounterPage>
   int? _baseline;
   String _status = 'Hazırlanıyor';
   bool _sensorError = false;
-  bool _permissionDenied = false;
-  bool _isStartingSensor = false;
 
   @override
   void initState() {
@@ -67,33 +63,7 @@ class _StepCounterPageState extends State<StepCounterPage>
 
   Future<void> _initialize() async {
     await _loadSavedState();
-    await _startSensor();
-  }
-
-  Future<void> _startSensor() async {
-    if (_isStartingSensor) return;
-    _isStartingSensor = true;
-
-    try {
-      if (Platform.isAndroid) {
-        final permission = await Permission.activityRecognition.request();
-        if (!permission.isGranted) {
-          if (!mounted) return;
-          setState(() {
-            _permissionDenied = true;
-            _sensorError = true;
-            _status = 'Aktivite izni gerekli';
-          });
-          return;
-        }
-      }
-
-      if (!mounted) return;
-      setState(() => _permissionDenied = false);
-      _listenToSensor();
-    } finally {
-      _isStartingSensor = false;
-    }
+    _listenToSensor();
   }
 
   Future<void> _loadSavedState() async {
@@ -140,7 +110,6 @@ class _StepCounterPageState extends State<StepCounterPage>
       _baseline = baseline;
       _steps = math.max(0, event.steps - baseline!);
       _sensorError = false;
-      _permissionDenied = false;
     });
   }
 
@@ -165,7 +134,7 @@ class _StepCounterPageState extends State<StepCounterPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _startSensor();
+    if (state == AppLifecycleState.resumed) _listenToSensor();
   }
 
   @override
@@ -177,23 +146,16 @@ class _StepCounterPageState extends State<StepCounterPage>
   }
 
   Future<void> _showGoalPicker() async {
-    var goalText = _goal.toString();
+    final controller = TextEditingController(text: _goal.toString());
     final newGoal = await showDialog<int>(
       context: context,
       builder:
           (context) => AlertDialog(
             title: const Text('Günlük hedef'),
-            content: TextFormField(
-              initialValue: goalText,
+            content: TextField(
+              controller: controller,
               autofocus: true,
               keyboardType: TextInputType.number,
-              onChanged: (value) => goalText = value,
-              onFieldSubmitted: (text) {
-                final value = int.tryParse(text);
-                if (value != null && value >= 100 && value <= 100000) {
-                  Navigator.pop(context, value);
-                }
-              },
               decoration: const InputDecoration(
                 labelText: 'Adım sayısı',
                 suffixText: 'adım',
@@ -207,7 +169,7 @@ class _StepCounterPageState extends State<StepCounterPage>
               ),
               FilledButton(
                 onPressed: () {
-                  final value = int.tryParse(goalText);
+                  final value = int.tryParse(controller.text);
                   if (value != null && value >= 100 && value <= 100000) {
                     Navigator.pop(context, value);
                   }
@@ -217,6 +179,7 @@ class _StepCounterPageState extends State<StepCounterPage>
             ],
           ),
     );
+    controller.dispose();
 
     if (newGoal == null || !mounted) return;
     final preferences = await SharedPreferences.getInstance();
@@ -414,24 +377,9 @@ class _StepCounterPageState extends State<StepCounterPage>
                       elevation: 0,
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _permissionDenied
-                                  ? 'Adımlarınızı sayabilmek için fiziksel aktivite iznini açmanız gerekiyor.'
-                                  : 'Bu cihazda adım sensörüne erişilemiyor.',
-                              style: TextStyle(color: colors.onErrorContainer),
-                            ),
-                            if (_permissionDenied) ...[
-                              const SizedBox(height: 10),
-                              TextButton.icon(
-                                onPressed: openAppSettings,
-                                icon: const Icon(Icons.settings_rounded),
-                                label: const Text('Ayarlara git'),
-                              ),
-                            ],
-                          ],
+                        child: Text(
+                          'Adım sensörü kullanılamıyor. Telefon ayarlarından fiziksel aktivite iznini açıp uygulamayı yeniden deneyin.',
+                          style: TextStyle(color: colors.onErrorContainer),
                         ),
                       ),
                     ),
