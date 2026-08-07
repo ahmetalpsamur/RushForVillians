@@ -29,6 +29,8 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
   late int _age;
   late int _weight;
   late String _gender;
+  late final FixedExtentScrollController _ageController;
+  late final FixedExtentScrollController _weightController;
   List<CharacterClass> _classes = const [];
   String? _selectedClassId;
   String? _selectedAsset;
@@ -45,6 +47,8 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     _age = avatar?.age ?? 24;
     _weight = avatar?.weight ?? 72;
     _gender = avatar?.gender ?? 'Erkek';
+    _ageController = FixedExtentScrollController(initialItem: _age - 16);
+    _weightController = FixedExtentScrollController(initialItem: _weight - 40);
     _loadCatalog();
   }
 
@@ -83,6 +87,8 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _ageController.dispose();
+    _weightController.dispose();
     super.dispose();
   }
 
@@ -238,6 +244,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       suffix: 'yaş',
       min: 16,
       max: 80,
+      controller: _ageController,
       onChanged: (value) => setState(() => _age = value),
     ),
     3 => _numberStep(
@@ -248,6 +255,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       suffix: 'kg',
       min: 40,
       max: 160,
+      controller: _weightController,
       onChanged: (value) => setState(() => _weight = value),
     ),
     4 => _classStep(),
@@ -324,6 +332,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     required String suffix,
     required int min,
     required int max,
+    required FixedExtentScrollController controller,
     required ValueChanged<int> onChanged,
   }) {
     return _QuestionFrame(
@@ -332,48 +341,13 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       subtitle: subtitle,
       child: Column(
         children: [
-          Container(
-            width: 170,
-            height: 170,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.09),
-              border: Border.all(color: AppColors.primary, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.42),
-                  blurRadius: 30,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$value',
-                  style: const TextStyle(
-                    fontSize: 54,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(suffix, style: const TextStyle(color: Colors.white60)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 36),
-          Slider(
-            value: value.toDouble(),
-            min: min.toDouble(),
-            max: max.toDouble(),
-            divisions: max - min,
-            onChanged: (next) => onChanged(next.round()),
-            onChangeEnd: (_) => HapticFeedback.selectionClick(),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [Text('$min $suffix'), Text('$max $suffix')],
+          _NumberWheel(
+            value: value,
+            suffix: suffix,
+            min: min,
+            max: max,
+            controller: controller,
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -509,6 +483,160 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     'Thief' => Icons.visibility_off,
     _ => Icons.person,
   };
+}
+
+class _NumberWheel extends StatelessWidget {
+  final int value;
+  final String suffix;
+  final int min;
+  final int max;
+  final FixedExtentScrollController controller;
+  final ValueChanged<int> onChanged;
+
+  const _NumberWheel({
+    required this.value,
+    required this.suffix,
+    required this.min,
+    required this.max,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 330,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                child: ShaderMask(
+                  shaderCallback:
+                      (bounds) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: [0, 0.2, 0.8, 1],
+                      ).createShader(bounds),
+                  blendMode: BlendMode.dstIn,
+                  child: ListWheelScrollView.useDelegate(
+                    controller: controller,
+                    itemExtent: 74,
+                    diameterRatio: 1.45,
+                    perspective: 0.0025,
+                    physics: const FixedExtentScrollPhysics(),
+                    useMagnifier: true,
+                    magnification: 1.16,
+                    overAndUnderCenterOpacity: 0.32,
+                    onSelectedItemChanged: (index) {
+                      final nextValue = min + index;
+                      if (nextValue == value) return;
+                      HapticFeedback.selectionClick();
+                      onChanged(nextValue);
+                    },
+                    childDelegate: ListWheelChildBuilderDelegate(
+                      childCount: max - min + 1,
+                      builder: (context, index) {
+                        final itemValue = min + index;
+                        final selected = itemValue == value;
+                        return Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 140),
+                            style: TextStyle(
+                              color: selected ? Colors.white : Colors.white70,
+                              fontSize: selected ? 46 : 29,
+                              fontWeight:
+                                  selected ? FontWeight.w900 : FontWeight.w500,
+                              shadows:
+                                  selected
+                                      ? [
+                                        const Shadow(
+                                          color: AppColors.primary,
+                                          blurRadius: 18,
+                                        ),
+                                        Shadow(
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                          blurRadius: 34,
+                                        ),
+                                      ]
+                                      : null,
+                            ),
+                            child: Text('$itemValue'),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              IgnorePointer(
+                child: Container(
+                  height: 78,
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.symmetric(
+                      horizontal: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.9),
+                        width: 2,
+                      ),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.25),
+                        blurRadius: 28,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 48,
+                child: IgnorePointer(
+                  child: Text(
+                    suffix,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Text(
+          'Değeri değiştirmek için yukarı veya aşağı kaydır',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.unfold_more, size: 18, color: Colors.white38),
+            const SizedBox(width: 6),
+            Text(
+              '$min–$max $suffix',
+              style: const TextStyle(color: Colors.white38),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 class _WizardHeader extends StatelessWidget {

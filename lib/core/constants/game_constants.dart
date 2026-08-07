@@ -5,9 +5,6 @@
 class GameConstants {
   GameConstants._();
 
-  /// Günlük hedef kalori yakımı.
-  static const double dailyCalorieGoal = 500;
-
   /// Oyuncunun başlangıç / taban canı (HP).
   static const int baseHp = 5000;
 

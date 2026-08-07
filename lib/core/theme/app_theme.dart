@@ -10,7 +10,6 @@ class AppColors {
   static const Color accent = Color(0xFFFF6B6B);
   static const Color hp = Color(0xFFE53E3E);
   static const Color xp = Color(0xFF3ECF8E);
-  static const Color calorie = Color(0xFFFFA94D);
   static const Color streak = Color(0xFFFFC94D);
 
   static const Color rarityCommon = Color(0xFF9E9E9E);

@@ -58,7 +58,7 @@ class _RootShellState extends State<RootShell> {
       _today.addSteps(amount);
       _dragon.currentSteps = _today.steps;
       _profile.addXp((amount / 10).round());
-      if (_today.calorieGoalReached && _profile.streakDays == 0) {
+      if (_today.stepGoalReached && _profile.streakDays == 0) {
         _profile.streakDays = 1;
       }
     });
@@ -124,9 +124,9 @@ class _RootShellState extends State<RootShell> {
   );
 
   void _push(Widget screen) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => screen)).then((_) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).then((
+      _,
+    ) {
       // Alt ekranlardan dönünce güncel state'i yansıtmak için yeniden çiz.
       setState(() {});
     });
@@ -170,10 +170,7 @@ class _RootShellState extends State<RootShell> {
             icon: Icon(Icons.local_fire_department),
             label: 'Ejderha',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.storefront),
-            label: 'Mağaza',
-          ),
+          NavigationDestination(icon: Icon(Icons.storefront), label: 'Mağaza'),
           NavigationDestination(icon: Icon(Icons.groups), label: 'Takım'),
           NavigationDestination(icon: Icon(Icons.person), label: 'Profil'),
         ],

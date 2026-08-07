@@ -6,9 +6,9 @@ import '../../models/daily_progress.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
-import '../../widgets/avatar_view.dart';
+import '../../widgets/hero_progress_rings.dart';
 
-/// Ana panel: günün özeti (HP, seviye/XP, kalori, adım) ve diğer
+/// Ana panel: günün özeti (HP, seviye/XP, adım) ve diğer
 /// bölümlere hızlı erişim.
 class HomeScreen extends StatelessWidget {
   final UserProfile profile;
@@ -60,44 +60,7 @@ class HomeScreen extends StatelessWidget {
         children: [
           SectionCard(
             title: 'Merhaba, ${profile.name}',
-            child: Column(
-              children: [
-                AvatarView(avatar: profile.avatar, size: 165),
-                const SizedBox(height: 8),
-                Text(
-                  profile.avatar.characterClassLabel,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                StatBar(
-                  label: 'HP',
-                  icon: Icons.favorite,
-                  color: AppColors.hp,
-                  progress: profile.hpProgress,
-                  valueText: '${profile.hp} / ${profile.maxHp}',
-                ),
-                const SizedBox(height: 12),
-                StatBar(
-                  label: 'Seviye ${profile.level}',
-                  icon: Icons.bolt,
-                  color: AppColors.xp,
-                  progress: profile.xpProgress,
-                  valueText: '${profile.xp} / ${profile.xpToNextLevel} XP',
-                ),
-                const SizedBox(height: 12),
-                StatBar(
-                  label: 'Günlük Kalori',
-                  icon: Icons.local_fire_department,
-                  color: AppColors.calorie,
-                  progress: today.calorieProgress,
-                  valueText:
-                      '${today.caloriesBurned.toStringAsFixed(0)} / ${today.calorieGoal.toStringAsFixed(0)} kcal',
-                ),
-              ],
-            ),
+            child: HeroProgressRings(profile: profile, today: today),
           ),
           const SizedBox(height: 12),
           SectionCard(

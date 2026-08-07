@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// HP/XP/Kalori gibi ilerlemeleri gösteren etiketli çubuk.
+/// Görev ilerlemelerini gösteren etiketli çubuk.
 class StatBar extends StatelessWidget {
   final String label;
   final IconData icon;

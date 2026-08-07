@@ -19,18 +19,19 @@ class AvatarView extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration:
-          showBackground
-              ? BoxDecoration(
-                borderRadius: BorderRadius.circular(size * 0.14),
-                gradient: const LinearGradient(
+      decoration: BoxDecoration(
+        color: showBackground ? null : Colors.transparent,
+        borderRadius: BorderRadius.circular(size * 0.14),
+        gradient:
+            showBackground
+                ? const LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [Color(0xFF39325E), Color(0xFF171521)],
-                ),
-                border: Border.all(color: Colors.white12),
-              )
-              : null,
+                )
+                : null,
+        border: showBackground ? Border.all(color: Colors.white12) : null,
+      ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
         avatar.characterAsset,

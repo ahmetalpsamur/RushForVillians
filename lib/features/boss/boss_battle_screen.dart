@@ -27,7 +27,6 @@ class BossBattleScreen extends StatelessWidget {
   Reward _buildReward(BuildContext context) {
     final rarity = calculateRewardRarity(
       stepRatio: dragon.currentSteps / dragon.requiredSteps,
-      calorieGoalReached: today.calorieGoalReached,
     );
     return Reward(
       id: 'dragon_${DateTime.now().millisecondsSinceEpoch}',
@@ -44,24 +43,25 @@ class BossBattleScreen extends StatelessWidget {
     onRewardClaimed(reward);
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Ejderha Yenildi! 🐉'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(reward.name),
-            const SizedBox(height: 8),
-            RarityBadge(rarity: reward.rarity),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Harika!'),
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Ejderha Yenildi! 🐉'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(reward.name),
+                const SizedBox(height: 8),
+                RarityBadge(rarity: reward.rarity),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Harika!'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -121,22 +121,20 @@ class BossBattleScreen extends StatelessWidget {
                   hint: '%75 - %99 hedef',
                 ),
                 _RarityRow(rarity: RewardRarity.rare, hint: 'Hedefi tuttur'),
-                _RarityRow(
-                  rarity: RewardRarity.epic,
-                  hint: 'Hedefin %125\'i',
-                ),
+                _RarityRow(rarity: RewardRarity.epic, hint: 'Hedefin %125\'i'),
                 _RarityRow(
                   rarity: RewardRarity.legendary,
-                  hint: 'Hedefin %150\'si + kalori hedefi',
+                  hint: 'Hedefin %150\'si',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: dragon.isDefeated && !dragon.rewardClaimed
-                ? () => _claim(context)
-                : null,
+            onPressed:
+                dragon.isDefeated && !dragon.rewardClaimed
+                    ? () => _claim(context)
+                    : null,
             icon: const Icon(Icons.card_giftcard),
             label: Text(
               dragon.rewardClaimed ? 'Ödül Alındı' : 'Ödülü Talep Et',
