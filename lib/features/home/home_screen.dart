@@ -6,6 +6,7 @@ import '../../models/daily_progress.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
+import '../../widgets/avatar_view.dart';
 
 /// Ana panel: günün özeti (HP, seviye/XP, kalori, adım) ve diğer
 /// bölümlere hızlı erişim.
@@ -61,6 +62,16 @@ class HomeScreen extends StatelessWidget {
             title: 'Merhaba, ${profile.name}',
             child: Column(
               children: [
+                AvatarView(avatar: profile.avatar, size: 165),
+                const SizedBox(height: 8),
+                Text(
+                  profile.avatar.characterClassLabel,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 StatBar(
                   label: 'HP',
                   icon: Icons.favorite,
@@ -153,7 +164,10 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     _StepButton(amount: 1000, onSimulateSteps: onSimulateSteps),
                     _StepButton(amount: 5000, onSimulateSteps: onSimulateSteps),
-                    _StepButton(amount: 20000, onSimulateSteps: onSimulateSteps),
+                    _StepButton(
+                      amount: 20000,
+                      onSimulateSteps: onSimulateSteps,
+                    ),
                   ],
                 ),
               ],

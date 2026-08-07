@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
+import '../../models/avatar_profile.dart';
 import '../../models/boss_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/reward.dart';
 import '../../models/user_profile.dart';
 import '../../models/xp_store_item.dart';
 import '../boss/boss_battle_screen.dart';
+import '../character/character_creation_screen.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../rewards/rewards_screen.dart';
@@ -19,7 +21,14 @@ import '../wheel/daily_wheel_screen.dart';
 /// state-management çözümüne (Riverpod/Bloc) veya kalıcı depolamaya
 /// (Hive/SharedPreferences) taşınabilir.
 class RootShell extends StatefulWidget {
-  const RootShell({super.key});
+  final AvatarProfile avatar;
+  final ValueChanged<AvatarProfile> onAvatarChanged;
+
+  const RootShell({
+    super.key,
+    required this.avatar,
+    required this.onAvatarChanged,
+  });
 
   @override
   State<RootShell> createState() => _RootShellState();
@@ -28,13 +37,21 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   int _tabIndex = 0;
 
-  late final UserProfile _profile = UserProfile(name: 'Kahraman');
+  late final UserProfile _profile = UserProfile(avatar: widget.avatar);
   late final DailyProgress _today = DailyProgress(date: DateTime.now());
   late final BossQuest _dragon = MockData.dailyDragon();
   final List<Reward> _rewards = [];
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
   bool _wheelSpunToday = false;
+
+  @override
+  void didUpdateWidget(covariant RootShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatar != widget.avatar) {
+      _profile.avatar = widget.avatar;
+    }
+  }
 
   void _simulateSteps(int amount) {
     setState(() {
@@ -87,6 +104,17 @@ class _RootShellState extends State<RootShell> {
 
   void _openRewards() => _push(RewardsScreen(rewards: _rewards));
 
+  void _editCharacter() => _push(
+    CharacterCreationScreen(
+      initialAvatar: _profile.avatar,
+      onCompleted: (avatar) {
+        _profile.avatar = avatar;
+        widget.onAvatarChanged(avatar);
+        Navigator.of(context).pop();
+      },
+    ),
+  );
+
   void _openStore() => _push(
     XpStoreScreen(
       items: _storeItems,
@@ -128,7 +156,7 @@ class _RootShellState extends State<RootShell> {
         onPurchase: _purchase,
       ),
       TeamScreen(team: _team),
-      ProfileScreen(profile: _profile),
+      ProfileScreen(profile: _profile, onEditCharacter: _editCharacter),
     ];
 
     return Scaffold(

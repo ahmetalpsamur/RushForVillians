@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -17,3 +18,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/Characters/Archer/
+    - lib/Characters/DarkMagic/
+    - lib/Characters/Faith/
+    - lib/Characters/Magic/
+    - lib/Characters/Nature/
+    - lib/Characters/Paladin/
+    - lib/Characters/SwordMan/
+    - lib/Characters/Thief/

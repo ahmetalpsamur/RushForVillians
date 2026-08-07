@@ -1,8 +1,9 @@
 import '../core/constants/game_constants.dart';
+import 'avatar_profile.dart';
 
 /// Oyuncunun genel ilerlemesi: can, seviye, XP, streak ve para birimi.
 class UserProfile {
-  final String name;
+  AvatarProfile avatar;
   int hp;
   int maxHp;
   int level;
@@ -12,7 +13,7 @@ class UserProfile {
   DateTime? lastActiveDay;
 
   UserProfile({
-    required this.name,
+    required this.avatar,
     int? hp,
     int? maxHp,
     this.level = 1,
@@ -22,6 +23,8 @@ class UserProfile {
     this.lastActiveDay,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp;
+
+  String get name => avatar.name;
 
   /// Bir sonraki seviyeye geçmek için gereken toplam XP.
   int get xpToNextLevel => GameConstants.baseXpPerLevel * level;

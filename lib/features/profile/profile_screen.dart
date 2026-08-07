@@ -4,37 +4,61 @@ import '../../core/theme/app_theme.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
+import '../../widgets/avatar_view.dart';
 
 /// Oyuncu profili: seviye, XP, streak ve genel istatistikler.
 class ProfileScreen extends StatelessWidget {
   final UserProfile profile;
+  final VoidCallback onEditCharacter;
 
-  const ProfileScreen({super.key, required this.profile});
+  const ProfileScreen({
+    super.key,
+    required this.profile,
+    required this.onEditCharacter,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(
+        title: const Text('Profil'),
+        actions: [
+          IconButton(
+            onPressed: onEditCharacter,
+            tooltip: 'Karakteri düzenle',
+            icon: const Icon(Icons.edit),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           SectionCard(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    profile.name.isNotEmpty ? profile.name[0] : '?',
-                    style: const TextStyle(fontSize: 28),
-                  ),
-                ),
+                AvatarView(avatar: profile.avatar, size: 170),
                 const SizedBox(height: 12),
                 Text(
                   profile.name,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 Text('Seviye ${profile.level}'),
+                const SizedBox(height: 8),
+                Chip(
+                  avatar: const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(profile.avatar.characterClassLabel),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${profile.avatar.age} yaş • ${profile.avatar.weight} kg • ${profile.avatar.gender}',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onEditCharacter,
+                  icon: const Icon(Icons.tune),
+                  label: const Text('Karakteri Düzenle'),
+                ),
               ],
             ),
           ),
