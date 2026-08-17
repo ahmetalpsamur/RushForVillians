@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../models/boss_quest.dart';
+import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/section_card.dart';
@@ -13,8 +13,8 @@ import '../../widgets/hero_progress_rings.dart';
 class HomeScreen extends StatelessWidget {
   final UserProfile profile;
   final DailyProgress today;
-  final BossQuest dragon;
-  final VoidCallback onOpenDragon;
+  final AdventureQuest? adventure;
+  final VoidCallback onOpenAdventure;
   final VoidCallback onOpenWheel;
   final VoidCallback onOpenRewards;
   final VoidCallback onOpenStore;
@@ -24,8 +24,8 @@ class HomeScreen extends StatelessWidget {
     super.key,
     required this.profile,
     required this.today,
-    required this.dragon,
-    required this.onOpenDragon,
+    required this.adventure,
+    required this.onOpenAdventure,
     required this.onOpenWheel,
     required this.onOpenRewards,
     required this.onOpenStore,
@@ -64,22 +64,39 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SectionCard(
-            title: '🐉 Ejderha Görevi',
-            onTap: onOpenDragon,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(dragon.description),
-                const SizedBox(height: 12),
-                StatBar(
-                  label: 'Adım İlerlemesi',
-                  icon: Icons.directions_walk,
-                  color: AppColors.primary,
-                  progress: dragon.progress,
-                  valueText: '${dragon.currentSteps} / ${dragon.requiredSteps}',
-                ),
-              ],
-            ),
+            title: 'Macera',
+            onTap: onOpenAdventure,
+            child:
+                adventure == null
+                    ? const Row(
+                      children: [
+                        Icon(Icons.explore, color: AppColors.primary),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Günlük hedefini ve düşmanını seçerek maceraya başla.',
+                          ),
+                        ),
+                        Icon(Icons.chevron_right),
+                      ],
+                    )
+                    : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${adventure!.enemy.name} seni bekliyor. Ritmini koru!',
+                        ),
+                        const SizedBox(height: 12),
+                        StatBar(
+                          label: 'Canavar Canı',
+                          icon: Icons.favorite,
+                          color: AppColors.hp,
+                          progress: adventure!.healthProgress(today.steps),
+                          valueText:
+                              '${adventure!.remainingHealth(today.steps)} / ${adventure!.stepGoal}',
+                        ),
+                      ],
+                    ),
           ),
           const SizedBox(height: 12),
           Row(

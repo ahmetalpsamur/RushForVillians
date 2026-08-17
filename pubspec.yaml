@@ -9,7 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_local_notifications: ^19.5.0
   shared_preferences: ^2.5.3
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +29,7 @@ flutter:
     - lib/Characters/Paladin/
     - lib/Characters/SwordMan/
     - lib/Characters/Thief/
+    - lib/Enemies/Gergin Asker/
+    - lib/Enemies/Tekinsiz Canavar!/
+    - lib/Enemies/Blood_Monster_A_GIFs/
+    - lib/Enemies/Demon_A_GIFs/
