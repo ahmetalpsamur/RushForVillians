@@ -74,4 +74,12 @@ class EnemyCatalog {
       xpReward: 1500,
     ),
   ];
+
+  /// Kayıtlı maceranın düşmanını kimliğinden geri bulur.
+  static Enemy? byId(String id) {
+    for (final enemy in enemies) {
+      if (enemy.id == id) return enemy;
+    }
+    return null;
+  }
 }

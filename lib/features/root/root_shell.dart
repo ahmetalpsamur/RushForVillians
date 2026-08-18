@@ -3,14 +3,21 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants/game_constants.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/coin_calculator.dart';
+import '../../core/utils/game_clock.dart';
 import '../../data/mock_data.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/daily_progress.dart';
+import '../../models/game_state.dart';
 import '../../models/reward.dart';
 import '../../models/user_profile.dart';
 import '../../models/xp_store_item.dart';
 import '../../services/adventure_notification_service.dart';
+import '../../services/game_storage.dart';
+import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
 import '../character/character_creation_screen.dart';
 import '../home/home_screen.dart';
@@ -21,17 +28,24 @@ import '../team/team_screen.dart';
 import '../wheel/daily_wheel_screen.dart';
 
 /// Uygulamanın kök iskeleti: alt gezinme çubuğu ve tüm oyun durumunun
-/// (state) tutulduğu yer. Şimdilik yerel state kullanır; ileride bir
-/// state-management çözümüne (Riverpod/Bloc) veya kalıcı depolamaya
-/// (Hive/SharedPreferences) taşınabilir.
+/// (state) tutulduğu yer. Şimdilik setState ile yerel state kullanır;
+/// ileride bir state-management çözümüne (Riverpod/Bloc) taşınabilir.
+///
+/// Durum [GameStorage] ile diske yazılır: her değişimde [_persist] çağrılır,
+/// uygulama arka plana alınırken veya kapanırken bekleyen yazma tamamlanır.
 class RootShell extends StatefulWidget {
   final AvatarProfile avatar;
+
+  /// Diskten okunan oyun durumu. Yeni oyuncuda veya kayıt bozuksa null gelir.
+  final GameState? initialState;
+
   final ValueChanged<AvatarProfile> onAvatarChanged;
 
   const RootShell({
     super.key,
     required this.avatar,
     required this.onAvatarChanged,
+    this.initialState,
   });
 
   @override
@@ -41,13 +55,18 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   int _tabIndex = 0;
 
-  late final UserProfile _profile = UserProfile(avatar: widget.avatar);
-  DailyProgress _today = DailyProgress(date: DateTime.now());
+  late final UserProfile _profile;
+  late DailyProgress _today;
   AdventureQuest? _adventure;
   final List<Reward> _rewards = [];
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
-  bool _wheelSpunToday = false;
+
+  /// Adım kaynağı. Bugün demo kontrolleriyle besleniyor; Aşama 2'de yerine
+  /// pedometer uygulaması geçecek, aşağıdaki akış değişmeyecek.
+  late final ManualStepSource _stepSource;
+  StreamSubscription<int>? _stepSubscription;
+
   Timer? _adventureClock;
   bool _isForeground = true;
   final Random _random = Random();
@@ -62,17 +81,81 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _restoreState();
+    _stepSource = ManualStepSource(initialSteps: _profile.totalSteps);
+    _stepSubscription = _stepSource.changes.listen(_onStepsReported);
     WidgetsBinding.instance.addObserver(this);
     _adventureClock = Timer.periodic(
       const Duration(seconds: 1),
-      (_) => _updateAdventureClock(),
+      (_) => _tick(),
+    );
+  }
+
+  /// Saniyelik nabız: önce gün döngüsü (gün değişimi + seri), sonra macera
+  /// saati. Gün döngüsü görünür bir şey değiştirmedikçe yeniden çizim yok.
+  void _tick() {
+    if (!mounted) return;
+    if (_refreshDayCycle()) {
+      setState(() {});
+      _persist();
+    }
+    _updateAdventureClock();
+  }
+
+  /// Gün döngüsünü işler: oyun günü değiştiyse günlük ilerlemeyi sıfırlar ve
+  /// seriyi tazeler. Görünür bir değişiklik olduysa `true` döner.
+  ///
+  /// Cihaz saati geriye alınmışsa [GameClock] okumayı en son güvenilen zamana
+  /// sabitler; bu yüzden burada ayrı bir "şüpheli saat" dalı yoktur — gün de,
+  /// seri de, çark hakkı da kendiliğinden donar.
+  bool _refreshDayCycle() {
+    final now = GameClock.now();
+    var changed = false;
+
+    if (!_today.isSameDayAs(now)) {
+      _today = DailyProgress(date: now);
+      // Macera günlük adım hedefine bağlı olduğu için gün değişiminde düşer.
+      // (Bilinen sorun; bkz. CLAUDE.md — Aşama 5a.)
+      _adventure = null;
+      unawaited(AdventureNotificationService.cancelAdventureReminders());
+      changed = true;
+    }
+    if (_profile.refreshStreak(now)) changed = true;
+    return changed;
+  }
+
+  /// Kayıtlı durumu geri yükler. Kayıt yoksa ya da kayıt başka bir güne aitse
+  /// günlük ilerleme (adım + macera) sıfırdan başlar; seviye, XP, para ve
+  /// streak gibi kalıcı ilerleme her durumda korunur.
+  void _restoreState() {
+    final restored = widget.initialState;
+    _profile = restored?.profile ?? UserProfile(avatar: widget.avatar);
+    // Kapat-aç sonrası da geriye alınan saati yakalayabilmek için en son
+    // güvenilen zaman diskten yüklenir.
+    GameClock.restore(_profile.lastSeenAt);
+    _today = restored?.today ?? DailyProgress(date: GameClock.now());
+    _adventure = restored?.adventure;
+    // Gün değişimi ve seri tazeleme tek yerden: _refreshDayCycle.
+    _refreshDayCycle();
+  }
+
+  /// Güncel durumu kalıcı depoya gönderir. Yazma sıklığını [GameStorage]
+  /// kendi içinde sınırladığı için her state değişiminde çağrılabilir.
+  void _persist() {
+    _profile.lastSeenAt = GameClock.lastSeenAt;
+    GameStorage.scheduleSave(
+      GameState(profile: _profile, today: _today, adventure: _adventure),
     );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_stepSubscription?.cancel());
+    _stepSource.dispose();
     _adventureClock?.cancel();
+    _persist();
+    unawaited(GameStorage.flush());
     super.dispose();
   }
 
@@ -83,17 +166,22 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       final adventure = _adventure;
       if (adventure != null) {
-        adventure.nextReminderAt = DateTime.now().add(
+        adventure.nextReminderAt = GameClock.now().add(
           AdventureQuest.reminderInterval,
         );
       }
+      if (_refreshDayCycle()) setState(() {});
       _updateAdventureClock();
+      _persist();
       return;
     }
 
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _isForeground = false;
+      // Arka plana geçerken bekleyen yazma hemen tamamlanır.
+      _persist();
+      unawaited(GameStorage.flush());
       final adventure = _adventure;
       if (adventure != null) {
         unawaited(
@@ -114,10 +202,37 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
-  void _simulateSteps(int amount) {
+  /// Demo kontrollerinin girişi. Kaynağı besler; işi [_onStepsReported] yapar.
+  void _simulateSteps(int amount) => _stepSource.add(amount);
+
+  /// Adım kaynağından gelen **kümülatif** sayacı işler.
+  ///
+  /// Kaynak kim olursa olsun (bugün demo butonları, Aşama 2'de pedometer)
+  /// akış buradan geçer: günlük ilerleme, para, seri ve macera tek yerde.
+  void _onStepsReported(int cumulativeSteps) {
+    final amount = cumulativeSteps - _profile.totalSteps;
+    if (amount <= 0) return;
+
     var enemyDefeated = false;
+    int? milestoneReached;
+    var capJustReached = false;
+    final now = GameClock.now();
+    final capWasReached = _today.coinCapReached;
     setState(() {
       _today.addSteps(amount);
+      _profile.totalSteps = cumulativeSteps;
+
+      // Para adım deltasından kazanılır: işaretçi yalnızca paraya çevrilen
+      // adım kadar ilerler, artan adımlar bir sonraki hesaba kalır.
+      final coinReward = calculateStepCoins(
+        pendingSteps: _profile.totalSteps - _profile.lastRewardedStepCount,
+        coinsEarnedToday: _today.coinsEarned,
+      );
+      _profile.coins += coinReward.coins;
+      _profile.lastRewardedStepCount += coinReward.consumedSteps;
+      _today.coinsEarned += coinReward.coins;
+      capJustReached = coinReward.capReached && !capWasReached;
+
       final adventure = _adventure;
       if (adventure != null &&
           adventure.isDefeated(_today.steps) &&
@@ -126,10 +241,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         _profile.addXp(adventure.enemy.xpReward);
         enemyDefeated = true;
       }
-      if (_today.stepGoalReached && _profile.streakDays == 0) {
-        _profile.streakDays = 1;
+      // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı.
+      if (_today.steps >= GameConstants.streakStepThreshold &&
+          _profile.registerStreakDay(now)) {
+        milestoneReached = _profile.reachedStreakMilestone;
       }
     });
+    _persist();
+    if (capJustReached) _showCoinCapNotice();
+    final milestone = milestoneReached;
+    if (milestone != null) _showStreakMilestone(milestone);
     if (enemyDefeated) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       ScaffoldMessenger.of(context).showSnackBar(
@@ -146,19 +267,26 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _selectAdventure(AdventureQuest adventure) {
     setState(() {
       _adventure = adventure;
+      // Günün adımları korunur; macera kendi başlangıç adımını taşır
+      // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
       _today = DailyProgress(
-        date: DateTime.now(),
+        date: _today.date,
+        steps: _today.steps,
         stepGoal: adventure.stepGoal,
       );
     });
+    _persist();
     unawaited(AdventureNotificationService.requestPermission());
   }
 
   void _chooseNewAdventure() {
     setState(() {
       _adventure = null;
-      _today = DailyProgress(date: DateTime.now());
+      // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
+      // varsayılana döner.
+      _today = DailyProgress(date: _today.date, steps: _today.steps);
     });
+    _persist();
     unawaited(AdventureNotificationService.cancelAdventureReminders());
   }
 
@@ -171,10 +299,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       return;
     }
 
-    final now = DateTime.now();
+    final now = GameClock.now();
     final result = adventure.resolveExpiredRound(_today.steps, now);
     final reminderDue = _isForeground && adventure.takeDueReminder(now);
     setState(() {});
+
+    if (result != null) _persist();
 
     if (result != null && result.playerDamage > 0) {
       _showEnemyAttackNotice(adventure, result.playerDamage);
@@ -183,6 +313,49 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
     }
     if (reminderDue) _showAdventureReminder(adventure);
+  }
+
+  /// Günlük adım-para tavanına ulaşıldığında bir kez gösterilir; kazanç
+  /// sessizce durmaz.
+  void _showCoinCapNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Row(
+          children: [
+            const Icon(Icons.monetization_on, color: AppColors.streak),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Günlük kazanç sınırına ulaştın '
+                '(${GameConstants.maxDailyStepCoins} coin). Bugünkü adımlar '
+                'artık para kazandırmıyor.',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // TODO(rewards): Kilometre taşı ödülü henüz üretilmiyor. Ödül altyapısı
+  // Aşama 3d/4b'de kurulunca (bkz. CLAUDE.md, kart #14) buraya bağlanacak;
+  // o güne kadar ödül uydurmak yerine yalnızca uygulama içi bildirim var.
+  void _showStreakMilestone(int days) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Row(
+          children: [
+            const Icon(Icons.local_fire_department, color: AppColors.streak),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('$days günlük seri! Kilometre taşına ulaştın.'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEnemyAttackNotice(AdventureQuest adventure, int damage) {
@@ -228,14 +401,22 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   void _spinWheel(int xpWon) {
     setState(() {
-      _wheelSpunToday = true;
+      _profile.lastWheelSpinAt = GameClock.now();
       _profile.addXp(xpWon);
     });
+    _persist();
   }
 
   void _purchase(XpStoreItem item) {
     if (_profile.coins < item.cost) return;
-    setState(() => _profile.coins -= item.cost);
+    setState(() {
+      _profile.coins -= item.cost;
+      // Item sistemi (#8) gelene kadar yalnızca sahiplik kaydı tutulur.
+      if (!_profile.ownedItemIds.contains(item.id)) {
+        _profile.ownedItemIds.add(item.id);
+      }
+    });
+    _persist();
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${item.name} satın alındı!')));
@@ -245,7 +426,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   void _openWheel() => _push(
     DailyWheelScreen(
-      alreadySpunToday: _wheelSpunToday,
+      alreadySpunToday: _profile.wheelSpunToday,
       onSpinResult: _spinWheel,
     ),
   );
@@ -307,7 +488,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onPurchase: _purchase,
       ),
       TeamScreen(team: _team),
-      ProfileScreen(profile: _profile, onEditCharacter: _editCharacter),
+      ProfileScreen(
+        profile: _profile,
+        adventure: _adventure,
+        onEditCharacter: _editCharacter,
+      ),
     ];
 
     return Scaffold(

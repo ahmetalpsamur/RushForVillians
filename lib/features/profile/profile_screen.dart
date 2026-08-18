@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../models/adventure_quest.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
@@ -9,12 +10,18 @@ import '../../widgets/avatar_view.dart';
 /// Oyuncu profili: seviye, XP, streak ve genel istatistikler.
 class ProfileScreen extends StatelessWidget {
   final UserProfile profile;
+
+  /// Savaş canının gerçek kaynağı. Macera yokken can çubuğu gösterilmez;
+  /// [UserProfile.hp] hiç azalmadığı için "can" diye gösterilmesi yanlıştı.
+  final AdventureQuest? adventure;
+
   final VoidCallback onEditCharacter;
 
   const ProfileScreen({
     super.key,
     required this.profile,
     required this.onEditCharacter,
+    this.adventure,
   });
 
   @override
@@ -67,14 +74,26 @@ class ProfileScreen extends StatelessWidget {
             title: 'İstatistikler',
             child: Column(
               children: [
-                StatBar(
-                  label: 'HP',
-                  icon: Icons.favorite,
-                  color: AppColors.hp,
-                  progress: profile.hpProgress,
-                  valueText: '${profile.hp} / ${profile.maxHp}',
-                ),
-                const SizedBox(height: 12),
+                if (adventure != null) ...[
+                  StatBar(
+                    label: 'Savaş Canı',
+                    icon: Icons.favorite,
+                    color: AppColors.hp,
+                    progress:
+                        adventure!.playerHealth /
+                        AdventureQuest.maxPlayerHealth,
+                    valueText:
+                        '${adventure!.playerHealth} / '
+                        '${AdventureQuest.maxPlayerHealth}',
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  const Text(
+                    'Savaş canı yalnızca macera sırasında takip edilir.',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 StatBar(
                   label: 'XP',
                   icon: Icons.bolt,
@@ -93,6 +112,7 @@ class ProfileScreen extends StatelessWidget {
                 color: AppColors.streak,
               ),
               title: const Text('Günlük Streak'),
+              subtitle: Text('En uzun seri: ${profile.longestStreak} gün'),
               trailing: Text(
                 '${profile.streakDays} gün',
                 style: const TextStyle(fontWeight: FontWeight.bold),

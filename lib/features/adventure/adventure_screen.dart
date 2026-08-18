@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/game_clock.dart';
 import '../../data/enemy_catalog.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
@@ -170,7 +171,12 @@ class _AdventureScreenState extends State<AdventureScreen>
     final enemy = _selectedEnemy;
     if (enemy == null) return;
     widget.onAdventureSelected(
-      AdventureQuest(enemy: enemy, stepGoal: _stepGoal),
+      AdventureQuest(
+        enemy: enemy,
+        stepGoal: _stepGoal,
+        // Günün adımları sıfırlanmaz; macera bu noktadan itibaren sayar.
+        startingSteps: widget.today.steps,
+      ),
     );
   }
 
@@ -563,7 +569,7 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Widget _buildCountdownCard(BuildContext context, AdventureQuest adventure) {
-    final remaining = adventure.countdownRemaining(DateTime.now());
+    final remaining = adventure.countdownRemaining(GameClock.now());
     final roundSteps = adventure.stepsThisRound(widget.today.steps);
     final minutes = remaining.inMinutes
         .remainder(60)

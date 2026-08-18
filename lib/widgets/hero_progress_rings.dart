@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../models/adventure_quest.dart';
 import '../models/daily_progress.dart';
 import '../models/user_profile.dart';
 import 'avatar_view.dart';
@@ -12,10 +13,15 @@ class HeroProgressRings extends StatelessWidget {
   final UserProfile profile;
   final DailyProgress today;
 
+  /// Savaş canının gerçek kaynağı. Macera yokken can çubuğu gösterilmez;
+  /// [UserProfile.hp] hiç azalmadığı için "can" diye gösterilmesi yanlıştı.
+  final AdventureQuest? adventure;
+
   const HeroProgressRings({
     super.key,
     required this.profile,
     required this.today,
+    this.adventure,
   });
 
   @override
@@ -142,14 +148,18 @@ class HeroProgressRings extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        StatBar(
-          label: 'HP',
-          icon: Icons.favorite,
-          color: AppColors.hp,
-          progress: profile.hpProgress,
-          valueText: '${profile.hp} / ${profile.maxHp}',
-        ),
-        const SizedBox(height: 14),
+        if (adventure != null) ...[
+          StatBar(
+            label: 'Savaş Canı',
+            icon: Icons.favorite,
+            color: AppColors.hp,
+            progress: adventure!.playerHealth / AdventureQuest.maxPlayerHealth,
+            valueText:
+                '${adventure!.playerHealth} / '
+                '${AdventureQuest.maxPlayerHealth}',
+          ),
+          const SizedBox(height: 14),
+        ],
         StatBar(
           label: 'Seviye ${profile.level}',
           icon: Icons.bolt,

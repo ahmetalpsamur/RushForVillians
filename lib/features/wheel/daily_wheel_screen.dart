@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/mock_data.dart';
+import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
 
 /// Günlük çark: adım hedefinin bir kısmı tamamlanınca açılır, günde bir
@@ -26,12 +27,22 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
   bool _spinning = false;
   int? _result;
 
+  static const _spinDuration = Duration(milliseconds: 900);
+
+  /// Sonuç animasyondan **önce** belirlenir; animasyon yalnızca belirlenmiş
+  /// sonucu gösterir, onu üretmez.
+  ///
+  // TODO(#16): Gerçek dilimli çark grafiği gelince dönüş açısı bu sonuca göre
+  // hesaplanacak (şimdiki çark jenerik bir daire, gösterecek dilimi yok).
   Future<void> _spin() async {
     if (widget.alreadySpunToday || _spinning) return;
-    setState(() => _spinning = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+
     final options = MockData.wheelXpOptions;
     final result = options[Random().nextInt(options.length)];
+
+    setState(() => _spinning = true);
+    await Future<void>.delayed(_spinDuration);
+    if (!mounted) return;
     setState(() {
       _spinning = false;
       _result = result;
@@ -52,7 +63,7 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
             children: [
               AnimatedRotation(
                 turns: _spinning ? 4 : 0,
-                duration: const Duration(milliseconds: 900),
+                duration: _spinDuration,
                 curve: Curves.easeOutCubic,
                 child: Container(
                   width: 180,
@@ -72,11 +83,23 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
               const SizedBox(height: 24),
               if (spun)
                 SectionCard(
-                  child: Text(
-                    _result != null
-                        ? 'Kazandın: +$_result XP 🎉'
-                        : 'Bugün çarkı zaten çevirdin, yarın tekrar gel!',
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      Text(
+                        _result != null
+                            ? 'Kazandın: +$_result XP 🎉'
+                            : 'Bugün çarkı zaten çevirdin.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      // Gün sınırı GameDay'den okunur; burada ayrı bir
+                      // gün/saat hesabı yapılmaz.
+                      const DayResetCountdown(
+                        prefix: 'Yeni çark hakkına kalan süre: ',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
                   ),
                 )
               else
