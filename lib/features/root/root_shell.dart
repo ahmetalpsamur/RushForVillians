@@ -227,7 +227,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       changed = true;
     }
-    if (_profile.refreshStreak(now)) changed = true;
+    final streakOutcome = _profile.refreshStreak(now);
+    if (streakOutcome != StreakDayOutcome.unchanged) changed = true;
+    if (streakOutcome == StreakDayOutcome.frozen) {
+      // Otomatik harcanan jeton sessiz kalmaz. Bu metot initState içinden de
+      // çağrıldığı için bildirim frame sonuna bırakılır.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showStreakFrozen();
+      });
+    }
     return changed;
   }
 
@@ -559,6 +567,29 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                 'Günlük kazanç sınırına ulaştın '
                 '(${GameConstants.maxDailyStepCoins} coin). Bugünkü adımlar '
                 'artık para kazandırmıyor.',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Seri, otomatik harcanan bir dondurma hakkıyla kurtarıldığında gösterilir.
+  void _showStreakFrozen() {
+    final left = _profile.streakFreezes;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            const Icon(Icons.ac_unit, color: AppColors.xp),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Serin korundu, 1 dondurma hakkı kullanıldı. '
+                '${left > 0 ? "Kalan hak: $left." : "Hakkın kalmadı."}',
               ),
             ),
           ],

@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 6;
+  static const int schemaVersion = 7;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -77,6 +77,10 @@ class GameStorage {
       }
       return state;
     },
+    // 6 -> 7: seri dondurma alanları eklendi (streakFreezes,
+    // lastFreezeUsedOn). Varsayılanları (0 / null) doğru olduğu için içerik
+    // taşınmıyor; sürüm yine de artırıldı (Model Kuralları #2 disiplini).
+    6: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

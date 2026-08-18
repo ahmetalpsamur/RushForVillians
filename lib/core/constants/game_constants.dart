@@ -36,6 +36,12 @@ class GameConstants {
   /// Seri kilometre taşları (gün).
   static const List<int> streakMilestones = [7, 30, 100];
 
+  /// Aynı anda tutulabilecek en fazla seri dondurma hakkı.
+  ///
+  /// Stok sınırı, jetonların biriktirilip haftalarca kaçırmayı serbest
+  /// bırakmasını engeller: seri hâlâ bir alışkanlık ölçüsü olmalı.
+  static const int maxStreakFreezes = 2;
+
   /// Gün bitmeye bu kadar saat kala, seri henüz tamamlanmadıysa uyarılır.
   static const int streakWarningHours = 3;
 

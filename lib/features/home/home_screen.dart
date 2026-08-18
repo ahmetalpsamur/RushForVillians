@@ -487,6 +487,24 @@ class _StreakCardState extends State<_StreakCard> {
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
+          // Stok 0'ken satır hiç çıkmaz: kazanım yolları Aşama 3'te gelene
+          // kadar kullanıcıya boş bir sayaç göstermenin anlamı yok.
+          if (profile.streakFreezes > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.ac_unit, size: 16, color: AppColors.xp),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${profile.streakFreezes} dondurma hakkın var. Bir gün '
+                    'kaçırırsan otomatik kullanılır.',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (endingSoon) ...[
             const SizedBox(height: 10),
             Row(

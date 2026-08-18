@@ -65,11 +65,12 @@ void main() {
       profile.registerStreakDay(dayAt(11));
 
       // Ertesi gün: seri hâlâ ayakta, henüz tamamlanmadı.
-      expect(profile.refreshStreak(dayAt(12)), isFalse);
+      expect(profile.refreshStreak(dayAt(12)), StreakDayOutcome.unchanged);
       expect(profile.streakDays, 2);
 
-      // Bir gün daha geçti, hiç yürünmedi.
-      expect(profile.refreshStreak(dayAt(13)), isTrue);
+      // Bir gün daha geçti, hiç yürünmedi. Dondurma hakkı yok (varsayılan 0),
+      // seri kırılır.
+      expect(profile.refreshStreak(dayAt(13)), StreakDayOutcome.broken);
       expect(profile.streakDays, 0);
     });
 

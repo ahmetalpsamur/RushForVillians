@@ -1060,7 +1060,10 @@ bölmek yanlış sonuç verir.
 > Ödül altyapısı Aşama 3d/4b'de kurulunca `_showStreakMilestone` içindeki
 > `TODO(rewards)` noktasına bağlanacak.
 
-### Streak koruması (dondurucu) — TASARIM ONAYI BEKLİYOR, UYGULANMADI
+### Streak koruması (dondurucu) — ✅ UYGULANDI (Aşama 2c)
+
+> Aşağıdaki tasarım olduğu gibi kabul edildi ve tüketim tarafı yazıldı.
+> Güncel durum için "Aşama 2c" bölümüne bak.
 
 Bir günlük kaçırmayı telafi eden jeton önerildi:
 
@@ -1237,9 +1240,11 @@ mesajını yaz. Commit'i kullanıcı atacak.
 
 ---
 
-# Streak Koruması — ONAYLANDI (2026-08-18)
+# Streak Koruması — ONAYLANDI (2026-08-18) → ✅ Aşama 2c'de uygulandı
 
-Aşama 1a'da önerilen tasarım **olduğu gibi kabul edildi.** Aşama 2'de uygulanacak.
+Aşama 1a'da önerilen tasarım **olduğu gibi kabul edildi** ve Aşama 2c'de
+uygulandı. Uygulama ayrıntıları için "Aşama 2c" bölümüne bak; aşağıdaki
+karar metni referans olarak duruyor.
 
 - `UserProfile.streakFreezes` (int, varsayılan 0) + `lastFreezeUsedOn` (DateTime?)
 - **Tüketim tarafı ŞİMDİ uygulanacak.** Varsayılan 0 olduğu için davranış
@@ -1251,7 +1256,7 @@ Aşama 1a'da önerilen tasarım **olduğu gibi kabul edildi.** Aşama 2'de uygul
 - **Kazanım yolları ERTELENDİ:** 7 günlük kilometre taşı ödülü ve mağazadan
   satın alma Aşama 3'e ait (ödül altyapısı ve gerçek Item modeli orada geliyor).
   `TODO(items)` ile işaretle.
-- Şema **v5** gerekiyor (v4 güncel sürüm).
+- Şema **v7** ile geldi (karar anında v5 planlanmıştı; 2a ve 2b araya girdi).
 
 Gerekçe: tek kötü günde uzun seriyi kaybetmek, streak sistemlerinin terk
 ettiren bir numaralı sebebi. Tüketim mantığı şimdi yazılıyor çünkü gün
@@ -1551,8 +1556,83 @@ Toplam **138 test geçiyor**, `flutter analyze` temiz.
 
 ---
 
+# Aşama 2c — Streak koruması ✅ (2026-08-18)
+
+Onaylanmış tasarımın **tüketim tarafı** uygulandı. Kazanım yolları Aşama 3'te
+(bkz. `UserProfile.grantStreakFreeze` üzerindeki `TODO(items)`).
+
+**Bugün hiçbir davranış değişmiyor:** `streakFreezes` varsayılanı 0, kazanım
+yolu yok. Tüketim mantığı şimdi yazıldı çünkü gün aritmetiği bu işte tazeydi;
+sonra dönmek `refreshStreak`'i ikinci kez açmak demekti.
+
+## Yeni alanlar
+
+| Alan | Rol |
+|---|---|
+| `UserProfile.streakFreezes` | Eldeki jeton (varsayılan 0, tavan `maxStreakFreezes` = 2) |
+| `UserProfile.lastFreezeUsedOn` | Jetonun kapattığı son oyun günü — "art arda koruma yok" kuralının dayanağı |
+
+## Dönüş tipi değişti: `bool` → `StreakDayOutcome`
+
+`refreshStreak` artık `unchanged / broken / frozen` döner. Gerekçe: "gün
+atlandı ama jetonla kurtarıldı" üçüncü bir durum ve kullanıcıya söylenmesi
+gerekiyor; bool bunu ifade edemiyor. `streak_test.dart` içindeki iki iddia
+buna göre güncellendi (test silinmedi, daha kesin hâle geldi).
+
+## Köprüleme kuralı
+
+Tek bir private yardımcı (`_bridgeWithFreeze`) hem pasif kontrolden
+(`refreshStreak`) hem aktif yoldan (`registerStreakDay`) çağrılıyor — aynı
+mantığın iki kopyası olmasın diye. İki yolun aynı sonucu verdiği testle
+doğrulandı.
+
+Köprülenen gün = son aktif günden sonraki oyun günü (`GameDay.nextResetAfter`).
+`lastActiveDay` oraya taşınır, `streakDays` **değişmez**.
+
+Üç sınır:
+
+| Sınır | Nasıl |
+|---|---|
+| Yalnızca **tek** kaçırılan gün | `gap == 2` şartı. İki gün üst üste kaçıran, stokta iki jeton olsa bile serisini kaybeder — jeton da boşa harcanmaz. |
+| Stok en fazla 2 | `GameConstants.maxStreakFreezes`; `fromJson` içinde savunma amaçlı kırpma da var (elle düzenlenmiş kayıt sınırsız jeton getirmesin). |
+| Art arda en fazla 1 gün | Son aktif gün zaten jetonla kapatılmışsa (`lastFreezeUsedOn` ile aynı oyun günü) ikinci jeton kullanılamaz. Arada **gerçek** aktivite varsa jeton tekrar geçerli. |
+
+**Otomatik ve geriye dönük** olması bilinçli: manuel bir kurtarma penceresi
+koyulsaydı, o pencereyi kaçıran kullanıcı iki kez cezalanırdı. Serinin amacı
+alışkanlık, ceza değil.
+
+Gün döngüsü saniyede bir çalıştığı için **aynı boşluk için ikinci kez jeton
+harcanmaması** ayrıca test edildi: köprüden sonra `gap` 1'e indiği için
+sonraki çağrılar `unchanged` döner.
+
+## Arayüz
+
+- Jeton harcandığında: "Serin korundu, 1 dondurma hakkı kullanıldı. Kalan
+  hak: N." — `_refreshDayCycle` `initState` içinden de çağrıldığı için
+  bildirim `addPostFrameCallback` ile gösteriliyor.
+- Seri kartında stok satırı **yalnızca stok > 0 iken** çıkar. Kazanım yolu
+  gelene kadar kullanıcıya boş bir sayaç göstermenin anlamı yok.
+
+## Şema v7
+
+`streakFreezes`, `lastFreezeUsedOn`. Varsayılanları (0 / null) doğru olduğu
+için 6 → 7 taşıması içerik değiştirmiyor; sürüm yine de artırıldı
+(Model Kuralları #2 disiplini).
+
+## Test
+
+`test/streak_freeze_test.dart` — 21 test: varsayılan davranışın değişmediği,
+tek günün köprülenmesi, serinin korunup **artmaması**, köprüden sonra normal
+ilerleme, aynı boşluk için ikinci harcama olmaması, iki gün üst üste, art arda
+koruma yasağı, arada gerçek aktivite, jeton bitmesi, kırık seri, geriye alınan
+saat, aktif/pasif yol eşitliği, stok tavanı, kapat-aç turu, bozuk kayıt
+kırpması, v6→v7.
+
+Toplam **159 test geçiyor**, `flutter analyze` temiz.
+
+---
+
 # Not — şema sürümü
 
 Aşama 0 bölümünde "Şema sürümü: 2" yazıyor; o bölüm yazıldığında güncel
-sürüm buydu. **Güncel sürüm v6** (bkz. Aşama 2b). Streak koruması v7 ile
-gelecek.
+sürüm buydu. **Güncel sürüm v7** (bkz. Aşama 2c).

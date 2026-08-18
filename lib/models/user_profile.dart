@@ -3,6 +3,18 @@ import '../core/utils/game_clock.dart';
 import '../core/utils/game_day.dart';
 import 'avatar_profile.dart';
 
+/// Gün döngüsü kontrolünün seri açısından sonucu.
+enum StreakDayOutcome {
+  /// Seride görünür bir değişiklik yok.
+  unchanged,
+
+  /// Gün atlandı, seri sıfırlandı.
+  broken,
+
+  /// Gün atlandı ama dondurma hakkı harcanarak seri korundu.
+  frozen,
+}
+
 /// Oyuncunun genel ilerlemesi: can, seviye, XP, streak ve para birimi.
 class UserProfile {
   AvatarProfile avatar;
@@ -18,6 +30,19 @@ class UserProfile {
 
   /// Şimdiye kadar ulaşılan en uzun seri. Seri kırılsa da korunur.
   int longestStreak;
+
+  /// Elde tutulan seri dondurma hakkı (jeton).
+  ///
+  /// Seri kırılacakken **otomatik** harcanır: kaçırılan tek günü köprüler,
+  /// seri korunur ama artmaz. Varsayılan 0 olduğu için bugün hiçbir davranış
+  /// değişmiyor — kazanım yolları Aşama 3'te geliyor.
+  int streakFreezes;
+
+  /// Dondurma hakkının kapattığı son oyun günü.
+  ///
+  /// "Art arda en fazla 1 gün korunur" kuralının dayanağı: son aktif gün
+  /// zaten bir dondurma ile kapatılmışsa ikinci jeton kullanılamaz.
+  DateTime? lastFreezeUsedOn;
 
   /// En son güvenilir kabul edilen zaman (UTC). [GameClock] geriye alınan
   /// cihaz saatini bununla yakalar; kapat-aç sonrası da geçerli olsun diye
@@ -81,6 +106,8 @@ class UserProfile {
     this.streakDays = 0,
     this.lastActiveDay,
     this.longestStreak = 0,
+    this.streakFreezes = 0,
+    this.lastFreezeUsedOn,
     this.lastSeenAt,
     this.totalSteps = 0,
     this.lastRewardedStepCount = 0,
@@ -111,19 +138,71 @@ class UserProfile {
   }
 
   /// Gün atlanmışsa seriyi sıfırlar. Aktivite gerektirmez; gün döngüsü
-  /// kontrolünde çağrılır. Seri sıfırlandıysa `true` döner.
+  /// kontrolünde çağrılır.
+  ///
+  /// Üç sonuçtan biri döner; bool yetmiyor çünkü "gün atlandı ama dondurma
+  /// hakkıyla kurtarıldı" ayrı bir durum ve kullanıcıya söylenmesi gerekiyor.
   ///
   /// [lastActiveDay] bilerek silinmez: bir sonraki [registerStreakDay]
   /// aradaki boşluğu buradan görüp seriyi 1'den başlatır.
-  bool refreshStreak(DateTime now) {
+  StreakDayOutcome refreshStreak(DateTime now) {
     final last = lastActiveDay;
-    if (last == null || streakDays == 0) return false;
+    if (last == null || streakDays == 0) return StreakDayOutcome.unchanged;
     final gap = GameDay.daysBetween(last, now);
     // gap 0 = bugün tamamlandı, 1 = dün tamamlandı (seri hâlâ ayakta),
     // negatif = saat geriye alınmış (dokunma).
-    if (gap < 2) return false;
+    if (gap < 2) return StreakDayOutcome.unchanged;
+    if (_bridgeWithFreeze(gap)) return StreakDayOutcome.frozen;
     streakDays = 0;
+    return StreakDayOutcome.broken;
+  }
+
+  /// Kaçırılan **tek** günü bir dondurma hakkıyla köprüler.
+  ///
+  /// Harcandıysa `true` döner. Seri korunur ama **artmaz**: jeton kaçırılan
+  /// günün yerine geçer, o gün yürünmüş sayılmaz.
+  ///
+  /// Üç sınır:
+  /// - Yalnızca `gap == 2`, yani tam bir gün kaçırıldıysa. İki gün üst üste
+  ///   kaçıran, stokta iki jeton olsa bile serisini kaybeder.
+  /// - Stok bitmişse çalışmaz.
+  /// - Son aktif gün zaten bir dondurma ile kapatılmışsa çalışmaz —
+  ///   "art arda en fazla 1 gün korunur" kuralı bu dala dayanıyor.
+  ///
+  /// **Otomatik ve geriye dönük** olması bilinçli: manuel bir kurtarma
+  /// penceresi koyulsaydı, o pencereyi kaçıran kullanıcı iki kez cezalanırdı.
+  /// Serinin amacı alışkanlık, ceza değil.
+  bool _bridgeWithFreeze(int gap) {
+    if (gap != 2 || streakFreezes <= 0) return false;
+    final last = lastActiveDay;
+    if (last == null) return false;
+
+    final lastFreeze = lastFreezeUsedOn;
+    if (lastFreeze != null && GameDay.isSameGameDay(lastFreeze, last)) {
+      return false;
+    }
+
+    // Köprülenen gün: son aktif günden sonraki oyun günü.
+    final bridged = GameDay.nextResetAfter(last);
+    streakFreezes--;
+    lastFreezeUsedOn = bridged;
+    lastActiveDay = bridged;
     return true;
+  }
+
+  /// Dondurma hakkı verir; stok [GameConstants.maxStreakFreezes] ile sınırlı.
+  /// Gerçekten eklenen jeton sayısını döner (stok doluysa 0).
+  // TODO(items): Kazanım yolları Aşama 3'e ait — 7 günlük kilometre taşı
+  // ödülü ve mağazadan satın alma (bkz. CLAUDE.md, "Streak Koruması").
+  // Tüketim tarafı önce yazıldı çünkü gün aritmetiği bu işte taze; kazanım
+  // eklenirken buraya ikinci bir stok mantığı yazılmamalı.
+  int grantStreakFreeze([int amount = 1]) {
+    if (amount <= 0) return 0;
+    final granted =
+        (streakFreezes + amount).clamp(0, GameConstants.maxStreakFreezes) -
+        streakFreezes;
+    streakFreezes += granted;
+    return granted;
   }
 
   /// Günün seri koşulu sağlandığında çağrılır. Aynı oyun gününde ikinci kez
@@ -138,6 +217,15 @@ class UserProfile {
 
     final gap = GameDay.daysBetween(last, now);
     if (gap < 0) return false; // saat geriye alınmış; seriyi ilerletme.
+
+    // Kaçırılan tek gün dondurma hakkıyla köprülenebiliyorsa seri kırılmaz.
+    // Köprü kurulunca boşluk 1 güne indiği için bugünün aktivitesi seriyi
+    // normal şekilde ilerletir. Aynı mantığın iki kopyası olmasın diye
+    // [refreshStreak] de aynı yardımcıyı kullanıyor.
+    if (_bridgeWithFreeze(gap)) {
+      _startStreakDay(now, streakDays + 1);
+      return true;
+    }
 
     // gap 1 = dün de yürünmüş, seri devam ediyor; daha büyükse baştan başlar.
     _startStreakDay(now, gap == 1 ? streakDays + 1 : 1);
@@ -199,6 +287,8 @@ class UserProfile {
     'streakDays': streakDays,
     'lastActiveDay': lastActiveDay?.toIso8601String(),
     'longestStreak': longestStreak,
+    'streakFreezes': streakFreezes,
+    'lastFreezeUsedOn': lastFreezeUsedOn?.toIso8601String(),
     'lastSeenAt': lastSeenAt?.toUtc().toIso8601String(),
     'totalSteps': totalSteps,
     'lastRewardedStepCount': lastRewardedStepCount,
@@ -223,6 +313,13 @@ class UserProfile {
       streakDays: json['streakDays'] as int? ?? 0,
       lastActiveDay: _parseDate(json['lastActiveDay']),
       longestStreak: json['longestStreak'] as int? ?? 0,
+      // Stok savunma amaçlı kırpılır: bozuk ya da elle düzenlenmiş bir kayıt
+      // sınırsız jeton getirmemeli.
+      streakFreezes: (json['streakFreezes'] as int? ?? 0).clamp(
+        0,
+        GameConstants.maxStreakFreezes,
+      ),
+      lastFreezeUsedOn: _parseDate(json['lastFreezeUsedOn']),
       lastSeenAt: _parseDate(json['lastSeenAt']),
       totalSteps: json['totalSteps'] as int? ?? 0,
       lastRewardedStepCount: json['lastRewardedStepCount'] as int? ?? 0,
