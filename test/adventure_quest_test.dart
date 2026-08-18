@@ -60,6 +60,87 @@ void main() {
     });
   });
 
+  // Uygulama arka planda kaldığında birden fazla tur birikir. Tek tur çözüp
+  // kalanları affetmek oyuncunun kalıcı savaş canını yanlış bırakıyordu
+  // (triaj A1).
+  group('biriken tur çözümü', () {
+    // sinister_monster: attackDamage 12, tur hedefi 1000 adım → 11 dakika.
+    AdventureQuest questAt(DateTime startedAt) => AdventureQuest(
+      enemy: EnemyCatalog.enemies[1],
+      stepGoal: 5000,
+      startedAt: startedAt,
+    );
+
+    test('arka planda biriken turların hepsi çözülür', () {
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(startedAt);
+
+      // 60 dakika arka plan, hiç adım atılmadı: 11, 22, 33, 44 ve 55.
+      // dakikalardaki beş tur dolmuş olmalı.
+      final result = quest.resolveExpiredRounds(
+        0,
+        startedAt.add(const Duration(minutes: 60)),
+      );
+
+      expect(result?.playerDamage, 60, reason: '5 tur × 12 hasar');
+      expect(quest.playerHealth, 40);
+      expect(quest.enemyAttackSerial, 5);
+    });
+
+    test('bir sonraki geri sayım geleceğe taşınır', () {
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(startedAt);
+      final now = startedAt.add(const Duration(minutes: 60));
+
+      quest.resolveExpiredRounds(0, now);
+
+      expect(quest.nextEnemyAttackAt.isAfter(now), isTrue);
+      // Sıra `now`'dan değil, dolan sıradan ileri taşınır: 55 + 11 = 66.
+      expect(
+        quest.nextEnemyAttackAt,
+        startedAt.add(const Duration(minutes: 66)),
+      );
+    });
+
+    test('arka planda atılan adımlar turlara sırayla sayılır', () {
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(startedAt);
+
+      // 60 dakikada 2.500 adım: ilk iki tur tam, üçüncüsü yarım, son ikisi boş.
+      final result = quest.resolveExpiredRounds(
+        2500,
+        startedAt.add(const Duration(minutes: 60)),
+      );
+
+      expect(result?.walkedSteps, 2500);
+      expect(result?.playerDamage, 6 + 12 + 12);
+      expect(quest.playerHealth, 70);
+    });
+
+    test('süresi dolmamış turda hiçbir şey olmaz', () {
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(startedAt);
+
+      final result = quest.resolveExpiredRounds(
+        0,
+        startedAt.add(const Duration(minutes: 5)),
+      );
+
+      expect(result, isNull);
+      expect(quest.playerHealth, AdventureQuest.maxPlayerHealth);
+    });
+
+    test('can bitince döngü durur, can eksiye düşmez', () {
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(startedAt);
+
+      // 3 gün arka plan: canı bitirmeye fazlasıyla yeter.
+      quest.resolveExpiredRounds(0, startedAt.add(const Duration(days: 3)));
+
+      expect(quest.playerHealth, 0);
+    });
+  });
+
   // Macera başlatmak günün adımlarını sıfırlamaz; ilerleme
   // [AdventureQuest.startingSteps] farkı üzerinden hesaplanır.
   group('macera başlangıç adımı', () {

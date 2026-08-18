@@ -8,6 +8,10 @@ class AdventureQuest {
   static const int syncGraceMinutes = 1;
   static const Duration reminderInterval = Duration(minutes: 10);
 
+  /// Tek seferde çözülecek en fazla birikmiş tur. Güvenlik ağı: çok eski bir
+  /// kayıttan dönüldüğünde döngü arayüzü kilitlemesin.
+  static const int maxCatchUpRounds = 500;
+
   final Enemy enemy;
   final int stepGoal;
 
@@ -93,6 +97,10 @@ class AdventureQuest {
       return null;
     }
 
+    // Sıradaki tur, `now`'dan değil **dolan sıradan** ileri taşınır. Aksi
+    // halde arka planda biriken turlar tek çözümden sonra geleceğe atlar ve
+    // sessizce affedilir.
+    final expiredAt = nextEnemyAttackAt;
     final walked = stepsThisRound(currentSteps);
     final missedSteps = (roundTargetSteps - walked).clamp(0, roundTargetSteps);
     final damage =
@@ -108,13 +116,46 @@ class AdventureQuest {
       lastEnemyDamage = 0;
     }
 
-    roundStartingSteps = currentSteps;
+    // Yalnızca bu turun tükettiği adım kadar ilerlenir; fazlası bir sonraki
+    // tura kalır. `currentSteps`'e atlamak, arka planda atılan adımların
+    // ilk tura yazılıp geri kalanının yanmasına yol açıyordu.
+    roundStartingSteps += walked;
     roundTargetSteps = _targetForRemaining(remainingHealth(currentSteps));
-    nextEnemyAttackAt = now.add(roundDurationForSteps(roundTargetSteps));
+    nextEnemyAttackAt = expiredAt.add(roundDurationForSteps(roundTargetSteps));
 
     return CombatRoundResult(
       walkedSteps: walked,
       targetSteps: walked + missedSteps,
+      playerDamage: damage,
+    );
+  }
+
+  /// Süresi dolmuş **tüm** turları sırayla çözer ve toplamlarını döner.
+  ///
+  /// Uygulama arka planda kaldığında birden fazla tur birikir; tek tur çözmek
+  /// kalanları sessizce affediyordu (triaj A1). Dolmuş tur yoksa `null`.
+  ///
+  /// [maxCatchUpRounds] yalnızca güvenlik ağıdır: can sıfırlanınca ya da
+  /// düşman yenilince döngü zaten durur.
+  CombatRoundResult? resolveExpiredRounds(int currentSteps, DateTime now) {
+    var walked = 0;
+    var target = 0;
+    var damage = 0;
+    var rounds = 0;
+
+    while (rounds < maxCatchUpRounds) {
+      final result = resolveExpiredRound(currentSteps, now);
+      if (result == null) break;
+      walked += result.walkedSteps;
+      target += result.targetSteps;
+      damage += result.playerDamage;
+      rounds++;
+    }
+
+    if (rounds == 0) return null;
+    return CombatRoundResult(
+      walkedSteps: walked,
+      targetSteps: target,
       playerDamage: damage,
     );
   }

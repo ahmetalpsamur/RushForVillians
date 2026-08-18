@@ -537,7 +537,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
 
     final now = GameClock.now();
-    final result = adventure.resolveExpiredRound(_today.steps, now);
+    // Biriken turların hepsi çözülür; arka planda geçen süre affedilmez.
+    final result = adventure.resolveExpiredRounds(_today.steps, now);
     final reminderDue = _isForeground && adventure.takeDueReminder(now);
     setState(() {});
 
