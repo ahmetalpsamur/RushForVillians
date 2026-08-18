@@ -27,12 +27,17 @@ final _cap = GameConstants.maxDailyStepCoins;
 
 /// Kazanç akışının test kopyası: RootShell'deki `_onStepsReported` ile aynı
 /// sırayı izler — delta hesabı, işaretçi ilerletme, günlük tavan.
+///
+/// Hız kontrolü burada yok; bu dosya demo (fiziksel olmayan) kaynağın yolunu
+/// test ediyor, orada raporlanan adımın tamamı kredilenir. Hız kontrolünün
+/// devrede olduğu akış `pedometer_step_source_test.dart` içinde.
 StepCoinReward award(UserProfile profile, DailyProgress today, int newTotal) {
   final amount = newTotal - profile.totalSteps;
   if (amount <= 0) return StepCoinReward.none;
 
   today.addSteps(amount);
   profile.totalSteps = newTotal;
+  profile.lastReportedStepCount = newTotal;
 
   final reward = calculateStepCoins(
     pendingSteps: profile.totalSteps - profile.lastRewardedStepCount,

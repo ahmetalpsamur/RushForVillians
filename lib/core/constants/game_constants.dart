@@ -40,8 +40,36 @@ class GameConstants {
   ///
   /// 400 coin = 20.000 adım, yani [dragonStepGoal] ile aynı: gerçekten o kadar
   /// yürüyen kullanıcı cezalanmaz, telefon sallayan da günde bundan fazlasını
-  /// alamaz. Asıl hile kontrolü Aşama 2'de gerçek pedometer ile gelecek.
+  /// alamaz. Adım hızı kontrolü ayrıca [maxStepsPerMinute] ile yapılır.
   static const int maxDailyStepCoins = 400;
+
+  /// Bir dakikada kabul edilen en fazla adım.
+  ///
+  /// Referans kadanslar: hızlı yürüyüş ~120/dk, koşu ~180/dk, yarış
+  /// yürüyüşü ~200/dk. 250 bunların hepsinin üstünde güvenli bir tavan
+  /// bırakır; telefonu sallamak ise kolayca 400+ üretir. Bu hızın üstündeki
+  /// adımlar sensör arızası ya da hile sayılır ve **yakılır**.
+  ///
+  /// Günlük coin tavanının ([maxDailyStepCoins]) yerine geçmez, üstünde
+  /// çalışır: burada "kaç adım", orada "kaç para" sorusu cevaplanır.
+  static const int maxStepsPerMinute = 250;
+
+  /// Geçen süreye bakılmaksızın tek bir raporda kabul edilen taban adım.
+  ///
+  /// Sensör verisi tek tek değil, küçük partiler hâlinde gelebilir; aynı
+  /// saniye içinde iki olay gelirse gerçek adımlar haksız yere kırpılmasın
+  /// diye. Bilerek küçük tutuldu: uzun aradan sonra gelen büyük partiler
+  /// zaten geçen süreden hak kazanır, bu taban yalnızca tek bir sensör
+  /// partisini karşılamalı.
+  static const int stepBurstAllowance = 100;
+
+  /// Sensör sıfırlandığında (cihaz yeniden başlatma) telafi edilecek en fazla
+  /// adım.
+  ///
+  /// Cihaz kapalıyken yeniden başlatılıp yürünen adımlar geri kazanılsın diye
+  /// var; bozuk bir sensörün tek okumada günlük tavanı patlatmasını da
+  /// engeller. 10.000 adım = 200 coin, yani günlük tavanın yarısı.
+  static const int maxResetRecoverySteps = 10000;
 
   /// Takımda "yan yana yürüyor" sayılmak için, üyelerin adım atma
   /// zamanları arasında izin verilen maksimum fark (dakika).

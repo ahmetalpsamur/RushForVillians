@@ -1224,3 +1224,221 @@ turu, v3→v4 taşıması, `ManualStepSource` davranışı.
 Mağaza butonu `'${item.cost} XP'` yazıyor ama `coins` harcıyor. Para
 kazanılamadığı için bugüne kadar görünmüyordu; **artık kullanıcının gözüne
 girecek.** Aşama 3'te #11/#12 kapsamında düzeltilecek (bkz. Kova A/A4).
+
+---
+
+# Çalışma Kuralı — Commit
+
+**Asla commit atma.** `/commit` çalıştırma, commit-commands skill'ini kullanma,
+`git commit` çağırma. Commit'leri kullanıcı elle atıyor.
+
+Bir iş bitince: değişen dosyaları listele, ne yaptığını özetle, önerdiğin commit
+mesajını yaz. Commit'i kullanıcı atacak.
+
+---
+
+# Streak Koruması — ONAYLANDI (2026-08-18)
+
+Aşama 1a'da önerilen tasarım **olduğu gibi kabul edildi.** Aşama 2'de uygulanacak.
+
+- `UserProfile.streakFreezes` (int, varsayılan 0) + `lastFreezeUsedOn` (DateTime?)
+- **Tüketim tarafı ŞİMDİ uygulanacak.** Varsayılan 0 olduğu için davranış
+  bugün değişmiyor.
+- Otomatik ve geriye dönük: seri kırılacakken jeton varsa 1 harcanır, seri
+  korunur ama **artmaz**.
+- Sınırlar: stok en fazla 2, art arda en fazla 1 gün korunur.
+- Kullanıcıya bildir: "Serin korundu, 1 dondurma hakkı kullanıldı."
+- **Kazanım yolları ERTELENDİ:** 7 günlük kilometre taşı ödülü ve mağazadan
+  satın alma Aşama 3'e ait (ödül altyapısı ve gerçek Item modeli orada geliyor).
+  `TODO(items)` ile işaretle.
+- Şema **v5** gerekiyor (v4 güncel sürüm).
+
+Gerekçe: tek kötü günde uzun seriyi kaybetmek, streak sistemlerinin terk
+ettiren bir numaralı sebebi. Tüketim mantığı şimdi yazılıyor çünkü gün
+aritmetiği taze; sonra dönmek `refreshStreak`'i ikinci kez açmak demek.
+
+---
+
+# Aşama 2 — EN KRİTİK RİSK
+
+`StepSource` sözleşmesi `cumulativeSteps`'in **azalmayan** olduğunu varsayıyor.
+Gerçek pedometer bu sözleşmeyi **ihlal edecek**: Android'de TYPE_STEP_COUNTER
+cihaz açılışından beri sayar ve **cihaz yeniden başlayınca sıfırlanır.**
+
+Ekonomi `totalSteps - lastRewardedStepCount` deltasından para üretiyor.
+Ham sensör değeri geriye giderse iki şeyden biri olur: oyuncu adımlarını
+kaybeder, ya da baseline yanlış kurulursa bir anda tavan dolusu coin kazanır.
+
+**Çözüm yönü:** sensörün ham değeri ile `totalSteps` AYRI kavramlar olsun.
+Sensör baseline'ı ayrı saklansın, düşüş tespit edilince baseline yeniden
+kurulsun, `totalSteps` **asla geriye alınmasın**. `StepSource` sözleşmesi
+korunsun — ihlali pedometer uygulaması içinde emsin, `RootShell`'e sızdırma.
+
+**Özel test şart:** sensör 8000'den 50'ye düşerse `totalSteps`, `coins` ve
+`lastRewardedStepCount` ne oluyor?
+
+Aynı desen `GameClock`'un geriye alınan saati emmesiyle birebir aynı —
+o çözümü örnek al.
+
+---
+
+# Aşama 2a — Gerçek pedometer (#1) ✅ (2026-08-18)
+
+Kart #1 kapandı. Triajdaki **C2** (POST_NOTIFICATIONS eksikliği) da burada
+kapandı.
+
+## Kritik risk nasıl çözüldü
+
+Yukarıdaki "EN KRİTİK RİSK" bölümünün cevabı **üç ayrı katmana** bölündü.
+Hiçbiri diğerinin işini yapmıyor:
+
+| Katman | Dosya | Sorumluluk |
+|---|---|---|
+| Ham sensör | `services/raw_step_sensor.dart` | Platform verisi. Değeri **azalabilir**; düzeltmez, olduğu gibi verir. |
+| Sıfırlanma emme | `services/pedometer_step_source.dart` | Azalan ham değeri `StepSource`'un azalmayan sözleşmesine çevirir. `GameClock` deseninin aynısı. |
+| Hız kontrolü | `core/utils/step_rate_limiter.dart` | Saf domain kuralı: "insan bu kadar adımı bu sürede atabilir mi". Sensör/platform bilmez. |
+
+`RootShell` **hiçbir koşulda** azalan bir kümülatif değer görmez — ihlal
+kaynağın içinde emilir, sözleşme değişmedi.
+
+### Aritmetik: tek referans, iki sayaç
+
+Artış her zaman `ham - öncekiHam` üzerinden. Sıfırlanma tespiti **offset'e
+değil, bir önceki ham okumaya** göre yapılır (ilk tasarım offset'e bakıyordu;
+testler yakaladı, düzeltildi).
+
+Kalıcı üç yeni alan (`UserProfile`):
+
+| Alan | Anlamı |
+|---|---|
+| `lastReportedStepCount` | Kaynağın **raporladığı** son kümülatif değer |
+| `lastSensorReading` (`int?`) | En son görülen **ham** sensör değeri |
+| `lastStepReportAt` (UTC) | Hız kontrolünün "aradan ne kadar geçti" hesabı |
+
+`lastSensorReading`'in **nullable olması şart:** varsayılan 0 olsaydı, cihaz
+açılışından beri birikmiş ham değer (milyonlarca adım) ilk okumada tek seferde
+kredilenirdi. `null` = referans henüz kurulmadı, ilk okuma yalnızca referans
+kurar.
+
+`lastReportedStepCount` ile `totalSteps` **ayrı kavramlar**: hız kontrolüne
+takılan adımlar raporlanmış sayılır ama kredilenmez. İşaretçi her raporda
+ilerlediği için **yakılan adım bir sonraki raporda geri sızmaz**. 1b'deki
+`lastRewardedStepCount` / `totalSteps` çift-sayma koruması hiç değişmedi.
+
+### Sıfırlanma: reboot mu, arıza mı
+
+Ayrımı **oturum bağlamı** yapar:
+
+| Durum | Varsayım | Davranış |
+|---|---|---|
+| Soğuk açılışın **ilk** okuması düşük | Cihaz kapalıyken yeniden başlatılmış | Ham değer telafi edilir (en fazla `maxResetRecoverySteps` = 10.000) |
+| **Oturum içi** düşüş (8000 → 50) | Sensör arızası | Hiçbir şey kredilenmez; değerler aynen kalır |
+
+Arıza dalındaki asıl tehlike **toparlanma**: 8000 → 50 → 8010 dizisinde
+normalize sayaç 15.960'a fırlar. Bu sıçrama hız kontrolünde yanar.
+
+## Hile koruması
+
+`limitStepBatch(reportedSteps, elapsed)` — `calculateStepCoins` ile aynı
+desende saf fonksiyon. İzin = `max(stepBurstAllowance, elapsed × maxStepsPerMinute)`.
+
+| Sabit | Değer | Gerekçe |
+|---|---|---|
+| `maxStepsPerMinute` | 250 | Yarış yürüyüşü ~200/dk, koşu ~180/dk. Telefon sallamak 400+ üretir. |
+| `stepBurstAllowance` | 100 | Aynı saniyede gelen tek bir sensör partisi kırpılmasın. Bilerek küçük. |
+| `maxResetRecoverySteps` | 10.000 | Günlük coin tavanının yarısı (200 coin). |
+
+Hesap **milisaniye** üzerinden: saniyeye yuvarlamak kısa aralıklarda gerçek
+adımları kırpıyordu.
+
+Günlük coin tavanının (1b) yerine geçmez, **üstünde** çalışır: burada
+"kaç adım", orada "kaç para" sorusu cevaplanır. İkisi sıralı uygulanır.
+
+**Demo kaynağı muaf.** `StepSource.isPhysical` eklendi; `ManualStepSource`
+`false` döner ve hız kontrolünden geçmez — emülatörde +20.000 çalışmaya devam
+etmeli.
+
+### BİLİNEN BOŞLUK — taban izin sızıntısı
+
+Toparlanma sıçramasının `stepBurstAllowance` kadarı (100 adım = 2 coin)
+kredilenir. Sensör arızası başına bir kez, günlük tavanla sınırlı. Tabanı
+sıfırlamak, partiler hâlinde gelen gerçek sensör verisini kırpardı; ölçülü
+bir takas olarak bırakıldı.
+
+## Platform
+
+**Android:** `pedometer` paketi → `TYPE_STEP_COUNTER`. Cihaz açılışından beri
+kümülatif, uygulama kapalıyken de artar → kapalıyken atılan adımlar ek bir iş
+olmadan, baseline aritmetiğinden gelir. Arka plan servisi yok.
+
+**iOS:** `pedometer` paketi **kullanılmadı.** Paket iOS'ta sayacı son cihaz
+açılışından başlatıyor; `CMPedometer` yalnızca 7 günlük geçmiş tuttuğu için
+uzun süre yeniden başlatılmamış cihazda o başlangıç noktası kayar ve değer
+oturumlar arasında **düşer** → sahte sıfırlanma → her açılışta bedava adım.
+Bunun yerine `ios/Runner/AppDelegate.swift` içinde kendi kanalımız var:
+başlangıç anını Dart veriyor (son rapor anı), yani okunan değer doğrudan
+"son rapordan beri atılan adım". Geçmiş sorgusu ve canlı akış tek kanaldan.
+`RawStepSensor.isBootCumulative` bu iki aritmetiği ayırıyor.
+
+> ⚠️ **iOS kodu derlenmedi ve test edilmedi.** Geliştirme Windows'ta yapılıyor.
+> Swift kanalı `AppDelegate.swift` içine yazıldı (yeni dosya `project.pbxproj`
+> düzenlemesi gerektirirdi). **Gerçek cihazda doğrulanmalı.**
+
+## İzinler
+
+| Platform | İzin | Nerede |
+|---|---|---|
+| Android | `ACTIVITY_RECOGNITION` | manifest + runtime (`permission_handler`) |
+| Android | `POST_NOTIFICATIONS` | manifest — **triaj C2 kapandı** |
+| Android | `stepcounter` / `stepdetector` uses-feature `required=false` | sensörsüz cihaz Play'de filtrelenmesin |
+| iOS | `NSMotionUsageDescription` | Info.plist |
+
+Reddedilme davranışı: hiçbir yol exception fırlatmaz. `StepPermissionStatus`
+beş durum taşır, ana ekranda açıklayıcı kart + kalıcı reddedildiyse
+"Ayarları Aç" düğmesi çıkar. Macera, mağaza, çark, profil çalışmaya devam eder.
+
+> **Yapılacak (macOS'ta):** `permission_handler` iOS'ta Podfile'da
+> `PERMISSION_*` makroları ile kısıtlanmazsa tüm izinleri derlemeye katar ve
+> App Store incelemesinde sorun çıkarır. Repoda henüz `ios/Podfile` yok
+> (ilk macOS derlemesinde üretilecek); o zaman yalnızca
+> `PERMISSION_EVENTS`/`PERMISSION_NOTIFICATIONS` gibi gerekenler açılmalı.
+
+## Debug görünürlüğü
+
+"Demo Kontrolleri" kartı **"Adım Kaynağı"** oldu: aktif kaynağı yazıyor
+(`Pedometer (gerçek sensör)` / `Manuel (demo kontrolleri)`) ve debug'da bir
+anahtarla kaynak değiştiriliyor. Debug varsayılanı **manuel** (emülatör kutudan
+çıkar çıkmaz çalışsın), release varsayılanı **pedometer**. Gerçek sensör
+aktifken demo butonları kilitli ve nedenini söylüyor.
+
+`ManualStepSource` **korundu** — testlerin ve emülatörün tek adım üretme yolu.
+
+## Şema v5
+
+Yeni alanlar: `lastReportedStepCount`, `lastSensorReading`, `lastStepReportAt`.
+4 → 5 taşıması: `lastReportedStepCount = totalSteps`, diğer ikisi **null**.
+Böylece güncelleme sonrası ilk gerçek okuma yalnızca referans kurar, birikmiş
+ham değer kredilenmez.
+
+⚠️ **Streak koruması artık v6.** CLAUDE.md'de v5 yazıyordu; 2a önce geldi.
+
+## Test
+
+- `test/step_rate_limiter_test.dart` — 10 test: sınırdaki hız, imkânsız hız,
+  uzun aradan sonra gerçek yürüyüş, taban izin, milisaniye hassasiyeti,
+  negatif süre.
+- `test/pedometer_step_source_test.dart` — 20 test: **CLAUDE.md senaryosu
+  (8000 → 50 → 8010)**, ilk kurulumda birikmiş ham değerin kredilenmemesi,
+  reboot telafisi ve üst sınırı, kapalıyken atılan adımlar (Android + iOS),
+  yakılan adımın geri gelmemesi, gün değişimi, izin reddi, kapat-aç turu,
+  v4→v5 taşıması.
+
+Toplam **116 test geçiyor**, `flutter analyze` temiz.
+
+---
+
+# Not — şema sürümü
+
+Aşama 0 bölümünde "Şema sürümü: 2" yazıyor; o bölüm yazıldığında güncel
+sürüm buydu. **Güncel sürüm v5** (bkz. Aşama 2a). Streak koruması v6 ile
+gelecek.

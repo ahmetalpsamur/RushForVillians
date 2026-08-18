@@ -9,6 +9,7 @@ import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/user_profile.dart';
+import '../../services/step_permission_service.dart';
 import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
@@ -26,6 +27,21 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenStore;
   final ValueChanged<int> onSimulateSteps;
 
+  /// Adımların gerçek sensörden mi geldiği. Demo butonları yalnızca manuel
+  /// kaynakta çalışır.
+  final bool usingRealPedometer;
+
+  /// Adım sayacı izninin durumu; verilmediyse ana ekranda açıklama çıkar.
+  final StepPermissionStatus stepPermission;
+
+  /// Kalıcı reddedilmiş izni açmak için sistem ayarlarına gider.
+  final VoidCallback onOpenStepSettings;
+
+  /// Debug'da kaynak değiştirme; release'de `null` gelir ve anahtar çıkmaz.
+  final ValueChanged<bool>? onUseManualSourceChanged;
+
+  final bool useManualSource;
+
   const HomeScreen({
     super.key,
     required this.profile,
@@ -36,6 +52,11 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenRewards,
     required this.onOpenStore,
     required this.onSimulateSteps,
+    required this.usingRealPedometer,
+    required this.stepPermission,
+    required this.onOpenStepSettings,
+    required this.useManualSource,
+    this.onUseManualSourceChanged,
   });
 
   /// Çarkın açılmasına kalan adım.
@@ -82,6 +103,13 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (usingRealPedometer && !stepPermission.isGranted) ...[
+            const SizedBox(height: 12),
+            _StepPermissionCard(
+              status: stepPermission,
+              onOpenSettings: onOpenStepSettings,
+            ),
+          ],
           const SizedBox(height: 12),
           SectionCard(
             title: 'Macera',
@@ -166,30 +194,135 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          SectionCard(
-            title: 'Demo Kontrolleri',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Gerçek adım sayacı entegrasyonu gelene kadar adımları '
-                  'buradan simüle edebilirsin.',
-                  style: TextStyle(fontSize: 12, color: Colors.white70),
+          _StepSourceCard(
+            usingRealPedometer: usingRealPedometer,
+            useManualSource: useManualSource,
+            onUseManualSourceChanged: onUseManualSourceChanged,
+            onSimulateSteps: onSimulateSteps,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Adım sayacı izni verilmediğinde çıkan açıklama kartı.
+///
+/// Devre dışı kalan bir özellik sessiz kalmaz: neden çalışmadığını söyler ve
+/// çözüm yolunu gösterir. Oyunun geri kalanı bu kart görünürken de çalışır.
+class _StepPermissionCard extends StatelessWidget {
+  final StepPermissionStatus status;
+  final VoidCallback onOpenSettings;
+
+  const _StepPermissionCard({
+    required this.status,
+    required this.onOpenSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      title: 'Adım Sayacı',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock, size: 18, color: AppColors.streak),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  status.description,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _StepButton(amount: 1000, onSimulateSteps: onSimulateSteps),
-                    _StepButton(amount: 5000, onSimulateSteps: onSimulateSteps),
-                    _StepButton(
-                      amount: 20000,
-                      onSimulateSteps: onSimulateSteps,
-                    ),
-                  ],
-                ),
-              ],
+              ),
+            ],
+          ),
+          if (status == StepPermissionStatus.permanentlyDenied) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: onOpenSettings,
+                icon: const Icon(Icons.settings, size: 18),
+                label: const Text('Ayarları Aç'),
+              ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Aktif adım kaynağını gösterir ve demo kontrollerini barındırır.
+///
+/// Gerçek sensör aktifken demo butonları kilitlidir; nedenini söyleyerek
+/// kilitlenir. Debug derlemelerinde kaynak anahtarla değiştirilebilir —
+/// emülatörde adım üretebilmek şart.
+class _StepSourceCard extends StatelessWidget {
+  final bool usingRealPedometer;
+  final bool useManualSource;
+  final ValueChanged<bool>? onUseManualSourceChanged;
+  final ValueChanged<int> onSimulateSteps;
+
+  const _StepSourceCard({
+    required this.usingRealPedometer,
+    required this.useManualSource,
+    required this.onUseManualSourceChanged,
+    required this.onSimulateSteps,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onChanged = onUseManualSourceChanged;
+    return SectionCard(
+      title: 'Adım Kaynağı',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                usingRealPedometer
+                    ? Icons.directions_walk
+                    : Icons.touch_app_outlined,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  usingRealPedometer
+                      ? 'Pedometer (gerçek sensör)'
+                      : 'Manuel (demo kontrolleri)',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              if (onChanged != null)
+                Switch(value: useManualSource, onChanged: onChanged),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            usingRealPedometer
+                ? 'Adımlar cihazın sensöründen geliyor. Demo butonları '
+                    'kapalı; açmak için kaynağı manuele al.'
+                : 'Adımları buradan simüle edebilirsin.',
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final amount in const [1000, 5000, 20000])
+                _StepButton(
+                  amount: amount,
+                  enabled: !usingRealPedometer,
+                  onSimulateSteps: onSimulateSteps,
+                ),
+            ],
           ),
         ],
       ),
@@ -352,14 +485,19 @@ class _StreakCardState extends State<_StreakCard> {
 
 class _StepButton extends StatelessWidget {
   final int amount;
+  final bool enabled;
   final ValueChanged<int> onSimulateSteps;
 
-  const _StepButton({required this.amount, required this.onSimulateSteps});
+  const _StepButton({
+    required this.amount,
+    required this.onSimulateSteps,
+    this.enabled = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: () => onSimulateSteps(amount),
+      onPressed: enabled ? () => onSimulateSteps(amount) : null,
       child: Text('+$amount adım'),
     );
   }

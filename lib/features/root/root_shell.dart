@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/step_rate_limiter.dart';
 import '../../data/mock_data.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
@@ -17,6 +19,9 @@ import '../../models/user_profile.dart';
 import '../../models/xp_store_item.dart';
 import '../../services/adventure_notification_service.dart';
 import '../../services/game_storage.dart';
+import '../../services/pedometer_step_source.dart';
+import '../../services/raw_step_sensor.dart';
+import '../../services/step_permission_service.dart';
 import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
 import '../character/character_creation_screen.dart';
@@ -62,10 +67,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
 
-  /// Adım kaynağı. Bugün demo kontrolleriyle besleniyor; Aşama 2'de yerine
-  /// pedometer uygulaması geçecek, aşağıdaki akış değişmeyecek.
-  late final ManualStepSource _stepSource;
+  /// Adım kaynağı: gerçek pedometer ya da demo kontrolleri.
+  ///
+  /// Kaynak kim olursa olsun akış tek yerden geçer ([_onStepsReported]).
+  /// Sensörün sıfırlanması [PedometerStepSource] içinde emildiği için burada
+  /// hiçbir zaman azalan bir kümülatif değer görülmez.
+  late StepSource _stepSource;
   StreamSubscription<int>? _stepSubscription;
+  StreamSubscription<StepSensorFailure>? _sensorFailureSubscription;
+
+  /// Demo kaynağı debug'da varsayılan: emülatörde adım üretebilmek şart.
+  /// Release'de her zaman gerçek sensör kullanılır.
+  bool _useManualSource = kDebugMode;
+
+  StepPermissionStatus _stepPermission = StepPermissionStatus.unknown;
 
   Timer? _adventureClock;
   bool _isForeground = true;
@@ -82,13 +97,103 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _restoreState();
-    _stepSource = ManualStepSource(initialSteps: _profile.totalSteps);
-    _stepSubscription = _stepSource.changes.listen(_onStepsReported);
+    _attachStepSource();
     WidgetsBinding.instance.addObserver(this);
     _adventureClock = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _tick(),
     );
+  }
+
+  /// Seçili adım kaynağını kurar ve dinlemeye başlar.
+  ///
+  /// Kaynak, kalıcı sayaçtan tohumlanır: [UserProfile.lastReportedStepCount]
+  /// ile [UserProfile.lastSensorReading] birlikte yazıldığı için kapat-aç
+  /// sonrasında sayaç kaldığı yerden devam eder — Android'de uygulama
+  /// kapalıyken atılan adımlar da bu aritmetikten gelir.
+  void _attachStepSource() {
+    final source = _createStepSource();
+    _stepSource = source;
+    _stepSubscription = source.changes.listen(_onStepsReported);
+    if (source is PedometerStepSource) {
+      _sensorFailureSubscription = source.failures.listen(_onSensorFailure);
+      unawaited(_startPhysicalSource(source));
+    }
+  }
+
+  StepSource _createStepSource() {
+    if (_useManualSource) {
+      return ManualStepSource(initialSteps: _profile.lastReportedStepCount);
+    }
+    final sensor = createPlatformStepSensor();
+    if (sensor == null) {
+      // Desteklenmeyen platform: oyun çalışmaya devam eder, adım gelmez.
+      _stepPermission = StepPermissionStatus.unavailable;
+      return ManualStepSource(initialSteps: _profile.lastReportedStepCount);
+    }
+    return PedometerStepSource(
+      sensor: sensor,
+      restoredTotal: _profile.lastReportedStepCount,
+      restoredReading: _profile.lastSensorReading,
+    );
+  }
+
+  /// İzni kontrol eder, gerekiyorsa ister ve sensörü başlatır.
+  ///
+  /// İzin verilmezse hiçbir şey çökmez: sensör başlatılmaz, ana ekranda
+  /// açıklayıcı bir kart çıkar, oyunun geri kalanı çalışmaya devam eder.
+  Future<void> _startPhysicalSource(PedometerStepSource source) async {
+    var status = await StepPermissionService.check();
+    if (status == StepPermissionStatus.denied) {
+      status = await StepPermissionService.request();
+    }
+    if (!mounted) return;
+    setState(() => _stepPermission = status);
+
+    // iOS'ta izin ayrı istenmez; CMPedometer ilk dinlemede sistem penceresini
+    // kendisi açar. Bu yüzden `unknown` durumunda da başlatılır.
+    if (status == StepPermissionStatus.permanentlyDenied ||
+        status == StepPermissionStatus.unavailable) {
+      return;
+    }
+    await source.start(lastReportedAt: _profile.lastStepReportAt);
+  }
+
+  /// Sensör kullanılamaz hâle geldiğinde nedenini ekrana taşır.
+  void _onSensorFailure(StepSensorFailure failure) {
+    if (!mounted) return;
+    setState(() {
+      _stepPermission = switch (failure) {
+        StepSensorFailure.permissionDenied =>
+          StepPermissionStatus.permanentlyDenied,
+        StepSensorFailure.unavailable => StepPermissionStatus.unavailable,
+        StepSensorFailure.unknown => StepPermissionStatus.unknown,
+      };
+    });
+  }
+
+  /// Debug'da adım kaynağını değiştirir. Release'de çağrılmaz.
+  void _setManualSource(bool useManual) {
+    if (_useManualSource == useManual) return;
+    unawaited(_stepSubscription?.cancel());
+    unawaited(_sensorFailureSubscription?.cancel());
+    _sensorFailureSubscription = null;
+    _stepSource.dispose();
+    setState(() {
+      _useManualSource = useManual;
+      _stepPermission = StepPermissionStatus.unknown;
+      _attachStepSource();
+    });
+  }
+
+  /// Kalıcı reddedilmiş izni açmak için sistem ayarlarına gider.
+  Future<void> _openStepPermissionSettings() async {
+    await StepPermissionService.openSettings();
+    if (!mounted) return;
+    // Kullanıcı ayarlardan dönünce durum değişmiş olabilir.
+    final status = await StepPermissionService.check();
+    if (!mounted) return;
+    setState(() => _stepPermission = status);
   }
 
   /// Saniyelik nabız: önce gün döngüsü (gün değişimi + seri), sonra macera
@@ -152,6 +257,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_stepSubscription?.cancel());
+    unawaited(_sensorFailureSubscription?.cancel());
     _stepSource.dispose();
     _adventureClock?.cancel();
     _persist();
@@ -203,24 +309,59 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   /// Demo kontrollerinin girişi. Kaynağı besler; işi [_onStepsReported] yapar.
-  void _simulateSteps(int amount) => _stepSource.add(amount);
+  /// Gerçek sensör aktifken demo butonları kilitli olduğu için burası
+  /// yalnızca manuel kaynakta çalışır.
+  void _simulateSteps(int amount) {
+    final source = _stepSource;
+    if (source is ManualStepSource) source.add(amount);
+  }
 
   /// Adım kaynağından gelen **kümülatif** sayacı işler.
   ///
-  /// Kaynak kim olursa olsun (bugün demo butonları, Aşama 2'de pedometer)
-  /// akış buradan geçer: günlük ilerleme, para, seri ve macera tek yerde.
+  /// Kaynak kim olursa olsun (demo butonları ya da pedometer) akış buradan
+  /// geçer: hız kontrolü, günlük ilerleme, para, seri ve macera tek yerde.
+  ///
+  /// İki sayaç bilerek ayrıdır:
+  /// - [UserProfile.lastReportedStepCount] kaynağın **raporladığı** yer;
+  ///   her raporda ilerler, böylece hız kontrolünde yakılan adım bir sonraki
+  ///   raporda geri sızmaz.
+  /// - [UserProfile.totalSteps] **kredilenen** adım; para, seri ve macera
+  ///   buna bakar. 1b'deki çift-sayma koruması değişmeden çalışmaya devam eder.
   void _onStepsReported(int cumulativeSteps) {
-    final amount = cumulativeSteps - _profile.totalSteps;
-    if (amount <= 0) return;
+    final now = GameClock.now();
+    final elapsed = now.difference(_profile.lastStepReportAt ?? now);
+    final reported = cumulativeSteps - _profile.lastReportedStepCount;
+
+    _profile.lastStepReportAt = now;
+    _profile.lastSensorReading = _stepSource.lastSensorReading;
+    if (reported <= 0) {
+      // Sensör referansı kurulmuş ya da aynı değer tekrar gelmiş olabilir;
+      // ikisi de diske yazılmalı ama oyunda bir şey değiştirmez.
+      _persist();
+      return;
+    }
+
+    // İmkânsız hızlar yalnızca fiziksel kaynağa uygulanır: demo butonlarının
+    // +20.000'i emülatörde çalışmaya devam etmeli.
+    final verdict =
+        _stepSource.isPhysical
+            ? limitStepBatch(reportedSteps: reported, elapsed: elapsed)
+            : StepBatchVerdict(accepted: reported, discarded: 0);
+
+    _profile.lastReportedStepCount = cumulativeSteps;
+    final amount = verdict.accepted;
+    if (amount <= 0) {
+      _persist();
+      return;
+    }
 
     var enemyDefeated = false;
     int? milestoneReached;
     var capJustReached = false;
-    final now = GameClock.now();
     final capWasReached = _today.coinCapReached;
     setState(() {
       _today.addSteps(amount);
-      _profile.totalSteps = cumulativeSteps;
+      _profile.totalSteps += amount;
 
       // Para adım deltasından kazanılır: işaretçi yalnızca paraya çevrilen
       // adım kadar ilerler, artan adımlar bir sonraki hesaba kalır.
@@ -473,6 +614,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenRewards: _openRewards,
         onOpenStore: _openStore,
         onSimulateSteps: _simulateSteps,
+        usingRealPedometer: _stepSource.isPhysical,
+        stepPermission: _stepPermission,
+        onOpenStepSettings: _openStepPermissionSettings,
+        // Kaynak değiştirme yalnızca debug'da; release'de anahtar çıkmaz.
+        onUseManualSourceChanged: kDebugMode ? _setManualSource : null,
+        useManualSource: _useManualSource,
       ),
       AdventureScreen(
         adventure: _adventure,

@@ -1,5 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Adım sayacı: TYPE_STEP_COUNTER okumak için Android 10+ zorunlu. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <!-- Android 13+ bildirim izni. Bu satır olmadan
+         requestNotificationsPermission() sessizce başarısız oluyordu. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Adım sayacı olmayan cihazlar Play'de filtrelenmesin: oyun sayaç
+         olmadan da (demo kontrolleriyle) çalışır. -->
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false"/>
+    <uses-feature
+        android:name="android.hardware.sensor.stepdetector"
+        android:required="false"/>
     <application
         android:label="rush_for_villains"
         android:name="${applicationName}"

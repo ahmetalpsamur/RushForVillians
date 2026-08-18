@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 4;
+  static const int schemaVersion = 5;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -51,6 +51,19 @@ class GameStorage {
       final profile = state['profile'];
       if (profile is Map<String, dynamic>) {
         profile['lastRewardedStepCount'] = profile['totalSteps'] as int? ?? 0;
+      }
+      return state;
+    },
+    // 4 -> 5: gerçek pedometer alanları eklendi. Raporlanmış sayaç mevcut
+    // toplam adıma eşitlenir; ham sensör offset'i bilerek **null** bırakılır,
+    // böylece ilk gerçek okuma yalnızca referans kurar ve cihaz açılışından
+    // beri birikmiş ham değer tek seferde kredilenmez.
+    4: (state) {
+      final profile = state['profile'];
+      if (profile is Map<String, dynamic>) {
+        profile['lastReportedStepCount'] = profile['totalSteps'] as int? ?? 0;
+        profile['lastSensorReading'] = null;
+        profile['lastStepReportAt'] = null;
       }
       return state;
     },

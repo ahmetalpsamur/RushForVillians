@@ -34,6 +34,27 @@ class UserProfile {
   /// uygulama kapanıp açılsa, gün değişse, macera seçilse de.
   int lastRewardedStepCount;
 
+  /// Adım kaynağından **raporlanmış** son kümülatif değer.
+  ///
+  /// [totalSteps]'ten ayrıdır ve ondan büyük olabilir: hız kontrolüne
+  /// (`limitStepBatch`) takılan adımlar raporlanmış sayılır ama kredilenmez.
+  /// İşaretçi her raporda ilerlediği için yakılan adım bir sonraki raporda
+  /// geri sızmaz.
+  int lastReportedStepCount;
+
+  /// Ham sensör sayacının, [lastReportedStepCount] anındaki değeri.
+  ///
+  /// Kapat-aç sonrası sayacın kaldığı yerden devam etmesi buna bağlı.
+  /// **Nullable olması şart:** varsayılan 0 olsaydı, cihaz açılışından beri
+  /// birikmiş ham değer (milyonlarca adım) ilk okumada tek seferde
+  /// kredilenirdi. `null` = referans henüz kurulmadı.
+  int? lastSensorReading;
+
+  /// Son adım raporunun anı (UTC). Hız kontrolünün "aradan ne kadar süre
+  /// geçti" hesabı buradan gelir; kapat-aç sonrası da geçerli olsun diye
+  /// diske yazılır.
+  DateTime? lastStepReportAt;
+
   /// Mağazadan satın alınmış öğelerin kimlikleri. Item sistemi gelene kadar
   /// yalnızca sahiplik kaydı tutar.
   final List<String> ownedItemIds;
@@ -55,6 +76,9 @@ class UserProfile {
     this.lastSeenAt,
     this.totalSteps = 0,
     this.lastRewardedStepCount = 0,
+    this.lastReportedStepCount = 0,
+    this.lastSensorReading,
+    this.lastStepReportAt,
     List<String>? ownedItemIds,
     this.lastWheelSpinAt,
   }) : hp = hp ?? GameConstants.baseHp,
@@ -169,6 +193,9 @@ class UserProfile {
     'lastSeenAt': lastSeenAt?.toUtc().toIso8601String(),
     'totalSteps': totalSteps,
     'lastRewardedStepCount': lastRewardedStepCount,
+    'lastReportedStepCount': lastReportedStepCount,
+    'lastSensorReading': lastSensorReading,
+    'lastStepReportAt': lastStepReportAt?.toUtc().toIso8601String(),
     'ownedItemIds': ownedItemIds,
     'lastWheelSpinAt': lastWheelSpinAt?.toIso8601String(),
   };
@@ -189,6 +216,9 @@ class UserProfile {
       lastSeenAt: _parseDate(json['lastSeenAt']),
       totalSteps: json['totalSteps'] as int? ?? 0,
       lastRewardedStepCount: json['lastRewardedStepCount'] as int? ?? 0,
+      lastReportedStepCount: json['lastReportedStepCount'] as int? ?? 0,
+      lastSensorReading: json['lastSensorReading'] as int?,
+      lastStepReportAt: _parseDate(json['lastStepReportAt']),
       ownedItemIds:
           (json['ownedItemIds'] as List?)?.whereType<String>().toList() ??
           <String>[],
