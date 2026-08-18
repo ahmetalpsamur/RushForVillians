@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 5;
+  static const int schemaVersion = 6;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -64,6 +64,16 @@ class GameStorage {
         profile['lastReportedStepCount'] = profile['totalSteps'] as int? ?? 0;
         profile['lastSensorReading'] = null;
         profile['lastStepReportAt'] = null;
+      }
+      return state;
+    },
+    // 5 -> 6: adım → XP alanları eklendi. Para işaretçisiyle aynı gerekçe:
+    // XP yokken atılmış adımlar geriye dönük seviye kazandırmamalı, yoksa
+    // güncelleme sonrası ilk açılışta oyuncu birkaç seviye birden atlar.
+    5: (state) {
+      final profile = state['profile'];
+      if (profile is Map<String, dynamic>) {
+        profile['lastXpRewardedStepCount'] = profile['totalSteps'] as int? ?? 0;
       }
       return state;
     },

@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/step_rate_limiter.dart';
+import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
@@ -19,6 +20,7 @@ import '../../models/user_profile.dart';
 import '../../models/xp_store_item.dart';
 import '../../services/adventure_notification_service.dart';
 import '../../services/game_storage.dart';
+import '../../services/level_events.dart';
 import '../../services/pedometer_step_source.dart';
 import '../../services/raw_step_sensor.dart';
 import '../../services/step_permission_service.dart';
@@ -308,6 +310,84 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
+  /// XP veren **tek** nokta: adım, düşman ve çark hep buradan geçer.
+  ///
+  /// Seviye atlandığında hem uygulama içi kutlamayı tetikler hem de
+  /// [LevelEvents] üzerinden yayınlar. Yayını tek noktada tutmak, Aşama 3'teki
+  /// seviye kilitlerinin (#10, #11) `addXp` çağıran her yeri gezmesini
+  /// gereksiz kılar.
+  ///
+  /// `setState` içinden de çağrılabilsin diye kendisi `setState` çağırmaz;
+  /// kutlama bir sonraki frame'e bırakılır.
+  void _awardXp(int amount) {
+    if (amount <= 0) return;
+    final previousLevel = _profile.level;
+    _profile.addXp(amount);
+    if (_profile.level == previousLevel) return;
+
+    final event = LevelUpEvent(
+      previousLevel: previousLevel,
+      newLevel: _profile.level,
+    );
+    LevelEvents.emit(event);
+    // Kutlama build sırasında gösterilemez; frame sonuna bırakılır.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showLevelUp(event);
+    });
+  }
+
+  /// Seviye atlama kutlaması.
+  void _showLevelUp(LevelUpEvent event) {
+    final gained = event.levelsGained;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          backgroundColor: const Color(0xFF171521),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: AppColors.xp, width: 1.5),
+          ),
+          content: Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: AppColors.xp, size: 26),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'SEVİYE ${event.newLevel}!',
+                      style: const TextStyle(
+                        color: AppColors.xp,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    Text(
+                      gained > 1
+                          ? '$gained seviye birden atladın. Adımların '
+                              'karşılığını veriyor!'
+                          : 'Yürümeye devam et, sıradaki seviye '
+                              '${_profile.xpToNextLevel} XP.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
   /// Demo kontrollerinin girişi. Kaynağı besler; işi [_onStepsReported] yapar.
   /// Gerçek sensör aktifken demo butonları kilitli olduğu için burası
   /// yalnızca manuel kaynakta çalışır.
@@ -374,12 +454,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _today.coinsEarned += coinReward.coins;
       capJustReached = coinReward.capReached && !capWasReached;
 
+      // XP'nin kendi işaretçisi var: para tavanı dolduğunda XP durmamalı.
+      final xpReward = calculateStepXp(
+        pendingSteps: _profile.totalSteps - _profile.lastXpRewardedStepCount,
+      );
+      _profile.lastXpRewardedStepCount += xpReward.consumedSteps;
+      _today.xpEarned += xpReward.xp;
+      _awardXp(xpReward.xp);
+
       final adventure = _adventure;
       if (adventure != null &&
           adventure.isDefeated(_today.steps) &&
           !adventure.xpAwarded) {
         adventure.xpAwarded = true;
-        _profile.addXp(adventure.enemy.xpReward);
+        _awardXp(adventure.enemy.xpReward);
         enemyDefeated = true;
       }
       // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı.
@@ -543,7 +631,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _spinWheel(int xpWon) {
     setState(() {
       _profile.lastWheelSpinAt = GameClock.now();
-      _profile.addXp(xpWon);
+      _awardXp(xpWon);
     });
     _persist();
   }

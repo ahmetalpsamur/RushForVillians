@@ -34,6 +34,14 @@ class UserProfile {
   /// uygulama kapanıp açılsa, gün değişse, macera seçilse de.
   int lastRewardedStepCount;
 
+  /// [totalSteps]'in XP'ye çevrilmiş olduğu nokta.
+  ///
+  /// [lastRewardedStepCount]'tan **bilerek ayrı**: ikisi aynı işaretçiyi
+  /// paylaşsaydı, günlük para tavanı dolduğunda o işaretçi bekleyen tüm
+  /// adımları tükettiği için XP de dururdu. İki ekonominin oranı, tavanı ve
+  /// artık-adım davranışı farklı.
+  int lastXpRewardedStepCount;
+
   /// Adım kaynağından **raporlanmış** son kümülatif değer.
   ///
   /// [totalSteps]'ten ayrıdır ve ondan büyük olabilir: hız kontrolüne
@@ -76,6 +84,7 @@ class UserProfile {
     this.lastSeenAt,
     this.totalSteps = 0,
     this.lastRewardedStepCount = 0,
+    this.lastXpRewardedStepCount = 0,
     this.lastReportedStepCount = 0,
     this.lastSensorReading,
     this.lastStepReportAt,
@@ -193,6 +202,7 @@ class UserProfile {
     'lastSeenAt': lastSeenAt?.toUtc().toIso8601String(),
     'totalSteps': totalSteps,
     'lastRewardedStepCount': lastRewardedStepCount,
+    'lastXpRewardedStepCount': lastXpRewardedStepCount,
     'lastReportedStepCount': lastReportedStepCount,
     'lastSensorReading': lastSensorReading,
     'lastStepReportAt': lastStepReportAt?.toUtc().toIso8601String(),
@@ -216,6 +226,7 @@ class UserProfile {
       lastSeenAt: _parseDate(json['lastSeenAt']),
       totalSteps: json['totalSteps'] as int? ?? 0,
       lastRewardedStepCount: json['lastRewardedStepCount'] as int? ?? 0,
+      lastXpRewardedStepCount: json['lastXpRewardedStepCount'] as int? ?? 0,
       lastReportedStepCount: json['lastReportedStepCount'] as int? ?? 0,
       lastSensorReading: json['lastSensorReading'] as int?,
       lastStepReportAt: _parseDate(json['lastStepReportAt']),

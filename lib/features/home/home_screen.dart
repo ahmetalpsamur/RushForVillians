@@ -330,8 +330,8 @@ class _StepSourceCard extends StatelessWidget {
   }
 }
 
-/// Bugün adımlardan kazanılan para. Tavana ulaşıldığında bunu da söyler —
-/// kazanç sessizce durmaz.
+/// Bugün adımlardan kazanılan para ve XP. Para tavanına ulaşıldığında bunu da
+/// söyler — kazanç sessizce durmaz. XP'nin günlük tavanı yok.
 class _DailyEarnings extends StatelessWidget {
   final DailyProgress today;
 
@@ -340,23 +340,56 @@ class _DailyEarnings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final capped = today.coinCapReached;
+    return Column(
+      children: [
+        _EarningRow(
+          icon: Icons.monetization_on,
+          color: AppColors.streak,
+          text:
+              capped
+                  ? 'Bugün adımlarından ${today.coinsEarned} coin kazandın — '
+                      'günlük sınır doldu.'
+                  : 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
+          rate: '${GameConstants.stepsPerCoin} adım = 1',
+        ),
+        const SizedBox(height: 6),
+        _EarningRow(
+          icon: Icons.bolt,
+          color: AppColors.xp,
+          text: 'Bugün adımlarından ${today.xpEarned} XP kazandın.',
+          rate: '${GameConstants.stepsPerXp} adım = 1',
+        ),
+      ],
+    );
+  }
+}
+
+class _EarningRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String text;
+  final String rate;
+
+  const _EarningRow({
+    required this.icon,
+    required this.color,
+    required this.text,
+    required this.rate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.monetization_on, size: 18, color: AppColors.streak),
+        Icon(icon, size: 18, color: color),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            capped
-                ? 'Bugün adımlarından ${today.coinsEarned} coin kazandın — '
-                    'günlük sınır doldu.'
-                : 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
+            text,
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
         ),
-        Text(
-          '${GameConstants.stepsPerCoin} adım = 1',
-          style: const TextStyle(fontSize: 11, color: Colors.white38),
-        ),
+        Text(rate, style: const TextStyle(fontSize: 11, color: Colors.white38)),
       ],
     );
   }

@@ -12,6 +12,16 @@ class GameConstants {
   static const int dragonStepGoal = 20000;
 
   /// Bir seviye atlamak için gereken taban XP. Her seviyede artar.
+  ///
+  /// Eğri `baseXpPerLevel * level`: seviye başına maliyet **doğrusal** artar,
+  /// kümülatif maliyet karesel olur (N. seviyeye ulaşmak `500·N·(N-1)` XP).
+  /// Günlük girdisi kabaca sabit olan bir oyuncu için seviye numarası
+  /// `√gün` hızında ilerler — erken seviyeler hızlı, sonrakiler anlamlı.
+  ///
+  /// **Üstel eğri bilerek seçilmedi:** girdisi gerçek hayattan gelen bir
+  /// oyunda üstel maliyet, bir noktada "aylarca sürecek seviye" üretir ve
+  /// sayı durmuş gibi görünür. Doğrusal artış, sonraki seviyeyi her zaman
+  /// makul bir ufukta tutar.
   static const int baseXpPerLevel = 1000;
 
   /// Günlük çarkın çevrilebilmesi için gereken minimum adım sayısı.
@@ -35,6 +45,21 @@ class GameConstants {
   /// atan kullanıcı ~120 coin/gün, ~840 coin/hafta kazanır — yani haftada
   /// 1-2 anlamlı satın alma.
   static const int stepsPerCoin = 50;
+
+  /// Kaç adımın 1 XP ettiği.
+  ///
+  /// Seviye eğrisinden ([baseXpPerLevel]) türetildi: 10. seviyeye ulaşmak
+  /// 45.000 XP istiyor. Günde 6.000 adım atan kullanıcı bu oranla 3.000 XP/gün
+  /// kazanır ve 10. seviyeye **yalnızca adımla 15 günde** ulaşır; düşman ve
+  /// çark XP'si bunu ~12 güne indirir. Erken seviyeler günler değil saatler
+  /// sürer, bu da ilk oturumda ilerleme hissi verir.
+  ///
+  /// **Günlük XP tavanı bilerek yok.** Para tavanı ([maxDailyStepCoins]) bir
+  /// ekonomi koruması; XP'nin harcanacağı bir yer olmadığı için aynı gerekçe
+  /// geçerli değil. Sahte adıma karşı koruma zaten yukarıda,
+  /// [maxStepsPerMinute] ile yapılıyor — gerçekten 20.000 adım atan kullanıcı
+  /// ilerlemesinin kesilmesini hak etmiyor.
+  static const int stepsPerXp = 2;
 
   /// Adımlardan bir günde kazanılabilecek en fazla para.
   ///

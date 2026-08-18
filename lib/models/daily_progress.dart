@@ -13,11 +13,17 @@ class DailyProgress {
   /// sıfırlanır.
   int coinsEarned;
 
+  /// Bugün **adımlardan** kazanılan XP. Yalnızca gösterim için; XP'nin günlük
+  /// tavanı yok (bkz. [GameConstants.stepsPerXp]). Düşman ve çark XP'si buraya
+  /// yazılmaz — bu satır "yürüyerek ne kazandım" sorusunu cevaplar.
+  int xpEarned;
+
   DailyProgress({
     required this.date,
     this.steps = 0,
     this.stepGoal = GameConstants.dragonStepGoal,
     this.coinsEarned = 0,
+    this.xpEarned = 0,
   });
 
   /// Günlük adım-para tavanı doldu mu.
@@ -42,6 +48,7 @@ class DailyProgress {
     'steps': steps,
     'stepGoal': stepGoal,
     'coinsEarned': coinsEarned,
+    'xpEarned': xpEarned,
   };
 
   factory DailyProgress.fromJson(Map<String, dynamic> json) {
@@ -53,6 +60,7 @@ class DailyProgress {
       steps: json['steps'] as int? ?? 0,
       stepGoal: json['stepGoal'] as int? ?? GameConstants.dragonStepGoal,
       coinsEarned: json['coinsEarned'] as int? ?? 0,
+      xpEarned: json['xpEarned'] as int? ?? 0,
     );
   }
 }

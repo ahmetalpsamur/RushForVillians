@@ -1437,8 +1437,122 @@ Toplam **116 test geçiyor**, `flutter analyze` temiz.
 
 ---
 
+# Aşama 2b — Adım → XP (#2) ✅ (2026-08-18)
+
+Kart #2 kapandı. XP artık yalnızca düşman ve çarktan değil, **her adımdan**
+geliyor.
+
+## Seviye eğrisi — değiştirilmedi, gerekçelendirildi
+
+Mevcut formül korundu (Kural 1/3): `xpToNextLevel = baseXpPerLevel * level`.
+Seviye başına maliyet **doğrusal** artar, kümülatif maliyet karesel olur:
+
+```
+N. seviyeye ulaşmak için gereken toplam XP = 500 · N · (N-1)
+```
+
+Günlük girdisi kabaca sabit olan bir oyuncu için seviye numarası `√gün`
+hızında ilerler — erken seviyeler hızlı (ilk oturumda ilerleme hissi),
+sonrakiler anlamlı.
+
+**Üstel eğri bilerek seçilmedi.** Girdisi gerçek hayattan gelen bir oyunda
+üstel maliyet bir noktada "aylarca sürecek seviye" üretir ve sayı durmuş gibi
+görünür. Doğrusal artış, sonraki seviyeyi her zaman makul bir ufukta tutar.
+
+## Oran: `stepsPerXp = 2`
+
+Eğriden türetildi: 10. seviye 45.000 XP istiyor, günde 6.000 adım 3.000 XP
+eder.
+
+| Seviye | Bu seviye | Kümülatif XP | Kümülatif adım | Gün (6.000/gün) |
+|---|---|---|---|---|
+| 1→2 | 1.000 | 1.000 | 2.000 | 0,3 |
+| 3→4 | 3.000 | 6.000 | 12.000 | 2 |
+| 5→6 | 5.000 | 15.000 | 30.000 | 5 |
+| 7→8 | 7.000 | 28.000 | 56.000 | 9,3 |
+| 9→10 | 9.000 | 45.000 | 90.000 | **15** |
+
+Kullanıcı profilleri (yalnızca adımdan; düşman 300–1.500 XP ve çark bunu
+~%20 kısaltır):
+
+| Günlük adım | XP/gün | 10. seviye | 20. seviye |
+|---|---|---|---|
+| 3.000 | 1.500 | 30 gün | 127 gün |
+| 6.000 (hedef) | 3.000 | **15 gün** | 63 gün |
+| 10.000 | 5.000 | 9 gün | 38 gün |
+| 20.000 | 10.000 | 4,5 gün | 19 gün |
+
+Tablodaki 15 ve 9 gün **testle doğrulandı** (`step_xp_test.dart`), prosa
+tahmini değil.
+
+**Günlük XP tavanı yok.** Para tavanı ([`maxDailyStepCoins`]) bir ekonomi
+koruması; XP'nin harcanacağı bir yer olmadığı için aynı gerekçe geçmiyor.
+Sahte adıma karşı koruma zaten akışın yukarısında, `limitStepBatch` içinde.
+Gerçekten 20.000 adım atan kullanıcının ilerlemesi kesilmemeli.
+
+## İşaretçi kararı: AYRI, paylaşılmadı
+
+`UserProfile.lastXpRewardedStepCount`, `lastRewardedStepCount`'tan **ayrı**.
+
+**Neden paylaşılmadı:** para işaretçisi günlük tavan dolduğunda bekleyen
+**tüm** adımları tüketiyor (1b kararı: biriktirip ertesi gün bozdurmak yok).
+Tek işaretçi olsaydı, para tavanına ulaşan oyuncunun **XP'si de dururdu** —
+birbirine bağlanmaması gereken iki ekonomi. Ayrıca iki oranın artık-adım
+davranışı da farklı (50 vs 2).
+
+Test: `para ve XP işaretçileri bağımsız` grubu — tavan doluyken 4.000 adım
+para vermiyor ama 2.000 XP veriyor.
+
+## Seviye atlama yayını
+
+`lib/services/level_events.dart` — `GameStorage` deseninde statik servis,
+`Stream<LevelUpEvent>` broadcast.
+
+XP veren **tüm** yollar tek noktadan geçiyor: `RootShell._awardXp`. Öncesinde
+`_profile.addXp` üç ayrı yerden çağrılıyordu (adım/düşman/çark); yayını
+oraya bağlamak her birini tek tek gezmek demekti.
+
+> Aşama 3'teki item seviye kilidi (#10) ve mağaza seviye kilidi (#11) bu
+> yayını dinleyecek. Bugün tek dinleyici kutlama.
+
+Tek ödülle birden fazla seviye atlanırsa **tek** olay yayınlanır
+(`levelsGained > 1`), her seviye için ayrı değil.
+
+## Arayüz
+
+- Ana ekrandaki kazanç satırı ikiye çıktı: coin + XP, her biri kendi oranıyla.
+  `DailyProgress.xpEarned` yalnızca **adımdan** gelen XP'yi sayar; düşman ve
+  çark XP'si buraya yazılmaz — satır "yürüyerek ne kazandım" sorusunu
+  cevaplıyor.
+- XP ilerleme çubuğu zaten `HeroProgressRings` içinde vardı, dokunulmadı.
+- Seviye atlama kutlaması: `AppColors.xp` çerçeveli, 5 saniyelik zengin
+  SnackBar. `_showStreakMilestone` / `_showCoinCapNotice` ile aynı desen.
+  `setState` içinden çağrılabilsin diye `addPostFrameCallback` ile
+  gösteriliyor.
+
+## Şema v6
+
+Yeni alanlar: `UserProfile.lastXpRewardedStepCount`, `DailyProgress.xpEarned`.
+5 → 6 taşıması: `lastXpRewardedStepCount = totalSteps`. Gerekçe 1b ile aynı —
+XP yokken atılmış adımlar geriye dönük seviye kazandırmamalı, yoksa
+güncelleme sonrası ilk açılışta oyuncu birkaç seviye birden atlar.
+
+⚠️ **Streak koruması artık v7.**
+
+## Test
+
+`test/step_xp_test.dart` — 22 test: dönüşüm oranı, artık adımların taşınması,
+tavansızlık, buff çarpanı, seviye eğrisi (doğrusal artış + 45.000 XP + 15/9
+günlük ulaşma süreleri), çift sayma (aynı adım, ardışık parti, gün değişimi),
+para/XP işaretçi bağımsızlığı, seviye atlama olayı (tek/çoklu/hiç), kapat-aç
+turu, v5→v6 taşıması.
+
+Toplam **138 test geçiyor**, `flutter analyze` temiz.
+
+---
+
 # Not — şema sürümü
 
 Aşama 0 bölümünde "Şema sürümü: 2" yazıyor; o bölüm yazıldığında güncel
-sürüm buydu. **Güncel sürüm v5** (bkz. Aşama 2a). Streak koruması v6 ile
+sürüm buydu. **Güncel sürüm v6** (bkz. Aşama 2b). Streak koruması v7 ile
 gelecek.
