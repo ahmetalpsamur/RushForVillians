@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../core/utils/game_clock.dart';
 import '../models/adventure_quest.dart';
 
 class AdventureNotificationService {
@@ -87,7 +88,10 @@ class AdventureNotificationService {
 
     final gifPath = await _copyAttackGif(adventure);
     final remainingSteps = adventure.roundStepsRemaining(currentSteps);
-    final timeLeft = adventure.countdownRemaining(DateTime.now());
+    // `nextEnemyAttackAt` GameClock ile yazılıyor; karşılaştırma da aynı
+    // kaynaktan yapılmalı, yoksa saat geriye alınmış cihazda kalan süre
+    // olduğundan kısa görünür ve hiç hatırlatma planlanmaz.
+    final timeLeft = adventure.countdownRemaining(GameClock.now());
     final reminders = min(_notificationCount, timeLeft.inMinutes ~/ 5);
     final random = Random(adventure.enemy.id.hashCode + currentSteps);
 

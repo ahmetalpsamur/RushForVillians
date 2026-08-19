@@ -1636,3 +1636,163 @@ Toplam **159 test geçiyor**, `flutter analyze` temiz.
 
 Aşama 0 bölümünde "Şema sürümü: 2" yazıyor; o bölüm yazıldığında güncel
 sürüm buydu. **Güncel sürüm v7** (bkz. Aşama 2c).
+
+---
+
+# Aşama 2d — Açılış dayanıklılığı ✅ (2026-08-19)
+
+Kart yok; Faz 0 incelemesinde çıkan tek gerçek hata.
+
+## Ne düzeltildi
+
+**Açılış akışı artık hiçbir koşulda ekranı kilitlemiyor.** Önceden
+`_initializeApp` içindeki `CharacterStorage.load()`, `GameStorage.load()` ve
+`AdventureNotificationService.initialize()` çağrılarının hiçbirinde hata
+yönetimi yoktu. Platform kanalı düşerse (SharedPreferences yok, bildirim
+kanalı yok) `_isLoading` sonsuza kadar `true` kalıyor ve kullanıcı markalı
+açılış görselinde asılı kalıyordu — ne hata mesajı vardı ne çıkış yolu.
+
+- Kayıt okuma `try/catch` içine alındı; hata `debugPrint` ile loglanır,
+  açılış temiz varsayılanla devam eder (gerekçe: **GD1**).
+- Bildirim servisi başlatması `.catchError` ile ayrıştırıldı; bildirim
+  kurulamayan cihazda oyunun geri kalanı açılır.
+- `CharacterStorage.save()` de sarmalandı: yazma başarısızsa oturum devam eder.
+- Hata sessiz kalmıyor: `scaffoldMessengerKey` üzerinden oturumda **bir kez**
+  açıklayıcı SnackBar gösterilir (CLAUDE.md — Model Kuralları #4).
+- `adventure_notification_service.dart` hatırlatma sayısı artık
+  `GameClock.now()` ile hesaplanıyor (gerekçe: **GD2**).
+
+## Test
+
+- `test/app_boot_test.dart` — 4 test: kayıt okunamazken açılış ekranında
+  asılı kalınmaması, kullanıcının sessizce geçiştirilmemesi, sağlıklı
+  kayıtta uyarı çıkmaması, açılış görselinin hemen kaybolmaması.
+  **Not:** platform kanalı cevapları `testWidgets`'in sahte saatiyle teslim
+  edilmiyor; açılış hem `WidgetTester.runAsync` ile gerçek zamanda hem de
+  `pump` ile sahte saatte ilerletiliyor. Mock kurulu olup olmamasına göre iki
+  yoldan biri çalışıyor.
+- `test/step_history_test.dart` — 8 test: `DailyStepRecord` gün anahtarı,
+  ilerleme kırpması, sıfır hedefte sıfıra bölme olmaması, kayıt turu, eksik
+  alanlar; `GameState` tarafında geçmişin yokluğu, liste olmayan geçmiş ve
+  bozuk satırların atılıp sağlamların korunması. (Arkadaşımın eklediği
+  `DailyStepRecord` modelinin hiç testi yoktu; yapısına dokunulmadı.)
+
+Toplam **179 test geçiyor**, `flutter analyze` temiz.
+
+## Sonraki adım
+
+Aşama 3 — Item temeli (`#8 → #10 → #11 → #16`). 784 asset hâlâ
+`pubspec.yaml`'a eklenmemiş durumda (triaj C8).
+
+
+---
+
+# Arkadaşımla Konuşulacak — mimari farklılıklar (2026-08-19)
+
+Bu maddeler **hata değil**; takım arkadaşımın (`e902185` + `f28f510` merge +
+`feec7db`) bilinçli tercihleri. Çalışıyorlar, bu yüzden dokunulmadı. Ama
+CLAUDE.md'de yazılı bir kararı değiştirdikleri ya da ileride bizi kesecekleri
+için konuşulmaları gerekiyor.
+
+### K1. Gün sınırı 04:00 → 00:00'a çekildi
+- **Dosya:** `lib/core/utils/game_day.dart` (`dayStartHour = 0`)
+- **Neden yapılmış:** adım halkası takvim günüyle kapansın ve arşivlensin
+  (`DailyStepRecord.dateKey` takvim günü).
+- **Ne kaybettik:** Aşama 1a'da 04:00 tam da "gece yarısını geçmiş ama hâlâ
+  ayakta olan kullanıcının serisi haksız yere kırılmasın" diye seçilmişti.
+  Ayrıca 04:00, çarkın gece yarısı açığını kapatıyordu: şimdi 23:59'da çevirip
+  00:01'de tekrar çevirmek mümkün. (Açık 04:00'da da vardı ama kimsenin ayakta
+  olmadığı bir saatteydi.)
+- **Öneri:** ikisi ayrılabilir — adım geçmişi arşivi takvim gününü kullanmaya
+  devam etsin, seri ve çark 04:00 sınırında kalsın. Bu, `GameDay`'e ikinci bir
+  sınır kavramı eklemek demek; **karar arkadaşımla birlikte verilmeli.**
+
+### K2. Round süresi adımdan bağımsız sabit 20 dakikaya çevrildi
+- **Dosya:** `lib/models/adventure_quest.dart`
+  (`roundDuration`, `briskWalkingStepsPerMinute`/`syncGraceMinutes` kaldırıldı)
+- Eski model "adım/100 dk + 1 dk senkron payı" idi; yenisi her round için sabit
+  20 dk. Testler birlikte güncellenmiş, silinmemiş. Denge kararı, kod hatası
+  değil.
+
+### K3. Round erken tamamlanınca anında kazanılıyor
+- **Dosya:** `adventure_quest.dart:resolveRound`
+- `resolveExpiredRound` artık `resolveRound`'a yönlendiren bir kabuk.
+  `isDefeated` erken çıkışı kaldırıldı; yerine `roundTargetSteps <= 0`
+  koruması var (düşman ölünce hedef 0'a düşüyor, döngü orada duruyor).
+  İncelendi, sonsuz döngü yok.
+
+### K4. Kalıcı round durumu `AdventureQuest` üzerinde büyüdü
+- `currentRound`, `lastResolvedRound`, `roundOutcomeSerial`,
+  `presentedRoundOutcomeSerial`, `lastRoundWon` diske yazılıyor.
+  `presentedRoundOutcomeSerial` bir **sunum** durumu (animasyon oynatıldı mı);
+  model katmanında duruyor. Model Kuralları #1'i ihlal etmiyor (int), ama
+  sunum/model sınırını bulanıklaştırıyor.
+
+### K5. Ekran, model nesnesini doğrudan değiştiriyor
+- **Dosya:** `adventure_screen.dart:_markRoundOutcomePresented`,
+  `_playRoundVictory` (`adventure.deathAnimationPlayed = true`)
+- `AdventureScreen`, `RootShell`'in state nesnesini mutasyona uğratıp
+  `onAdventureUpdated()` ile kaydettiriyor. Mevcut `setState` mimarisinde
+  çalışıyor; Riverpod/Bloc'a geçişte ilk kırılacak yer burası olur.
+
+### K6. Yeni düşmanlar kataloğun **başına** eklendi
+- **Dosya:** `lib/data/enemy_catalog.dart` — `border_scout` (500),
+  `forest_raider` (1000), `blood_apprentice` (1500).
+- Testler `EnemyCatalog.enemies[0]` yerine `byId(...)` kullanacak şekilde
+  güncellenmiş; sıraya bağlı kod kalmamış. İyi.
+
+### K7. Açılış sesi için özel platform kanalı
+- **Dosyalar:** `lib/services/launch_sound.dart`, `MainActivity.kt`,
+  `AppDelegate.swift` (`rush_for_villains/launch_sound`)
+- `audioplayers` gibi bir paket yerine elle kanal yazılmış. Kotlin tarafı
+  düzgün (release, onCompletion/onError, onDestroy). **Küçük sızıntı:**
+  `prepare()` fırlatırsa `MediaPlayer` release edilmiyor — süreç başına bir
+  kez, zararsız. iOS tarafı Windows'ta derlenemedi.
+
+### K8. `_stepHistory` sınırsız büyüyor
+- **Dosya:** `root_shell.dart:_archiveDailySteps`
+- Her gün bir kayıt; 5 yılda ~1.800 satır (~180 KB SharedPreferences).
+  Bugün sorun değil, ama bir üst sınır (ör. son 730 gün) ya da aylık özet
+  konuşulmalı.
+
+---
+
+# GERİ DÖNÜLECEK KARARLAR
+
+Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kararlar.
+
+### GD1. Açılışta kayıt okunamazsa oyun temiz varsayılanla açılır (2026-08-19)
+- **Nerede:** `lib/app.dart:_initializeApp`
+- **Karar:** `CharacterStorage.load()` / `GameStorage.load()` fırlatırsa hata
+  yutulmuyor ama açılış da durmuyor: `avatar = null`, `gameState = null` ile
+  devam edilir ve kullanıcıya bir SnackBar ile "kayıtlı ilerlemene şu an
+  ulaşılamadı" denir.
+- **Neden:** eskiden herhangi bir platform kanalı hatası `_isLoading`'i sonsuza
+  kadar `true` bırakıyordu — kullanıcı açılış görselinde asılı kalıyor, ne hata
+  görüyor ne çıkış yolu buluyordu.
+- **Riski ve neden kabul edildi:** temiz varsayılanla açılmak, oyuncuya
+  "ilerlemem silinmiş" hissi verebilir. Bu yüzden **kayıt silinmiyor ve
+  üzerine hemen yazılmıyor kararı verilmedi** — `RootShell` normal akışında
+  `_persist()` çağırdığı anda eski kayıt üzerine yazılır. Kalıcı bir okuma
+  hatası (bozuk değil, erişilemez kayıt) senaryosunda bu veri kaybı demektir.
+- **Geri dönülecek nokta:** Aşama 6 (Firebase) geldiğinde sunucu kaydı ikinci
+  bir kaynak olur. O zamana kadar daha güvenli davranış: `_storageFailed`
+  iken `GameStorage` yazmayı tamamen kilitlemek (salt-okunur oturum). Şimdi
+  yapılmadı çünkü `RootShell`'in yazma yolunu tek bayrakla kilitlemek onun
+  akışına dokunmayı gerektiriyor ve bu birimin kapsamı dışıydı.
+
+### GD2. Bildirim planlaması `GameClock`'a bağlandı (2026-08-19)
+- **Nerede:** `lib/services/adventure_notification_service.dart`
+- **Karar:** `countdownRemaining(DateTime.now())` → `countdownRemaining(GameClock.now())`.
+- **Neden:** `nextEnemyAttackAt` `GameClock` ile yazılıyor. İki farklı saat
+  kaynağını karşılaştırmak, cihaz saati geriye alınmış (GameClock donmuş)
+  durumda kalan süreyi olduğundan kısa gösteriyor ve hiç hatırlatma
+  planlanmamasına yol açıyordu.
+- **Açık kalan:** `tz.setLocalLocation(tz.UTC)` hâlâ sabit (triaj C3).
+
+### GD3. Round sistemine dokunulmadı (2026-08-19)
+- İncelendi, gerçek bir hata bulunmadı: `_onStepsReported` tek round çözüyor
+  ama saniyelik `_updateAdventureClock` → `resolveExpiredRounds` kalanları bir
+  saniye içinde topluyor; düşman aynı partide ölürse `roundTargetSteps` zaten
+  0'a düştüğü için çözülecek round kalmıyor. Kova A'ya terfi eden bir şey yok.
+

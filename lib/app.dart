@@ -27,6 +27,15 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
   GameState? _gameState;
   bool _isLoading = true;
 
+  /// Kayıt okunamadıysa `true`. Bu durumda kayıt **silinmez**; kullanıcı
+  /// varsayılanla oynar ve bir sonraki açılışta okuma yeniden denenir.
+  bool _storageFailed = false;
+
+  /// Kayıt hatası uyarısı oturumda bir kez gösterilir.
+  bool _storageWarningShown = false;
+
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
@@ -39,11 +48,30 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
 
     // Bildirim servisi açılış görseli gösterilirken hazırlanır. Böylece native
     // açılış ekranı gereksiz yere ekranda kalmaz.
-    final notificationInitialization = AdventureNotificationService.initialize();
-    final avatar = await CharacterStorage.load();
-    // Oyun durumu avatara bağlı okunur; avatar yoksa yeni oyuncu demektir.
-    final gameState =
-        avatar == null ? null : await GameStorage.load(avatar: avatar);
+    final notificationInitialization = AdventureNotificationService.initialize()
+        .catchError((Object error) {
+          // Bildirim izni/kanalı olmayan cihazda oyun yine de açılmalı.
+          debugPrint('Açılış: bildirim servisi hazırlanamadı ($error)');
+        });
+
+    // Açılışın hiçbir adımı ekranı kilitlememeli: platform kanalı düşerse
+    // (SharedPreferences yoksa, izin reddedilirse) yükleme sonsuza kadar
+    // sürer ve kullanıcı açılış görselinde asılı kalırdı.
+    AvatarProfile? avatar;
+    GameState? gameState;
+    try {
+      avatar = await CharacterStorage.load();
+      // Oyun durumu avatara bağlı okunur; avatar yoksa yeni oyuncu demektir.
+      gameState =
+          avatar == null ? null : await GameStorage.load(avatar: avatar);
+    } catch (error) {
+      // Kayıt okunamadıysa temiz varsayılanla başlanır; kayıt silinmez, bir
+      // sonraki açılışta tekrar denenir.
+      debugPrint('Açılış: kayıt okunamadı, varsayılanla başlanıyor ($error)');
+      avatar = null;
+      gameState = null;
+      _storageFailed = true;
+    }
     await notificationInitialization;
 
     final elapsed = DateTime.now().difference(startedAt);
@@ -57,10 +85,35 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       _gameState = gameState;
       _isLoading = false;
     });
+    _showStorageWarningIfNeeded();
+  }
+
+  /// Kayıt okunamadığında sessiz kalınmaz: oyuncu ilerlemesinin neden sıfır
+  /// göründüğünü bilmeli (CLAUDE.md — Model Kuralları #4).
+  void _showStorageWarningIfNeeded() {
+    if (!_storageFailed || _storageWarningShown) return;
+    _storageWarningShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _messengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 6),
+          content: Text(
+            'Kayıtlı ilerlemene şu an ulaşılamadı. Oyun geçici bir '
+            'kayıtla açıldı; uygulamayı yeniden başlatmayı dene.',
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _saveCharacter(AvatarProfile avatar) async {
-    await CharacterStorage.save(avatar);
+    try {
+      await CharacterStorage.save(avatar);
+    } catch (error) {
+      // Yazma başarısızsa oyun oturum boyunca çalışmaya devam eder.
+      debugPrint('Karakter kaydedilemedi ($error)');
+    }
     if (!mounted) return;
     setState(() => _avatar = avatar);
   }
@@ -69,6 +122,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rush for Villains',
+      scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       home:
