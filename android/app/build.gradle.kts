@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.ahmetalpsamur.rush_for_villains"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
