@@ -11,8 +11,19 @@ class GameDay {
 
   /// Oyun gününün başladığı saat (0-23).
   ///
-  /// Adım halkası takvim günüyle birlikte gece 00:00'da kapanır ve arşivlenir.
-  static const int dayStartHour = 0;
+  /// 04:00 seçildi: gece yarısını geçmiş ama hâlâ ayakta olan kullanıcıyı gün
+  /// ortasında kesmiyor, serisini haksız yere kırmıyor. Ayrıca çarkın gece
+  /// yarısı açığını kapatıyor — 00:00 sınırında 23:59'da çevirip 00:01'de
+  /// tekrar çevirmek mümkündü.
+  ///
+  /// **Adım halkası da bu sınırı kullanır.** Bir ara takvim gününe (00:00)
+  /// çekilmişti; ama halka, günlük hedefe göre ölçülen bir ilerlemeyi
+  /// gösteriyor ve o hedef bu sınırda sıfırlanıyor. İki farklı sınır,
+  /// halkanın ölçtüğü şeyle gösterdiği pencereyi ayırırdı.
+  ///
+  /// Değiştirmek için yalnızca bu sabit güncellenir; adım sıfırlaması, çark
+  /// hakkı, çark geri sayımı, seri ve adım geçmişi arşivi otomatik uyar.
+  static const int dayStartHour = 4;
 
   /// [moment]'in ait olduğu oyun gününün başlangıç anı.
   static DateTime startOf(DateTime moment) {

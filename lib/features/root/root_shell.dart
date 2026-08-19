@@ -8,6 +8,7 @@ import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
@@ -16,11 +17,13 @@ import '../../models/avatar_profile.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
+import '../../models/item.dart';
 import '../../models/reward.dart';
 import '../../models/user_profile.dart';
 import '../../models/xp_store_item.dart';
 import '../../services/adventure_notification_service.dart';
 import '../../services/game_storage.dart';
+import '../../services/item_catalog.dart';
 import '../../services/level_events.dart';
 import '../../services/pedometer_step_source.dart';
 import '../../services/raw_step_sensor.dart';
@@ -71,6 +74,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
 
+  /// Oyuncunun sınıfının kuşanabileceği ekipman. Katalog asset taramasıyla
+  /// üretildiği için asenkron gelir; okunana kadar mağazanın ekipman bölümü
+  /// boş görünür, geri kalanı çalışır.
+  List<Item> _equipment = const [];
+
   /// Adım kaynağı: gerçek pedometer ya da demo kontrolleri.
   ///
   /// Kaynak kim olursa olsun akış tek yerden geçer ([_onStepsReported]).
@@ -90,6 +98,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   bool _isForeground = true;
   final Random _random = Random();
 
+  /// Dondurma hakkı yükseltmesinin kimliği ([MockData.storeItems]).
+  /// Satın alma stoğu [UserProfile.grantStreakFreeze] üzerinden büyütür.
+  static const _streakFreezeItemId = 'upgrade_streak_freeze';
+
   static const _reminderMessages = [
     '{round}. round: {enemy} için {steps} adım kaldı.',
     '{round}. round devam ediyor! {steps} adım daha atmalısın.',
@@ -102,11 +114,26 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     super.initState();
     _restoreState();
     _attachStepSource();
+    unawaited(_loadItemCatalog());
     WidgetsBinding.instance.addObserver(this);
     _adventureClock = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _tick(),
     );
+  }
+
+  /// Item kataloğunu yükler ve oyuncunun sınıfına göre süzer.
+  ///
+  /// Katalog okunamazsa [ItemCatalog.load] boş liste döner ve loglar; mağaza
+  /// ekipmansız açılır, oyunun geri kalanı etkilenmez.
+  Future<void> _loadItemCatalog() async {
+    await ItemCatalog.load();
+    if (!mounted) return;
+    setState(() {
+      _equipment = ItemCatalog.forCharacterClass(
+        _profile.avatar.characterClass,
+      );
+    });
   }
 
   /// Seçili adım kaynağını kurar ve dinlemeye başlar.
@@ -242,15 +269,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     return changed;
   }
 
+  /// Tamamlanan günü adım halkası geçmişine yazar.
+  /// Kural ve gerekçeler [archiveStepDay] içinde.
   void _archiveDailySteps(DailyProgress progress) {
-    final record = DailyStepRecord(
-      date: progress.date,
-      steps: progress.steps,
-      stepGoal: progress.stepGoal,
+    _stepHistory = archiveStepDay(
+      history: _stepHistory,
+      completedDay: progress,
     );
-    _stepHistory.removeWhere((item) => item.dateKey == record.dateKey);
-    _stepHistory.add(record);
-    _stepHistory.sort((a, b) => a.calendarDay.compareTo(b.calendarDay));
   }
 
   /// Kayıtlı durumu geri yükler. Kayıt yoksa ya da kayıt başka bir güne aitse
@@ -263,7 +288,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // güvenilen zaman diskten yüklenir.
     GameClock.restore(_profile.lastSeenAt);
     _today = restored?.today ?? DailyProgress(date: GameClock.now());
-    _stepHistory = List<DailyStepRecord>.of(restored?.stepHistory ?? const []);
+    // Eski (sınır konmadan önce yazılmış) kayıtlar açılışta da kırpılır.
+    _stepHistory = pruneStepHistory(
+      List<DailyStepRecord>.of(restored?.stepHistory ?? const []),
+    );
     _adventure = restored?.adventure;
     // Gün değişimi ve seri tazeleme tek yerden: _refreshDayCycle.
     if (_refreshDayCycle()) _persist();
@@ -466,6 +494,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     var enemyDefeated = false;
     CombatRoundResult? roundResult;
     int? milestoneReached;
+    var milestoneFreezeGranted = false;
     var capJustReached = false;
     final capWasReached = _today.coinCapReached;
     setState(() {
@@ -507,12 +536,19 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       if (_today.steps >= GameConstants.streakStepThreshold &&
           _profile.registerStreakDay(now)) {
         milestoneReached = _profile.reachedStreakMilestone;
+        // Her kilometre taşı bir dondurma hakkı verir (stok sınırlı).
+        // Aşama 2c'de bilerek boş bırakılan kazanım yolu bu.
+        if (milestoneReached != null) {
+          milestoneFreezeGranted = _profile.grantStreakFreeze() > 0;
+        }
       }
     });
     _persist();
     if (capJustReached) _showCoinCapNotice();
     final milestone = milestoneReached;
-    if (milestone != null) _showStreakMilestone(milestone);
+    if (milestone != null) {
+      _showStreakMilestone(milestone, freezeGranted: milestoneFreezeGranted);
+    }
     if (enemyDefeated) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       ScaffoldMessenger.of(context).showSnackBar(
@@ -625,20 +661,24 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
-  // TODO(rewards): Kilometre taşı ödülü henüz üretilmiyor. Ödül altyapısı
-  // Aşama 3d/4b'de kurulunca (bkz. CLAUDE.md, kart #14) buraya bağlanacak;
-  // o güne kadar ödül uydurmak yerine yalnızca uygulama içi bildirim var.
-  void _showStreakMilestone(int days) {
+  // TODO(rewards): Kilometre taşı **item** ödülü henüz üretilmiyor; ödül
+  // altyapısı (kart #14) Aşama 4b'de kurulunca buraya bağlanacak. Dondurma
+  // hakkı ödülü Aşama 3'te bağlandı.
+  void _showStreakMilestone(int days, {required bool freezeGranted}) {
+    final message =
+        freezeGranted
+            ? '$days günlük seri! Kilometre taşı ödülün: 1 dondurma hakkı.'
+            : '$days günlük seri! Kilometre taşına ulaştın '
+                '(dondurma stoğun zaten dolu).';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
         content: Row(
           children: [
             const Icon(Icons.local_fire_department, color: AppColors.streak),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text('$days günlük seri! Kilometre taşına ulaştın.'),
-            ),
+            Expanded(child: Text(message)),
           ],
         ),
       ),
@@ -695,19 +735,58 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _persist();
   }
 
+  /// Yükseltme satın alır (kozmetik, unvan, dondurma hakkı).
+  ///
+  /// Tekrarlanamayan bir öğe zaten sahipliyse **para düşülmez**: eski kod
+  /// coin'i alıyor ama kimliği ikinci kez eklemediği için oyuncu bedavaya
+  /// ödüyordu.
   void _purchase(XpStoreItem item) {
+    final alreadyOwned = _profile.ownedItemIds.contains(item.id);
+    if (alreadyOwned && !item.repeatable) return;
     if (_profile.coins < item.cost) return;
+
+    var granted = 0;
+    if (item.id == _streakFreezeItemId) {
+      // Stok doluysa satış yapılmaz; para boşa gitmemeli.
+      granted = _profile.grantStreakFreeze();
+      if (granted == 0) {
+        _showStoreNotice(
+          'Dondurma hakkı stoğun dolu '
+          '(${GameConstants.maxStreakFreezes}). Para harcanmadı.',
+        );
+        return;
+      }
+    }
+
     setState(() {
       _profile.coins -= item.cost;
-      // Item sistemi (#8) gelene kadar yalnızca sahiplik kaydı tutulur.
-      if (!_profile.ownedItemIds.contains(item.id)) {
-        _profile.ownedItemIds.add(item.id);
-      }
+      if (!alreadyOwned) _profile.ownedItemIds.add(item.id);
     });
     _persist();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('${item.name} satın alındı!')));
+    _showStoreNotice('${item.name} satın alındı!');
+  }
+
+  /// Ekipman satın alır. Seviye kilidi (#10/#11) ve para kontrolü burada da
+  /// yapılır: ekran devre dışı görünse bile son söz state'in.
+  void _purchaseEquipment(Item item) {
+    if (_profile.ownedItemIds.contains(item.id)) return;
+    if (!item.isUnlockedAt(_profile.level)) return;
+    if (_profile.coins < item.cost) return;
+
+    setState(() {
+      _profile.coins -= item.cost;
+      _profile.ownedItemIds.add(item.id);
+    });
+    _persist();
+    _showStoreNotice('${item.name} satın alındı!');
+  }
+
+  void _showStoreNotice(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(behavior: SnackBarBehavior.floating, content: Text(message)),
+      );
   }
 
   void _openAdventure() => setState(() => _tabIndex = 1);
@@ -735,8 +814,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _openStore() => _push(
     XpStoreScreen(
       items: _storeItems,
+      equipment: _equipment,
       coins: _profile.coins,
+      level: _profile.level,
+      ownedItemIds: _profile.ownedItemIds,
+      streakFreezes: _profile.streakFreezes,
       onPurchase: _purchase,
+      onPurchaseEquipment: _purchaseEquipment,
     ),
   );
 
@@ -779,8 +863,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       ),
       XpStoreScreen(
         items: _storeItems,
+        equipment: _equipment,
         coins: _profile.coins,
+        level: _profile.level,
+        ownedItemIds: _profile.ownedItemIds,
+        streakFreezes: _profile.streakFreezes,
         onPurchase: _purchase,
+        onPurchaseEquipment: _purchaseEquipment,
       ),
       TeamScreen(team: _team),
       ProfileScreen(

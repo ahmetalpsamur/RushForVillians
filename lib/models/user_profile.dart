@@ -192,10 +192,10 @@ class UserProfile {
 
   /// Dondurma hakkı verir; stok [GameConstants.maxStreakFreezes] ile sınırlı.
   /// Gerçekten eklenen jeton sayısını döner (stok doluysa 0).
-  // TODO(items): Kazanım yolları Aşama 3'e ait — 7 günlük kilometre taşı
-  // ödülü ve mağazadan satın alma (bkz. CLAUDE.md, "Streak Koruması").
-  // Tüketim tarafı önce yazıldı çünkü gün aritmetiği bu işte taze; kazanım
-  // eklenirken buraya ikinci bir stok mantığı yazılmamalı.
+  // Kazanım yolları (Aşama 3'te bağlandı): seri kilometre taşları
+  // (`RootShell._onStepsReported`) ve mağazadaki "Seri Dondurma Hakkı"
+  // yükseltmesi (`RootShell._purchase`). İkisi de buradan geçer; ikinci bir
+  // stok mantığı yazılmamalı.
   int grantStreakFreeze([int amount = 1]) {
     if (amount <= 0) return 0;
     final granted =

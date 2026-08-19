@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
@@ -33,11 +34,9 @@ class ProfileScreen extends StatelessWidget {
   });
 
   List<DailyStepRecord> get _recentRecords {
-    final todayDate = DateTime(
-      today.date.year,
-      today.date.month,
-      today.date.day,
-    );
+    // Halka oyun gününe göre anahtarlanıyor (bkz. GameDay.dayStartHour);
+    // takvim gününe düşmek gün sınırından önceki saatleri kaydırırdı.
+    final todayDate = GameDay.startOf(today.date);
     final recordsByDay = {
       for (final record in stepHistory) record.dateKey: record,
     };

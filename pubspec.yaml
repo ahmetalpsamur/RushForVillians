@@ -37,3 +37,13 @@ flutter:
     - lib/Enemies/Blood_Monster_A_GIFs/
     - lib/Enemies/Demon_A_GIFs/
     - lib/Backgrounds/
+    - lib/Items/arch/
+    - lib/Items/axes_halberds/
+    - lib/Items/maces_hammers/
+    - lib/Items/magic/
+    - lib/Items/ranged_other/
+    - lib/Items/scythes/
+    - lib/Items/shields/
+    - lib/Items/spears/
+    - lib/Items/special_other/
+    - lib/Items/swords/

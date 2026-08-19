@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/game_day.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../widgets/daily_step_ring.dart';
@@ -22,11 +23,16 @@ class StepHistoryScreen extends StatefulWidget {
 class _StepHistoryScreenState extends State<StepHistoryScreen> {
   late DateTime _selectedMonth;
 
+  /// Takvimin "bugün"ü oyun günüdür, takvim günü değil: gün sınırı gece
+  /// yarısı olmadığı için (bkz. [GameDay.dayStartHour]) sınırdan önceki
+  /// saatler hâlâ önceki güne yazılır.
+  DateTime get _todayGameDay => GameDay.startOf(widget.today.date);
+
   @override
   void initState() {
     super.initState();
-    final now = widget.today.date;
-    _selectedMonth = DateTime(now.year, now.month);
+    final today = GameDay.startOf(widget.today.date);
+    _selectedMonth = DateTime(today.year, today.month);
   }
 
   Map<String, DailyStepRecord> get _records {
@@ -34,7 +40,7 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
       for (final record in widget.history) record.dateKey: record,
     };
     final todayRecord = DailyStepRecord(
-      date: widget.today.date,
+      date: _todayGameDay,
       steps: widget.today.steps,
       stepGoal: widget.today.stepGoal,
     );
@@ -49,7 +55,8 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
     final leadingBlanks =
         DateTime(_selectedMonth.year, _selectedMonth.month).weekday - 1;
     final cellCount = leadingBlanks + daysInMonth;
-    final nowMonth = DateTime(widget.today.date.year, widget.today.date.month);
+    final today = _todayGameDay;
+    final nowMonth = DateTime(today.year, today.month);
     final canGoNext = _selectedMonth.isBefore(nowMonth);
 
     return Scaffold(
@@ -145,7 +152,7 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
                   _selectedMonth.month,
                   day,
                 );
-                if (date.isAfter(widget.today.date)) {
+                if (date.isAfter(today)) {
                   return Center(
                     child: Text(
                       '$day',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/constants/game_constants.dart';
 import '../models/boss_quest.dart';
 import '../models/team.dart';
 import '../models/xp_store_item.dart';
@@ -45,6 +46,16 @@ class MockData {
       description: 'Günlük çarkı bir kez daha çevir.',
       cost: 300,
       icon: Icons.replay_circle_filled,
+    ),
+    XpStoreItem(
+      id: 'upgrade_streak_freeze',
+      name: 'Seri Dondurma Hakkı',
+      description:
+          'Bir günü kaçırırsan serin otomatik korunur. '
+          'Stok en fazla ${GameConstants.maxStreakFreezes}.',
+      cost: 600,
+      icon: Icons.ac_unit,
+      repeatable: true,
     ),
     XpStoreItem(
       id: 'title_villain_hunter',

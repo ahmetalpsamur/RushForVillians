@@ -1687,75 +1687,218 @@ Aşama 3 — Item temeli (`#8 → #10 → #11 → #16`). 784 asset hâlâ
 
 ---
 
-# Arkadaşımla Konuşulacak — mimari farklılıklar (2026-08-19)
+# Aşama 2e — Gün sınırı ve adım geçmişi bütünlüğü ✅ (2026-08-19)
 
-Bu maddeler **hata değil**; takım arkadaşımın (`e902185` + `f28f510` merge +
-`feec7db`) bilinçli tercihleri. Çalışıyorlar, bu yüzden dokunulmadı. Ama
-CLAUDE.md'de yazılı bir kararı değiştirdikleri ya da ileride bizi kesecekleri
-için konuşulmaları gerekiyor.
+Faz 0'daki B listesinin (arkadaşımın mimari tercihleri) karara bağlandığı
+birim. Kararların gerekçeleri **GD4–GD6**; madde madde durum "Arkadaşımın
+Kodu" bölümünde.
 
-### K1. Gün sınırı 04:00 → 00:00'a çekildi
-- **Dosya:** `lib/core/utils/game_day.dart` (`dayStartHour = 0`)
-- **Neden yapılmış:** adım halkası takvim günüyle kapansın ve arşivlensin
-  (`DailyStepRecord.dateKey` takvim günü).
-- **Ne kaybettik:** Aşama 1a'da 04:00 tam da "gece yarısını geçmiş ama hâlâ
-  ayakta olan kullanıcının serisi haksız yere kırılmasın" diye seçilmişti.
-  Ayrıca 04:00, çarkın gece yarısı açığını kapatıyordu: şimdi 23:59'da çevirip
-  00:01'de tekrar çevirmek mümkün. (Açık 04:00'da da vardı ama kimsenin ayakta
-  olmadığı bir saatteydi.)
-- **Öneri:** ikisi ayrılabilir — adım geçmişi arşivi takvim gününü kullanmaya
-  devam etsin, seri ve çark 04:00 sınırında kalsın. Bu, `GameDay`'e ikinci bir
-  sınır kavramı eklemek demek; **karar arkadaşımla birlikte verilmeli.**
+## Ne değişti
 
-### K2. Round süresi adımdan bağımsız sabit 20 dakikaya çevrildi
-- **Dosya:** `lib/models/adventure_quest.dart`
-  (`roundDuration`, `briskWalkingStepsPerMinute`/`syncGraceMinutes` kaldırıldı)
-- Eski model "adım/100 dk + 1 dk senkron payı" idi; yenisi her round için sabit
-  20 dk. Testler birlikte güncellenmiş, silinmemiş. Denge kararı, kod hatası
-  değil.
+| Konu | Değişiklik |
+|---|---|
+| Gün sınırı | `GameDay.dayStartHour` 0 → **4** (Aşama 1a kararı geri geldi) |
+| Çark açığı | 23:59'da çevirip 00:01'de tekrar çevirme kapandı |
+| Halka arşivi | Kayıt artık **oyun gününe** anahtarlanıyor, ham tarihe değil |
+| Geçmiş boyutu | En yeni **400** gün tutuluyor (`maxStepHistoryDays`) |
+| Testedilebilirlik | Arşivleme mantığı `core/utils/step_history.dart`'a taşındı |
+| Android | `MainActivity.kt` — `prepare()` patlarsa `MediaPlayer` sızıntısı |
+| Biçim | `dart format` uygulanmamış 3 dosya düzeltildi (**triaj C1 kapandı**) |
 
-### K3. Round erken tamamlanınca anında kazanılıyor
-- **Dosya:** `adventure_quest.dart:resolveRound`
-- `resolveExpiredRound` artık `resolveRound`'a yönlendiren bir kabuk.
-  `isDefeated` erken çıkışı kaldırıldı; yerine `roundTargetSteps <= 0`
-  koruması var (düşman ölünce hedef 0'a düşüyor, döngü orada duruyor).
-  İncelendi, sonsuz döngü yok.
+## Gizli hata: arşiv gününün kayması
 
-### K4. Kalıcı round durumu `AdventureQuest` üzerinde büyüdü
-- `currentRound`, `lastResolvedRound`, `roundOutcomeSerial`,
-  `presentedRoundOutcomeSerial`, `lastRoundWon` diske yazılıyor.
-  `presentedRoundOutcomeSerial` bir **sunum** durumu (animasyon oynatıldı mı);
-  model katmanında duruyor. Model Kuralları #1'i ihlal etmiyor (int), ama
-  sunum/model sınırını bulanıklaştırıyor.
+Gün sınırı gece yarısı **olmadığında**, `DailyProgress.date`'in ham değerini
+kullanarak arşivlemek kaydı yanlış güne yazıyor: 20 Ağustos 01:00'de açılmış
+bir günlük ilerleme aslında **19 Ağustos** oyun gününe ait, ama ham tarih
+20 Ağustos'u gösteriyor. 00:00 sınırında bu hiç görünmüyordu; 04:00'e dönünce
+açığa çıkacaktı. `archiveStepDay` artık `GameDay.startOf(...)` kullanıyor.
+Aynı düzeltme profil ekranındaki "Son 3 Gün" ve takvim ekranının "bugün"
+hesabına da uygulandı.
 
-### K5. Ekran, model nesnesini doğrudan değiştiriyor
-- **Dosya:** `adventure_screen.dart:_markRoundOutcomePresented`,
-  `_playRoundVictory` (`adventure.deathAnimationPlayed = true`)
-- `AdventureScreen`, `RootShell`'in state nesnesini mutasyona uğratıp
-  `onAdventureUpdated()` ile kaydettiriyor. Mevcut `setState` mimarisinde
-  çalışıyor; Riverpod/Bloc'a geçişte ilk kırılacak yer burası olur.
+## Test
 
-### K6. Yeni düşmanlar kataloğun **başına** eklendi
-- **Dosya:** `lib/data/enemy_catalog.dart` — `border_scout` (500),
-  `forest_raider` (1000), `blood_apprentice` (1500).
-- Testler `EnemyCatalog.enemies[0]` yerine `byId(...)` kullanacak şekilde
-  güncellenmiş; sıraya bağlı kod kalmamış. İyi.
+`test/step_history_archive_test.dart` — 13 test: gün ortasında açılmış gün,
+gün sınırının iki yanı, aynı günün iki kez arşivlenmesi, sıralama, gelen
+listenin değiştirilmemesi, sınırın altı/üstü/sıfır/negatif, arşivlemenin
+sınırı kendi başına uygulaması, gece yarısının iki yanının aynı oyun günü
+olması.
 
-### K7. Açılış sesi için özel platform kanalı
-- **Dosyalar:** `lib/services/launch_sound.dart`, `MainActivity.kt`,
-  `AppDelegate.swift` (`rush_for_villains/launch_sound`)
-- `audioplayers` gibi bir paket yerine elle kanal yazılmış. Kotlin tarafı
-  düzgün (release, onCompletion/onError, onDestroy). **Küçük sızıntı:**
-  `prepare()` fırlatırsa `MediaPlayer` release edilmiyor — süreç başına bir
-  kez, zararsız. iOS tarafı Windows'ta derlenemedi.
+Toplam **192 test geçiyor**, `flutter analyze` temiz.
 
-### K8. `_stepHistory` sınırsız büyüyor
-- **Dosya:** `root_shell.dart:_archiveDailySteps`
-- Her gün bir kayıt; 5 yılda ~1.800 satır (~180 KB SharedPreferences).
-  Bugün sorun değil, ama bir üst sınır (ör. son 730 gün) ya da aylık özet
-  konuşulmalı.
+## Sonraki adım
+
+Aşama 3 — Item temeli (`#8 → #10 → #11 → #16`). 784 asset hâlâ
+`pubspec.yaml`'a eklenmemiş (triaj C8).
+
 
 ---
+
+# Aşama 3 — Item temeli ✅ (2026-08-19)
+
+Kartlar **#8** (item modeli + katalog), **#10** (seviye kilidi), **#11** (mağaza
+seviye kilidi) kapandı. Triajdaki **A4** (mağaza para birimi) ve **C8** (784
+PNG pubspec'te değil) de burada kapandı. Aşama 2c'de bilerek boş bırakılan
+**streak dondurma kazanım yolları** da bağlandı.
+
+## Karar: 784 görselin hepsi oyuna girdi
+
+CLAUDE.md'deki "hepsi mi, seçki mi?" sorusunun cevabı **hepsi**. Gerekçe:
+toplam 1,8 MB (ortalama ~2 KB pixel art), yani APK maliyeti yok; nadirlik ve
+seviye kilidi zaten 784 item'ı uzun bir ilerlemeye yayıyor. Seçki yapmak,
+oyuncuya daha az şey verip aynı işi yapmak olurdu.
+
+## Katalog nasıl üretiliyor
+
+`CharacterCatalog` deseninin aynısı: **sanat klasörü doğruluk kaynağı**, kod
+yalnızca ona anlam veriyor.
+
+| Dosya | Rol |
+|---|---|
+| `lib/models/item.dart` | `Item`, `ItemCategory` (+rol, sınıf kısıtı), `ItemBuff` |
+| `lib/data/item_definitions.dart` | 166 temel adın **Türkçe adı ve nadirliği** |
+| `lib/core/utils/item_rules.dart` | Saf türetme: yol çözümleme, seviye, fiyat, buff |
+| `lib/services/item_catalog.dart` | `AssetManifest` taraması + süzgeçler |
+
+Akış: `lib/Items/swords/fire_sword.png` → kategori `swords`, temel kimlik
+`swords/fire_sword` → tablo ("Ateş Kılıcı", nadir) → seviye bandı, fiyat, buff.
+Varyant dosyaları (`dagger_variant_04`) aynı satırdan beslenir; ada varyant
+numarası eklenir ("Hançer 4").
+
+**Model Kuralları #1 temiz:** `Item` diske hiç yazılmıyor — `ownedItemIds`
+yalnızca `String` kimlik tutuyor, item her açılışta katalogdan çözülüyor.
+Görsel `assetPath` ile `String` olarak taşınıyor; `IconData` yok.
+
+## Üretilen denge
+
+| Nadirlik | Adet | Seviye | Fiyat |
+|---|---|---|---|
+| Sıradan | 371 | 1–3 | 125–150 |
+| Az Bulunur | 271 | 4–7 | 300–350 |
+| Nadir | 81 | 8–12 | 775–875 |
+| Epik | 43 | 14–19 | 2.375–2.725 |
+| Efsanevi | 18 | 22–29 | 7.550–8.825 |
+
+6.000 adım/gün = 120 coin/gün oyuncusu için kabaca: sıradan yarım gün, nadir
+bir hafta, epik üç hafta, efsanevi iki aydan uzun.
+
+## Mağaza yeniden kuruldu
+
+- **Para birimi coin** — buton artık "N XP" yazmıyor (triaj A4 kapandı).
+  Sınıf/dosya adı `XpStoreScreen` olarak **bırakıldı** (bkz. GD10); yalnızca
+  kullanıcıya görünen başlık "Mağaza" oldu.
+- İki bölüm: **Yükseltmeler** (eski `XpStoreItem`'lar, korundu) ve **Ekipman**
+  (katalogdan, oyuncunun **kendi sınıfının** kullanabildikleri).
+- Kategori süzgeci + "Alabileceklerim" süzgeci.
+- **Kilitli kart sessiz kalmıyor** (Model Kuralları #4): kilit ikonu, "Sv. N"
+  etiketi ve dokununca tam neden — "29. seviye gerekiyor, şu an 2.
+  seviyedesin" / "375 coin daha gerekiyor" / "zaten sende".
+- Kilit **iki yerde** tutuluyor: ekranda (görünürlük) ve `RootShell`'de
+  (`_purchaseEquipment`). Son söz state'in.
+
+## Çözülen hata: aynı öğeyi ikinci kez almak parayı yakıyordu
+
+`RootShell._purchase` coin'i düşürüyor, ama kimlik `ownedItemIds` içinde zaten
+varsa ikinci kez eklemiyordu. Sahip olunan kozmetiği tekrar satın almak parayı
+alıp hiçbir şey vermiyordu. Artık sahiplik önce kontrol ediliyor.
+
+## Streak dondurma kazanım yolları bağlandı
+
+Aşama 2c'de tüketim tarafı yazılmış, kazanım `TODO(items)` ile Aşama 3'e
+bırakılmıştı. İkisi de `UserProfile.grantStreakFreeze` üzerinden geçiyor:
+
+1. **Kilometre taşları** (7/30/100 gün) — `_onStepsReported` içinde 1 hak.
+2. **Mağaza** — "Seri Dondurma Hakkı", 600 coin, `repeatable: true`.
+   Stok doluysa **satış yapılmıyor ve para harcanmıyor**; nedeni söyleniyor.
+
+`XpStoreItem`'a `repeatable` alanı eklendi: kozmetik bir kez alınır, tüketilen
+yükseltme stok dolana kadar tekrar alınabilir.
+
+## Test
+
+- `test/item_catalog_test.dart` — 39 test. Türetme kurallarının tamamı, artı
+  bir **sanat kapsamı** grubu: dosya sistemini okuyup 784 görselin hepsinin
+  item'a dönüştüğünü, kimliklerin benzersizliğini, **her görselin Türkçe tanımı
+  olduğunu**, tanımlarda öksüz satır kalmadığını, bütün kategorilerin
+  `pubspec.yaml`'da olduğunu ve her karakter sınıfına item düştüğünü doğruluyor.
+  Yeni sanat eklenip tanımı unutulursa burada yakalanır.
+- `test/store_screen_test.dart` — 14 widget testi: seviye kilidinin gerçekten
+  tutması, nedenin söylenmesi, süzgeçler, tekrarlanabilir yükseltme, para
+  biriminin coin olduğu. Bu testler yazılırken ekipman kartında gerçek bir
+  layout hatası da yakalandı (`SectionCard` içinde `Expanded` sınırsız yükseklik
+  alıyordu).
+
+Toplam **245 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- **#9 (item buff'ları oyuna işlesin)** — `ItemBuff` üretiliyor ve mağazada
+  gösteriliyor ama **hiçbir yere uygulanmıyor**: kuşanma (equip) kavramı yok.
+  `coin_calculator.dart` / `xp_calculator.dart` içindeki `TODO(items)` çarpan
+  kancaları hâlâ boş. Sıradaki iş: envanter + kuşanma, sonra çarpanın
+  bağlanması.
+- **#16 (çark item verebilsin)** — katalog hazır, çark hâlâ yalnızca XP veriyor.
+- Kilometre taşı **item** ödülü (#14) hâlâ Aşama 4b'de.
+
+
+---
+
+# Arkadaşımın Kodu — inceleme ve kararlar (2026-08-19)
+
+`e902185` + `f28f510` (merge) + `feec7db`. Bunlar **hata değil**, bilinçli
+tercihler. Kullanıcı "hepsini kendi kararınla düzelt/geliştir ve ilerle" dedi;
+her madde için verilen karar aşağıda. Karar **DOKUNULMADI** olanların gerekçesi
+tek cümleyle: çalışan koda mimari uyum için dokunmak boşa risk (Kural 1/3).
+
+### K1. Gün sınırı 04:00 → 00:00'a çekilmişti → ✅ **04:00'e geri alındı**
+- **Dosya:** `lib/core/utils/game_day.dart`
+- **Neden yapılmıştı:** adım halkası takvim günüyle kapansın ve arşivlensin.
+- **Neden geri alındı:** 04:00, Aşama 1a'da iki gerekçeyle seçilmişti — gece
+  yarısını geçmiş kullanıcının serisi haksız yere kırılmasın, **ve** çarkın
+  gece yarısı açığı kapansın (23:59'da çevir, 00:01'de tekrar çevir). 00:00
+  sınırı ikisini de geri açıyordu; hem de en kolay istismar edilecek saatte.
+- **Halka ne oldu:** halka artık oyun gününü gösteriyor. Bu **daha tutarlı**:
+  halka günlük hedefe göre ölçülen bir ilerlemeyi çiziyor ve o hedef bu
+  sınırda sıfırlanıyor. İki ayrı sınır, halkanın ölçtüğü şeyle gösterdiği
+  pencereyi ayırırdı.
+- Ayrıntı: **GD4**.
+
+### K2. Round süresi adımdan bağımsız sabit 20 dakika → **DOKUNULMADI**
+- `roundDuration = 20dk`, `briskWalkingStepsPerMinute`/`syncGraceMinutes`
+  kaldırıldı. Denge kararı, kod hatası değil; testler birlikte güncellenmiş.
+
+### K3. Round erken tamamlanınca anında kazanılıyor → **DOKUNULMADI**
+- `resolveExpiredRound` artık `resolveRound`'a yönlendiren kabuk.
+  `isDefeated` erken çıkışı yerine `roundTargetSteps <= 0` koruması var;
+  düşman ölünce hedef 0'a düşüyor ve döngü orada duruyor. **Sonsuz döngü ve
+  çift hasar yok — satır satır doğrulandı.**
+
+### K4. Sunum durumu (`presentedRoundOutcomeSerial`) modelde → **DOKUNULMADI**
+- "Animasyon oynatıldı mı" bilgisi `AdventureQuest` üzerinde ve diske
+  yazılıyor. Model Kuralları #1'i ihlal etmiyor (`int`), yalnızca sunum/model
+  sınırını bulanıklaştırıyor. Ayırmak modeli, ekranı ve şemayı birlikte
+  değiştirmek demek — kazancı riskini karşılamıyor.
+
+### K5. Ekran, model nesnesini doğrudan değiştiriyor → **DOKUNULMADI**
+- `adventure_screen.dart` `RootShell`'in state nesnesini mutasyona uğratıp
+  `onAdventureUpdated()` ile kaydettiriyor. Mevcut `setState` mimarisi zaten
+  buna dayanıyor (`RootShell` yorumundaki not). Riverpod/Bloc'a geçişte ilk
+  kırılacak yer burası; o geçiş geldiğinde birlikte ele alınmalı.
+
+### K6. Yeni düşmanlar kataloğun başına eklendi → **DOKUNULMADI**
+- `border_scout` (500), `forest_raider` (1000), `blood_apprentice` (1500).
+  Testler `enemies[0]` yerine `byId(...)` kullanacak şekilde güncellenmiş;
+  sıraya bağlı kod kalmamış.
+
+### K7. Açılış sesi için elle yazılmış platform kanalı → ✅ **sızıntı kapatıldı**
+- **Dosya:** `MainActivity.kt`
+- Kanalın kendisine dokunulmadı (paket getirmek daha büyük bir karar).
+  Düzeltilen: `prepare()` ya da `setDataSource()` fırlatırsa `MediaPlayer`
+  release edilmiyordu ve `AssetFileDescriptor` kapatılmıyordu. Artık
+  `try/catch` + `use {}` ile her yolda kapanıyor.
+- ⚠️ iOS tarafı (`AppDelegate.swift`) Windows'ta **derlenemedi**.
+
+### K8. `_stepHistory` sınırsız büyüyordu → ✅ **sınır kondu**
+- `GameConstants.maxStepHistoryDays = 400`. Ayrıntı: **GD5**.
 
 # GERİ DÖNÜLECEK KARARLAR
 
@@ -1795,4 +1938,386 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
   ama saniyelik `_updateAdventureClock` → `resolveExpiredRounds` kalanları bir
   saniye içinde topluyor; düşman aynı partide ölürse `roundTargetSteps` zaten
   0'a düştüğü için çözülecek round kalmıyor. Kova A'ya terfi eden bir şey yok.
+
+### GD4. Gün sınırı 04:00'e geri alındı, adım halkası da onu kullanıyor (2026-08-19)
+- **Nerede:** `lib/core/utils/game_day.dart`, `lib/core/utils/step_history.dart`
+- **Karar:** `dayStartHour = 4`. Adım halkası arşivi de takvim gününü değil
+  **oyun gününü** anahtarlıyor (`GameDay.startOf(progress.date)`).
+- **Neden anahtarlama değişti:** arşivleme, `DailyProgress.date`'in **ham**
+  değerini kullanıyordu. Gün sınırı gece yarısı olmadığında bu değer
+  sınırdan sonra ama gece yarısından önce açılmış bir gün için **bir sonraki
+  takvim gününü** gösterir; halka yanlış güne düşerdi. 00:00 sınırında bu
+  gizli kalıyordu, 04:00'e dönünce açığa çıkardı.
+- **Kabul edilen takas:** 02:00'de atılan adım önceki günün halkasında
+  görünür. Apple Health / Google Fit gece yarısında keser; biz kesmiyoruz.
+  Gerekçe: halka, günlük **hedefe** göre ölçülüyor ve hedef 04:00'te
+  sıfırlanıyor — halkanın penceresi ölçtüğü şeyle aynı olmalı.
+- **Geri dönülecek nokta:** kullanıcı geri bildirimi "gece yürüyüşüm yanlış
+  güne yazılıyor" derse, halkaya ayrı bir takvim-günü sınırı verilebilir.
+  Bu, `GameDay`'e ikinci bir gün kavramı eklemek demek; bugün gereksiz
+  karmaşıklık.
+
+### GD5. Adım halkası geçmişi 400 günle sınırlandı (2026-08-19)
+- **Nerede:** `GameConstants.maxStepHistoryDays`, `core/utils/step_history.dart`
+- **Karar:** en yeni 400 gün tutulur, daha eskiler **kalıcı olarak düşer**.
+  Sınır hem arşivlemede hem diskten okumada uygulanır (sınır konmadan önce
+  yazılmış kayıtlar da kırpılır).
+- **Neden 400:** takvim ekranında bir yıl geriye rahatça gitmeye yeter (~13
+  ay) ve ~40 KB'ın altında kalır. Geçmiş tek bir SharedPreferences anahtarında
+  duruyor; sınırsız liste hem her açılış okumasını hem **her yazmayı**
+  (2 saniyede bir) yavaşlatır.
+- **Riski:** veri kaybı geri alınamaz. Bugün kabul edildi çünkü tüketicisi
+  yalnızca takvim ekranı. Aşama 6'da Firestore geldiğinde geçmişin tamamı
+  sunucuda tutulabilir; yerel liste "cache" rolüne düşer ve sınır sorun olmaz.
+
+### GD6. `_archiveDailySteps` saf bir fonksiyona taşındı (2026-08-19)
+- **Nerede:** `lib/core/utils/step_history.dart` (`archiveStepDay`,
+  `pruneStepHistory`)
+- **Karar:** mantık `RootShell`'in private metodundan çıkarıldı; `RootShell`
+  artık yalnızca çağırıyor. Davranış birebir aynı.
+- **Neden:** `StatefulWidget` içindeki private metot test edilemiyordu ve bu
+  kod (gün anahtarlama + sınır) sessizce yanlış veri üretebilecek türden.
+  Proje zaten bu deseni kullanıyor: `calculateStepCoins`, `calculateStepXp`,
+  `limitStepBatch` hepsi `core/utils/` altında saf fonksiyon.
+- **Not:** bu, arkadaşımın kodunda yaptığım **tek** yapısal değişiklik.
+  İsimlendirme, model ve ekran akışı olduğu gibi bırakıldı.
+
+### GD7. 784 item'ın tamamı katalogda; ad ve nadirlik elle tanımlandı (2026-08-19)
+- **Nerede:** `lib/data/item_definitions.dart` (166 satır), `core/utils/item_rules.dart`
+- **Karar:** Türkçe ad ve nadirlik **elle** yazıldı; seviye kilidi, fiyat ve
+  buff bunlardan **türetiliyor**.
+- **Neden elle ad:** dosya adını kelime kelime çevirmek Türkçede bozuk sonuç
+  veriyor ("Ateş Kılıç"). 166 satırlık tablo, 784 item'ın hepsini düzgün Türkçe
+  yapıyor — kullanıcıya görünen metnin Türkçe olması CLAUDE.md kuralı.
+- **Neden türetilmiş seviye/fiyat:** 784 item'a elle seviye ve fiyat vermek hem
+  tutarsız olurdu hem bakımı imkânsız. Nadirlik tek karar noktası.
+- **Geri dönülecek nokta:** bant değerleri (`_levelBand`, `_costBase`,
+  `_buffTotal`) tek yerde; denge değişecekse yalnızca orası düzenlenir.
+
+### GD8. Seviye kilidi kararlı bir dağılımdan çıkıyor, `String.hashCode`'dan değil (2026-08-19)
+- **Nerede:** `item_rules.dart:stableSpread`
+- **Karar:** aynı nadirlikteki itemleri bir seviye bandına yaymak için kimlikten
+  hesaplanan kendi kararlı fonksiyonumuz kullanılıyor.
+- **Neden:** `String.hashCode` Dart sürümleri ve platformlar arasında **sabit
+  değil**. Seviye kilidi ondan çıksaydı, bir güncelleme sonrası oyuncunun sahip
+  olduğu item "seviyen yetmiyor" diyebilirdi. `ownedItemIds` kalıcı olduğu için
+  bu sessiz bir veri hatası olurdu.
+
+### GD9. Item buff'ı bugün yalnızca adım kazancını büyütüyor (2026-08-19)
+- **Nerede:** `models/item.dart:ItemBuff`, `item_rules.dart:buffFor`
+- **Karar:** `stepCoinBonus` ve `stepXpBonus` — başka stat yok. Dağılım role
+  göre: yakın dövüş → XP, menzil ve savunma → para, büyü → yarı yarıya.
+- **Neden:** Aşama 1b ve 2b bu iki noktaya (`calculateStepCoins`,
+  `calculateStepXp`) zaten birer `TODO(items)` çarpan kancası bıraktı. Savaş
+  istatistikleri (can, saldırı, savunma) Aşama 4a'da tanımlanacak; onlar
+  netleşmeden buff'a savaş alanı eklemek, iki kez yazmak olurdu.
+- **Bilinçli tuhaflık:** **kalkanlar para veriyor.** Doğru cevap savunma
+  istatistiği; o istatistik henüz yok. Aşama 4a'da düzeltilecek.
+- **Açık:** buff hiçbir yere **uygulanmıyor** — kuşanma (equip) kavramı yok.
+  Bu #9'un işi.
+
+### GD10. `XpStoreScreen` adı korundu, yalnızca başlık değişti (2026-08-19)
+- Para birimi coin olduğu hâlde sınıf/dosya adı "Xp" ile başlıyor. Yeniden
+  adlandırmak `root_shell` dahil çağrı noktalarını gezmek demek ve CLAUDE.md
+  zaten benzer bir yazım borcunu ("Villians") bilerek bırakıyor. Kullanıcıya
+  görünen başlık "Mağaza" oldu; kod adı olduğu gibi kaldı.
+
+---
+---
+
+# OTURUM KAPANIŞI — 2026-08-19
+
+> **Sonraki oturum buradan başlasın.** Bu bölüm, hiçbir şey sormadan devam
+> edebilmek için gereken her şeyi taşıyor: ne yapıldı, hangi kararlar hangi
+> gerekçeyle verildi, ne açık kaldı ve sıradaki iş neyle başlamalı.
+
+## 1. Bu oturumda ne yapıldı
+
+Oturum gözetimsiz çalıştı. Önce Faz 0 incelemesi (kod yazmadan), sonra üç birim.
+
+| Birim | Ne | Test |
+|---|---|---|
+| **Aşama 2d** | Açılış dayanıklılığı — kayıt/bildirim hatası artık açılışı kilitlemiyor | 167 → 179 |
+| **Aşama 2e** | Gün sınırı 04:00'e geri alındı, adım geçmişi oyun gününe bağlandı, 400 gün sınırı, MediaPlayer sızıntısı | 179 → 192 |
+| **Aşama 3** | Item temeli: model + katalog + mağaza + seviye kilidi (#8, #10, #11) | 192 → **245** |
+
+Kapanan kartlar: **#8**, **#10**, **#11**.
+Kapanan triaj maddeleri: **A4** (mağaza para birimi), **C1** (dart format),
+**C8** (784 PNG pubspec'te değildi).
+Kapanan `TODO`: streak dondurma **kazanım** yolları (Aşama 2c'de bilerek
+boş bırakılmıştı).
+
+Oturum sonunda: `flutter analyze` temiz, `flutter test` **245/245 geçiyor**.
+
+### Commit durumu — DİKKAT
+
+- **Aşama 2d commit edildi** (`fix: harden app boot against storage and
+  notification failures`).
+- **Aşama 2e ve Aşama 3 commit EDİLMEDİ.** Çalışma ağacında duruyorlar.
+  Kullanıcı "çok sık commit yapmayalım" dedi; commit'i kendisi atıyor
+  (bkz. "Çalışma Kuralı — Commit").
+
+Commit edilmemiş dosyalar:
+
+```
+M  CLAUDE.md
+M  android/.../MainActivity.kt
+M  lib/core/constants/game_constants.dart
+M  lib/core/utils/game_day.dart
+M  lib/data/mock_data.dart
+M  lib/features/profile/profile_screen.dart
+M  lib/features/profile/step_history_screen.dart
+M  lib/features/rewards/rewards_screen.dart        (yalnızca dart format)
+M  lib/features/root/root_shell.dart
+M  lib/features/store/xp_store_screen.dart
+M  lib/features/team/team_screen.dart              (yalnızca dart format)
+M  lib/models/user_profile.dart
+M  lib/models/xp_store_item.dart
+M  pubspec.yaml
+?? lib/core/utils/item_rules.dart
+?? lib/core/utils/step_history.dart
+?? lib/data/item_definitions.dart
+?? lib/models/item.dart
+?? lib/services/item_catalog.dart
+?? test/item_catalog_test.dart
+?? test/step_history_archive_test.dart
+?? test/store_screen_test.dart
+```
+
+⚠️ **`pubspec.yaml` değişti** (10 item asset klasörü eklendi). Çalışan bir
+`flutter run` varsa **yeniden başlatılmalı** — hot reload yeni asset'leri almaz.
+
+## 2. Verilen kararlar
+
+Hepsi "GERİ DÖNÜLECEK KARARLAR" bölümünde gerekçesiyle yazılı. Özet:
+
+| # | Karar | Tek cümlelik gerekçe |
+|---|---|---|
+| GD1 | Açılışta kayıt okunamazsa temiz varsayılanla devam | Sonsuza kadar açılış ekranında asılı kalmaktansa açılmak yeğ; kayıt silinmiyor |
+| GD2 | Bildirim planlaması `GameClock`'a bağlandı | İki farklı saat kaynağını karşılaştırmak, donmuş saatte hiç hatırlatma planlamıyordu |
+| GD3 | Round sistemine dokunulmadı | İncelendi, gerçek hata yok |
+| GD4 | Gün sınırı 04:00, adım halkası da onu kullanıyor | 00:00 sınırı çarkın gece yarısı açığını geri açıyordu |
+| GD5 | Adım geçmişi 400 günle sınırlı | Tek anahtarda büyüyen liste her açılışı ve **her yazmayı** yavaşlatır |
+| GD6 | `_archiveDailySteps` saf fonksiyona taşındı | Sessizce yanlış veri üretebilecek mantık test edilemiyordu |
+| GD7 | 784 item'ın hepsi katalogda; ad+nadirlik elle | Sanat bedava (1,8 MB); kelime kelime çeviri Türkçede bozuk sonuç veriyor |
+| GD8 | Seviye kilidi kararlı dağılımdan, `hashCode`'dan değil | `hashCode` sürümler arası sabit değil; sahip olunan item kilitlenebilirdi |
+| GD9 | Buff bugün yalnızca adım kazancını büyütüyor | Savaş statları Aşama 4a'da tanımlanacak; şimdi uydurmak iki kez yazmak olur |
+| GD10 | `XpStoreScreen` adı korundu, başlık "Mağaza" oldu | Yeniden adlandırma churn; CLAUDE.md benzer yazım borcunu bilerek bırakıyor |
+
+## 3. Arkadaşımın kodu — bulgular
+
+İncelenen: `e902185` (adventure rounds + step history) + `f28f510` (merge) +
+`feec7db` (açılış ekranı ve sesi). Merge, önceki işi (Aşama 0–2c) **hiç
+kaybetmemiş**; dosya dosya doğrulandı.
+
+**Genel değerlendirme: kod sağlam.** Şema sürümü doğru artırılmış (v7 → v8) ve
+migration eklenmiş; controller/timer/stream dispose'ları eksiksiz; mevcut
+testler silinmemiş, birlikte güncellenmiş; `enemy_catalog` sıraya bağlı kod
+bırakmamış (`byId` kullanılıyor).
+
+**Bulunan gerçek hatalar (ikisi de düzeltildi):**
+1. `app.dart:_initializeApp` — kayıt okuma ve bildirim init'inde hiç hata
+   yönetimi yoktu; platform kanalı düşerse uygulama açılış görselinde
+   **sonsuza kadar** asılı kalıyordu. (Bu kodun bir kısmı bize aitti; `feec7db`
+   bildirim init'ini de bu yola taşıyıp hata yüzeyini büyütmüştü.)
+2. `MainActivity.kt` — `prepare()` / `setDataSource()` fırlatırsa `MediaPlayer`
+   release edilmiyor, `AssetFileDescriptor` kapanmıyordu.
+
+**Ayrıntılı inceleme edilip hata bulunmayan yer:** yeni round sistemi
+(`resolveRound`, erken kazanma, `resolveExpiredRounds`). Sonsuz döngü, çift
+hasar ya da yanlış değer yok — `roundTargetSteps <= 0` koruması düşman ölünce
+döngüyü durduruyor.
+
+**Mimari farklılıklar:** "Arkadaşımın Kodu — inceleme ve kararlar" bölümünde
+K1–K8 olarak madde madde duruyor. K1 (gün sınırı), K7 (ses sızıntısı) ve K8
+(sınırsız geçmiş) düzeltildi; K2–K6 bilinçli olarak **dokunulmadı**.
+
+**Bir sonraki oturuma not:** kullanıcı "arkadaşımla konuşacak bir şey yok, sen
+karar ver" dedi. Yani K listesi artık bir bekleme listesi değil; K2–K6 için
+verilen "dokunma" kararı nihai, tekrar açılmasına gerek yok.
+
+## 4. AÇIK KALANLAR — öncelik sırası
+
+### 4.1. Seviye ↔ fiyat hizalama kontrolü ⚠️ YAPILMADI
+
+Aşama 3'te seviye kilidi ve fiyat **ayrı ayrı** türetildi; ikisinin aynı
+ilerleme hızına oturup oturmadığı **hiç ölçülmedi**.
+
+**Yapılacak ölçüm.** Beş nadirlik için iki sayı hesaplanmalı ve
+karşılaştırılmalı:
+
+- **Seviyeye ulaşma günü** — o nadirliğin seviye bandına varmak kaç gün sürer.
+  `N. seviyeye toplam XP = 500 · N · (N−1)` (bkz. Aşama 2b), günlük XP =
+  `günlük adım / stepsPerXp`.
+- **Fiyatı biriktirme günü** — o nadirliğin fiyatını biriktirmek kaç gün sürer.
+  Günlük coin = `günlük adım / stepsPerCoin`, günlük tavan
+  `maxDailyStepCoins`.
+
+Referans oyuncu: **6.000 adım/gün** → 3.000 XP/gün, 120 coin/gün.
+
+**Kalem hesabı (DOĞRULANMADI — testle üretilmeli):**
+
+| Nadirlik | Örnek seviye | Seviyeye ulaşma | Örnek fiyat | Fiyatı biriktirme | Sapma |
+|---|---|---|---|---|---|
+| Sıradan | 2 | ~0,3 gün | 125 | ~1,0 gün | fiyat bağlıyor |
+| Az Bulunur | 5 | ~3,3 gün | 325 | ~2,7 gün | dengeli |
+| Nadir | 10 | ~15 gün | 825 | ~6,9 gün | **seviye bağlıyor, ~2,2×** |
+| Epik | 16 | ~40 gün | 2.550 | ~21 gün | **seviye bağlıyor, ~1,9×** |
+| Efsanevi | 25 | ~100 gün | 8.100 | ~67 gün | **seviye bağlıyor, ~1,5×** |
+
+**Okuma:** nadir ve üstünde parayı seviyeden **önce** biriktiriyorsun. Yani
+fiyat fiilen bir kapı olmaktan çıkıyor, coin birikip duruyor ve ekonomi
+anlamını yitiriyor.
+
+**Karar kuralı — sapma büyükse FİYAT eğrisi düzeltilecek, XP eğrisine
+DOKUNULMAYACAK.** Gerekçe: XP eğrisi (doğrusal artan seviye maliyeti) Aşama
+2b'de ayrıca gerekçelendirildi ve `stepsPerXp` ile birlikte test edildi
+(`step_xp_test.dart`, 15/9 günlük ulaşma süreleri testli). Fiyat ise tek bir
+sabit tablodan çıkıyor: `item_rules.dart:_costBase`. Düzeltme oraya yazılır.
+
+**Ölçmeden karar verilmemesi gereken çelinme:** yukarıdaki hesap **tek item**
+alındığını varsayıyor. Oyuncu her katmanda birden çok item alıyorsa (81 nadir,
+43 epik var) gerçek coin talebi kat kat yüksek ve mevcut fiyatlar göründüğünden
+daha doğru olabilir. Ölçüm "katman başına kaç item alınıyor" varsayımını açıkça
+yazmalı; aksi halde fiyatlar gereksiz yere şişirilir.
+
+**Nereye yazılacak:** hesap bir teste dönüştürülmeli (ör.
+`test/economy_pacing_test.dart`), prosa tahmini olarak bırakılmamalı — Aşama
+2b'de 15/9 günlük süreler için yapılan şeyin aynısı.
+
+### 4.2. #9 — Item buff'ları oyuna işlesin (Aşama 4a ile birlikte)
+
+**Bugünkü durum:** `ItemBuff` üretiliyor ve mağaza kartında gösteriliyor ama
+**hiçbir yere uygulanmıyor**. Kuşanma (equip) kavramı yok; `ownedItemIds`
+yalnızca sahiplik tutuyor. `coin_calculator.dart` ve `xp_calculator.dart`
+içindeki `TODO(items)` çarpan kancaları hâlâ boş.
+
+**Karar verilmiş plan — Aşama 4a'da uygulanacak:**
+
+Buff'lar **iki katmanlı** olacak:
+
+1. **Kural türetmesi (çoğunluk).** 784 item'ın büyük kısmı bugünkü gibi
+   nadirlik + kategori rolünden türetilen sayısal bonusu almaya devam eder
+   (`buffFor`). Bunlar tahmin edilebilir ve bakımı bedava.
+2. **Elle tasarlanmış özel buff'lar (küçük alt küme).** Yalnızca **18
+   efsanevi + seçilmiş bazı epikler** elle yazılmış, karakteri olan etkiler
+   alır: koşullu ("gece yürüyüşlerinde"), tetiklenen ("düşman öldürünce"),
+   oyun dışı ("uygulama kapalıyken de sayar", "kaçırılan günü telafi eder")
+   tipleri dahil.
+
+**Gerekçe:** *her item özelse hiçbiri özel değil.* 784 el yapımı etki hem
+bakımı imkânsız hem de efsanevileri sıradanlaştırır. Küçük bir alt kümeyi
+gerçekten özel yapmak, geri kalanın sayısal olmasını da anlamlı kılar.
+
+**Sıra:** kuşanma (equip) + envanter ekranı → çarpanın `coin_calculator` /
+`xp_calculator` kancalarına bağlanması → özel buff tipleri. İlk ikisi
+Aşama 4a'nın savaş statlarını beklemiyor; özel buff'lar bekliyor.
+
+**Ayrıca düzeltilecek:** GD9'daki bilinçli tuhaflık — **kalkanlar şu an para
+veriyor.** Savunma istatistiği tanımlanır tanımlanmaz kalkanlar oraya taşınmalı.
+
+### 4.3. #16 — Çark item ödülü verebilsin ⚠️ YAPILMADI
+
+Katalog hazır (`ItemCatalog.byId`, `unlockedAt`, `forCharacterClass`) ama çark
+hâlâ yalnızca XP veriyor (`MockData.wheelXpOptions`, 6 sabit değer).
+
+Yapılacak: çark ödül havuzuna item eklenmesi. Havuz oyuncunun **seviyesine ve
+sınıfına** göre süzülmeli, yoksa 1. seviyede efsanevi çıkar ve hem seviye
+kilidi hem ekonomi anlamını yitirir.
+
+Not: `daily_wheel_screen.dart` içinde `TODO(#16)` olarak işaretli ikinci bir iş
+daha var — çarkın iğnesinin doğru dilimde durması gerçek dilimli çark grafiği
+gerektiriyor. İkisi aynı ekranda, birlikte yapılabilir.
+
+### 4.4. Aşama 4 — Savaş sistemi (#4 + #9)
+
+#### ⚠️ EN KRİTİK ŞART: SAVAŞ MOTORU DETERMİNİSTİK OLMALI
+
+**Kural:** savaş sonucunu etkileyen hiçbir rastgelelik motorun **içinden**
+gelmeyecek. `Random()` çağrısı savaş kodunda **yasak**. Tohum (seed) dışarıdan
+enjekte edilecek ve **savaş durumuyla birlikte diske yazılacak**; aynı tohum +
+aynı girdi her zaman aynı sonucu vermeli.
+
+**Neden:** Aşama 6b'de (takım savaşları, #7) **aynı motor sunucuda çalışacak.**
+İstemci ile sunucu aynı girdiden farklı sonuç üretirse ya hile kapısı açılır ya
+da savaş sistemi ikinci kez, bu sefer sunucu için baştan yazılır. Deterministik
+olmayan bir motoru sonradan deterministik yapmak, motoru yeniden yazmakla aynı
+şey.
+
+**İzlenecek desen:** `GameClock`. Tek giriş noktası, enjekte edilebilir,
+testlerde sahte kaynak verilebiliyor, kalıcı durumda saklanıyor. Rastgelelik
+için birebir aynısı yapılmalı (ör. `CombatRng` / `AdventureQuest.seed`).
+
+**Bugünkü durum ve yapılacak ayrım:**
+
+| Yer | Durum |
+|---|---|
+| `adventure_quest.dart` | ✅ Şu an **hiç** `Random` kullanmıyor; hasar tamamen deterministik. Bu özellik korunacak. |
+| `adventure_screen.dart:_startAdventure` | Arka plan seçimi `Random(startedAt.microsecondsSinceEpoch)` ile. **Sorun değil:** sonuç `backgroundAsset` olarak kaydediliyor, yani bir kez üretilip sabitleniyor. |
+| `root_shell.dart:_random` | Hatırlatma metni seçimi. Sunum, savaş sonucu değil — serbest. |
+| `daily_wheel_screen.dart` | `Random()` — çark sonucu **kalıcı ödüle** dönüşüyor. #16 ile birlikte tohumlu kaynağa taşınmalı. |
+
+**Kural netleştirmesi:** kalıcı oyun sonucunu (can, ödül, item, para, XP)
+etkileyen her rastgelelik tohumdan gelmeli ve tohum durumla birlikte
+saklanmalı. Yalnızca sunumu etkileyen rastgelelik (animasyon, metin seçimi)
+serbest.
+
+#### Aşama 4'ün geri kalanı
+
+- **İki HP kavramının birleştirilmesi** (triaj B2'nin açık kalan yarısı):
+  `UserProfile.hp` (5000, hiç azalmıyor, şema v2'de persist'ten çıkarıldı) ve
+  `AdventureQuest.playerHealth` (0-100, savaşta kullanılan). Karar Aşama 4a'nın.
+- **A2 — düşman canı = günlük adım hedefi, her adım 1 hasar**
+  (`adventure_quest.dart:TODO(combat)`). Can/saldırı/savunma ayrı combat
+  istatistikleri olarak modellenecek.
+- **A3 — `stepGoal` üç işi birden yapıyor**: düşmanın canı, düşman kilidi eşiği
+  ve günlük adım hedefi. Aşama 4a bunları ayıracak.
+- **A1 — tur çözüm döngüsü**: `resolveExpiredRounds` ile zaten çözüldü, ama
+  savaş motoru yeniden yazılırken korunmalı (arka planda biriken turların
+  hepsi çözülmeli, tek tur değil).
+- Bitince **#14** (canavara göre ödül) doğal devamı: `RootShell`'de düşman
+  yenilme hook'u hazır, `Reward.icon` ise `IconData` — Model Kuralları #1
+  gereği `String` anahtara çevrilmeli.
+
+### 4.5. Daha sonrası (sıra değişmedi)
+
+- **Aşama 5:** #3 (slide scroll adım seçimi — `_NumberWheel` hazır bekliyor),
+  #6 (VS ekranı — arka plan görselleri artık var: `lib/Backgrounds/`),
+  #18 (avatar asset — hâlâ belirsiz, kod işi mi sanat işi mi netleşmedi).
+- **Aşama 6:** #13b Firebase → #7 takım savaşları. 6a'da `GameClock` sunucu
+  saatine geçecek; 6b'de savaş motoru sunucuda çalışacak (bkz. determinizm
+  şartı).
+
+## 5. Hâlâ açık duran küçük maddeler
+
+| Kaynak | Ne | Not |
+|---|---|---|
+| Triaj C3 | `tz.setLocalLocation(tz.UTC)` sabit; cihaz saat dilimi okunmuyor | Gün/saat bazlı bildirim eklenirse B'ye terfi eder |
+| Triaj C4 | Hatırlatma metinleri iki yerde kopyalanmış | Bakım borcu |
+| Triaj C5 | `RootShell._rewards` hiç doldurulmuyor → Ödüllerim hep boş | #14 ile kapanacak |
+| Triaj C6 | `GameConstants.sideBySideWindowMinutes` kullanılmıyor | Ölü sabit, #7'ye ait |
+| Triaj C7 | `nextReminderAt` geçmiş bir zamanla dönerse resume'da anında hatırlatma | Tek seferlik, zararsız |
+| Triaj C9 | `lib/GIF Animations/Soldier/`, `lib/Characters/DarkMagic/Nature/` kullanılmayan asset klasörleri | Zararsız |
+| Triaj C10 | `README.md` hâlâ "A new Flutter project." | Şablon artığı |
+| Triaj C11 | Release imzası hâlâ debug key | Yayına çıkmadan önce |
+| Triaj C13 | `RewardRarityX.color` model katmanında `Color` döndürüyor | Extension getter, persist edilmiyor |
+| Aşama 2a | `ios/Podfile` yok; `permission_handler` makroları macOS'ta kısıtlanmalı | İlk macOS derlemesinde |
+| Aşama 2a | iOS `AppDelegate.swift` (pedometer kanalı) **derlenmedi, test edilmedi** | Gerçek cihazda doğrulanmalı |
+| `feec7db` | iOS açılış sesi kanalı (`AppDelegate.swift`) da Windows'ta derlenmedi | Gerçek cihazda doğrulanmalı |
+| Aşama 1a | Saat dilimi değişimi test edilemiyor (Dart'ta süreç içi API yok) | Gerçek cihazda elle |
+| Aşama 1a | İleri alınan cihaz saati yerelde yakalanamıyor | Aşama 6a'da sunucu saatiyle kapanır |
+| Aşama 2a | Sensör arızası toparlanmasında `stepBurstAllowance` kadar (100 adım) sızıntı | Ölçülü takas, bilinçli |
+| Aşama 0 | Gün değişiminde macera düşüyor; #3'te adım harcanacağı için telafi gerekecek | Aşama 5a |
+| GD1 | Kayıt okunamazken `RootShell` yine de üzerine yazabilir (salt-okunur oturum yok) | Aşama 6'da sunucu ikinci kaynak olunca kapanır |
+
+## 6. Sonraki oturum için önerilen sıra
+
+1. **Seviye ↔ fiyat hizalama ölçümü** (§4.1) — ucuz, tek test dosyası, ve
+   Aşama 4'ün denge kararlarının üstüne oturacağı zemini sağlamlaştırır.
+   Sapma büyükse yalnızca `item_rules.dart:_costBase` düzeltilir.
+2. **Envanter + kuşanma ekranı**, ardından buff çarpanlarının
+   `coin_calculator` / `xp_calculator` kancalarına bağlanması (§4.2'nin
+   savaş statlarını beklemeyen kısmı).
+3. **#16 çark item ödülü** (§4.3) — katalog hazır, küçük iş.
+4. **Aşama 4a savaş motoru** — determinizm şartıyla (§4.4).
 

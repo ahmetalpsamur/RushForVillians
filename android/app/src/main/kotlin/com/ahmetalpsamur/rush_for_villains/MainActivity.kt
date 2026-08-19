@@ -38,31 +38,40 @@ class MainActivity : FlutterActivity() {
 
         val assetKey = FlutterInjector.instance().flutterLoader()
             .getLookupKeyForAsset("lib/Start/anime_kiz_sesi.mp3")
-        val descriptor = assets.openFd(assetKey)
         val player = MediaPlayer()
 
-        player.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build(),
-        )
-        player.setDataSource(
-            descriptor.fileDescriptor,
-            descriptor.startOffset,
-            descriptor.length,
-        )
-        descriptor.close()
-        player.setOnCompletionListener { completedPlayer ->
-            completedPlayer.release()
-            if (launchPlayer === completedPlayer) launchPlayer = null
+        // Hazırlık adımlarının herhangi biri patlarsa (asset yok, codec
+        // desteklenmiyor, prepare hatası) native kaynak sızmasın: player ve
+        // dosya tanımlayıcısı her durumda kapatılır.
+        try {
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            assets.openFd(assetKey).use { descriptor ->
+                player.setDataSource(
+                    descriptor.fileDescriptor,
+                    descriptor.startOffset,
+                    descriptor.length,
+                )
+            }
+            player.setOnCompletionListener { completedPlayer ->
+                completedPlayer.release()
+                if (launchPlayer === completedPlayer) launchPlayer = null
+            }
+            player.setOnErrorListener { failedPlayer, _, _ ->
+                failedPlayer.release()
+                if (launchPlayer === failedPlayer) launchPlayer = null
+                true
+            }
+            player.prepare()
+        } catch (error: Exception) {
+            player.release()
+            throw error
         }
-        player.setOnErrorListener { failedPlayer, _, _ ->
-            failedPlayer.release()
-            if (launchPlayer === failedPlayer) launchPlayer = null
-            true
-        }
-        player.prepare()
+
         launchPlayer = player
         player.start()
     }

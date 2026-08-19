@@ -105,4 +105,12 @@ class GameConstants {
   /// Takımda "yan yana yürüyor" sayılmak için, üyelerin adım atma
   /// zamanları arasında izin verilen maksimum fark (dakika).
   static const int sideBySideWindowMinutes = 5;
+
+  /// Diskte tutulan tamamlanmış gün sayısı (adım halkası geçmişi).
+  ///
+  /// Geçmiş her gün bir satır büyüyor ve kayıt tek bir SharedPreferences
+  /// anahtarında duruyor; sınırsız büyümek hem açılış okumasını hem her
+  /// yazmayı yavaşlatır. 400 gün, takvim ekranında bir yıl geriye rahatça
+  /// gitmeye yeter (~13 ay) ve ~40 KB'ın altında kalır.
+  static const int maxStepHistoryDays = 400;
 }

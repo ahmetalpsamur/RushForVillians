@@ -14,52 +14,53 @@ class RewardsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Ödüllerim')),
-      body: rewards.isEmpty
-          ? const Center(
-              child: Text(
-                'Henüz ödül kazanmadın.\nEjderhayı yenmeyi dene!',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: rewards.length,
-              itemBuilder: (context, index) {
-                final reward = rewards[rewards.length - 1 - index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: SectionCard(
-                    child: Row(
-                      children: [
-                        Icon(reward.icon, size: 32),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                reward.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+      body:
+          rewards.isEmpty
+              ? const Center(
+                child: Text(
+                  'Henüz ödül kazanmadın.\nEjderhayı yenmeyi dene!',
+                  textAlign: TextAlign.center,
+                ),
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: rewards.length,
+                itemBuilder: (context, index) {
+                  final reward = rewards[rewards.length - 1 - index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: SectionCard(
+                      child: Row(
+                        children: [
+                          Icon(reward.icon, size: 32),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  reward.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                reward.description,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
+                                Text(
+                                  reward.description,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        RarityBadge(rarity: reward.rarity),
-                      ],
+                          RarityBadge(rarity: reward.rarity),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
     );
   }
 }

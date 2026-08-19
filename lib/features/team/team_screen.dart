@@ -25,9 +25,8 @@ class TeamScreen extends StatelessWidget {
                   team.isWalkingSideBySide
                       ? Icons.groups
                       : Icons.groups_outlined,
-                  color: team.isWalkingSideBySide
-                      ? AppColors.xp
-                      : Colors.white54,
+                  color:
+                      team.isWalkingSideBySide ? AppColors.xp : Colors.white54,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -44,41 +43,43 @@ class TeamScreen extends StatelessWidget {
           SectionCard(
             title: 'Toplam Takım Adımı: ${team.totalSteps}',
             child: Column(
-              children: team.members
-                  .map(
-                    (m) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          CircleAvatar(child: Text(m.name[0])),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(m.name),
-                                Text(
-                                  '${m.steps} adım',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
+              children:
+                  team.members
+                      .map(
+                        (m) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            children: [
+                              CircleAvatar(child: Text(m.name[0])),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(m.name),
+                                    Text(
+                                      '${m.steps} adım',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              Icon(
+                                Icons.directions_walk,
+                                size: 18,
+                                color:
+                                    m.isWalkingNow
+                                        ? AppColors.xp
+                                        : Colors.white24,
+                              ),
+                            ],
                           ),
-                          Icon(
-                            Icons.directions_walk,
-                            size: 18,
-                            color: m.isWalkingNow
-                                ? AppColors.xp
-                                : Colors.white24,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
+                        ),
+                      )
+                      .toList(),
             ),
           ),
         ],
