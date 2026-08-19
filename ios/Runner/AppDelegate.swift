@@ -2,10 +2,13 @@ import Flutter
 import UIKit
 import UserNotifications
 import CoreMotion
+import AVFoundation
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   private var stepCounter: StepCountStreamHandler?
+  private var launchAudioPlayer: AVAudioPlayer?
+  private var hasPlayedLaunchSound = false
 
   override func application(
     _ application: UIApplication,
@@ -14,7 +17,51 @@ import CoreMotion
     UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     GeneratedPluginRegistrant.register(with: self)
     registerStepSensorChannels()
+    registerLaunchSoundChannel()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func registerLaunchSoundChannel() {
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+      return
+    }
+
+    FlutterMethodChannel(
+      name: "rush_for_villains/launch_sound",
+      binaryMessenger: controller.binaryMessenger
+    ).setMethodCallHandler { [weak self] call, result in
+      guard call.method == "play" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self?.playLaunchSound()
+      result(nil)
+    }
+  }
+
+  private func playLaunchSound() {
+    guard !hasPlayedLaunchSound else { return }
+    hasPlayedLaunchSound = true
+
+    let assetKey = FlutterDartProject.lookupKey(
+      forAsset: "lib/Start/anime_kiz_sesi.mp3"
+    )
+    guard let path = Bundle.main.path(forResource: assetKey, ofType: nil) else {
+      return
+    }
+
+    do {
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.ambient, options: [.mixWithOthers])
+      try session.setActive(true)
+      let player = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
+      player.numberOfLoops = 0
+      player.prepareToPlay()
+      launchAudioPlayer = player
+      player.play()
+    } catch {
+      launchAudioPlayer = nil
+    }
   }
 
   /// Adım sayacı kanalları.

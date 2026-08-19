@@ -23,6 +23,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - lib/Start/
     - lib/Characters/Archer/
     - lib/Characters/DarkMagic/
     - lib/Characters/Faith/
