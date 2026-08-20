@@ -25,7 +25,13 @@ class XpStoreScreen extends StatefulWidget {
   final int coins;
   final int level;
   final List<String> ownedItemIds;
+
+  /// Tüketilen yükseltmelerin eldeki stoğu. Kart altında gösterilir ki
+  /// oyuncu stok dolduğunda boşuna satın almaya çalışmasın.
   final int streakFreezes;
+  final int extraWheelSpins;
+  final bool xpBoostActive;
+
   final void Function(XpStoreItem item) onPurchase;
   final void Function(Item item) onPurchaseEquipment;
 
@@ -39,11 +45,21 @@ class XpStoreScreen extends StatefulWidget {
     required this.streakFreezes,
     required this.onPurchase,
     required this.onPurchaseEquipment,
+    this.extraWheelSpins = 0,
+    this.xpBoostActive = false,
   });
 
   @override
   State<XpStoreScreen> createState() => _XpStoreScreenState();
 }
+
+/// Ekipman kartının sabit yüksekliği (logical piksel).
+///
+/// Kart içeriği sabit: görsel kutusu, en fazla iki satır ad, nadirlik satırı,
+/// tek satır buff ve fiyat düğmesi. En dar desteklenen ekranda (320 dp) bile
+/// taşmayacak şekilde ölçüldü; `store_screen_test.dart` her genişlikte taşma
+/// olmadığını doğruluyor.
+const double _equipmentCardHeight = 280;
 
 class _XpStoreScreenState extends State<XpStoreScreen> {
   /// `null` = bütün kategoriler.
@@ -65,13 +81,29 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
       if (_categoryFilter != null && item.category != _categoryFilter) {
         return false;
       }
+      // "Alabileceklerim" = **bugün satın alınabilecekler**. Sahip olunan
+      // item de süzgeçten geçiyordu; alınamayacak bir şey o listede olmamalı.
       if (_onlyAffordable &&
-          !(item.isUnlockedAt(widget.level) && widget.coins >= item.cost)) {
+          !(item.isUnlockedAt(widget.level) &&
+              widget.coins >= item.cost &&
+              !widget.ownedItemIds.contains(item.id))) {
         return false;
       }
       return true;
     }).toList();
   }
+
+  /// Tüketilen yükseltmelerin kart altı durum satırı; kalıcı öğelerde `null`.
+  ///
+  /// Kimlikler [MockData.storeItems] ile aynı; tüketim tarafı da aynı
+  /// kimliklere bakıyor ([RootShell] `_purchase`).
+  String? _stockLabel(XpStoreItem item) => switch (item.id) {
+    'upgrade_streak_freeze' => 'Elinde ${widget.streakFreezes} hak var',
+    'wheel_extra_spin' => 'Elinde ${widget.extraWheelSpins} hak var',
+    'boost_double_xp' =>
+      widget.xpBoostActive ? 'Şu an etkin — gün sonuna kadar' : null,
+    _ => null,
+  };
 
   void _explain(String message) {
     ScaffoldMessenger.of(context)
@@ -125,10 +157,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                         item: item,
                         coins: widget.coins,
                         owned: widget.ownedItemIds.contains(item.id),
-                        stockLabel:
-                            item.id == 'upgrade_streak_freeze'
-                                ? 'Elinde ${widget.streakFreezes} hak var'
-                                : null,
+                        stockLabel: _stockLabel(item),
                         onPurchase: () => widget.onPurchase(item),
                         onBlocked: _explain,
                       ),
@@ -234,11 +263,16 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 sliver: SliverGrid(
+                  // Yükseklik **sabit**, en-boy oranından türetilmiyor:
+                  // `childAspectRatio` dar ekranda hücreyi kısaltıyordu ve
+                  // kartın son çocuğu (fiyat düğmesi) kartın dışında kalıyordu
+                  // — 360 dp'de 40 px, 320 dp'de 67 px taşma. Kart içeriği
+                  // sabit yükseklikte olduğu için ölçüyü de sabitlemek doğru.
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.72,
+                    mainAxisExtent: _equipmentCardHeight,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final item = equipment[index];
@@ -415,30 +449,46 @@ class _EquipmentCard extends StatelessWidget {
             SizedBox(
               height: 62,
               width: double.infinity,
-              child: Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Image.asset(
-                      item.assetPath,
-                      height: 54,
-                      filterQuality: FilterQuality.none,
-                      errorBuilder:
-                          (context, error, stackTrace) => const Icon(
-                            Icons.inventory_2_outlined,
-                            size: 40,
-                            color: Colors.white24,
-                          ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    item.assetPath,
+                    height: 54,
+                    filterQuality: FilterQuality.none,
+                    errorBuilder:
+                        (context, error, stackTrace) => const Icon(
+                          Icons.inventory_2_outlined,
+                          size: 40,
+                          color: Colors.white24,
+                        ),
+                  ),
+                  if (locked) ...[
+                    const Icon(
+                      Icons.lock,
+                      size: 22,
+                      color: AppColors.streak,
+                      shadows: [Shadow(color: Colors.black, blurRadius: 8)],
                     ),
-                    if (locked)
-                      const Icon(
-                        Icons.lock,
-                        size: 22,
-                        color: AppColors.streak,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                    // Seviye etiketi kilit ikonunun yanına, görselin üstüne
+                    // alındı. Nadirlik rozetiyle aynı satırdayken dar kartta
+                    // sığmıyor ve kırpılıyordu — kilidin nedenini gösteren tek
+                    // görsel bilgi o (Model Kuralları #4).
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Text(
+                        'Sv. ${item.requiredLevel}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.streak,
+                          fontWeight: FontWeight.w800,
+                          shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                        ),
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 6),
@@ -449,26 +499,12 @@ class _EquipmentCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                RarityBadge(rarity: item.rarity),
-                const SizedBox(width: 6),
-                if (locked)
-                  Text(
-                    'Sv. ${item.requiredLevel}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.streak,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-              ],
-            ),
+            RarityBadge(rarity: item.rarity),
             if (buffLabel != null) ...[
               const SizedBox(height: 4),
               Text(
                 buffLabel,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11, color: AppColors.xp),
               ),

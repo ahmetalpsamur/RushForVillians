@@ -102,6 +102,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// Satın alma stoğu [UserProfile.grantStreakFreeze] üzerinden büyütür.
   static const _streakFreezeItemId = 'upgrade_streak_freeze';
 
+  /// Ekstra çark hakkı yükseltmesinin kimliği ([MockData.storeItems]).
+  static const _extraWheelSpinItemId = 'wheel_extra_spin';
+
+  /// "2x XP" yükseltmesinin kimliği ([MockData.storeItems]).
+  static const _xpBoostItemId = 'boost_double_xp';
+
   static const _reminderMessages = [
     '{round}. round: {enemy} için {steps} adım kaldı.',
     '{round}. round devam ediyor! {steps} adım daha atmalısın.',
@@ -375,11 +381,19 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   ///
   /// `setState` içinden de çağrılabilsin diye kendisi `setState` çağırmaz;
   /// kutlama bir sonraki frame'e bırakılır.
-  void _awardXp(int amount) {
-    if (amount <= 0) return;
+  ///
+  /// **Gerçekten verilen** XP'yi döner: "2x XP" yükseltmesi etkinse çarpan
+  /// burada uygulanır. Çarpanın tek noktası burası, çünkü yükseltmenin sözü
+  /// "kazandığın XP" — adım, düşman ve çark, hepsi.
+  int _awardXp(int amount) {
+    if (amount <= 0) return 0;
+    final granted =
+        _profile.isXpBoostActive
+            ? amount * GameConstants.xpBoostMultiplier
+            : amount;
     final previousLevel = _profile.level;
-    _profile.addXp(amount);
-    if (_profile.level == previousLevel) return;
+    _profile.addXp(granted);
+    if (_profile.level == previousLevel) return granted;
 
     final event = LevelUpEvent(
       previousLevel: previousLevel,
@@ -390,6 +404,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showLevelUp(event);
     });
+    return granted;
   }
 
   /// Seviye atlama kutlaması.
@@ -517,8 +532,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         pendingSteps: _profile.totalSteps - _profile.lastXpRewardedStepCount,
       );
       _profile.lastXpRewardedStepCount += xpReward.consumedSteps;
-      _today.xpEarned += xpReward.xp;
-      _awardXp(xpReward.xp);
+      // Ana ekrandaki "adımdan kazandığın XP" satırı gerçekten verileni
+      // göstermeli: "2x XP" etkinse [_awardXp] çarpanı uygulayıp döner.
+      _today.xpEarned += _awardXp(xpReward.xp);
 
       final adventure = _adventure;
       if (adventure != null) {
@@ -727,9 +743,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
+  /// Çark sonucu geldi. Hak tüketimi [UserProfile.consumeWheelSpin] üzerinden:
+  /// günlük hak duruyorsa o, kullanılmışsa bir ekstra jeton düşer.
   void _spinWheel(int xpWon) {
     setState(() {
-      _profile.lastWheelSpinAt = GameClock.now();
+      _profile.consumeWheelSpin(GameClock.now());
       _awardXp(xpWon);
     });
     _persist();
@@ -745,17 +763,30 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (alreadyOwned && !item.repeatable) return;
     if (_profile.coins < item.cost) return;
 
-    var granted = 0;
-    if (item.id == _streakFreezeItemId) {
-      // Stok doluysa satış yapılmaz; para boşa gitmemeli.
-      granted = _profile.grantStreakFreeze();
-      if (granted == 0) {
-        _showStoreNotice(
-          'Dondurma hakkı stoğun dolu '
-          '(${GameConstants.maxStreakFreezes}). Para harcanmadı.',
-        );
-        return;
-      }
+    // Tüketilen yükseltmeler: etkiyi **önce** uygula, veremiyorsan sat.
+    // Stok doluysa / zaten etkinse satış yapılmaz, para boşa gitmemeli.
+    switch (item.id) {
+      case _streakFreezeItemId:
+        if (_profile.grantStreakFreeze() == 0) {
+          _showStoreNotice(
+            'Dondurma hakkı stoğun dolu '
+            '(${GameConstants.maxStreakFreezes}). Para harcanmadı.',
+          );
+          return;
+        }
+      case _extraWheelSpinItemId:
+        if (_profile.grantExtraWheelSpin() == 0) {
+          _showStoreNotice(
+            'Ekstra çark hakkı stoğun dolu '
+            '(${GameConstants.maxExtraWheelSpins}). Para harcanmadı.',
+          );
+          return;
+        }
+      case _xpBoostItemId:
+        if (!_profile.activateXpBoost(GameClock.now())) {
+          _showStoreNotice('2x XP zaten etkin. Para harcanmadı.');
+          return;
+        }
     }
 
     setState(() {
@@ -794,6 +825,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _openWheel() => _push(
     DailyWheelScreen(
       alreadySpunToday: _profile.wheelSpunToday,
+      extraSpins: _profile.extraWheelSpins,
       onSpinResult: _spinWheel,
     ),
   );
@@ -811,18 +843,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     ),
   );
 
-  void _openStore() => _push(
-    XpStoreScreen(
-      items: _storeItems,
-      equipment: _equipment,
-      coins: _profile.coins,
-      level: _profile.level,
-      ownedItemIds: _profile.ownedItemIds,
-      streakFreezes: _profile.streakFreezes,
-      onPurchase: _purchase,
-      onPurchaseEquipment: _purchaseEquipment,
-    ),
-  );
+  /// Mağazayı açar.
+  ///
+  /// **Sekmeye geçilir, ekran itilmez.** [_push] önceden inşa edilmiş bir
+  /// widget örneğini rotaya veriyor; itilen rota kök Navigator'da durduğu için
+  /// [RootShell]'in alt ağacında değil ve `setState` onu tazelemiyordu.
+  /// Sonuç: itilen mağazada satın alma sonrası para düşüyor ama ekranda eski
+  /// bakiye kalıyor, kart "Sahipsin" demiyor ve ikinci dokunuş sessizce
+  /// düşüyordu. Sekme gövdesi her `setState`'te yeniden kurulduğu için bu
+  /// sorun orada hiç yoktu — [_openAdventure] de aynı deseni kullanıyor.
+  void _openStore() => setState(() => _tabIndex = 2);
 
   void _push(Widget screen) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).then((
@@ -868,6 +898,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         level: _profile.level,
         ownedItemIds: _profile.ownedItemIds,
         streakFreezes: _profile.streakFreezes,
+        extraWheelSpins: _profile.extraWheelSpins,
+        xpBoostActive: _profile.isXpBoostActive,
         onPurchase: _purchase,
         onPurchaseEquipment: _purchaseEquipment,
       ),

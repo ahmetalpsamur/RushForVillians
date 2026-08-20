@@ -45,6 +45,16 @@ class GameConstants {
   /// Gün bitmeye bu kadar saat kala, seri henüz tamamlanmadıysa uyarılır.
   static const int streakWarningHours = 3;
 
+  /// Aynı anda tutulabilecek en fazla ekstra çark hakkı.
+  ///
+  /// [maxStreakFreezes] ile aynı gerekçe: jeton biriktirip günlerce çark
+  /// yağmuru yapmak, "günde bir kez" kuralını anlamsız kılardı.
+  static const int maxExtraWheelSpins = 2;
+
+  /// "2x XP" yükseltmesinin XP çarpanı. Yükseltme, satın alındığı oyun
+  /// gününün sonuna kadar (bkz. [GameDay.nextResetAfter]) geçerlidir.
+  static const int xpBoostMultiplier = 2;
+
   /// Kaç adımın 1 coin ettiği.
   ///
   /// Mağaza fiyatlarından türetildi (300 / 500 / 800 / 1200): günde 6.000 adım

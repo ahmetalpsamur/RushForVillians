@@ -33,19 +33,27 @@ class MockData {
       cost: 500,
       icon: Icons.checkroom,
     ),
+    // Tüketilen iki yükseltme: `repeatable`, çünkü etkileri bir kerelik.
+    // Kalıcı sahiplik yerine profildeki sayaçlara/süreye yazılırlar.
     XpStoreItem(
       id: 'boost_double_xp',
       name: '2x XP Boost (1 gün)',
-      description: 'Bir günlüğüne kazandığın XP\'yi ikiye katlar.',
+      description:
+          'Gün sonuna kadar kazandığın tüm XP\'yi ikiye katlar '
+          '(adım, düşman ve çark dahil).',
       cost: 800,
       icon: Icons.flash_on,
+      repeatable: true,
     ),
     XpStoreItem(
       id: 'wheel_extra_spin',
       name: 'Ekstra Çark Hakkı',
-      description: 'Günlük çarkı bir kez daha çevir.',
+      description:
+          'Günlük hakkın bittikten sonra çarkı bir kez daha çevir. '
+          'Stok en fazla ${GameConstants.maxExtraWheelSpins}.',
       cost: 300,
       icon: Icons.replay_circle_filled,
+      repeatable: true,
     ),
     XpStoreItem(
       id: 'upgrade_streak_freeze',

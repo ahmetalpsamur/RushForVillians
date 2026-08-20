@@ -2022,6 +2022,83 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
   zaten benzer bir yazım borcunu ("Villians") bilerek bırakıyor. Kullanıcıya
   görünen başlık "Mağaza" oldu; kod adı olduğu gibi kaldı.
 
+### GD11. Mağaza artık itilmiyor, sekmeye geçiliyor (2026-08-20)
+- **Nerede:** `lib/features/root/root_shell.dart:_openStore`
+- **Karar:** Ana ekrandaki "Mağaza" hızlı erişimi `_push(XpStoreScreen(...))`
+  yerine `setState(() => _tabIndex = 2)` yapıyor. `_openAdventure` zaten aynı
+  deseni kullanıyordu.
+- **Neden:** `_push` **önceden inşa edilmiş** bir widget örneğini
+  `MaterialPageRoute`'a veriyor. İtilen rota kök Navigator'ın overlay'inde
+  duruyor, yani `RootShell`'in alt ağacında **değil** — `setState` onu
+  tazelemiyor. Gerçek `RootShell` üzerinde ölçüldü: 99999 coin ile 850
+  coinlik ekipman alındığında profildeki para 99149'a düşüyor ama ekranda
+  hâlâ 99999 yazıyor, kart "Sahipsin" demiyor, seviye atlayınca kilitler
+  açılmıyor ve aynı düğmeye ikinci dokunuş sessizce düşüyor (Model Kuralları
+  #4 ihlali). Sekme gövdesi her `setState`'te yeniden kurulduğu için mağazanın
+  sekme sürümünde bu sorun hiç yoktu.
+- **Kabul edilen takas:** mağazadan geri düğmesiyle ana ekrana dönülmüyor;
+  alt gezinme çubuğu kullanılıyor. Macera sekmesi zaten böyle çalışıyor.
+- **Geri dönülecek nokta:** aynı tuzak `_openWheel`, `_openRewards` ve
+  `_editCharacter` için de var. Üçü de **bugün güvenli**, çünkü ya kendi
+  iç durumlarını tutuyorlar (çark) ya da salt-okunur bir anlık görüntü
+  gösteriyorlar. `RootShell` durumunu canlı yansıtması gereken **yeni** bir
+  ekran eklenirse ya sekmeye alınmalı ya da state bir `Listenable`'a
+  taşınmalı. Riverpod/Bloc geçişinde bu tuzak kendiliğinden kapanır.
+
+### GD12. Ekipman kartı sabit yükseklikte (2026-08-20)
+- **Nerede:** `lib/features/store/xp_store_screen.dart` —
+  `_equipmentCardHeight`, `_EquipmentCard`
+- **Karar:** `childAspectRatio: 0.72` yerine `mainAxisExtent: 280`. Seviye
+  etiketi ("Sv. N") nadirlik rozetinin yanından alınıp görselin üstüne,
+  kilit ikonunun yanına taşındı. Buff satırı 2 satırdan 1 satıra indi.
+- **Neden:** en-boy oranı, hücre yüksekliğini ekran genişliğinden türetiyordu
+  ve dar ekranda kartı kısaltıyordu. Ölçülen dikey taşma: 320 dp'de 67 px,
+  360 dp'de (en yaygın Android) 40 px, 390 dp'de 19 px, 412 dp'de 3,4 px.
+  Taşan kısım Column'un son çocuğu, yani **satın alma düğmesi** — yaygın
+  telefonlarda ekipman satın almak fiilen imkânsızdı. Ayrıca rozet + "Sv. N"
+  satırı 480 dp'de bile yatay taşıyor ve kilidin nedenini gösteren tek görsel
+  bilgiyi kırpıyordu.
+- **Neden `Expanded` değil:** `SectionCard`'ın kendi `Column`'u alt Column'a
+  sınırsız yükseklik veriyor; esnek çocuk kullanmak paylaşılan `SectionCard`
+  widget'ını değiştirmeyi gerektirirdi (Kural 1/3).
+- **Neden 280:** 320 dp'de, katalogdaki **en uzun Türkçe adlarla** ölçülüp
+  ~18 px pay bırakıldı. Değer değişecekse `store_screen_test.dart` içindeki
+  "dar ekran düzeni" grubu altı genişlikte taşma olmadığını doğruluyor.
+
+### GD13. Para alıp hiçbir şey yapmayan iki yükseltme tüketilir hâle geldi (2026-08-20)
+- **Nerede:** `models/user_profile.dart` (`extraWheelSpins`, `xpBoostUntil`),
+  `features/root/root_shell.dart` (`_purchase`, `_awardXp`, `_spinWheel`),
+  `features/wheel/daily_wheel_screen.dart`, `data/mock_data.dart`
+- **Sorun:** `ownedItemIds`'i okuyan tek kod "Sahipsin" etiketiydi.
+  `boost_double_xp` (800 coin) ve `wheel_extra_spin` (300 coin) satın
+  alınıyor, para gidiyor, hiçbir yerde tüketilmiyordu. Üstelik
+  `boost_double_xp` `repeatable: false` olduğu için bir kez alınınca kalıcı
+  "Sahipsin" oluyor ve "1 gün" vaadi anlamsız kalıyordu.
+- **Karar:** ikisi de `repeatable: true` oldu ve gerçek tüketim aldı:
+  - **Ekstra çark hakkı:** `UserProfile.grantExtraWheelSpin()` /
+    `consumeWheelSpin()`. Stok `GameConstants.maxExtraWheelSpins` = 2.
+    Dondurma hakkıyla **birebir aynı sözleşme**: stok doluysa 0 döner,
+    satış yapılmaz, para harcanmaz, nedeni söylenir.
+  - **2x XP:** `activateXpBoost()` süreyi
+    `GameDay.nextResetAfter(now)`'a kadar açar — ayrı bir gün/saat hesabı
+    yok (Model Kuralları #3). Zaten etkinse satış yapılmaz.
+- **Çarpan neden `_awardXp` içinde:** yükseltmenin sözü "kazandığın XP",
+  yani adım + düşman + çark. `_awardXp` XP veren **tek** nokta (Aşama 2b);
+  çarpanı `calculateStepXp`'in `multiplier` kancasına koymak yalnızca adım
+  XP'sini büyütürdü. `_awardXp` artık **gerçekten verilen** XP'yi döndürüyor,
+  böylece ana ekrandaki "adımdan kazandığın XP" satırı da doğru kalıyor.
+- **Kalan:** `skin_dragon_cape` ve `title_villain_hunter` hâlâ hiçbir yerde
+  gösterilmiyor. Bunlar kod değil **sanat/ekran** işi (pelerin görseli,
+  profilde unvan satırı); mağazadaki tüketim hatası kapsamında değil.
+- **Şema v9.** 8 → 9 taşıması içerik değiştirmiyor (varsayılanlar 0 / null
+  doğru); sürüm yine de artırıldı. `fromJson` stoğu savunma amaçlı kırpıyor.
+
+### GD14. "Alabileceklerim" süzgeci sahip olunanları eliyor (2026-08-20)
+- **Nerede:** `xp_store_screen.dart:_visibleEquipment`
+- Süzgeç yalnızca seviye + paraya bakıyordu; zaten sahip olunan item de
+  "alabileceklerim" listesinde çıkıyordu. Süzgecin sözü "bugün satın
+  alabileceklerim" — alınamayacak bir şey orada olmamalı.
+
 ---
 ---
 
@@ -2321,3 +2398,49 @@ serbest.
 3. **#16 çark item ödülü** (§4.3) — katalog hazır, küçük iş.
 4. **Aşama 4a savaş motoru** — determinizm şartıyla (§4.4).
 
+
+---
+---
+
+# Aşama 3b — Mağaza denetimi ✅ (2026-08-20)
+
+Mağaza "sorunsuz görünüyordu"; kapsamlı denetimde **beş gerçek hata** çıktı.
+Kararların gerekçesi GD11–GD14.
+
+## Denetimde temiz çıkanlar
+
+Bunlar okunarak doğrulandı, hepsi gerçekten çalışıyor — ileride tekrar
+açılmasına gerek yok:
+
+| Kontrol | Neden güvenli |
+|---|---|
+| Yetersiz bakiye / negatif coin | Her iki satın alma yolunda `coins < cost` erken çıkışı |
+| Aynı öğeyi ikinci kez alma | Yükseltmede `alreadyOwned && !repeatable`, ekipmanda `ownedItemIds.contains` |
+| Atomiklik | Para düşme + envantere ekleme aynı senkron `setState` bloğunda, arada `await` yok |
+| Çift dokunma / eşzamanlılık | Dart tek iş parçacıklı; muhafızlar ikinci çağrıyı yakalıyor |
+| Kalıcılık | `_persist()` → `profile.coins` + `ownedItemIds` zaten yazılıyor |
+| Seviye kilidi tam sınırda | `isUnlockedAt(l) => l >= requiredLevel` — Sv.7 item + Sv.7 oyuncu = açık |
+| Kilidi arayüzden atlatma | `_purchaseEquipment` seviyeyi **yeniden** kontrol ediyor |
+| Kilit tek kaynaktan mı | `Item.isUnlockedAt` tek fonksiyon, iki katmanda çağrılıyor; kopya mantık yok |
+| Dondurma stok sınırı | Mağaza ve kilometre taşı **aynı** `grantStreakFreeze()`'den geçiyor |
+| Tembel yükleme | `SliverGrid` + `SliverChildBuilderDelegate` |
+| Boş durum | İki ayrı mesaj (sınıfa ekipman yok / süzgeç boş) |
+
+## Düzeltilen hatalar
+
+| # | Ne | Ciddiyet | Karar |
+|---|---|---|---|
+| M1 | Ana ekrandan itilen mağaza satın alma sonrası hiç tazelenmiyordu | işlevsel, yüksek | GD11 |
+| M2 | Ekipman kartı dikey taşıyor, satın alma düğmesi kartın dışında kalıyordu | işlevsel, yüksek | GD12 |
+| M3 | Nadirlik + "Sv. N" satırı yatay taşıyor, seviye etiketi kırpılıyordu | işlevsel, orta | GD12 |
+| M4 | İki yükseltme para alıp hiçbir şey yapmıyordu | işlevsel, orta | GD13 |
+| M5 | "Alabileceklerim" sahip olunanları da gösteriyordu | kozmetik | GD14 |
+
+## Test
+
+`test/store_screen_test.dart` — "dar ekran düzeni" grubu (7 test): katalogdaki
+**en uzun adlı 20 item** ile altı ekran genişliğinde (320/360/390/412/480/800)
+taşma olmadığı, ve 320 dp'de kilit ikonuyla seviye etiketinin ikisinin de
+görünür kaldığı.
+
+Toplam **252 test geçiyor**, `flutter analyze` temiz.

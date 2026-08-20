@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
@@ -9,6 +11,18 @@ import 'package:rush_for_villains/models/xp_store_item.dart';
 /// Mağazanın iki sözü var: kilitli bir kart **sessiz kalmaz** (CLAUDE.md —
 /// Model Kuralları #4) ve kilit gerçekten tutar (#10/#11).
 void main() {
+  /// Gerçek sanat klasöründen üretilmiş katalogun tamamı. Düzen testleri
+  /// gerçek (uzun) Türkçe adlarla çalışsın diye dosya sisteminden okunuyor —
+  /// `item_catalog_test.dart` de aynı deseni kullanıyor.
+  final allItems =
+      [
+        for (final entity in Directory('lib/Items').listSync(recursive: true))
+          if (entity is File)
+            buildItemFromAsset(
+              entity.path.replaceAll(Platform.pathSeparator, '/'),
+            ),
+      ].nonNulls.toList();
+
   // Sıradan, ilk seviyelerde açılan ucuz item.
   final cheapItem = buildItemFromAsset('lib/Items/swords/sword.png')!;
   // Efsanevi, 22+ seviye isteyen pahalı item.
@@ -273,6 +287,50 @@ void main() {
       expect(find.text('${cheapItem.cost}'), findsOneWidget);
       expect(find.text('1234'), findsOneWidget);
       expect(find.byIcon(Icons.monetization_on), findsWidgets);
+    });
+  });
+
+  group('dar ekran düzeni', () {
+    // Kart yüksekliği `childAspectRatio` ile ekran genişliğinden türetiliyordu:
+    // 360 dp'de 40 px, 320 dp'de 67 px dikey taşma oluyor ve Column'un son
+    // çocuğu — **satın alma düğmesi** — kartın dışında kalıyordu. Ayrıca
+    // nadirlik rozeti + "Sv. N" satırı her genişlikte yatay taşıyordu.
+    //
+    // En uzun adlı itemler en kötü durum: ad iki satıra çıkıyor.
+    final longest = [...allItems]
+      ..sort((a, b) => b.name.length.compareTo(a.name.length));
+    final worst = longest.take(20).toList();
+
+    for (final width in [320.0, 360.0, 390.0, 412.0, 480.0, 800.0]) {
+      testWidgets('$width dp genişlikte ekipman kartı taşmıyor', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 4000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        final errors = <String>[];
+        final previous = FlutterError.onError;
+        FlutterError.onError = (details) {
+          errors.add(details.exceptionAsString());
+        };
+        addTearDown(() => FlutterError.onError = previous);
+
+        await pumpStore(tester, equipment: worst, coins: 10, level: 1);
+
+        expect(errors, isEmpty, reason: errors.join(' | '));
+      });
+    }
+
+    testWidgets('kilitli kartta seviye etiketi görünür', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await pumpStore(tester, equipment: [lockedItem], level: 1);
+
+      expect(find.text('Sv. ${lockedItem.requiredLevel}'), findsOneWidget);
+      expect(find.byIcon(Icons.lock), findsOneWidget);
     });
   });
 }

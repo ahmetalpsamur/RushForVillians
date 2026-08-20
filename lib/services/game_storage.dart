@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 8;
+  static const int schemaVersion = 9;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -87,6 +87,10 @@ class GameStorage {
       state['stepHistory'] ??= <Object>[];
       return state;
     },
+    // 8 -> 9: mağazadaki iki yükseltme artık gerçekten tüketiliyor
+    // (extraWheelSpins, xpBoostUntil). Varsayılanları (0 / null) doğru
+    // olduğu için içerik değişmiyor; sürüm yine de artırıldı.
+    8: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

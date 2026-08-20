@@ -96,6 +96,18 @@ class UserProfile {
   /// kalıcılık için kullanılır.
   DateTime? lastWheelSpinAt;
 
+  /// Mağazadan alınmış ekstra çark hakkı (jeton).
+  ///
+  /// Günlük hak kullanıldıktan sonra çevirmeyi mümkün kılar. Stok
+  /// [GameConstants.maxExtraWheelSpins] ile sınırlı.
+  int extraWheelSpins;
+
+  /// "2x XP" yükseltmesinin bitiş anı (UTC). `null` = etkin değil.
+  ///
+  /// Satın alındığı oyun gününün sonunda ([GameDay.nextResetAfter]) düşer;
+  /// ayrı bir gün hesabı yapılmaz.
+  DateTime? xpBoostUntil;
+
   UserProfile({
     required this.avatar,
     int? hp,
@@ -117,6 +129,8 @@ class UserProfile {
     this.lastStepReportAt,
     List<String>? ownedItemIds,
     this.lastWheelSpinAt,
+    this.extraWheelSpins = 0,
+    this.xpBoostUntil,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItemIds = ownedItemIds ?? <String>[];
@@ -129,6 +143,49 @@ class UserProfile {
   bool get wheelSpunToday {
     final lastSpin = lastWheelSpinAt;
     return lastSpin != null && GameDay.isSameGameDay(lastSpin, GameClock.now());
+  }
+
+  /// Çark şu an çevrilebilir mi: ya günlük hak duruyordur ya da elde ekstra
+  /// jeton vardır.
+  bool get canSpinWheel => !wheelSpunToday || extraWheelSpins > 0;
+
+  /// Çark çevrildi. Günlük hak duruyorsa o kullanılır; kullanılmışsa bir
+  /// ekstra jeton düşer. Hiç hak yoksa hiçbir şey yapmaz ve `false` döner.
+  bool consumeWheelSpin(DateTime now) {
+    if (!wheelSpunToday) {
+      lastWheelSpinAt = now;
+      return true;
+    }
+    if (extraWheelSpins <= 0) return false;
+    extraWheelSpins--;
+    return true;
+  }
+
+  /// Ekstra çark hakkı verir; stok tavanına ([GameConstants.maxExtraWheelSpins])
+  /// takılırsa **verilen kadarını** döner. Sıfır dönmesi "stok dolu" demektir
+  /// ve çağıran para harcamamalıdır — [grantStreakFreeze] ile aynı sözleşme.
+  int grantExtraWheelSpin([int amount = 1]) {
+    if (amount <= 0) return 0;
+    final granted =
+        (extraWheelSpins + amount).clamp(0, GameConstants.maxExtraWheelSpins) -
+        extraWheelSpins;
+    extraWheelSpins += granted;
+    return granted;
+  }
+
+  /// "2x XP" yükseltmesi şu an etkin mi.
+  bool get isXpBoostActive {
+    final until = xpBoostUntil;
+    return until != null && GameClock.now().toUtc().isBefore(until);
+  }
+
+  /// "2x XP" yükseltmesini bu oyun gününün sonuna kadar etkinleştirir.
+  /// Zaten etkinse hiçbir şey yapmaz ve `false` döner — çağıran para
+  /// harcamamalıdır.
+  bool activateXpBoost(DateTime now) {
+    if (isXpBoostActive) return false;
+    xpBoostUntil = GameDay.nextResetAfter(now).toUtc();
+    return true;
   }
 
   /// Serinin bu oyun gününde tamamlanıp tamamlanmadığı.
@@ -298,6 +355,8 @@ class UserProfile {
     'lastStepReportAt': lastStepReportAt?.toUtc().toIso8601String(),
     'ownedItemIds': ownedItemIds,
     'lastWheelSpinAt': lastWheelSpinAt?.toIso8601String(),
+    'extraWheelSpins': extraWheelSpins,
+    'xpBoostUntil': xpBoostUntil?.toUtc().toIso8601String(),
   };
 
   /// Eksik alanlar varsayılana düşer; böylece eski kayıtlar okunabilir kalır.
@@ -331,6 +390,13 @@ class UserProfile {
           (json['ownedItemIds'] as List?)?.whereType<String>().toList() ??
           <String>[],
       lastWheelSpinAt: _parseDate(json['lastWheelSpinAt']),
+      // Dondurma stoğuyla aynı savunma: elle düzenlenmiş kayıt sınırsız
+      // ekstra çark hakkı getirmemeli.
+      extraWheelSpins: (json['extraWheelSpins'] as int? ?? 0).clamp(
+        0,
+        GameConstants.maxExtraWheelSpins,
+      ),
+      xpBoostUntil: _parseDate(json['xpBoostUntil']),
     );
   }
 
