@@ -53,15 +53,6 @@ class XpStoreScreen extends StatefulWidget {
   State<XpStoreScreen> createState() => _XpStoreScreenState();
 }
 
-/// Ekipman kartının sabit yüksekliği (logical piksel).
-///
-/// Kart içeriği sınırlı: görsel kutusu, en fazla iki satır ad, nadirlik rozeti,
-/// **en fazla üç satır bonus** (efsanevi itemler üç bonus taşıyor) ve fiyat
-/// düğmesi. En dar desteklenen ekranda (320 dp), en uzun sınıf lakabı ve en
-/// uzun Türkçe adlarla ölçüldü; `store_screen_test.dart` altı genişlikte taşma
-/// olmadığını doğruluyor.
-const double _equipmentCardHeight = 302;
-
 class _XpStoreScreenState extends State<XpStoreScreen> {
   /// `null` = bütün kategoriler.
   ItemCategory? _categoryFilter;
@@ -263,21 +254,15 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                sliver: SliverGrid(
-                  // Yükseklik **sabit**, en-boy oranından türetilmiyor:
-                  // `childAspectRatio` dar ekranda hücreyi kısaltıyordu ve
-                  // kartın son çocuğu (fiyat düğmesi) kartın dışında kalıyordu
-                  // — 360 dp'de 40 px, 320 dp'de 67 px taşma. Kart içeriği
-                  // sabit yükseklikte olduğu için ölçüyü de sabitlemek doğru.
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    mainAxisExtent: _equipmentCardHeight,
-                  ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final item = equipment[index];
-                    return _EquipmentCard(
+                sliver: SliverList.builder(
+                  // Satır yüksekliğini kart içeriği belirler. Böylece az bonuslu
+                  // itemler, en uzun item için ayrılan boşluğu taşımaz.
+                  itemCount: (equipment.length + 1) ~/ 2,
+                  itemBuilder: (context, rowIndex) {
+                    final firstIndex = rowIndex * 2;
+                    final hasSecond = firstIndex + 1 < equipment.length;
+
+                    Widget buildCard(Item item) => _EquipmentCard(
                       item: item,
                       coins: widget.coins,
                       level: widget.level,
@@ -285,7 +270,27 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       onPurchase: () => widget.onPurchaseEquipment(item),
                       onBlocked: _explain,
                     );
-                  }, childCount: equipment.length),
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom:
+                            rowIndex == (equipment.length - 1) ~/ 2 ? 0 : 12,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: buildCard(equipment[firstIndex])),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child:
+                                hasSecond
+                                    ? buildCard(equipment[firstIndex + 1])
+                                    : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
           ],

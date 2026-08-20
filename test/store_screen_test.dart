@@ -385,6 +385,19 @@ void main() {
         });
     final sample = worst.take(20).toList();
 
+    testWidgets('az içerikli ekipman kartı gereksiz boşluk bırakmaz', (
+      tester,
+    ) async {
+      await pumpStore(tester, equipment: [cheapItem]);
+
+      final card = find.ancestor(
+        of: find.text(cheapItem.name),
+        matching: find.byType(Card),
+      );
+
+      expect(tester.getSize(card).height, lessThan(250));
+    });
+
     for (final width in [320.0, 360.0, 390.0, 412.0, 480.0, 800.0]) {
       testWidgets('$width dp genişlikte ekipman kartı taşmıyor', (
         tester,
