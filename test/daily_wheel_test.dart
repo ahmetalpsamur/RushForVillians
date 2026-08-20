@@ -6,6 +6,7 @@ import 'package:rush_for_villains/features/wheel/daily_wheel_screen.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/models/wheel_reward.dart';
+import 'package:rush_for_villains/widgets/reward_reveal.dart';
 
 /// Çark ekranının hak yönetimi ve ödül gösterimi (#16).
 ///
@@ -49,10 +50,19 @@ void main() {
     return results;
   }
 
-  /// Çarkı çevirir ve animasyonun bitmesini bekler.
+  /// Çarkı çevirir, animasyonun bitmesini bekler ve açılışı kapatır.
+  ///
+  /// Ödül artık önce tam ekran bir açılışla gösteriliyor
+  /// ([RewardRevealOverlay]); kalıcı sonuç kartı ancak açılış kapatılınca
+  /// çiziliyor. Açılışın kendisi `wheel_reveal_test.dart` içinde test
+  /// ediliyor, buradaki testler hak yönetimine bakıyor.
   Future<void> spin(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
     await tester.pumpAndSettle();
+    if (find.byType(RewardRevealOverlay).evaluate().isNotEmpty) {
+      await tester.tap(find.byType(RewardRevealOverlay));
+      await tester.pumpAndSettle();
+    }
   }
 
   group('günlük hak', () {

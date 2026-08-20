@@ -2377,6 +2377,52 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
 - **Onay şart:** satış geri alınamaz, bu yüzden diyalog hem geri gelecek
   parayı hem tekrar almanın maliyetini söylüyor.
 
+### GD30. Çevirme süresi ödülün nadirliğine bağlı (2026-08-20)
+- **Nerede:** `wheel_rewards.dart:spinDurationFor`
+- **Karar:** sıradan 2600 ms, az bulunur 3400 ms, nadir ve üstü 4600 ms.
+- **Neden:** beklenti inşasının en ucuz ve en etkili aracı. Yavaşlama uzadıkça
+  "acaba" hissi büyüyor.
+- **Bilinçli sızıntı:** uzun çevirme ödülün iyi olduğunu **ele veriyor**. Bu
+  bir kusur değil; gacha çarkları tam olarak bunu yapar ve heyecanı kuran şey
+  o. Sonuç zaten çark dönmeden belli ([pickWinningSlice]), yani sızan şey
+  sonucun kendisi değil, kalitesi.
+- **Üst sınır 5 sn:** beklenti inşası hoş, oyuncuyu bekletmek değil. Testle
+  bağlı.
+
+### GD31. Açılış kademesi "nadir ve üstü" olarak yazıldı (2026-08-20)
+- **Nerede:** `wheel_rewards.dart:revealTierFor`
+- **Karar:** üç kademe var ve en üstü nadir/epik/efsanevi'yi birlikte kapsıyor.
+- **Neden:** çarkın tavanı nadir (GD19), yani epik ve efsanevi bugün **çarktan
+  çıkamıyor**. Kademeyi "yalnızca efsanevi" diye yazsaydık hiç çalışmayan bir
+  dal olurdu; "nadir ve üstü" yazınca çarkın büyük ikramiyesi tam ekran
+  muameleyi alıyor **ve** ödül havuzu ileride genişlerse (kart #14, düşman
+  ödülleri) aynı kod kendiliğinden doğru çalışıyor. Ölü dal yok.
+
+### GD32. Haptic: şiddet artar, sıklık azalır (2026-08-20)
+- **Nerede:** `daily_wheel_screen.dart:_onSpinTick`
+- **Karar:** ibrenin altından geçen her dilim için bir titreşim; ilk %55'te
+  `selectionClick`, %85'e kadar `lightImpact`, sonrasında `mediumImpact`,
+  oturunca `heavyImpact`.
+- **Neden:** çark yavaşladıkça darbeler doğal olarak seyrekleşiyor. Şiddeti
+  ters yönde artırmak "artan geri bildirim" isteğini karşılıyor ve son
+  dilimlerde tek tek ağır vuruşlar gerilimi kuruyor.
+- **Not:** bir karede birden çok dilim geçilse bile tek titreşim çalıyor
+  (son dilim indeksi tutuluyor); açılışta spam yok.
+
+### GD33. Atlama ticker'ı iptal ediyor — `TickerCanceled` yakalanmak zorunda (2026-08-20)
+- **Nerede:** `daily_wheel_screen.dart:_spin`
+- **Sorun:** atlama `_spinController.value = 1` yapıyor; bu ticker'ı **iptal**
+  ediyor ve `forward()`'ın döndürdüğü `TickerFuture` normal yoldan **hiç
+  tamamlanmıyor**. `await` orada asılı kalıyor, ödül veren kod hiç
+  çalışmıyordu — yani **atlamak çevirmeyi sessizce yutuyordu** (hak harcanır,
+  ödül gelmez).
+- **Karar:** `.orCancel` + `on TickerCanceled` ile iptal normal bir sonlanma
+  gibi ele alınıyor; sonuç zaten önceden belli olduğu için akış aynen devam
+  ediyor.
+- **Testle bağlı:** "atlanan çevirme ile beklenen çevirme aynı sonucu verir".
+- **Genel ders:** bu projede bir animasyonun sonunu bekleyen her `await`
+  atlanabilir olacaksa aynı korumaya ihtiyaç duyar.
+
 ### GD14. "Alabileceklerim" süzgeci sahip olunanları eliyor (2026-08-20)
 - **Nerede:** `xp_store_screen.dart:_visibleEquipment`
 - Süzgeç yalnızca seviye + paraya bakıyordu; zaten sahip olunan item de
@@ -3406,3 +3452,111 @@ ediyor ve dokümantasyonu bunu söylüyor.
 > testi düşürüyor.
 
 Toplam **422 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# Aşama 3i — Çark: gacha hissi ✅ (2026-08-20)
+
+Çark çalışıyordu ama tek eğrili, tek hızlı ve sonuçsuz bir daireydi. Artık
+pull atma hissi veriyor. Kararlar **GD30–GD33**. **Paket eklenmedi** — hepsi
+Flutter'ın kendi `AnimationController` / `CustomPainter` araçlarıyla.
+
+## Beklenti inşası
+
+| | Önce | Sonra |
+|---|---|---|
+| Süre | sabit 2600 ms | ödüle göre **2600 / 3400 / 4600 ms** |
+| Eğri | `Curves.easeOutCubic` | `Cubic(0.22, 0, 0.06, 1)` — hızlan, uzun kuyrukla sürün |
+| Duruş | `AnimatedRotation` | `AnimationController` + `Transform.rotate` |
+| Haptic | yok | dilim başına titreşim; **şiddet artar, sıklık azalır** |
+| Açılış | yok | nadirliğe göre üç kademe |
+| Atlama | yok | her aşamada dokunmak geçer |
+
+**İyi ödülde çevirme daha uzun sürüyor** ([spinDurationFor]). Süre farkı
+ödülü ele veriyor; bu bir kusur değil, aranan şeyin ta kendisi — çark
+uzadıkça "acaba" hissi büyüyor.
+
+**Haptic deseni:** ilk %55'te `selectionClick`, %85'e kadar `lightImpact`,
+sonrasında `mediumImpact`, oturunca `heavyImpact`. Çark yavaşladıkça darbeler
+seyrekleşir ama sertleşir — gerilimi kuran şey bu.
+
+## Üç kademeli açılış
+
+`RewardRevealTier` (`wheel_rewards.dart`, saf):
+
+| Kademe | Ne zaman | Ne olur | Parçacık |
+|---|---|---|---|
+| `plain` | XP ve sıradan item | kart büyüyerek açılır | 0 |
+| `bright` | az bulunur item | renk dalgası + parçacık | 20 |
+| `spectacular` | **nadir ve üstü** | tam ekran, ışık patlaması, çift halka | 48 |
+
+Çarkın tavanı nadir (GD19), yani **nadir bu çarkın büyük ikramiyesi** ve tam
+ekran muameleyi o alıyor. Koşul yine de "nadir ve üstü" olarak yazıldı: ödül
+havuzu genişlerse (kart #14, düşman ödülleri) aynı kademe kendiliğinden
+çalışır — ölü dal yok.
+
+Açılış kartı ödülün **adını, nadirliğini, lore cümlesini ve etkilerini**
+gösteriyor; nadirlik renkleri mağaza ve envanterle aynı palet
+(`AppColors.rarity*`).
+
+**Sonuç kartı ancak açılış kapatılınca çiziliyor.** Aynı bilgiyi iki yerde
+birden göstermemek için; kalıcı kayıt açılıştan sonra geliyor.
+
+## Atlanabilirlik
+
+Dokunmanın anlamı aşamaya göre değişiyor ve **hiçbir aşama sessiz değil**:
+
+- dönerken → çark sonuca ışınlanır ("Dokunarak geçebilirsin" yazısı görünür),
+- açılış oynarken → animasyon tamamlanır,
+- açılış durduğunda → kapanır ("Devam etmek için dokun").
+
+> **Yakalanan tuzak:** atlama, denetleyicinin değerini elle 1'e çekiyor ve bu
+> ticker'ı **iptal** ediyor. `forward()`'ın döndürdüğü `TickerFuture` iptal
+> edildiğinde normal yoldan **hiç tamamlanmaz**; `await` orada asılı kalıyor
+> ve ödül hiç verilmiyordu — yani atlamak çevirmeyi sessizce yutuyordu.
+> `.orCancel` + `on TickerCanceled` ile kapatıldı ve
+> "atlanan çevirme ile beklenen çevirme aynı sonucu verir" testiyle bağlandı.
+
+## Performans
+
+Ölçülen ve yapısal olarak garanti edilenler:
+
+- **Dönme sırasında yalnızca `Transform.rotate` yeniden kuruluyor.** Çark
+  yüzeyi `AnimatedBuilder`'ın `child`'ı olarak animasyonun **dışında** bir kez
+  inşa ediliyor ve bir `RepaintBoundary` içinde duruyor;
+  `_WheelPainter.shouldRepaint` dilimler değişmedikçe `false` dönüyor. Yani
+  dönerken hiçbir dilim, hiçbir metin yeniden boyanmıyor — sadece dönüştürme.
+- **Açılışta da aynı desen:** ödül kartının içeriği (görsel, ad, lore, etki
+  satırları) `AnimatedBuilder`'ın `child`'ı; her karede yeniden inşa edilmiyor.
+- **Parçacıkların tamamı tek bir `CustomPainter`'da**, parçacık başına widget
+  yok. Geometri (açı, hız, boyut, gecikme) tohumdan **bir kez** üretiliyor;
+  her karede rastgele sayı çekilmiyor.
+- **Parçacık sayısı 48 ile sınırlı** ve sıradan ödülde sıfır — her ödülde
+  patlama olursa hiçbiri özel hissettirmez.
+
+Ölçüm: dönme boyunca 300 kare pompalandı, toplam **268 ms**, kare başına
+**0,9 ms**.
+
+> ⚠️ **Bu sayı cihaz FPS'i değil.** `flutter test` GPU'suz, yazılım
+> rasterleyiciyle çalışıyor; ölçtüğü şey inşa + yerleşim + boyama CPU
+> maliyeti. 16,6 ms'lik kare bütçesinin çok altında olması işin CPU tarafının
+> rahat olduğunu gösteriyor, ama **gerçek cihazda ölçülmedi** — Windows'ta
+> geliştiriliyor ve `flutter run` bu oturumda çalıştırılmadı. Düşük seviye
+> telefonda doğrulanması gereken tek şey blur'lu ışık patlaması
+> (`MaskFilter.blur`); pahalı düşerse tek satırla kaldırılabilir
+> (`_BurstPainter.paint` içindeki ilk çizim).
+
+## Test
+
+- `test/wheel_reveal_test.dart` (14 test): kademe kuralları (beş nadirlik),
+  sürelerin nadirlikle uzaması ve 5 sn'yi aşmaması, parçacık tavanı, açılış
+  katmanının ad/nadirlik/lore/etki göstermesi, XP ödülü, kademeye göre başlık,
+  dokunma geri çağrısı, animasyonun sıfır ilerlemede çökmemesi, sonuç kartının
+  ancak kapatılınca çıkması, atlamanın çalışması ve **atlanan çevirmenin
+  beklenenle aynı sonucu vermesi**, çark yüzeyinin `RepaintBoundary` içinde
+  olması.
+- `test/daily_wheel_test.dart`: `spin()` yardımcısı artık açılışı da kapatıyor
+  (12 test, hiçbiri silinmedi).
+
+Toplam **436 test geçiyor**, `flutter analyze` temiz.

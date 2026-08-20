@@ -100,3 +100,69 @@ int pickWinningSlice(int sliceCount, int seed) {
   // ilerletiliyor ki sonuç dilim sırasına bağlı kalmasın.
   return Random(nextWheelSeed(seed)).nextInt(sliceCount);
 }
+
+/// Çark durduktan sonraki açılışın şiddeti.
+///
+/// Nadirlik yükseldikçe hem **bekleme** hem **kutlama** büyür: sıradan bir
+/// ödül sade gelir, çarkın en iyi ödülü tam ekran açılır. Kademe ödülden
+/// türetildiği için animasyon sonucu belirlemiyor — sonuç zaten
+/// [pickWinningSlice] ile önceden belli, kademe yalnızca onu **nasıl**
+/// göstereceğimizi söylüyor (CLAUDE.md §4.4).
+enum WheelRevealTier {
+  /// XP ödülleri ve sıradan itemler: kart açılır, ekran efekti yok.
+  plain,
+
+  /// Az bulunur item: renk dalgası ve az sayıda parçacık.
+  bright,
+
+  /// Nadir ve üstü: tam ekran açılış, ışık patlaması, yoğun parçacık.
+  ///
+  /// Çarkın tavanı nadir ([maxWheelRarity], bkz. GD19), yani **nadir bu
+  /// çarkın büyük ikramiyesi** ve tam ekran muamelesini o alıyor. Koşul
+  /// "nadir ve üstü" olarak yazıldı ki ödül havuzu ileride genişlerse
+  /// (ör. kart #14, düşman ödülleri) aynı kademe kendiliğinden çalışsın.
+  spectacular,
+}
+
+/// Ödülün açılış kademesi.
+WheelRevealTier revealTierFor(WheelReward reward) {
+  final item = reward.item;
+  if (item == null) return WheelRevealTier.plain;
+  return switch (item.rarity) {
+    RewardRarity.common => WheelRevealTier.plain,
+    RewardRarity.uncommon => WheelRevealTier.bright,
+    RewardRarity.rare ||
+    RewardRarity.epic ||
+    RewardRarity.legendary => WheelRevealTier.spectacular,
+  };
+}
+
+/// Çarkın dönme süresi.
+///
+/// İyi ödülde daha uzun sürmesi bilinçli: yavaşlama uzadıkça "acaba" hissi
+/// büyüyor. Süre farkı ödülü **ele veriyor** ama bu bir kusur değil, aranan
+/// şeyin ta kendisi — gacha çarkları tam olarak bunu yapar.
+Duration spinDurationFor(WheelRevealTier tier) => switch (tier) {
+  WheelRevealTier.plain => const Duration(milliseconds: 2600),
+  WheelRevealTier.bright => const Duration(milliseconds: 3400),
+  WheelRevealTier.spectacular => const Duration(milliseconds: 4600),
+};
+
+/// Açılış animasyonunun süresi.
+Duration revealDurationFor(WheelRevealTier tier) => switch (tier) {
+  WheelRevealTier.plain => const Duration(milliseconds: 420),
+  WheelRevealTier.bright => const Duration(milliseconds: 700),
+  WheelRevealTier.spectacular => const Duration(milliseconds: 1100),
+};
+
+/// Açılışta çizilecek parçacık sayısı.
+///
+/// **Bilerek düşük tutuldu.** Parçacıklar tek bir `CustomPainter` içinde,
+/// tek bir `AnimationController`'dan besleniyor; sayı düşük seviye telefonda
+/// kare süresini şişirmesin diye 48'i geçmiyor. Sıradan ödülde hiç yok:
+/// her ödülde patlama olursa hiçbiri özel hissettirmez.
+int particleCountFor(WheelRevealTier tier) => switch (tier) {
+  WheelRevealTier.plain => 0,
+  WheelRevealTier.bright => 20,
+  WheelRevealTier.spectacular => 48,
+};
