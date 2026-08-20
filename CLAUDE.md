@@ -2438,9 +2438,22 @@ açılmasına gerek yok:
 
 ## Test
 
-`test/store_screen_test.dart` — "dar ekran düzeni" grubu (7 test): katalogdaki
-**en uzun adlı 20 item** ile altı ekran genişliğinde (320/360/390/412/480/800)
-taşma olmadığı, ve 320 dp'de kilit ikonuyla seviye etiketinin ikisinin de
-görünür kaldığı.
+Toplam **295 test geçiyor**, `flutter analyze` temiz.
 
-Toplam **252 test geçiyor**, `flutter analyze` temiz.
+## Test kapsamı — mağaza artık sessizce bozulamaz
+
+Aşama 4'te savaş sistemi item buff'larına dokunacak ve mağazayı dolaylı
+etkileyebilir; bu testlerin görevi o anda alarm vermek.
+
+| Dosya | Ne kapsıyor | Test |
+|---|---|---|
+| `test/store_screen_test.dart` | **Ekranın ne gösterdiği:** seviye kilidi görünürlüğü, kilidin nedeni, süzgeçler (kategori / "Alabileceklerim" / sahip olunanların elenmesi), boş durumlar, tüketilen yükseltmelerin stok satırı, para biriminin coin olduğu, ve **altı ekran genişliğinde taşma olmadığı** (320/360/390/412/480/800, katalogdaki en uzun adlı 20 item ile) | 26 |
+| `test/store_purchase_test.dart` | **Satın alma kararı:** gerçek `RootShell` widget ağacı üzerinden para/sahiplik/seviye kilidi/kalıcılık. Yetersiz bakiye, negatif coin, ikinci satın alma, hızlı çift dokunma, atomiklik, tam seviye sınırı, seviye atlayınca kilidin açılması, ekranın tazelenmesi (M1 regresyonu), stok dolu reddi, 2x XP çarpanı, diske yazma, model kuralları ve v8→v9 taşıması | 30 |
+| `test/daily_wheel_test.dart` | Mağazanın sattığı **ekstra çark hakkının tüketimi:** günlük hak dururken jeton harcanmaması, jetonla çevirme, kalan hakkın önceden söylenmesi, iki hakkın aynı ekranda kullanılabilmesi | 8 |
+
+**Neden `RootShell` üzerinden:** `_purchase` / `_purchaseEquipment` bir
+`StatefulWidget`'ın private metodu ve mağazanın **son söz sahibi** orası
+(ekran kilitli görünse bile state yeniden kontrol ediyor). Mantığı saf bir
+fonksiyona çıkarmak çalışan mimariye dokunmak olurdu (Kural 1/3); widget
+testi aynı garantiyi mevcut yapıyı bozmadan veriyor. M1 regresyon testi
+("satın alma sonrası ekran tazelenir") ancak bu seviyede yazılabiliyordu.

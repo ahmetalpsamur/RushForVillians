@@ -52,6 +52,8 @@ void main() {
     int level = 50,
     List<String> owned = const [],
     int streakFreezes = 0,
+    int extraWheelSpins = 0,
+    bool xpBoostActive = false,
     void Function(Item)? onPurchaseEquipment,
     void Function(XpStoreItem)? onPurchase,
   }) async {
@@ -65,6 +67,8 @@ void main() {
           level: level,
           ownedItemIds: owned,
           streakFreezes: streakFreezes,
+          extraWheelSpins: extraWheelSpins,
+          xpBoostActive: xpBoostActive,
           onPurchase: onPurchase ?? (_) {},
           onPurchaseEquipment: onPurchaseEquipment ?? (_) {},
         ),
@@ -210,6 +214,36 @@ void main() {
       expect(find.text(cheapItem.name), findsNothing);
     });
 
+    testWidgets('"Alabileceklerim" sahip olunan itemi de gizler', (
+      tester,
+    ) async {
+      // Süzgecin sözü "bugün satın alabileceklerim"; alınamayacak bir şey
+      // orada olmamalı.
+      await pumpStore(
+        tester,
+        equipment: [cheapItem],
+        level: 50,
+        coins: 100000,
+        owned: [cheapItem.id],
+      );
+
+      expect(find.text(cheapItem.name), findsOneWidget);
+      await tester.tap(find.text('Alabileceklerim'));
+      await tester.pump();
+
+      expect(find.text(cheapItem.name), findsNothing);
+    });
+
+    testWidgets('süzgeç sonucu boşsa açıklayıcı metin çıkar', (tester) async {
+      await pumpStore(tester, equipment: [lockedItem], level: 1, coins: 0);
+
+      await tester.tap(find.text('Alabileceklerim'));
+      await tester.pump();
+
+      expect(find.textContaining('gösterilecek ekipman yok'), findsOneWidget);
+      expect(find.text('0 ekipman'), findsOneWidget);
+    });
+
     testWidgets('ekipman yoksa açıklayıcı metin çıkar', (tester) async {
       await pumpStore(tester);
 
@@ -274,6 +308,47 @@ void main() {
 
       expect(purchased, isEmpty);
       expect(find.textContaining('60 coin daha gerekiyor'), findsOneWidget);
+    });
+  });
+
+  group('tüketilen yükseltmelerin stok satırı', () {
+    const wheelSpin = XpStoreItem(
+      id: 'wheel_extra_spin',
+      name: 'Ekstra Çark Hakkı',
+      description: 'Bir kez daha çevir.',
+      cost: 100,
+      icon: Icons.replay_circle_filled,
+      repeatable: true,
+    );
+    const boost = XpStoreItem(
+      id: 'boost_double_xp',
+      name: '2x XP Boost (1 gün)',
+      description: 'XP ikiye katlanır.',
+      cost: 100,
+      icon: Icons.flash_on,
+      repeatable: true,
+    );
+
+    testWidgets('dondurma stoğu gösterilir', (tester) async {
+      await pumpStore(tester, upgrades: const [freeze], streakFreezes: 2);
+
+      expect(find.text('Elinde 2 hak var'), findsOneWidget);
+    });
+
+    testWidgets('ekstra çark stoğu gösterilir', (tester) async {
+      await pumpStore(tester, upgrades: const [wheelSpin], extraWheelSpins: 1);
+
+      expect(find.text('Elinde 1 hak var'), findsOneWidget);
+    });
+
+    testWidgets('2x XP etkinken söylenir, değilken satır çıkmaz', (
+      tester,
+    ) async {
+      await pumpStore(tester, upgrades: const [boost], xpBoostActive: true);
+      expect(find.textContaining('Şu an etkin'), findsOneWidget);
+
+      await pumpStore(tester, upgrades: const [boost]);
+      expect(find.textContaining('Şu an etkin'), findsNothing);
     });
   });
 
