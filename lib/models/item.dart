@@ -1,3 +1,4 @@
+import 'item_effect.dart';
 import 'reward_rarity.dart';
 
 /// Item kategorisi. Her kategori bir asset klasörüne birebir karşılık gelir
@@ -97,11 +98,15 @@ extension ItemCategoryX on ItemCategory {
   }
 }
 
-/// Bir item'ın verebileceği bonus türü.
+/// Bir item'ın verebileceği bonus türü — **kural türetmesinin** alfabesi.
 ///
 /// Sekiz tür var ve her karakter sınıfının **imzası** ayrı bir tür
 /// (`item_rules.dart:_classSignature`); aynı görsel bu sayede sınıfa göre
 /// farklı bir item oluyor.
+///
+/// Bu enum yalnızca sıradan/az bulunur/nadir itemlerin kuraldan türeyen
+/// bonuslarını tanımlar. Elle tasarlanmış itemler ([ItemEffects]) doğrudan
+/// [ItemEffect] listesi taşır ve buradaki türlerle sınırlı değildir.
 enum ItemBuffType {
   stepCoin,
   stepXp,
@@ -113,90 +118,159 @@ enum ItemBuffType {
   streakRelief,
 }
 
-/// Bir item'ın sağladığı kalıcı bonuslar.
+extension ItemBuffTypeX on ItemBuffType {
+  /// Kural türetmesindeki türün karşılık geldiği stat.
+  ItemStat get stat => switch (this) {
+    ItemBuffType.stepCoin => ItemStat.stepCoin,
+    ItemBuffType.stepXp => ItemStat.stepXp,
+    ItemBuffType.wheelXp => ItemStat.wheelXp,
+    ItemBuffType.enemyXp => ItemStat.enemyXp,
+    ItemBuffType.dailyCoinCap => ItemStat.dailyCoinCap,
+    ItemBuffType.streakFreezeCap => ItemStat.streakFreezeCap,
+    ItemBuffType.wheelSpinCap => ItemStat.wheelSpinCap,
+    ItemBuffType.streakRelief => ItemStat.streakRelief,
+  };
+}
+
+/// Bir item'ın sağladığı etkilerin tamamı.
 ///
-/// Nadirlik yükseldikçe **hem bonus miktarı hem bonus sayısı** artar
-/// (sıradan 1, az bulunur/nadir 2, epik/efsanevi 3) ve hangi bonusların
-/// düştüğü oyuncunun **karakter sınıfına** göre değişir: aynı görsel, Büyücüde
-/// başka bir item, Kara Büyücüde başka.
+/// **Tek alanı [effects]**: sayısal getter'ların hepsi ondan türetilir. Bu
+/// yapı, kuraldan türeyen basit bonuslarla ([buffFor]) elle tasarlanmış
+/// koşullu/tetiklenen etkileri ([ItemEffects]) aynı kapta taşımayı mümkün
+/// kılıyor — mağaza, envanter ve toplama mantığı ikisini ayırt etmek zorunda
+/// kalmıyor.
 ///
-/// Buradaki her alan **bugün var olan** bir uygulama noktasına karşılık gelir.
-/// Savaş istatistiği (can, saldırı, savunma) bilerek yok: o statlar Aşama 4a'da
-/// tanımlanacak ve şimdi uydurmak iki kez yazmak olurdu (bkz. GD9).
+/// **Türetilmiş getter'lar yalnızca [ItemEffect.isPassive] efektleri sayar.**
+/// Koşullu bir etki ("can %30 altındayken +%40 saldırı") kuşanıldığı anda
+/// pasif bir çarpana dönüşmemeli; kullanıcıya gösterilir, ekonomiye girmez.
+///
+/// Model Kuralları #1: burada hiçbir Flutter tipi yok — bkz. [Item] yorumu.
 class ItemBuff {
+  final List<ItemEffect> effects;
+
+  const ItemBuff(this.effects);
+
+  static const none = ItemBuff([]);
+
+  /// Sayısal bonuslardan buff kurar.
+  ///
+  /// Kural türetmesinin ve testlerin kısayolu; sıfır olan alanlar efekt
+  /// üretmez. Sıra sabittir ki aynı item her açılışta aynı görünsün.
+  factory ItemBuff.stats({
+    double stepCoinBonus = 0,
+    double stepXpBonus = 0,
+    double wheelXpBonus = 0,
+    double enemyXpBonus = 0,
+    int dailyCoinCapBonus = 0,
+    int streakFreezeCapBonus = 0,
+    int wheelSpinCapBonus = 0,
+    int streakStepRelief = 0,
+  }) {
+    return ItemBuff([
+      if (stepCoinBonus != 0)
+        ItemEffect(stat: ItemStat.stepCoin, value: stepCoinBonus),
+      if (stepXpBonus != 0)
+        ItemEffect(stat: ItemStat.stepXp, value: stepXpBonus),
+      if (wheelXpBonus != 0)
+        ItemEffect(stat: ItemStat.wheelXp, value: wheelXpBonus),
+      if (enemyXpBonus != 0)
+        ItemEffect(stat: ItemStat.enemyXp, value: enemyXpBonus),
+      if (dailyCoinCapBonus != 0)
+        ItemEffect.flat(
+          stat: ItemStat.dailyCoinCap,
+          value: dailyCoinCapBonus.toDouble(),
+        ),
+      if (streakFreezeCapBonus != 0)
+        ItemEffect.flat(
+          stat: ItemStat.streakFreezeCap,
+          value: streakFreezeCapBonus.toDouble(),
+        ),
+      if (wheelSpinCapBonus != 0)
+        ItemEffect.flat(
+          stat: ItemStat.wheelSpinCap,
+          value: wheelSpinCapBonus.toDouble(),
+        ),
+      if (streakStepRelief != 0)
+        ItemEffect.flat(
+          stat: ItemStat.streakRelief,
+          value: streakStepRelief.toDouble(),
+        ),
+    ]);
+  }
+
+  bool get isEmpty => effects.isEmpty;
+
+  /// Kaç ayrı etki taşıdığı. Nadirlikle birlikte büyür.
+  int get count => effects.length;
+
+  /// Kullanıcıya gösterilecek satırlar; her etki için bir satır.
+  List<String> get labels => [for (final effect in effects) effect.label];
+
+  /// Tek satırlık özet; etki yoksa `null`.
+  String? get label => labels.isEmpty ? null : labels.join(' · ');
+
+  /// Savaş motoru gelene kadar etkisiz olan etkiler (Aşama 4a).
+  List<ItemEffect> get combatEffects => [
+    for (final e in effects)
+      if (e.stat.isCombat) e,
+  ];
+
+  /// Bugün gerçekten çalışan etkiler.
+  List<ItemEffect> get liveEffects => [
+    for (final e in effects)
+      if (!e.stat.isCombat) e,
+  ];
+
+  /// Koşullu ya da tetiklenen etkiler: gösterilir, çarpana girmez.
+  List<ItemEffect> get conditionalEffects => [
+    for (final e in effects)
+      if (!e.isPassive) e,
+  ];
+
+  double _rate(ItemStat stat) {
+    var total = 0.0;
+    for (final effect in effects) {
+      if (effect.stat == stat && effect.isPassive) total += effect.value;
+    }
+    return total;
+  }
+
+  int _flat(ItemStat stat) {
+    var total = 0.0;
+    for (final effect in effects) {
+      if (effect.stat == stat && effect.isPassive) total += effect.value;
+    }
+    return total.round();
+  }
+
   /// Adımdan kazanılan paraya eklenen oran (0.05 = +%5).
   /// Uygulama noktası: `calculateStepCoins` çarpanı.
-  final double stepCoinBonus;
+  double get stepCoinBonus => _rate(ItemStat.stepCoin);
 
   /// Adımdan kazanılan XP'ye eklenen oran.
   /// Uygulama noktası: `calculateStepXp` çarpanı.
-  final double stepXpBonus;
+  double get stepXpBonus => _rate(ItemStat.stepXp);
 
   /// Çarktan kazanılan XP'ye eklenen oran.
-  /// Uygulama noktası: `RootShell._spinWheel` → `_awardXp`.
-  final double wheelXpBonus;
+  double get wheelXpBonus => _rate(ItemStat.wheelXp);
 
   /// Düşman yenince kazanılan XP'ye eklenen oran.
-  /// Uygulama noktası: `RootShell._onStepsReported` düşman yenilme dalı.
-  final double enemyXpBonus;
+  double get enemyXpBonus => _rate(ItemStat.enemyXp);
 
-  /// Günlük adım-para tavanına eklenen coin
-  /// ([GameConstants.maxDailyStepCoins] üstüne).
-  final int dailyCoinCapBonus;
+  /// Günlük adım-para tavanına eklenen coin.
+  int get dailyCoinCapBonus => _flat(ItemStat.dailyCoinCap);
 
-  /// Seri dondurma stoğuna eklenen hak
-  /// ([GameConstants.maxStreakFreezes] üstüne).
-  final int streakFreezeCapBonus;
+  /// Seri dondurma stoğuna eklenen hak.
+  int get streakFreezeCapBonus => _flat(ItemStat.streakFreezeCap);
 
-  /// Ekstra çark hakkı stoğuna eklenen hak
-  /// ([GameConstants.maxExtraWheelSpins] üstüne).
-  final int wheelSpinCapBonus;
+  /// Ekstra çark hakkı stoğuna eklenen hak.
+  int get wheelSpinCapBonus => _flat(ItemStat.wheelSpinCap);
 
-  /// Seri eşiğinden ([GameConstants.streakStepThreshold]) düşülen adım.
-  final int streakStepRelief;
+  /// Seri eşiğinden düşülen adım.
+  int get streakStepRelief => _flat(ItemStat.streakRelief);
 
-  const ItemBuff({
-    this.stepCoinBonus = 0,
-    this.stepXpBonus = 0,
-    this.wheelXpBonus = 0,
-    this.enemyXpBonus = 0,
-    this.dailyCoinCapBonus = 0,
-    this.streakFreezeCapBonus = 0,
-    this.wheelSpinCapBonus = 0,
-    this.streakStepRelief = 0,
-  });
-
-  static const none = ItemBuff();
-
-  bool get isEmpty => labels.isEmpty;
-
-  /// Kaç ayrı bonus taşıdığı. Nadirlikle birlikte büyür.
-  int get count => labels.length;
-
-  /// Kullanıcıya gösterilecek satırlar; her bonus için bir satır.
-  ///
-  /// Sıra sabit tutuluyor ki aynı item her açılışta aynı görünsün.
-  List<String> get labels => [
-    if (stepCoinBonus > 0) 'adım parası +%${_percent(stepCoinBonus)}',
-    if (stepXpBonus > 0) 'adım XP +%${_percent(stepXpBonus)}',
-    if (wheelXpBonus > 0) 'çark XP +%${_percent(wheelXpBonus)}',
-    if (enemyXpBonus > 0) 'düşman XP +%${_percent(enemyXpBonus)}',
-    if (dailyCoinCapBonus > 0) 'günlük coin sınırı +$dailyCoinCapBonus',
-    if (streakFreezeCapBonus > 0) 'dondurma stoğu +$streakFreezeCapBonus',
-    if (wheelSpinCapBonus > 0) 'çark hakkı stoğu +$wheelSpinCapBonus',
-    if (streakStepRelief > 0) 'seri eşiği -$streakStepRelief adım',
-  ];
-
-  /// Tek satırlık özet; bonus yoksa `null`.
-  String? get label => labels.isEmpty ? null : labels.join(' · ');
-
-  static String _percent(double value) {
-    final percent = value * 100;
-    final rounded = percent.round();
-    // Yarım yüzdeleri yuvarlayıp saklamak yerine göster: %2,5 gibi.
-    if ((percent - rounded).abs() < 0.05) return '$rounded';
-    return percent.toStringAsFixed(1).replaceAll('.', ',');
-  }
+  @override
+  String toString() => 'ItemBuff(${labels.join(', ')})';
 }
 
 /// Envanterde ve mağazada kullanılan item.
@@ -227,6 +301,14 @@ class Item {
 
   final ItemBuff buff;
 
+  /// Elle tasarlanmış itemlerin kısa kural cümlesi; kuraldan türeyenlerde
+  /// `null`.
+  ///
+  /// Aynı zamanda "bu item **imzalı** mı" sorusunun cevabı ([hasSignature]):
+  /// imzalı itemler sınıfa göre ad ve buff değiştirmez, kendi kimlikleriyle
+  /// dururlar (bkz. GD22).
+  final String? lore;
+
   const Item({
     required this.id,
     required this.name,
@@ -236,7 +318,11 @@ class Item {
     required this.requiredLevel,
     required this.cost,
     required this.buff,
+    this.lore,
   });
+
+  /// Elle tasarlanmış (imzalı) bir item mi.
+  bool get hasSignature => lore != null;
 
   /// Aynı kimlikle, yalnızca [name] ve [buff] değiştirilmiş bir kopya.
   ///
@@ -253,6 +339,7 @@ class Item {
     requiredLevel: requiredLevel,
     cost: cost,
     buff: buff ?? this.buff,
+    lore: lore,
   );
 
   /// Bu item'ı [characterClass] sınıfı kuşanabilir mi.

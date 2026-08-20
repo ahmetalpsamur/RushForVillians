@@ -1,6 +1,9 @@
 import '../../data/item_definitions.dart';
+import '../../data/item_effects.dart';
 import '../../models/item.dart';
+import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
+import '../constants/game_constants.dart';
 
 /// Bir item asset yolunun çözümlenmiş hâli.
 class ItemAssetIdentity {
@@ -256,51 +259,55 @@ ItemBuff buffFor(
     id: id,
   ).take(count);
 
-  var stepCoin = 0.0;
-  var stepXp = 0.0;
-  var wheelXp = 0.0;
-  var enemyXp = 0.0;
-  var coinCap = 0;
-  var freezeCap = 0;
-  var spinCap = 0;
-  var relief = 0;
-
+  final effects = <ItemEffect>[];
   var index = 0;
   for (final type in types) {
     final value = total * shares[index++];
-    switch (type) {
-      case ItemBuffType.stepCoin:
-        stepCoin += value;
-      case ItemBuffType.stepXp:
-        stepXp += value;
-      // Çark ve düşman XP'si nadir olaylar: aynı bütçe payı orada daha az
-      // hissedilir, bu yüzden iki katına çıkarılıyor.
-      case ItemBuffType.wheelXp:
-        wheelXp += value * 2;
-      case ItemBuffType.enemyXp:
-        enemyXp += value * 2;
-      case ItemBuffType.dailyCoinCap:
-        coinCap += _roundTo(value * 600, 5);
-      case ItemBuffType.streakFreezeCap:
-        freezeCap += _atLeastOne(value * 12);
-      case ItemBuffType.wheelSpinCap:
-        spinCap += _atLeastOne(value * 12);
-      case ItemBuffType.streakRelief:
-        relief += _roundTo(value * 3000, 25);
-    }
+    effects.add(_ruleEffect(type, value));
   }
-
-  return ItemBuff(
-    stepCoinBonus: stepCoin,
-    stepXpBonus: stepXp,
-    wheelXpBonus: wheelXp,
-    enemyXpBonus: enemyXp,
-    dailyCoinCapBonus: coinCap,
-    streakFreezeCapBonus: freezeCap,
-    wheelSpinCapBonus: spinCap,
-    streakStepRelief: relief,
-  );
+  return ItemBuff(effects);
 }
+
+/// Kural türetmesinin tek bir bonusunu [ItemEffect]'e çevirir.
+///
+/// Sayı olarak verilen bonuslar (tavan, eşik) oranla ölçeklenip okunur
+/// değerlere yuvarlanır ve hiçbiri sıfıra düşmez: etiketi görünüp etkisi
+/// olmayan bir bonus olmamalı.
+ItemEffect _ruleEffect(ItemBuffType type, double value) {
+  switch (type) {
+    case ItemBuffType.stepCoin:
+    case ItemBuffType.stepXp:
+      return ItemEffect(stat: type.stat, value: _cappedRate(value));
+    // Çark ve düşman XP'si nadir olaylar: aynı bütçe payı orada daha az
+    // hissedilir, bu yüzden iki katına çıkarılıyor — ama tek item tavanını
+    // ([GameConstants.maxSingleItemEconomyBonus]) yine de aşamıyor.
+    case ItemBuffType.wheelXp:
+    case ItemBuffType.enemyXp:
+      return ItemEffect(stat: type.stat, value: _cappedRate(value * 2));
+    case ItemBuffType.dailyCoinCap:
+      return ItemEffect.flat(
+        stat: type.stat,
+        value: _roundTo(value * 600, 5).toDouble(),
+      );
+    case ItemBuffType.streakFreezeCap:
+    case ItemBuffType.wheelSpinCap:
+      return ItemEffect.flat(
+        stat: type.stat,
+        value: _atLeastOne(value * 12).toDouble(),
+      );
+    case ItemBuffType.streakRelief:
+      return ItemEffect.flat(
+        stat: type.stat,
+        value: _roundTo(value * 3000, 25).toDouble(),
+      );
+  }
+}
+
+/// Oyun dışı oran bonusunu tek item tavanına kırpar.
+double _cappedRate(double value) =>
+    value > GameConstants.maxSingleItemEconomyBonus
+        ? GameConstants.maxSingleItemEconomyBonus
+        : value;
 
 int _roundTo(double value, int step) {
   final rounded = (value / step).round() * step;
@@ -310,6 +317,88 @@ int _roundTo(double value, int step) {
 int _atLeastOne(double value) {
   final rounded = value.round();
   return rounded < 1 ? 1 : rounded;
+}
+
+/// Varyant sıfatları.
+///
+/// Aynı temel görselin varyantları eskiden "Hançer 4" diye numaralanıyordu;
+/// sayı bir ad değil, bir dosya indeksidir. Bu havuz her varyanta bir sıfat
+/// verir: *Paslı Hançer*, *Uğursuz Hançer*, *Kanlı Hançer*.
+///
+/// **En kalabalık temel item 28 varyant taşıyor** (`magic/staff_type_1`);
+/// havuz 36 girişle bunun üstünde tutuldu ki aynı temel item'ın iki varyantı
+/// asla aynı sıfatı almasın (indeksler ardışık ilerliyor).
+///
+/// Sıfatlar bilerek "durum/geçmiş" bildiriyor, "malzeme" değil: sınıf lakabı
+/// (`classEpithet`) zaten malzeme/karakter bildiriyor ve ikisi çelişmesin.
+const List<String> variantAdjectives = [
+  'Paslı',
+  'Yıpranmış',
+  'Çentikli',
+  'Keskin',
+  'Ağır',
+  'Hafif',
+  'Uğursuz',
+  'Kanlı',
+  'Solgun',
+  'Karanlık',
+  'Sessiz',
+  'Kadim',
+  'Eğri',
+  'İnce',
+  'Süslü',
+  'Sade',
+  'Yanık',
+  'Buzlu',
+  'Çatlak',
+  'Onarılmış',
+  'Zincirli',
+  'Oymalı',
+  'Yaldızlı',
+  'Tozlu',
+  'Fırtınalı',
+  'Küllü',
+  'Dikenli',
+  'Tılsımlı',
+  'Uykusuz',
+  'Yorgun',
+  'Öfkeli',
+  'Sabırlı',
+  'Kırağılı',
+  'Közlü',
+  'Alacalı',
+  'Yeminli',
+];
+
+/// Bir varyantın sıfatı.
+///
+/// [characterClass] verildiğinde havuzdaki başlangıç noktası kayar: aynı
+/// görsel Savaşçıda *Paslı Hançer*, Hırsızda *Uğursuz Hançer* olur. Sıfat
+/// yığmak yerine (bkz. GD23) sınıf farkı **sıfatın kendisinden** geliyor;
+/// böylece ad hâlâ iki kelime kalıyor ve mağaza kartında kırpılmıyor.
+///
+/// Dağılım [stableSpread] ile kararlı: aynı item her açılışta aynı adı alır.
+String variantAdjective(String baseId, int variant, {String? characterClass}) {
+  final salt = characterClass == null ? baseId : '$baseId|$characterClass';
+  final offset = stableSpread(salt, variantAdjectives.length);
+  final index = (offset + variant - 1) % variantAdjectives.length;
+  return variantAdjectives[index];
+}
+
+/// Varyantlı bir item'ın tam adı; varyantsızsa ad olduğu gibi döner.
+String decorateVariantName(
+  String baseName,
+  ItemAssetIdentity identity, {
+  String? characterClass,
+}) {
+  final variant = identity.variant;
+  if (variant == null) return baseName;
+  final adjective = variantAdjective(
+    identity.baseId,
+    variant,
+    characterClass: characterClass,
+  );
+  return '$adjective $baseName';
 }
 
 /// Karakter sınıfının, paylaşılan itemlerin adına eklenen lakabı.
@@ -334,9 +423,13 @@ String classEpithet(String characterClass) => switch (characterClass) {
 /// Kimlik **değişmez** (bkz. [Item.copyWith] yorumu): sahiplik kaydı sınıftan
 /// bağımsız durur, oyuncu sınıf değiştirdiğinde envanteri kaybolmaz.
 Item flavorForClass(Item item, String characterClass) {
-  final epithet = item.category.isShared ? classEpithet(characterClass) : '';
+  // İmzalı itemler sınıfa göre değişmez: karakterleri elle yazıldı ve o
+  // karakter herkes için aynı olmalı. "Azrailin Tırpanı" her sınıfta
+  // Azrailin Tırpanı'dır (bkz. GD22).
+  if (item.hasSignature) return item;
+
   return item.copyWith(
-    name: epithet.isEmpty ? item.name : '$epithet ${item.name}',
+    name: _classFlavoredName(item, characterClass),
     buff: buffFor(
       item.rarity,
       item.category,
@@ -344,6 +437,29 @@ Item flavorForClass(Item item, String characterClass) {
       id: item.id,
     ),
   );
+}
+
+/// Item'ın sınıfa uyarlanmış adı.
+///
+/// İki yol var ve **hiçbir zaman ikisi birden** uygulanmaz (GD23):
+/// - varyantlı item → sıfat sınıfa göre kayar (*Paslı* / *Uğursuz* Hançer),
+/// - varyantsız item → paylaşılan kategoride sınıf lakabı öne gelir
+///   (*Esrarlı* Kutsal Asa).
+String _classFlavoredName(Item item, String characterClass) {
+  final identity = parseItemAsset(item.assetPath);
+  if (identity?.variant != null) {
+    final definition = ItemDefinitions.of(identity!.baseId);
+    final baseName =
+        definition?.$1 ?? fallbackDisplayName(identity.baseId.split('/').last);
+    return decorateVariantName(
+      baseName,
+      identity,
+      characterClass: characterClass,
+    );
+  }
+
+  final epithet = item.category.isShared ? classEpithet(characterClass) : '';
+  return epithet.isEmpty ? item.name : '$epithet ${item.name}';
 }
 
 /// Tanımsız bir dosya adını okunur hâle getirir: `fire_sword` → `Fire Sword`.
@@ -371,10 +487,13 @@ Item? buildItemFromAsset(String assetPath) {
   final rarity = definition?.$2 ?? ItemDefinitions.fallbackRarity;
   final baseName =
       definition?.$1 ?? fallbackDisplayName(identity.baseId.split('/').last);
-  final name =
-      identity.variant == null ? baseName : '$baseName ${identity.variant}';
+  final name = decorateVariantName(baseName, identity);
 
   final requiredLevel = requiredLevelFor(rarity, identity.id);
+
+  // Elle tasarlanmış (imzalı) itemler kuraldan türeyen bonusun yerine kendi
+  // etkilerini alır. Tablo veridir; burada `switch (id)` yok.
+  final signature = ItemEffects.of(identity.baseId);
 
   return Item(
     id: identity.id,
@@ -384,6 +503,10 @@ Item? buildItemFromAsset(String assetPath) {
     rarity: rarity,
     requiredLevel: requiredLevel,
     cost: costFor(rarity, requiredLevel),
-    buff: buffFor(rarity, identity.category),
+    buff:
+        signature == null
+            ? buffFor(rarity, identity.category)
+            : ItemBuff(signature.effects),
+    lore: signature?.lore,
   );
 }

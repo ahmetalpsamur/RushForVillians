@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../models/reward_rarity.dart';
 import '../../models/item.dart';
 import '../../models/xp_store_item.dart';
 import '../../widgets/rarity_badge.dart';
@@ -506,16 +507,36 @@ class _EquipmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             RarityBadge(rarity: item.rarity),
+            // İmzalı itemlerin kural cümlesi: item'ın karakterini bu taşıyor.
+            if (item.lore case final lore?) ...[
+              const SizedBox(height: 4),
+              Text(
+                lore,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1.25,
+                  fontStyle: FontStyle.italic,
+                  color: item.rarity.color,
+                ),
+              ),
+            ],
             // Her bonus kendi satırında: nadirlik yükseldikçe sayıları artıyor
-            // (sıradan 1, epik/efsanevi 3) ve tek satıra sıkıştırmak okunmaz
-            // hâle getiriyordu.
+            // (sıradan 1, epik/efsanevi 3-4) ve tek satıra sıkıştırmak okunmaz
+            // hâle getiriyordu. Koşullu etkiler ("can %30 altındayken...")
+            // tek satıra sığmadığı için iki satıra kadar sarılıyor.
             for (final line in buffLabels) ...[
               const SizedBox(height: 2),
               Text(
                 line,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: AppColors.xp),
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.2,
+                  color: AppColors.xp,
+                ),
               ),
             ],
             const SizedBox(height: 6),

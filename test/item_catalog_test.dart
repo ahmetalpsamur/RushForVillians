@@ -250,9 +250,8 @@ void main() {
     });
 
     test('tek sınıfa özel kategoride ad değişmez', () {
-      final base = ItemCatalog.fromAssetPaths([
-        'lib/Items/swords/sword.png',
-      ]).single;
+      final base =
+          ItemCatalog.fromAssetPaths(['lib/Items/swords/sword.png']).single;
       // Kılıçlar paylaşılan bir kategori: lakap eklenir.
       expect(flavorForClass(base, 'SwordMan').name, startsWith('Çelik '));
       expect(flavorForClass(base, 'Thief').name, startsWith('Gölge '));
@@ -286,13 +285,13 @@ void main() {
     });
 
     test('etiket yüzdeyi okunur yazar', () {
-      expect(const ItemBuff(stepXpBonus: 0.07).label, 'adım XP +%7');
+      expect(ItemBuff.stats(stepXpBonus: 0.07).label, 'adım XP +%7');
       expect(
-        const ItemBuff(stepCoinBonus: 0.06, stepXpBonus: 0.06).label,
+        ItemBuff.stats(stepCoinBonus: 0.06, stepXpBonus: 0.06).label,
         'adım parası +%6 · adım XP +%6',
       );
       expect(
-        const ItemBuff(dailyCoinCapBonus: 30, streakStepRelief: 200).labels,
+        ItemBuff.stats(dailyCoinCapBonus: 30, streakStepRelief: 200).labels,
         ['günlük coin sınırı +30', 'seri eşiği -200 adım'],
       );
     });
@@ -311,7 +310,10 @@ void main() {
     test('varyant numarası ada eklenir', () {
       final item = buildItemFromAsset('lib/Items/swords/dagger_variant_04.png');
 
-      expect(item!.name, 'Hançer 4');
+      // Varyantlar artık numarayla değil sıfatla ayrılıyor (GD23); sıfat
+      // kimlikten kararlı biçimde türer.
+      expect(item!.name, '${variantAdjective('swords/dagger', 4)} Hançer');
+      expect(item.name, isNot(contains('4')));
       expect(item.id, 'swords/dagger_variant_04');
     });
 

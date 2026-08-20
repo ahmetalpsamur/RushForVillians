@@ -1900,6 +1900,21 @@ tek cümleyle: çalışan koda mimari uyum için dokunmak boşa risk (Kural 1/3)
 ### K8. `_stepHistory` sınırsız büyüyordu → ✅ **sınır kondu**
 - `GameConstants.maxStepHistoryDays = 400`. Ayrıntı: **GD5**.
 
+### K9. Ekipman ızgarası sabit yükseklikten esnek satıra çevrildi → **DOKUNULMADI, iyileştirme**
+- **Commit:** `04a3687 estetik` (2026-08-20, Berkay)
+- **Dosya:** `lib/features/store/xp_store_screen.dart`
+- **Ne yapıldı:** `SliverGrid` + `mainAxisExtent: 302` yerine
+  `SliverList.builder` + iki hücreli `Row` + `CrossAxisAlignment.start`.
+  Satır yüksekliğini artık kart içeriği belirliyor.
+- **Neden dokunulmadı:** GD12'nin çözdüğü sorunu (dar ekranda satın alma
+  düğmesinin kartın dışında kalması) **daha iyi** çözüyor: az bonuslu itemler
+  artık en uzun item için ayrılmış boşluğu taşımıyor ve `SliverList.builder`
+  hâlâ tembel. `store_screen_test.dart` içindeki altı genişlikte taşma testleri
+  değişmeden geçiyor.
+- **GD12 artık geçersiz:** `_equipmentCardHeight` sabiti kaldırıldı. Bu, Aşama
+  3f'te buff satır sayısını 3'ün üstüne çıkarmayı da mümkün kıldı (koşullu
+  etkiler iki satıra sarabiliyor, lore cümlesi üç satır).
+
 # GERİ DÖNÜLECEK KARARLAR
 
 Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kararlar.
@@ -2245,6 +2260,67 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
   kavramı yok (#9). Bu birim buff'ları modelledi ve gösterdi; uygulama Aşama
   4a'da envanter/kuşanma ile birlikte gelecek. Yukarıdaki tablo o işin
   yol haritası.
+
+### GD22. İmzalı itemler sınıfa göre değişmez (2026-08-20)
+- **Nerede:** `item_rules.dart:flavorForClass` — `if (item.hasSignature) return item;`
+- **Karar:** elle tasarlanmış (lore taşıyan) itemler sınıf lakabı almaz ve
+  buff'ları yeniden türetilmez. "Azrailin Tırpanı" her sınıfta Azrailin
+  Tırpanı'dır.
+- **Neden:** GD16'nın amacı paylaşılan bir görseli sınıfa göre farklı bir item
+  yapmaktı — yani **karakteri olmayan** itemlere karakter vermek. İmzalı
+  itemin zaten bir karakteri var; onu sınıfa göre yeniden yazmak o karakteri
+  silerdi. Oyuncular arasında "şu itemi istiyorum" diyebilmenin şartı da bu:
+  itemin ne yaptığı sınıfa göre değişmemeli.
+- **Kimlik yine değişmiyor**, dolayısıyla GD16'nın envanter güvencesi
+  bozulmuyor.
+
+### GD23. Varyantlar numara değil sıfat alıyor, sıfat sınıfa göre kayıyor (2026-08-20)
+- **Nerede:** `item_rules.dart:variantAdjectives` / `variantAdjective` /
+  `decorateVariantName`
+- **Karar:** "Hançer 4" → "Yıpranmış Hançer". 36 sıfatlık tek havuz; havuzdaki
+  başlangıç noktası `stableSpread('<baseId>|<sınıf>')` ile kayıyor, yani aynı
+  görsel Savaşçıda ve Hırsızda farklı sıfat alıyor.
+- **Neden numara değil:** varyant numarası bir dosya indeksidir, ad değildir.
+- **Neden sıfat yığmak yerine kaydırma:** sınıf lakabı + varyant sıfatı üst
+  üste gelseydi "Çelik Paslı Hançer" gibi hem çelişkili hem üç kelimeli adlar
+  çıkardı; mağaza kartında ad iki satırla sınırlı. Bu yüzden **ikisi birden
+  hiçbir zaman uygulanmaz**: varyantlıysa sıfat, varyantsızsa lakap.
+- **Neden 36:** en kalabalık temel item 28 varyant taşıyor
+  (`magic/staff_type_1`); havuz onun üstünde olmalı ki indeksler ardışık
+  ilerlerken aynı temel item'ın iki varyantı çakışmasın. Testle bağlı.
+- **`String.hashCode` yine kullanılmadı** (GD8): ad kalıcı bir şeyin görünen
+  yüzü, sürümler arası değişmemeli.
+
+### GD24. Savaş statları cömert, oyun dışı statlar sıkı (2026-08-20)
+- **Nerede:** `item_effects.dart` denge notu, `GameConstants.maxSingleItemEconomyBonus`
+- **Karar:** saldırı/savunma/kritik/can çalma değerleri rahat verildi
+  (+52 saldırı, +%60 savunma, %15 ihtimalle +%90 kritik hasarı); adım parası
+  ve XP oranları item başına **%15** ile sınırlandı.
+- **Neden asimetrik:** savaş motoru Aşama 4a'da yazılacak ve denge orada
+  yapılacak — bugün o sayıların hiçbir etkisi yok, dolayısıyla cömert olmak
+  bedava. Oyun dışı statlar ise **canlı** ve `economy_pacing_test.dart` ile
+  ölçülmüş bir ekonomiye bağlı.
+- **Kabul edilen takas:** imzalı itemlerin çoğu ağırlıkla savaş statı veriyor,
+  yani bugün bir epik silah bir nadirden daha az *görünür* fayda sağlayabilir.
+  Bu bilinçli; ama **her efsanevinin en az bir canlı etkisi olması** şart
+  koşuldu ve testle bağlandı, çünkü en üst katmanın bugün de bir karşılığı
+  olmalı.
+- **Geri dönülecek nokta:** Aşama 4a'da savaş statları canlanınca imzalı
+  itemler kendiliğinden güçlenecek; o noktada oyun dışı oranların
+  düşürülmesi gerekebilir. Tek yer: `_buffTotal` ve `item_effects.dart`.
+
+### GD25. Kuşanma tavanı toplama noktasında, item başına değil (2026-08-20)
+- **Nerede:** `core/utils/equipped_buffs.dart:_cap`
+- **Karar:** "+%50" sınırı tek tek itemlerde değil, `EquippedBuffs.from`
+  içinde sert kırpma olarak uygulanıyor.
+- **Neden:** item başına %15 bir **tasarım disiplini** — insan hatasıyla
+  aşılabilir. Toplama noktasındaki kırpma bir **garanti**: 784 item'ın tasarımı
+  ne olursa olsun, ne kadar slot açılırsa açılsın toplam çarpan sabit bir
+  sınırın altında kalır. İkisi birlikte tutuluyor; ilki testle taranıyor,
+  ikincisi kodla zorlanıyor.
+- **Ölçüm:** gerçek katalogla en kötü kuşanmada en yüksek tek oran **+%29**,
+  yani kırpma bugün hiç devreye girmiyor. Kırpma sigortadır, tasarım aracı
+  değil.
 
 ### GD14. "Alabileceklerim" süzgeci sahip olunanları eliyor (2026-08-20)
 - **Nerede:** `xp_store_screen.dart:_visibleEquipment`
@@ -2939,3 +3015,132 @@ eklenenler:
 
 `test/daily_wheel_test.dart` bu oturumda yazıldı ve #16 ile birlikte
 yeniden yazıldı (12 test).
+
+---
+---
+
+# Aşama 3f — Buff sistemi ve item isimleri ✅ (2026-08-20)
+
+Kart **#9**'un tasarım yarısı kapandı: buff'lar artık çeşitli, güçlü ve
+karakterli. **Uygulama yarısı (kuşanma) hâlâ açık** — Aşama 3g'nin konusu.
+Kararlar **GD22–GD25**.
+
+## 1. Buff modeli efektler üstüne yeniden kuruldu
+
+`lib/models/item_effect.dart` (yeni):
+
+| Kavram | Ne |
+|---|---|
+| `ItemStat` | 15 stat. **7 savaş** (saldırı, savunma, savaş canı, kritik şansı, kritik hasarı, can çalma, sıyrılma) + **8 oyun dışı** (eskiden var olanlar). |
+| `ItemEffectMode` | `flat` (+12 saldırı) / `percent` (+%18 savunma) |
+| `ItemEffectTrigger` | `always`, `lowHealth`, `highHealth`, `onHit`, `onKill`, `untouchedRounds`, `nightWalk`, `streakActive` |
+| `ItemEffect` | stat + mode + değer (**eksi olabilir**) + tetikleyici + ihtimal + eşik + serbest etiket |
+
+`ItemBuff` artık tek alanlı: `List<ItemEffect> effects`. Sekiz sayısal getter
+(`stepCoinBonus`, `dailyCoinCapBonus`, …) **türetilmiş** hâle geldi, yani
+mevcut 43 katalog testi kırılmadan çalışmaya devam ediyor.
+
+> **Kritik ayrım:** türetilmiş getter'lar yalnızca `ItemEffect.isPassive`
+> (koşulsuz + tam ihtimalli) etkileri toplar. Koşullu bir etki kuşanıldığı anda
+> pasif bir çarpana dönüşmez; gösterilir, ekonomiye girmez.
+
+İstenen yedi buff tipinin karşılığı:
+
+| İstenen | Karşılığı |
+|---|---|
+| sabit artış | `ItemEffect.flat(stat: attack, value: 46)` |
+| yüzdesel artış | `ItemEffect(stat: defense, value: 0.38)` |
+| koşullu | `trigger: lowHealth, threshold: 0.3` |
+| tetiklenen | `trigger: onHit, chance: 0.15` |
+| eşikli | `trigger: untouchedRounds, threshold: 3` |
+| oyun dışı | `stepCoin` / `stepXp` / `wheelXp` / `enemyXp` + `nightWalk`, `streakActive` |
+| çift etkili | aynı listede bir artı bir eksi değer (`+%50 saldırı, -%18 savunma`) |
+
+## 2. Elle tasarlanmış alt küme
+
+`lib/data/item_effects.dart` (yeni) — **veri, kod değil**. Hiçbir yerde
+`switch (item.id)` yok; `buildItemFromAsset` tabloyu okur.
+
+- **18 efsanevi + 31 epik temel item'ın tamamı** imzalı (kart 43 epik *item*
+  diyordu; 43 item = 31 temel tanım, hepsi kapsandı).
+- **12 seçilmiş nadir** de imzalı.
+- Her imzalı item bir **lore cümlesi** taşır (`Item.lore`) ve mağaza kartında
+  nadirlik renginde, italik gösterilir.
+- Geri kalan (bütün sıradan ve az bulunur, imzasız nadirler) kural
+  türetmesinde kaldı.
+
+Test `bütün epik ve efsanevi temel itemlerin imzası var` bunu bağlıyor: yeni
+bir epik/efsanevi eklenip imzası unutulursa test kırılır.
+
+## 3. Ekonomi hesabı — istenen üç sınır
+
+| Sınır | Nerede | Nasıl garanti |
+|---|---|---|
+| Tek item ≤ **+%15** | `GameConstants.maxSingleItemEconomyBonus` | Kural türetmesinde `_cappedRate`; imzalı itemlerde tasarım disiplini. **784 item × 8 sınıf taranarak** testle doğrulanıyor. |
+| Kuşanılan toplam ≤ **+%50** | `GameConstants.maxEquippedEconomyBonus` | `EquippedBuffs.from` içinde **sert kırpma**. Item tasarımı ne olursa olsun garanti. |
+| Günlük coin tavanı aşılamaz | `maxEquippedCoinCapBonus = 200` | Tavan bonusu da kırpılıyor; çarpan yalnızca ödemeyi büyütür, tüketilen adımı değiştirmez (Aşama 1b kuralı). |
+
+Ek kırpmalar: stok bonusu ≤ +2 (her biri), seri eşiği indirimi ≤ 1000 adım
+(yani eşik hiçbir zaman 1000'in altına inmez).
+
+**Ölçülen en kötü durum** (her kategoriden en yüksek nadirlikli item kuşanılmış):
+
+| Sınıf | Slot | adım parası | adım XP | çark XP | düşman XP | coin tavanı | koşullu | savaş |
+|---|---|---|---|---|---|---|---|---|
+| SwordMan | 4 | — | — | — | +%14 | — | 0 | 11 |
+| Paladin | 4 | +%13 | — | — | — | — | 0 | 10 |
+| Thief | 5 | — | — | — | +%29 | +80 | 1 | 10 |
+| Archer | 3 | +%13 | — | — | — | +60 | 1 | 6 |
+| Magic | 3 | — | +%3 | +%15 | — | — | 1 | 4 |
+| DarkMagic | 4 | — | — | +%21 | +%15 | — | 1 | 7 |
+| Faith | 3 | — | — | +%15 | — | — | 0 | 7 |
+| Nature | 4 | +%13 | +%15 | +%15 | — | +60 | 0 | 9 |
+
+En yüksek tek oran **+%29** — kırpmaya (%50) hiç dayanmıyor. Kırpma yalnızca
+teorik uç durumu (beş item de aynı statı %15 verirse %75) kapatıyor.
+
+`economy_pacing_test.dart` buff'sız dünyayı ölçüyor ve **hâlâ geçerli**:
+oradaki 120 coin/gün artık "taban" değeri, kuşanma onu en fazla %50 büyütüyor.
+
+## 4. İsimler
+
+166 temel adın tamamı elden geçti (`item_definitions.dart`).
+
+- **Varyantlar artık numaralanmıyor.** "Hançer 4" → "Yıpranmış Hançer".
+  36 sıfatlık havuz (`variantAdjectives`); en kalabalık temel item 28 varyant
+  taşıyor, havuz onun üstünde tutuldu ki aynı temel item'ın iki varyantı asla
+  aynı sıfatı almasın.
+- **Sıfat sınıfa göre kayıyor** (GD23): aynı görsel Savaşçıda *Paslı Hançer*,
+  Hırsızda *Uğursuz Hançer*. Sıfat yığmak yerine sınıf farkı sıfatın
+  kendisinden geliyor.
+- **Efsanevilere unvan verildi:** "Efsanevi Mızrak" → **Ordu Deviren**,
+  "Göktaşı Oku" → **Yıldız Düşüren**, "Tsunami Oku" → **Kıyı Yutan**,
+  "Yeraltı Kayıtları" → **Yeraltı Sicili**, "Ejderha Büyü Kitabı" →
+  **Ejderha Fermanı**, "Ruh Hapseden Kalkan" → **Ruh Kapanı**.
+- **Sıradan/az bulunur adlar isimle başlıyor**, sıfatla değil — varyant sıfatı
+  öne geldiği için iki sıfatlı ağır adlar çıkmasın diye ("Yassı Ok" →
+  "Talim Oku").
+- Uydurma İngilizce yok. `rapier` → **Meç**. Yerleşmiş yabancı kökenli silah
+  adları korundu (arbalet, kunai, şuriken, bumerang).
+- **Aynı ad iki kez geçmiyor** — hem temel adlar, hem 784 item, hem her sınıfın
+  gördüğü liste ayrı ayrı testle taranıyor.
+
+## 5. Test
+
+- `test/item_effects_test.dart` (33 test): etiket üretimi (yedi tetikleyicinin
+  hepsi), toplama kuralları, imza tablosunun eksiksizliği, imzalı itemlerin
+  sınıfa göre değişmemesi, efsanevilerin ≥3 etki + lore taşıması, **her
+  efsanevinin bugün de işe yarayan bir etkisi olması**, yedi tetikleyicinin ve
+  çift etkili itemlerin katalogda gerçekten bulunması, ekonomi tavanları,
+  varyant sıfatlarının benzersizliği/kararlılığı, ad benzersizliği.
+- `test/equipped_buffs_test.dart` (13 test): boş kuşanma, toplama, koşullu ve
+  savaş etkilerinin çarpana girmemesi, dört tavanın da tutması, **gerçek
+  katalogla her sınıfın en güçlü kuşanmasının** tavanı aşmaması.
+
+Toplam **379 test geçiyor**, `flutter analyze` temiz.
+
+## 6. Açık kalan (Aşama 3g)
+
+Buff'lar hâlâ **hiçbir yere uygulanmıyor**: `EquippedBuffs` yazıldı ve test
+edildi ama onu besleyecek kuşanma kavramı yok. `coin_calculator.dart` ve
+`xp_calculator.dart` içindeki `TODO(items)` kancaları hâlâ boş.

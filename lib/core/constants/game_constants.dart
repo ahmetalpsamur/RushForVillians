@@ -112,6 +112,41 @@ class GameConstants {
   /// engeller. 10.000 adım = 200 coin, yani günlük tavanın yarısı.
   static const int maxResetRecoverySteps = 10000;
 
+  /// Tek bir item'ın verebileceği en yüksek **koşulsuz** oyun dışı oran
+  /// bonusu (adım parası, adım XP, çark XP, düşman XP).
+  ///
+  /// Savaş statlarına uygulanmaz: savaş motoru Aşama 4a'da yazılacak ve
+  /// denge orada yapılacak, o yüzden orada cömert olmak bedava. Oyun dışı
+  /// statlar ise **bugün canlı** ve ölçülmüş bir ekonomiye bağlı
+  /// (`economy_pacing_test.dart`); tek bir efsanevi item'ın ekonomiyi
+  /// devirmesi mümkün olmamalı.
+  static const double maxSingleItemEconomyBonus = 0.15;
+
+  /// Kuşanılan **bütün** slotların toplamında izin verilen en yüksek oyun
+  /// dışı oran bonusu.
+  ///
+  /// Slot sayısı sınıfa göre 3–5 arasında değişiyor (bkz. GD15). Item başına
+  /// tavan %15 olduğu için beş slot teorik olarak %75'e çıkabilirdi; bu sert
+  /// kırpma o ihtimali kapatıyor. Kırpma toplama noktasında yapılır
+  /// (`equipped_buffs.dart`), yani item tasarımı ne olursa olsun garanti.
+  static const double maxEquippedEconomyBonus = 0.50;
+
+  /// Kuşanılan itemlerin günlük coin tavanına ekleyebileceği en fazla coin.
+  ///
+  /// [maxDailyStepCoins] üstüne gelir; yarısıyla sınırlı tutuldu ki tavan
+  /// hâlâ bir tavan olsun.
+  static const int maxEquippedCoinCapBonus = 200;
+
+  /// Kuşanılan itemlerin stok tavanlarına ekleyebileceği en fazla hak
+  /// (dondurma ve ekstra çark hakkı için ayrı ayrı).
+  static const int maxEquippedStockBonus = 2;
+
+  /// Kuşanılan itemlerin seri eşiğinden düşebileceği en fazla adım.
+  ///
+  /// [streakStepThreshold] 2000; yarısıyla sınırlı, yani eşik hiçbir zaman
+  /// 1000 adımın altına inmez. Seri hâlâ "yürüdüm" demeli.
+  static const int maxEquippedStreakRelief = 1000;
+
   /// Takımda "yan yana yürüyor" sayılmak için, üyelerin adım atma
   /// zamanları arasında izin verilen maksimum fark (dakika).
   static const int sideBySideWindowMinutes = 5;

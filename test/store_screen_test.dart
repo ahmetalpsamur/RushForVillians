@@ -374,15 +374,12 @@ void main() {
     // En kötü durum: **sınıfa uyarlanmış** (lakaplı, yani en uzun) adlar ve
     // üç bonus taşıyan itemler. Mağaza itemleri her zaman uyarlanmış gösterir.
     // 'Kutsanmış' katalogdaki en uzun sınıf lakabı.
-    final worst =
-        [for (final item in allItems) flavorForClass(item, 'Paladin')]..sort((
-          a,
-          b,
-        ) {
-          final byBuff = b.buff.count.compareTo(a.buff.count);
-          if (byBuff != 0) return byBuff;
-          return b.name.length.compareTo(a.name.length);
-        });
+    final worst = [for (final item in allItems) flavorForClass(item, 'Paladin')]
+      ..sort((a, b) {
+        final byBuff = b.buff.count.compareTo(a.buff.count);
+        if (byBuff != 0) return byBuff;
+        return b.name.length.compareTo(a.name.length);
+      });
     final sample = worst.take(20).toList();
 
     testWidgets('az içerikli ekipman kartı gereksiz boşluk bırakmaz', (
