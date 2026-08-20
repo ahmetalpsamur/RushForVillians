@@ -122,6 +122,16 @@ int costFor(RewardRarity rarity, int requiredLevel) {
   return (raw / 25).round() * 25;
 }
 
+/// Item satılınca geri alınan coin.
+///
+/// Fiyatın [GameConstants.itemSellRatio] kadarı, 5'in katına yuvarlanır ve
+/// **en az 5** olur: satılabilen hiçbir item sıfır etmemeli.
+int sellValueFor(int cost) {
+  final raw = cost * GameConstants.itemSellRatio;
+  final rounded = (raw / 5).round() * 5;
+  return rounded < 5 ? 5 : rounded;
+}
+
 /// Nadirliğin toplam bonus bütçesi (0.07 = +%7). Bütçe, item'ın taşıdığı
 /// bonuslara [_buffShares] oranlarıyla bölünür.
 double _buffTotal(RewardRarity rarity) => switch (rarity) {

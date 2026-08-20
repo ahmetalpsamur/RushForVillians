@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 10;
+  static const int schemaVersion = 11;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -94,6 +94,10 @@ class GameStorage {
     // 9 -> 10: çark tohumu eklendi (#16). Varsayılan 0 "henüz kurulmadı"
     // demek; ilk çevirmede oyuncuya özel bir tohumla dolduruluyor.
     9: (state) => state,
+    // 10 -> 11: kuşanma haritası eklendi (equippedItemIds). Yeni oyuncuda ve
+    // eski kayıtta boş harita doğru varsayılan: sahip olunan hiçbir item
+    // kendiliğinden kuşanılmış sayılmamalı, kuşanmayı oyuncu seçer.
+    10: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

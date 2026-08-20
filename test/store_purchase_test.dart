@@ -654,7 +654,11 @@ void main() {
         'extraWheelSpins': 999,
       }, avatar: _avatar);
 
-      expect(profile.extraWheelSpins, GameConstants.maxExtraWheelSpins);
+      // Üst sınır **buff'lı** tavan; gerekçe [UserProfile.fromJson] içinde.
+      expect(
+        profile.extraWheelSpins,
+        GameConstants.maxExtraWheelSpins + GameConstants.maxEquippedStockBonus,
+      );
     });
 
     test('v8 kaydı v9 alanları olmadan okunabilir', () async {

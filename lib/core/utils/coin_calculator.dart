@@ -33,21 +33,24 @@ class StepCoinReward {
 ///
 /// Adım → para oranı ve tavan [GameConstants] içinde; burada sabit yok.
 ///
-/// [multiplier] item buff'ları için bırakılmış çarpan noktasıdır. Yalnızca
-/// ödemeyi büyütür, tüketilen adımı değiştirmez — buff, adımı daha değerli
-/// yapar, daha çok adım harcatmaz.
-// TODO(items): Aşama 3'te "adım başına +%X para" buff'ları (bkz. CLAUDE.md,
-// kart #9) bu çarpandan geçecek. Şimdilik tüm çağıranlar 1.0 veriyor;
-// buff sistemi henüz yok.
+/// [multiplier] kuşanılan itemlerin adım-para bonusudur
+/// ([EquippedBuffs.stepCoinMultiplier]). Yalnızca **ödemeyi** büyütür,
+/// tüketilen adımı değiştirmez — buff, adımı daha değerli yapar, daha çok
+/// adım harcatmaz.
+///
+/// [dailyCap] o oyuncunun günlük tavanıdır ([EquippedBuffs.dailyCoinCap]);
+/// verilmezse [GameConstants.maxDailyStepCoins] taban değeri kullanılır.
+/// Çarpan **tavanı aşamaz**: buff'lı kazanç da bu sınıra kırpılır.
 StepCoinReward calculateStepCoins({
   required int pendingSteps,
   required int coinsEarnedToday,
   double multiplier = 1.0,
+  int? dailyCap,
 }) {
   if (pendingSteps <= 0) return StepCoinReward.none;
 
-  final remainingToday = (GameConstants.maxDailyStepCoins - coinsEarnedToday)
-      .clamp(0, GameConstants.maxDailyStepCoins);
+  final cap = dailyCap ?? GameConstants.maxDailyStepCoins;
+  final remainingToday = (cap - coinsEarnedToday).clamp(0, cap);
 
   if (remainingToday == 0) {
     // Tavan zaten dolu: adımlar tüketilir ama para kazandırmaz.

@@ -4,7 +4,9 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
+import '../../core/utils/equipped_buffs.dart';
 import '../../models/daily_step_record.dart';
+import '../../models/item.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/daily_step_ring.dart';
@@ -24,12 +26,22 @@ class ProfileScreen extends StatelessWidget {
 
   final VoidCallback onEditCharacter;
 
+  /// Kuşanılan itemler ve toplam etkileri. Profilde yalnızca **özet**
+  /// gösterilir; ayrıntı ve kuşanma envanter ekranında.
+  final List<Item> equippedItems;
+  final EquippedBuffs buffs;
+
+  final VoidCallback onOpenInventory;
+
   const ProfileScreen({
     super.key,
     required this.profile,
     required this.today,
     required this.stepHistory,
     required this.onEditCharacter,
+    required this.onOpenInventory,
+    this.equippedItems = const [],
+    this.buffs = EquippedBuffs.none,
     this.adventure,
   });
 
@@ -50,6 +62,25 @@ class ProfileScreen extends StatelessWidget {
       );
       return recordsByDay[emptyRecord.dateKey] ?? emptyRecord;
     }).reversed.toList();
+  }
+
+  /// Kuşanmanın tek satırlık özeti. Ayrıntı envanterdeki karakter panelinde.
+  static String _buffSummary(EquippedBuffs buffs) {
+    String rate(String label, double value) =>
+        '$label +%${(value * 100).round()}';
+    final parts = <String>[
+      if (buffs.stepCoinBonus > 0) rate('adım parası', buffs.stepCoinBonus),
+      if (buffs.stepXpBonus > 0) rate('adım XP', buffs.stepXpBonus),
+      if (buffs.wheelXpBonus > 0) rate('çark XP', buffs.wheelXpBonus),
+      if (buffs.enemyXpBonus > 0) rate('düşman XP', buffs.enemyXpBonus),
+      if (buffs.dailyCoinCapBonus > 0)
+        'günlük sınır +${buffs.dailyCoinCapBonus}',
+      if (buffs.streakFreezeCapBonus > 0)
+        'dondurma stoğu +${buffs.streakFreezeCapBonus}',
+      if (buffs.wheelSpinCapBonus > 0) 'çark stoğu +${buffs.wheelSpinCapBonus}',
+      if (buffs.streakStepRelief > 0) 'seri eşiği -${buffs.streakStepRelief}',
+    ];
+    return parts.join(' · ');
   }
 
   @override
@@ -101,6 +132,38 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'Ekipman',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  equippedItems.isEmpty
+                      ? 'Hiçbir şey kuşanmadın.'
+                      : '${equippedItems.length} item kuşanılı: '
+                          '${equippedItems.map((item) => item.name).join(', ')}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                if (!buffs.isEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _buffSummary(buffs),
+                    style: const TextStyle(color: AppColors.xp, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onOpenInventory,
+                    icon: const Icon(Icons.backpack),
+                    label: const Text('Envanteri Aç'),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),

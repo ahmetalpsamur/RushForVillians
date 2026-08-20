@@ -88,9 +88,22 @@ class UserProfile {
   /// diske yazılır.
   DateTime? lastStepReportAt;
 
-  /// Mağazadan satın alınmış öğelerin kimlikleri. Item sistemi gelene kadar
-  /// yalnızca sahiplik kaydı tutar.
+  /// Mağazadan satın alınmış ya da çarktan kazanılmış öğelerin kimlikleri.
+  /// Sahiplik kaydı; kuşanma ayrı tutulur ([equippedItemIds]).
   final List<String> ownedItemIds;
+
+  /// Kuşanılan itemler: **slot anahtarı → item kimliği**.
+  ///
+  /// Slot = item kategorisi ([ItemCategory.folder]); yani her kategoriden
+  /// **tek** item kuşanılabilir. Sınıfa göre 3–5 slot açık (bkz. GD15).
+  /// Bu yapı "slot başına tek item" kuralını veri düzeyinde zorluyor: aynı
+  /// anahtara ikinci bir kimlik yazılamaz.
+  ///
+  /// Model Kuralları #1: yalnızca `String` tutulur. Item'ın kendisi her
+  /// açılışta katalogdan çözülür ve sınıfa uyarlanır — kimliğe sınıf
+  /// gömülmediği için (GD16) sınıf değişse de kuşanma kaybolmaz, yalnızca
+  /// artık kullanılamayan slotlar boşaltılır.
+  final Map<String, String> equippedItemIds;
 
   /// Günlük çarkın en son çevrildiği an. Gün başına tek hak kontrolü ve
   /// kalıcılık için kullanılır.
@@ -135,15 +148,48 @@ class UserProfile {
     this.lastSensorReading,
     this.lastStepReportAt,
     List<String>? ownedItemIds,
+    Map<String, String>? equippedItemIds,
     this.lastWheelSpinAt,
     this.extraWheelSpins = 0,
     this.wheelSeed = 0,
     this.xpBoostUntil,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
-       ownedItemIds = ownedItemIds ?? <String>[];
+       ownedItemIds = ownedItemIds ?? <String>[],
+       equippedItemIds = equippedItemIds ?? <String, String>{};
 
   String get name => avatar.name;
+
+  /// [slotKey] slotunda kuşanılı item'ın kimliği; boşsa `null`.
+  String? equippedIdInSlot(String slotKey) => equippedItemIds[slotKey];
+
+  /// Bu kimlik herhangi bir slotta kuşanılı mı.
+  bool isEquipped(String itemId) => equippedItemIds.containsValue(itemId);
+
+  /// Item'ı slotuna kuşandırır ve o slotta duran öncekinin kimliğini döner
+  /// (yoksa `null`). Sahiplik ve seviye kontrolü **burada yapılmaz**;
+  /// çağıran taraf ([RootShell]) yapar — kilidin tek kaynağı
+  /// [Item.isUnlockedAt] (#10) ve ikinci bir kopyası yazılmamalı.
+  String? equipInSlot(String slotKey, String itemId) {
+    final previous = equippedItemIds[slotKey];
+    equippedItemIds[slotKey] = itemId;
+    return previous == itemId ? null : previous;
+  }
+
+  /// Slotu boşaltır; çıkarılan kimliği döner.
+  String? unequipSlot(String slotKey) => equippedItemIds.remove(slotKey);
+
+  /// Kimliği hangi slotta olursa olsun çıkarır. Çıkarıldıysa `true`.
+  bool unequipItem(String itemId) {
+    final slot =
+        equippedItemIds.entries
+            .where((entry) => entry.value == itemId)
+            .map((entry) => entry.key)
+            .firstOrNull;
+    if (slot == null) return false;
+    equippedItemIds.remove(slot);
+    return true;
+  }
 
   /// Günlük çark bu oyun gününde çevrildi mi? Gün sınırı [GameDay],
   /// şimdiki zaman [GameClock] üzerinden gelir; ayrı bir gün ya da saat
@@ -172,11 +218,12 @@ class UserProfile {
   /// Ekstra çark hakkı verir; stok tavanına ([GameConstants.maxExtraWheelSpins])
   /// takılırsa **verilen kadarını** döner. Sıfır dönmesi "stok dolu" demektir
   /// ve çağıran para harcamamalıdır — [grantStreakFreeze] ile aynı sözleşme.
-  int grantExtraWheelSpin([int amount = 1]) {
+  int grantExtraWheelSpin([int amount = 1, int? cap]) {
     if (amount <= 0) return 0;
+    final limit = cap ?? GameConstants.maxExtraWheelSpins;
     final granted =
-        (extraWheelSpins + amount).clamp(0, GameConstants.maxExtraWheelSpins) -
-        extraWheelSpins;
+        (extraWheelSpins + amount).clamp(0, limit) - extraWheelSpins;
+    if (granted <= 0) return 0;
     extraWheelSpins += granted;
     return granted;
   }
@@ -261,11 +308,14 @@ class UserProfile {
   // (`RootShell._onStepsReported`) ve mağazadaki "Seri Dondurma Hakkı"
   // yükseltmesi (`RootShell._purchase`). İkisi de buradan geçer; ikinci bir
   // stok mantığı yazılmamalı.
-  int grantStreakFreeze([int amount = 1]) {
+  ///
+  /// [cap] kuşanılan itemlerin büyüttüğü stok tavanıdır
+  /// ([EquippedBuffs.streakFreezeCap]); verilmezse taban değer kullanılır.
+  int grantStreakFreeze([int amount = 1, int? cap]) {
     if (amount <= 0) return 0;
-    final granted =
-        (streakFreezes + amount).clamp(0, GameConstants.maxStreakFreezes) -
-        streakFreezes;
+    final limit = cap ?? GameConstants.maxStreakFreezes;
+    final granted = (streakFreezes + amount).clamp(0, limit) - streakFreezes;
+    if (granted <= 0) return 0;
     streakFreezes += granted;
     return granted;
   }
@@ -362,6 +412,7 @@ class UserProfile {
     'lastSensorReading': lastSensorReading,
     'lastStepReportAt': lastStepReportAt?.toUtc().toIso8601String(),
     'ownedItemIds': ownedItemIds,
+    'equippedItemIds': equippedItemIds,
     'lastWheelSpinAt': lastWheelSpinAt?.toIso8601String(),
     'extraWheelSpins': extraWheelSpins,
     'wheelSeed': wheelSeed,
@@ -383,9 +434,12 @@ class UserProfile {
       longestStreak: json['longestStreak'] as int? ?? 0,
       // Stok savunma amaçlı kırpılır: bozuk ya da elle düzenlenmiş bir kayıt
       // sınırsız jeton getirmemeli.
+      // Kırpma **buff'lı** tavana göre: kuşanılan bir item stoğu büyütmüş
+      // olabilir ve o jetonlar okurken sessizce yakılmamalı. Yine de üst
+      // sınır var; elle düzenlenmiş kayıt sınırsız jeton getiremez.
       streakFreezes: (json['streakFreezes'] as int? ?? 0).clamp(
         0,
-        GameConstants.maxStreakFreezes,
+        GameConstants.maxStreakFreezes + GameConstants.maxEquippedStockBonus,
       ),
       lastFreezeUsedOn: _parseDate(json['lastFreezeUsedOn']),
       lastSeenAt: _parseDate(json['lastSeenAt']),
@@ -398,16 +452,33 @@ class UserProfile {
       ownedItemIds:
           (json['ownedItemIds'] as List?)?.whereType<String>().toList() ??
           <String>[],
+      equippedItemIds: _parseEquipped(json['equippedItemIds']),
       lastWheelSpinAt: _parseDate(json['lastWheelSpinAt']),
       // Dondurma stoğuyla aynı savunma: elle düzenlenmiş kayıt sınırsız
       // ekstra çark hakkı getirmemeli.
       extraWheelSpins: (json['extraWheelSpins'] as int? ?? 0).clamp(
         0,
-        GameConstants.maxExtraWheelSpins,
+        GameConstants.maxExtraWheelSpins + GameConstants.maxEquippedStockBonus,
       ),
       wheelSeed: json['wheelSeed'] as int? ?? 0,
       xpBoostUntil: _parseDate(json['xpBoostUntil']),
     );
+  }
+
+  /// Kuşanma haritasını okur. Bozuk satırlar (sayı, null, boş anahtar)
+  /// **sessizce atılır**; tek bozuk kayıt yüzünden bütün kuşanma kaybolmasın.
+  static Map<String, String> _parseEquipped(Object? value) {
+    if (value is! Map) return <String, String>{};
+    final result = <String, String>{};
+    value.forEach((key, item) {
+      if (key is String &&
+          key.isNotEmpty &&
+          item is String &&
+          item.isNotEmpty) {
+        result[key] = item;
+      }
+    });
+    return result;
   }
 
   static DateTime? _parseDate(Object? value) {

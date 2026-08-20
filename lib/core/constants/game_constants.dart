@@ -147,6 +147,13 @@ class GameConstants {
   /// 1000 adımın altına inmez. Seri hâlâ "yürüdüm" demeli.
   static const int maxEquippedStreakRelief = 1000;
 
+  /// Item satarken geri alınan fiyat oranı.
+  ///
+  /// %40: satmak bir çıkış yolu olmalı ama alım-satım döngüsüyle para
+  /// üretilememeli. Tam iade olsaydı oyuncu itemleri "depo" gibi kullanır,
+  /// çok düşük olsaydı yanlış alınan bir item kalıcı bir ceza olurdu.
+  static const double itemSellRatio = 0.4;
+
   /// Takımda "yan yana yürüyor" sayılmak için, üyelerin adım atma
   /// zamanları arasında izin verilen maksimum fark (dakika).
   static const int sideBySideWindowMinutes = 5;

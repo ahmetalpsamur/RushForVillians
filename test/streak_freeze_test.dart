@@ -245,7 +245,13 @@ void main() {
 
       final restored = (await GameStorage.load(avatar: _avatar))!;
 
-      expect(restored.profile.streakFreezes, GameConstants.maxStreakFreezes);
+      // Üst sınır **buff'lı** tavan: kuşanılan bir item stoğu büyütmüş
+      // olabilir ve o jetonlar okurken sessizce yakılmamalı. Yine de bir
+      // sınır var; elle düzenlenmiş kayıt sınırsız jeton getiremez.
+      expect(
+        restored.profile.streakFreezes,
+        GameConstants.maxStreakFreezes + GameConstants.maxEquippedStockBonus,
+      );
     });
 
     test('v6 kaydı jetonsuz açılır, davranış değişmez', () async {

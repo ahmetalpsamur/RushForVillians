@@ -25,6 +25,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenWheel;
   final VoidCallback onOpenRewards;
   final VoidCallback onOpenStore;
+  final VoidCallback onOpenInventory;
   final ValueChanged<int> onSimulateSteps;
 
   /// Adımların gerçek sensörden mi geldiği. Demo butonları yalnızca manuel
@@ -51,6 +52,7 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenWheel,
     required this.onOpenRewards,
     required this.onOpenStore,
+    required this.onOpenInventory,
     required this.onSimulateSteps,
     required this.usingRealPedometer,
     required this.stepPermission,
@@ -183,12 +185,26 @@ class HomeScreen extends StatelessWidget {
                   onTap: onOpenRewards,
                 ),
               ),
-              const SizedBox(width: 12),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // İkinci satır: dört hızlı erişim tek satıra sığmıyor, dar
+          // ekranlarda etiketler kırpılıyordu.
+          Row(
+            children: [
               Expanded(
                 child: _QuickAction(
                   icon: Icons.storefront,
                   label: 'Mağaza',
                   onTap: onOpenStore,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.backpack,
+                  label: 'Envanter',
+                  onTap: onOpenInventory,
                 ),
               ),
             ],

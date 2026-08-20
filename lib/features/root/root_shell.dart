@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
+import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
 import '../../core/utils/wheel_rewards.dart';
@@ -34,6 +36,7 @@ import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
 import '../character/character_creation_screen.dart';
 import '../home/home_screen.dart';
+import '../inventory/inventory_screen.dart';
 import '../profile/profile_screen.dart';
 import '../rewards/rewards_screen.dart';
 import '../store/xp_store_screen.dart';
@@ -80,6 +83,18 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// üretildiği için asenkron gelir; okunana kadar mağazanın ekipman bölümü
   /// boş görünür, geri kalanı çalışır.
   List<Item> _equipment = const [];
+
+  /// Kuşanılan itemlerin toplam etkisi. Kuşanma her değiştiğinde yeniden
+  /// hesaplanır; sekiz uygulama noktası **yalnızca** buradan okur.
+  EquippedBuffs _buffs = EquippedBuffs.none;
+
+  /// İtilen ekranların (envanter) kendini tazelemesi için sayaç.
+  ///
+  /// [_push] ile açılan bir rota kök Navigator'ın overlay'inde durur, yani
+  /// [RootShell]'in alt ağacında değildir ve `setState` onu tazelemez
+  /// (bkz. GD11). Envanter canlı state göstermek zorunda olduğu için bu
+  /// sayacı dinliyor; [_persist] her anlamlı değişimde artırıyor.
+  final ValueNotifier<int> _revision = ValueNotifier(0);
 
   /// Adım kaynağı: gerçek pedometer ya da demo kontrolleri.
   ///
@@ -141,7 +156,55 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _equipment = ItemCatalog.forCharacterClass(
         _profile.avatar.characterClass,
       );
+      // Kuşanma ancak katalog geldikten sonra çözülebilir; buff'lar da o
+      // ana kadar boş kalır. Ekonomi bu yüzden bir süre buff'sız çalışır —
+      // katalog okunması milisaniyeler sürüyor ve buff'sız hesap **eksik**
+      // değil, yalnızca bonussuz. Sessiz bir hata değil.
+      _refreshEquipment();
     });
+  }
+
+  /// Kuşanılan itemleri katalogdan çözer ve toplam buff'ı yeniden hesaplar.
+  ///
+  /// Üç şeyi birden temizler:
+  /// - katalogdan kalkmış kimlikler (slot boşalır),
+  /// - artık sahip olunmayan kimlikler (satılmış item kuşanılı kalmasın),
+  /// - oyuncunun sınıfının kullanamadığı kategoriler (sınıf değişimi).
+  ///
+  /// **Sahiplik kaydına dokunmaz**: yalnızca kuşanma boşaltılır.
+  /// `setState` içinden çağrılabilsin diye kendisi `setState` çağırmaz.
+  void _refreshEquipment() {
+    final characterClass = _profile.avatar.characterClass;
+    final resolved = <Item>[];
+    final staleSlots = <String>[];
+
+    _profile.equippedItemIds.forEach((slot, id) {
+      final item = ItemCatalog.byId(id, characterClass: characterClass);
+      if (item == null ||
+          !_profile.ownedItemIds.contains(id) ||
+          !item.isUsableBy(characterClass) ||
+          item.category.folder != slot) {
+        staleSlots.add(slot);
+        return;
+      }
+      resolved.add(item);
+    });
+
+    for (final slot in staleSlots) {
+      _profile.unequipSlot(slot);
+    }
+    _buffs = EquippedBuffs.from(resolved);
+  }
+
+  /// Kuşanılan itemler, oyuncunun sınıfına uyarlanmış hâlleriyle.
+  List<Item> get _equippedItems {
+    final characterClass = _profile.avatar.characterClass;
+    return [
+      for (final id in _profile.equippedItemIds.values)
+        if (ItemCatalog.byId(id, characterClass: characterClass)
+            case final item?)
+          item,
+    ];
   }
 
   /// Seçili adım kaynağını kurar ve dinlemeye başlar.
@@ -309,6 +372,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// kendi içinde sınırladığı için her state değişiminde çağrılabilir.
   void _persist() {
     _profile.lastSeenAt = GameClock.lastSeenAt;
+    // İtilen ekranlar (envanter) bu sayacı dinliyor; bkz. [_revision].
+    _revision.value++;
     GameStorage.scheduleSave(
       GameState(
         profile: _profile,
@@ -327,6 +392,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _stepSource.dispose();
     _adventureClock?.cancel();
     _persist();
+    _revision.dispose();
     unawaited(GameStorage.flush());
     super.dispose();
   }
@@ -370,7 +436,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void didUpdateWidget(covariant RootShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.avatar != widget.avatar) {
+      final classChanged =
+          oldWidget.avatar.characterClass != widget.avatar.characterClass;
       _profile.avatar = widget.avatar;
+      if (classChanged) {
+        // Sınıf değişti: yeni sınıfın kullanamadığı kategoriler kuşanmadan
+        // düşer (sahiplik korunur, bkz. GD16) ve mağaza listesi yenilenir.
+        setState(() {
+          _equipment = ItemCatalog.forCharacterClass(
+            widget.avatar.characterClass,
+          );
+          _refreshEquipment();
+        });
+        _persist();
+      }
     }
   }
 
@@ -509,6 +588,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
 
     var enemyDefeated = false;
+    var enemyXpGranted = 0;
     CombatRoundResult? roundResult;
     int? milestoneReached;
     var milestoneFreezeGranted = false;
@@ -523,6 +603,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       final coinReward = calculateStepCoins(
         pendingSteps: _profile.totalSteps - _profile.lastRewardedStepCount,
         coinsEarnedToday: _today.coinsEarned,
+        // Kuşanılan ekipmanın adım-para bonusu ve büyütülmüş günlük tavanı.
+        // Çarpan tavanı aşamaz; kırpma [calculateStepCoins] içinde.
+        multiplier: _buffs.stepCoinMultiplier,
+        dailyCap: _buffs.dailyCoinCap,
       );
       _profile.coins += coinReward.coins;
       _profile.lastRewardedStepCount += coinReward.consumedSteps;
@@ -532,6 +616,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // XP'nin kendi işaretçisi var: para tavanı dolduğunda XP durmamalı.
       final xpReward = calculateStepXp(
         pendingSteps: _profile.totalSteps - _profile.lastXpRewardedStepCount,
+        multiplier: _buffs.stepXpMultiplier,
       );
       _profile.lastXpRewardedStepCount += xpReward.consumedSteps;
       // Ana ekrandaki "adımdan kazandığın XP" satırı gerçekten verileni
@@ -547,17 +632,23 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           adventure.isDefeated(_today.steps) &&
           !adventure.xpAwarded) {
         adventure.xpAwarded = true;
-        _awardXp(adventure.enemy.xpReward);
+        // Düşman XP bonusu: kuşanılan ekipmandan gelir.
+        enemyXpGranted = _awardXp(
+          (adventure.enemy.xpReward * _buffs.enemyXpMultiplier).floor(),
+        );
         enemyDefeated = true;
       }
-      // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı.
-      if (_today.steps >= GameConstants.streakStepThreshold &&
+      // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı. Kuşanılan
+      // ekipman bu eşiği düşürebilir (`streakRelief`); eşik yalnızca **o an**
+      // kontrol ediliyor, yani kuşanmayı çıkarmak geçmiş günleri bozmaz.
+      if (_today.steps >= _buffs.streakStepThreshold &&
           _profile.registerStreakDay(now)) {
         milestoneReached = _profile.reachedStreakMilestone;
         // Her kilometre taşı bir dondurma hakkı verir (stok sınırlı).
         // Aşama 2c'de bilerek boş bırakılan kazanım yolu bu.
         if (milestoneReached != null) {
-          milestoneFreezeGranted = _profile.grantStreakFreeze() > 0;
+          milestoneFreezeGranted =
+              _profile.grantStreakFreeze(1, _buffs.streakFreezeCap) > 0;
         }
       }
     });
@@ -572,8 +663,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${_adventure!.enemy.name} yenildi! '
-            '${_adventure!.enemy.xpReward} XP kazandın.',
+            '${_adventure!.enemy.name} yenildi! $enemyXpGranted XP kazandın.',
           ),
         ),
       );
@@ -646,7 +736,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             Expanded(
               child: Text(
                 'Günlük kazanç sınırına ulaştın '
-                '(${GameConstants.maxDailyStepCoins} coin). Bugünkü adımlar '
+                '(${_buffs.dailyCoinCap} coin). Bugünkü adımlar '
                 'artık para kazandırmıyor.',
               ),
             ),
@@ -760,7 +850,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
       final item = reward.item;
       if (item == null) {
-        _awardXp(reward.xp);
+        // Çark XP bonusu: kuşanılan ekipmandan gelir.
+        _awardXp((reward.xp * _buffs.wheelXpMultiplier).floor());
       } else if (!_profile.ownedItemIds.contains(item.id)) {
         _profile.ownedItemIds.add(item.id);
       }
@@ -782,18 +873,19 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // Stok doluysa / zaten etkinse satış yapılmaz, para boşa gitmemeli.
     switch (item.id) {
       case _streakFreezeItemId:
-        if (_profile.grantStreakFreeze() == 0) {
+        // Stok tavanı kuşanılan ekipmanla büyüyebilir.
+        if (_profile.grantStreakFreeze(1, _buffs.streakFreezeCap) == 0) {
           _showStoreNotice(
             'Dondurma hakkı stoğun dolu '
-            '(${GameConstants.maxStreakFreezes}). Para harcanmadı.',
+            '(${_buffs.streakFreezeCap}). Para harcanmadı.',
           );
           return;
         }
       case _extraWheelSpinItemId:
-        if (_profile.grantExtraWheelSpin() == 0) {
+        if (_profile.grantExtraWheelSpin(1, _buffs.wheelSpinCap) == 0) {
           _showStoreNotice(
             'Ekstra çark hakkı stoğun dolu '
-            '(${GameConstants.maxExtraWheelSpins}). Para harcanmadı.',
+            '(${_buffs.wheelSpinCap}). Para harcanmadı.',
           );
           return;
         }
@@ -826,6 +918,115 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _persist();
     _showStoreNotice('${item.name} satın alındı!');
   }
+
+  /// Item'ı kategorisine karşılık gelen slota kuşandırır.
+  ///
+  /// Üç kontrol de **burada** yeniden yapılır: ekran devre dışı görünse bile
+  /// son söz state'in (mağaza satın almasında olduğu gibi). Kilidin tek
+  /// kaynağı [Item.isUnlockedAt] (#10); ikinci bir seviye mantığı yok.
+  ///
+  /// Engellenen her durum **sessiz kalmaz** (Model Kuralları #4): nedeni
+  /// söylenir.
+  void _equipItem(Item item) {
+    if (!_profile.ownedItemIds.contains(item.id)) {
+      _showStoreNotice('${item.name} sende yok.');
+      return;
+    }
+    if (!item.isUnlockedAt(_profile.level)) {
+      _showStoreNotice(
+        '${item.name} için ${item.requiredLevel}. seviye gerekiyor. '
+        'Şu an ${_profile.level}. seviyedesin.',
+      );
+      return;
+    }
+    if (!item.isUsableBy(_profile.avatar.characterClass)) {
+      _showStoreNotice('${item.name} senin sınıfın için değil.');
+      return;
+    }
+    if (_profile.equippedIdInSlot(item.category.folder) == item.id) return;
+
+    final replacedId = _profile.equipInSlot(item.category.folder, item.id);
+    setState(_refreshEquipment);
+    _persist();
+
+    final replaced =
+        replacedId == null
+            ? null
+            : ItemCatalog.byId(
+              replacedId,
+              characterClass: _profile.avatar.characterClass,
+            );
+    _showStoreNotice(
+      replaced == null
+          ? '${item.name} kuşanıldı.'
+          : '${item.name} kuşanıldı, ${replaced.name} çıkarıldı.',
+    );
+  }
+
+  /// Slotu boşaltır.
+  void _unequipSlot(ItemCategory category) {
+    final removedId = _profile.unequipSlot(category.folder);
+    if (removedId == null) return;
+    setState(_refreshEquipment);
+    _persist();
+
+    final removed = ItemCatalog.byId(
+      removedId,
+      characterClass: _profile.avatar.characterClass,
+    );
+    _showStoreNotice('${removed?.name ?? 'Item'} çıkarıldı.');
+  }
+
+  /// Item'ı satar: sahiplikten düşer, kuşanılıysa önce çıkarılır ve
+  /// [sellValueFor] kadar coin geri verilir.
+  ///
+  /// Onay ekranını çağıran taraf (envanter) gösterir; burası kararı uygular.
+  void _sellItem(Item item) {
+    if (!_profile.ownedItemIds.contains(item.id)) return;
+    final value = sellValueFor(item.cost);
+    final wasEquipped = _profile.isEquipped(item.id);
+
+    setState(() {
+      _profile.unequipItem(item.id);
+      _profile.ownedItemIds.remove(item.id);
+      _profile.coins += value;
+      _refreshEquipment();
+    });
+    _persist();
+
+    _showStoreNotice(
+      wasEquipped
+          ? '${item.name} çıkarılıp satıldı. +$value coin.'
+          : '${item.name} satıldı. +$value coin.',
+    );
+  }
+
+  /// Envanteri açar.
+  ///
+  /// İtilen bir rota [RootShell]'in alt ağacında değil (GD11), bu yüzden
+  /// ekran [_revision] sayacını dinliyor: adım gelip para değiştiğinde ya da
+  /// seviye atlandığında envanter de tazeleniyor.
+  void _openInventory() => _push(
+    InventoryScreen(
+      revision: _revision,
+      readState: _readInventoryState,
+      onEquip: _equipItem,
+      onUnequip: _unequipSlot,
+      onSell: _sellItem,
+    ),
+  );
+
+  InventoryState _readInventoryState() => InventoryState(
+    profile: _profile,
+    ownedItems: [
+      for (final id in _profile.ownedItemIds)
+        if (ItemCatalog.byId(id, characterClass: _profile.avatar.characterClass)
+            case final item?)
+          item,
+    ],
+    equippedItems: _equippedItems,
+    buffs: _buffs,
+  );
 
   void _showStoreNotice(String message) {
     ScaffoldMessenger.of(context)
@@ -904,6 +1105,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenWheel: _openWheel,
         onOpenRewards: _openRewards,
         onOpenStore: _openStore,
+        onOpenInventory: _openInventory,
         onSimulateSteps: _simulateSteps,
         usingRealPedometer: _stepSource.isPhysical,
         stepPermission: _stepPermission,
@@ -939,7 +1141,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         adventure: _adventure,
         today: _today,
         stepHistory: _stepHistory,
+        equippedItems: _equippedItems,
+        buffs: _buffs,
         onEditCharacter: _editCharacter,
+        onOpenInventory: _openInventory,
       ),
     ];
 

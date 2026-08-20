@@ -2322,6 +2322,61 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
   yani kırpma bugün hiç devreye girmiyor. Kırpma sigortadır, tasarım aracı
   değil.
 
+### GD26. Slot = item kategorisi (2026-08-20)
+- **Nerede:** `UserProfile.equippedItemIds` (`Map<String, String>`),
+  `RootShell._equipItem`
+- **Karar:** kuşanma slotu için yeni bir kavram uydurulmadı; `ItemCategory`
+  doğrudan slot anahtarı oldu (`ItemCategory.folder`).
+- **Neden:** kategori zaten mağaza süzgeci olarak kullanılıyor, sınıf başına
+  3–5 tanesi açık (GD15) ve her sınıfa makul sayıda slot düşüyor. Ayrı bir
+  `EquipmentSlot` enum'u aynı bilgiyi ikinci kez modellemek olurdu ve
+  kategoriyle eşlemesini elle bakmak gerekirdi.
+- **Neden `Map`, `List` değil:** "slot başına tek item" kuralı böylece
+  **veri düzeyinde** zorlanıyor; aynı anahtara ikinci kimlik yazılamıyor.
+  Liste olsaydı kural her yazma noktasında elle kontrol edilecekti.
+- **Kabul edilen takas:** "iki yüzük" gibi aynı türden iki slot mümkün değil.
+  Bugün öyle bir kategori yok; gerekirse anahtar biçimi
+  `<kategori>#<indeks>`'e genişletilebilir, şema taşımayla.
+
+### GD27. Envanter itilen rotada ama canlı: `_revision` sayacı (2026-08-20)
+- **Nerede:** `RootShell._revision` (`ValueNotifier<int>`),
+  `InventoryScreen.revision` + `readState`
+- **Karar:** envanter ekranı veri **tutmuyor**; her çizimde `readState()` ile
+  `RootShell`'den yeniden okuyor ve `_persist()` içinde artırılan bir sayacı
+  `ValueListenableBuilder` ile dinliyor.
+- **Neden:** GD11'in tuzağı — itilen rota `RootShell`'in alt ağacında değil,
+  `setState` onu tazelemiyor. Mağazada bu tuzak sekmeye geçilerek çözülmüştü;
+  envanter için altıncı bir sekme açmak alt gezinme çubuğunu sıkıştırırdı.
+- **Neden veri kopyalanmadı:** çark ekranı kendi kopyasını tutuyor (GD18) ve
+  bu, iki tarafın aynı adımı ayrı ayrı uygulamasını gerektiriyor. Envanterde
+  para, seviye ve kuşanma aynı anda değişebiliyor; kopya tutmak kaçınılmaz
+  olarak tutarsızlık üretirdi.
+- **Yan fayda:** arka planda adım gelip para değiştiğinde envanter de
+  güncelleniyor. Riverpod/Bloc geçişinde bu sayaç kendiliğinden düşer.
+
+### GD28. Kuşanma temizliği sahipliğe dokunmaz (2026-08-20)
+- **Nerede:** `RootShell._refreshEquipment`
+- **Karar:** çözülemeyen bir kuşanma (katalogdan kalkmış, satılmış, sınıfın
+  kullanamadığı, yanlış slota yazılmış) **yalnızca slotu boşaltır**;
+  `ownedItemIds` hiç değişmez.
+- **Neden:** GD16, kimliğe sınıf gömmeme kararını "envanter sessizce
+  boşalmasın" diye vermişti. Temizlik sahipliği de silseydi aynı sorun bu kez
+  sınıf değişiminde geri gelirdi; şimdi oyuncu sınıf değiştirip geri
+  döndüğünde itemleri yerinde duruyor.
+- **Sessiz değil:** slot boşalınca envanterdeki slot tahtası "Boş" gösteriyor
+  ve karakter panelindeki "N / M slot dolu" satırı düşüyor.
+
+### GD29. Satış fiyatın %40'ı ve geri alınamaz (2026-08-20)
+- **Nerede:** `GameConstants.itemSellRatio`, `item_rules.dart:sellValueFor`
+- **Karar:** %40, 5'in katına yuvarlı, en az 5 coin.
+- **Neden tam iade değil:** itemleri bir "depo" hâline getirirdi — oyuncu her
+  şeyi alır, beğenmediğini iade ederdi ve satın alma kararının ağırlığı
+  kalmazdı. Alım-satım döngüsünün para üretmemesi testle bağlı.
+- **Neden çok düşük değil:** yanlış alınan bir item kalıcı bir ceza olmamalı;
+  %40 bir sonraki alışverişe anlamlı katkı yapıyor.
+- **Onay şart:** satış geri alınamaz, bu yüzden diyalog hem geri gelecek
+  parayı hem tekrar almanın maliyetini söylüyor.
+
 ### GD14. "Alabileceklerim" süzgeci sahip olunanları eliyor (2026-08-20)
 - **Nerede:** `xp_store_screen.dart:_visibleEquipment`
 - Süzgeç yalnızca seviye + paraya bakıyordu; zaten sahip olunan item de
@@ -3144,3 +3199,131 @@ Toplam **379 test geçiyor**, `flutter analyze` temiz.
 Buff'lar hâlâ **hiçbir yere uygulanmıyor**: `EquippedBuffs` yazıldı ve test
 edildi ama onu besleyecek kuşanma kavramı yok. `coin_calculator.dart` ve
 `xp_calculator.dart` içindeki `TODO(items)` kancaları hâlâ boş.
+
+---
+---
+
+# Aşama 3g — Envanter ve kuşanma (#9) ✅ (2026-08-20)
+
+Kart **#9** kapandı. Buff'lar artık gerçekten uygulanıyor:
+`coin_calculator.dart` ve `xp_calculator.dart` içindeki `TODO(items)`
+kancaları doldu ve kaldırıldı. Kararlar **GD26–GD29**.
+
+## Slot modeli
+
+**Slot = item kategorisi.** Yeni bir kavram uydurulmadı; `ItemCategory` zaten
+mağaza süzgeci olarak kullanılıyordu ve sınıf başına 3–5 kategori düşüyor
+(GD15). Sonuç: her sınıf 3–5 item kuşanabiliyor ve "slot başına tek item"
+kuralı veri düzeyinde zorlanıyor.
+
+`UserProfile.equippedItemIds` bir **`Map<String, String>`**: slot anahtarı
+(`ItemCategory.folder`) → item kimliği. Aynı anahtara ikinci bir kimlik
+yazılamayacağı için kural kodla değil yapıyla korunuyor.
+
+Model Kuralları #1 temiz: yalnızca `String` tutuluyor, item her açılışta
+katalogdan çözülüyor ve **sınıfa uyarlanıyor**
+(`ItemCatalog.byId(id, characterClass:)`) — yoksa GD16'nın sınıfa özel
+buff'ları uygulanmazdı.
+
+## Buff uygulama noktaları — sekizi de bağlandı
+
+| Buff | Nerede |
+|---|---|
+| `stepCoin` | `calculateStepCoins(multiplier:)` |
+| `dailyCoinCap` | `calculateStepCoins(dailyCap:)` — yeni parametre |
+| `stepXp` | `calculateStepXp(multiplier:)` |
+| `wheelXp` | `_spinWheel` → `_awardXp((reward.xp * çarpan).floor())` |
+| `enemyXp` | `_onStepsReported` düşman yenilme dalı |
+| `streakFreezeCap` | `grantStreakFreeze(1, cap)` — kilometre taşı **ve** mağaza |
+| `wheelSpinCap` | `grantExtraWheelSpin(1, cap)` — mağaza |
+| `streakRelief` | `_onStepsReported` seri eşiği kontrolü |
+
+`EquippedBuffs` (Aşama 3f'te yazılmıştı) tek okuma noktası; hiçbir yerde
+ikinci bir toplama yok.
+
+**Ekonomi güvenliği korundu:** çarpan yalnızca ödemeyi büyütüyor, tüketilen
+adımı değiştirmiyor (Aşama 1b kuralı) ve günlük tavanı aşamıyor — kırpma
+`calculateStepCoins` içinde. `lastRewardedStepCount` /
+`lastXpRewardedStepCount` çift-sayma koruması hiç değişmedi.
+
+## Kuşanmanın sessizce bozulmaması
+
+`_refreshEquipment` her çözümlemede dört şeyi temizliyor:
+
+1. katalogdan kalkmış kimlik → slot boşalır,
+2. artık **sahip olunmayan** kimlik (satılmış item) → slot boşalır,
+3. oyuncunun sınıfının kullanamadığı kategori (sınıf değişimi) → slot boşalır,
+4. yanlış slota yazılmış kimlik (elle düzenlenmiş kayıt) → slot boşalır.
+
+**Sahiplik kaydına hiç dokunulmuyor.** Sınıf değiştiren oyuncu itemlerini
+kaybetmiyor, yalnızca kullanamadıklarını kuşanmıyor — GD16'nın kimlik
+kararının doğrudan meyvesi. Karakter düzenleme ekranından sınıf değişince
+`didUpdateWidget` bunu tetikliyor.
+
+## Ekran
+
+`lib/features/inventory/inventory_screen.dart`:
+
+- **Karakter paneli** — sekiz canlı stat için *taban · ekipman · toplam* ayrı
+  sütunlarda. Savaş statları ayrı bir başlıkta, soluk ve **nedeni yazılı**:
+  "Bu değerler savaş sistemiyle birlikte etkinleşecek". Koşullu etkiler ayrı
+  listede; sayıya indirgenip toplama katılmıyorlar.
+- **Slot tahtası** — her kategori için kuşanılı item ya da boş kutu. Boş kutuya
+  dokunmak o kategoriye süzgeç uygulayıp nedenini söylüyor.
+- **Liste** — kuşanılanlar önce, sonra nadirlik ve seviye. Kilitli itemler
+  soluk + kilit ikonu + "Sv. N" etiketi, ama **tıklanabilir**: neden kilitli
+  olduğunu görebilmeli.
+- **Item kartı (bottom sheet)** — lore, etkiler (savaş statları soluk),
+  **karşılaştırma** ("Çelik Kılıç yerine kuşanınca: +8 saldırı, -%3 savunma"),
+  kilit sebebi, Kuşan/Çıkar ve Sat düğmeleri.
+- **Satış onay diyaloğu** geri gelecek parayı ve geri alınamazlığı önceden
+  söylüyor.
+
+Giriş noktaları: ana ekranda ikinci hızlı erişim satırı (dört kart tek satıra
+sığmıyordu) ve profildeki "Ekipman" kartı.
+
+## Satış
+
+`sellValueFor(cost)` = fiyatın **%40'ı**, 5'in katına yuvarlı, en az 5.
+Alım-satım döngüsü para üretemez; testle bağlı. Kuşanılı bir item satılırsa
+önce çıkarılıyor ve bu kullanıcıya söyleniyor.
+
+## Şema v11
+
+Yeni alan: `equippedItemIds`. 10 → 11 taşıması içerik değiştirmiyor — boş
+harita doğru varsayılan, hiçbir item kendiliğinden kuşanılmış sayılmamalı.
+
+`streakFreezes` / `extraWheelSpins` okuma kırpması **buff'lı tavana**
+genişletildi (`taban + maxEquippedStockBonus`): kuşanılan bir item stoğu
+büyütmüş olabilir ve o jetonlar okurken sessizce yakılmamalı. İki mevcut test
+bu yeni sınıra göre güncellendi (silinmedi).
+
+## Test
+
+- `test/item_comparison_test.dart` (10 test): boş slot, artı/eksi fark, denk
+  itemler, aynı statın sabit+oransal ayrımı, koşullu etkilerin sayıya
+  indirgenmemesi, kazanılan/kaybedilen koşullar.
+- `test/inventory_test.dart` (22 test, gerçek `RootShell` üzerinden):
+  kuşanma, slot çakışması (yerinden edilen item **satılmıyor**), farklı
+  kategoriler, çıkarma, seviye kilidi (tam sınır dahil), **buff'ın gerçekten
+  paraya yansıması** (+%50 → 100 coin yerine 150), çıkarınca geri düşmesi,
+  satış (onay/vazgeç/kuşanılı item), dört temizlik senaryosu, diske yazma,
+  v10→v11, bozuk kuşanma satırları, stok tavanı.
+
+> **Test notu:** aynı test içinde ikinci kez `pumpWidget` çağrılınca Flutter
+> aynı tipteki elemanı yeniden kullanıp `initState` yerine `didUpdateWidget`
+> çalıştırıyor; `RootShell._profile` `late final` olduğu için eski profil
+> yerinde kalıyor ve test sessizce yanlış şeyi ölçüyordu. Her kurulum ayrı bir
+> `ValueKey` alıyor.
+
+Toplam **411 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- **Özel buff'ların koşullu dalları hâlâ çalışmıyor**: `nightWalk`,
+  `streakActive`, `lowHealth`, `onHit`, `onKill`, `untouchedRounds`. Bunlar
+  gösteriliyor ama uygulanmıyor. Savaş tetikleyicileri Aşama 4a'yı bekliyor;
+  `nightWalk` ve `streakActive` **beklemiyor** ve bir sonraki uygun birimde
+  bağlanabilir.
+- `economy_pacing_test.dart` hâlâ buff'sız dünyayı ölçüyor; buff'lı senaryo
+  ayrıca ölçülmedi (tavanlar `equipped_buffs_test.dart` ile bağlı).

@@ -27,10 +27,9 @@ class StepXpReward {
 ///    tüm adımları tüketeceği için **XP de dururdu**. İki ekonomi birbirine
 ///    bağlanmamalı.
 ///
-/// [multiplier] item buff'ları için bırakılmış çarpan noktasıdır. Yalnızca
-/// ödemeyi büyütür, tüketilen adımı değiştirmez.
-// TODO(items): Aşama 3'te "adım başına +%X XP" buff'ları (bkz. CLAUDE.md,
-// kart #9) bu çarpandan geçecek. Şimdilik tüm çağıranlar 1.0 veriyor.
+/// [multiplier] kuşanılan itemlerin adım-XP bonusudur
+/// ([EquippedBuffs.stepXpMultiplier]). Yalnızca ödemeyi büyütür, tüketilen
+/// adımı değiştirmez.
 StepXpReward calculateStepXp({
   required int pendingSteps,
   double multiplier = 1.0,
