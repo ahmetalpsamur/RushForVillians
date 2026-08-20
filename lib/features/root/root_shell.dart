@@ -593,7 +593,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     int? milestoneReached;
     var milestoneFreezeGranted = false;
     var capJustReached = false;
-    final capWasReached = _today.coinCapReached;
+    // Tavan kontrolü oyuncunun **gerçek** tavanına göre: kuşanılan ekipman
+    // günlük sınırı büyütmüş olabilir.
+    final capWasReached = _today.coinCapReachedAt(_buffs.dailyCoinCap);
     setState(() {
       _today.addSteps(amount);
       _profile.totalSteps += amount;
@@ -674,13 +676,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _selectAdventure(AdventureQuest adventure) {
     setState(() {
       _adventure = adventure;
-      // Günün adımları korunur; macera kendi başlangıç adımını taşır
-      // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
-      _today = DailyProgress(
-        date: _today.date,
-        steps: _today.steps,
-        stepGoal: adventure.stepGoal,
-      );
+      // Günün ilerlemesi **bütünüyle** korunur; macera kendi başlangıç adımını
+      // taşır (AdventureQuest.startingSteps). Yalnızca günlük hedef değişir.
+      //
+      // Eskiden burada elle yeni bir DailyProgress kuruluyordu ve
+      // `coinsEarned` / `xpEarned` varsayılan 0'a düşüyordu: macera seçmek
+      // **günlük coin tavanını sıfırlıyordu** (tavana dayanan oyuncu macera
+      // seçip 400 coin daha kazanabiliyordu) ve ana ekrandaki "bugün
+      // adımlarından kazandığın XP" satırı yanlış gösteriyordu.
+      _today = _today.withStepGoal(adventure.stepGoal);
     });
     _persist();
     unawaited(AdventureNotificationService.requestPermission());
@@ -689,9 +693,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _chooseNewAdventure() {
     setState(() {
       _adventure = null;
-      // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
-      // varsayılana döner.
-      _today = DailyProgress(date: _today.date, steps: _today.steps);
+      // Macera bırakılınca da günün ilerlemesi yanmaz; yalnızca günlük hedef
+      // varsayılana döner. Kazanç sayaçları için bkz. [_selectAdventure].
+      _today = _today.withStepGoal(GameConstants.dragonStepGoal);
     });
     _persist();
     unawaited(AdventureNotificationService.cancelAdventureReminders());
@@ -1106,6 +1110,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenRewards: _openRewards,
         onOpenStore: _openStore,
         onOpenInventory: _openInventory,
+        dailyCoinCap: _buffs.dailyCoinCap,
         onSimulateSteps: _simulateSteps,
         usingRealPedometer: _stepSource.isPhysical,
         stepPermission: _stepPermission,

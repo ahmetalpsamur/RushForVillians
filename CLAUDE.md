@@ -3327,3 +3327,82 @@ Toplam **411 test geçiyor**, `flutter analyze` temiz.
   bağlanabilir.
 - `economy_pacing_test.dart` hâlâ buff'sız dünyayı ölçüyor; buff'lı senaryo
   ayrıca ölçülmedi (tavanlar `equipped_buffs_test.dart` ile bağlı).
+
+---
+---
+
+# Aşama 3h — Macera yokken de kazanç ✅ (2026-08-20)
+
+**Beklenen iş bir davranış değişikliğiydi; ölçüm başka bir şey gösterdi.**
+Kazanç zaten maceradan bağımsızdı — `_onStepsReported` içinde para ve XP,
+macera dalından **önce** işleniyor. Kaldırılacak bir bağ yoktu.
+
+Ama aynı yolu satır satır okurken **gerçek bir ekonomi açığı** çıktı ve bu
+birim onu kapattı.
+
+## Bulunan hata — macera seçmek günlük coin tavanını sıfırlıyordu
+
+`_selectAdventure` ve `_chooseNewAdventure` elle yeni bir [DailyProgress]
+kuruyordu:
+
+```dart
+_today = DailyProgress(
+  date: _today.date,
+  steps: _today.steps,
+  stepGoal: adventure.stepGoal,
+);
+```
+
+`coinsEarned` ve `xpEarned` verilmediği için **varsayılan 0'a düşüyordu**.
+Sonuçları:
+
+1. **Günlük coin tavanı sıfırlanıyordu.** 400 coin'lik sınıra dayanan oyuncu
+   macera seçip bırakarak sınırı yeniden açabiliyordu — Aşama 1b'nin
+   "adım biriktirip ertesi gün bozdurmak yok" kararını doğrudan deliyor.
+2. Ana ekrandaki "bugün adımlarından N XP kazandın" satırı yanlış gösteriyordu.
+
+**Çift sayma değildi** (`lastRewardedStepCount` işaretçisi hep doğruydu), bu
+yüzden mevcut çift-sayma testleri bunu yakalamıyordu — açık tavan sayacındaydı.
+
+**Çözüm:** `DailyProgress.withStepGoal(int)` — günün ilerlemesinin tamamını
+taşıyıp yalnızca `stepGoal`'ü değiştiren kopya. `stepGoal` `final` olduğu için
+hedef değişimi zaten yeni bir nesne gerektiriyor; hatayı doğuran şey o nesneyi
+**elle** kurmaktı. Artık iki çağıran da bu metodu kullanıyor ve sayaçları
+unutmak mümkün değil.
+
+## İkinci düzeltme — tavan doluluğu buff'lı tavana göre ölçülüyor
+
+`DailyProgress.coinCapReached` sabit `GameConstants.maxDailyStepCoins`
+kullanıyordu. Aşama 3g'de kuşanılan ekipman tavanı büyütebilir hâle geldi;
+bu getter olduğu gibi kalsaydı tavan dolmadan "doldu" denecekti (uyarı erken
+çıkar, ana ekranda yanlış metin görünürdü).
+
+`coinCapReachedAt([int? cap])` eklendi; `RootShell` ve ana ekran oyuncunun
+**gerçek** tavanını veriyor. Eski getter taban tavana göre çalışmaya devam
+ediyor ve dokümantasyonu bunu söylüyor.
+
+## Test
+
+`test/earning_without_adventure_test.dart` — 11 test:
+
+- macera yokken adım para + XP kazandırıyor, seri ilerliyor, çark açılıyor,
+- macera **varken** kazanç birebir aynı (hedef bilerek yüksek: düşman
+  yenilirse ayrıca düşman XP'si gelir ve karşılaştırma bozulur),
+- macera seçmek günlük coin sayacını, adımları ve XP'yi koruyor,
+- macera seçtikten sonra atılan adım da kazandırıyor,
+- macera seçip bırakmak aynı adımı ikinci kez ödemiyor,
+- **günlük coin tavanı macera seçilerek aşılamıyor** (regresyon),
+- `withStepGoal` ilerlemenin tamamını taşıyor,
+- tavan doluluğu verilen tavana göre ölçülüyor.
+
+> **Test notları.** (1) Macera ekranı sürekli animasyon içeriyor, bu yüzden
+> orada `pumpAndSettle` hiçbir zaman durmuyor; sabit sayıda kare ilerleten bir
+> `settle` yardımcısı kullanılıyor. (2) Düşman seçim akışını (hedef
+> kaydırıcısı + kart + başlat düğmesi) elle sürmek yerine ekranın kendi
+> `onAdventureSelected` / `onChooseNewAdventure` geri çağrıları doğrudan
+> çağrılıyor: ölçülen şey `RootShell`'in günün sayaçlarına ne yaptığı, ekran
+> düzeni değil. (3) Macera ekranı avatar ve düşman görselleri çiziyor;
+> yalnızca **görsel yükleme** hataları yutuluyor, diğer hatalar olduğu gibi
+> testi düşürüyor.
+
+Toplam **422 test geçiyor**, `flutter analyze` temiz.

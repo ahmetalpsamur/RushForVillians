@@ -27,7 +27,30 @@ class DailyProgress {
   });
 
   /// Günlük adım-para tavanı doldu mu.
-  bool get coinCapReached => coinsEarned >= GameConstants.maxDailyStepCoins;
+  ///
+  /// [cap] verilmezse taban tavan ([GameConstants.maxDailyStepCoins])
+  /// kullanılır. Kuşanılan ekipman tavanı büyütebildiği için
+  /// ([EquippedBuffs.dailyCoinCap]) çağıranların oyuncunun **gerçek**
+  /// tavanını vermesi gerekir; aksi halde tavan dolmadan "doldu" denir.
+  bool coinCapReachedAt([int? cap]) =>
+      coinsEarned >= (cap ?? GameConstants.maxDailyStepCoins);
+
+  /// Taban tavana göre doluluk. Ekipman bonusunu **hesaba katmaz**;
+  /// buff'ı olan çağıranlar [coinCapReachedAt] kullanmalı.
+  bool get coinCapReached => coinCapReachedAt();
+
+  /// Bu günün ilerlemesini koruyarak yalnızca [stepGoal]'ü değiştiren kopya.
+  ///
+  /// [stepGoal] `final` olduğu için hedef değişimi yeni bir nesne gerektiriyor.
+  /// Bunu elle kurmak, gün içinde kazanılan para ve XP sayaçlarını sıfırlama
+  /// riskini taşıyor — macera seçmek günlük coin tavanını sıfırlıyordu.
+  DailyProgress withStepGoal(int stepGoal) => DailyProgress(
+    date: date,
+    steps: steps,
+    stepGoal: stepGoal,
+    coinsEarned: coinsEarned,
+    xpEarned: xpEarned,
+  );
 
   double get stepProgress => (steps / stepGoal).clamp(0, 1);
 

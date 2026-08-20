@@ -26,6 +26,9 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenRewards;
   final VoidCallback onOpenStore;
   final VoidCallback onOpenInventory;
+
+  /// Oyuncunun günlük coin tavanı; kuşanılan ekipmanla büyüyebilir.
+  final int dailyCoinCap;
   final ValueChanged<int> onSimulateSteps;
 
   /// Adımların gerçek sensörden mi geldiği. Demo butonları yalnızca manuel
@@ -53,6 +56,7 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenRewards,
     required this.onOpenStore,
     required this.onOpenInventory,
+    required this.dailyCoinCap,
     required this.onSimulateSteps,
     required this.usingRealPedometer,
     required this.stepPermission,
@@ -101,7 +105,7 @@ class HomeScreen extends StatelessWidget {
                   adventure: adventure,
                 ),
                 const SizedBox(height: 14),
-                _DailyEarnings(today: today),
+                _DailyEarnings(today: today, dailyCoinCap: dailyCoinCap),
               ],
             ),
           ),
@@ -351,11 +355,15 @@ class _StepSourceCard extends StatelessWidget {
 class _DailyEarnings extends StatelessWidget {
   final DailyProgress today;
 
-  const _DailyEarnings({required this.today});
+  /// Oyuncunun **gerçek** günlük coin tavanı; kuşanılan ekipmanla büyümüş
+  /// olabilir ([EquippedBuffs.dailyCoinCap]).
+  final int dailyCoinCap;
+
+  const _DailyEarnings({required this.today, required this.dailyCoinCap});
 
   @override
   Widget build(BuildContext context) {
-    final capped = today.coinCapReached;
+    final capped = today.coinCapReachedAt(dailyCoinCap);
     return Column(
       children: [
         _EarningRow(
@@ -364,7 +372,7 @@ class _DailyEarnings extends StatelessWidget {
           text:
               capped
                   ? 'Bugün adımlarından ${today.coinsEarned} coin kazandın — '
-                      'günlük sınır doldu.'
+                      'günlük sınır ($dailyCoinCap) doldu.'
                   : 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
           rate: '${GameConstants.stepsPerCoin} adım = 1',
         ),
