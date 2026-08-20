@@ -1772,7 +1772,7 @@ Görsel `assetPath` ile `String` olarak taşınıyor; `IconData` yok.
 
 | Nadirlik | Adet | Seviye | Fiyat |
 |---|---|---|---|
-| Sıradan | 371 | 1–3 | 125–150 |
+| Sıradan | 371 | 1–3 | 100–125 |
 | Az Bulunur | 271 | 4–7 | 300–350 |
 | Nadir | 81 | 8–12 | 775–875 |
 | Epik | 43 | 14–19 | 2.375–2.725 |
@@ -2093,6 +2093,41 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
 - **Şema v9.** 8 → 9 taşıması içerik değiştirmiyor (varsayılanlar 0 / null
   doğru); sürüm yine de artırıldı. `fromJson` stoğu savunma amaçlı kırpıyor.
 
+### GD20. Fiyat eğrisi "katman başına 2 item" varsayımına kalibre (2026-08-20)
+- **Nerede:** `test/economy_pacing_test.dart`, `item_rules.dart:_costBase`
+- **Karar:** ölçümün açık varsayımı **katman başına 2 item**. Her sınıf 3–5
+  kategori görüyor (GD15) ve gerçekçi bir oyuncu katman başına bunların
+  ikisinde yükseltme yapıyor.
+- **Neden bu varsayım kritik:** tek item varsayımıyla ölçülürse para seviyeden
+  **iki kat önce** birikiyor görünür (nadir 0,46 · epik 0,48 · efsanevi 0,60);
+  üç item varsayımıyla tersi çıkar (1,38 · 1,43 · 1,81). Kesişim tam ikide
+  (0,92 · 0,96 · 1,20). CLAUDE.md §4.1'in "nadir ve üstünde fiyat kapı olmaktan
+  çıkıyor, ~2× sapma var" okuması **tek item varsayımının artefaktıydı** —
+  notun kendisi bu tuzağı uyarmıştı.
+- **Oran bandı [0,5 – 1,8]:** altında para hiç kısıt olmaz (fiyat dekoratif),
+  üstünde seviye hiç kısıt olmaz (kilit dekoratif). 2× sapmayı yakalayacak
+  kadar dar, gürültüye takılmayacak kadar geniş.
+- **Sıradan katman ölçümün dışında.** Seviye bandı 1–3, yani seviye kapısı
+  birkaç saatte geçiliyor; oran orada anlamsız (payda sıfıra yakın). O katmanın
+  ölçütü **mutlak**: günlük hedefini tutturan oyuncu ilk akşam bir item
+  alabilmeli.
+
+### GD21. Sıradan item fiyat tabanı 120 → 100 (2026-08-20)
+- **Nerede:** `item_rules.dart:_costBase(common)`
+- **Sorun:** 120 tabanı en ucuz sıradan item'ı **125 coin**'e çıkarıyordu.
+  6.000 adımlık günlük hedefi tutturan oyuncu **120 coin** kazanıyor — beş
+  coin farkla ikinci güne sarkıyordu. Mağazanın ilk gün ölü görünmesinin tek
+  sebebi buydu.
+- **Karar:** taban 100. En ucuz item artık 100 coin; hedefini tutturan oyuncu
+  ilk akşam alışverişini yapıyor.
+- **Neden fiyat, XP değil:** düzeltmenin fiyat eğrisine yazılacağı §4.1'de
+  önceden kararlaştırılmıştı. XP eğrisi Aşama 2b'de ayrıca gerekçelendirildi
+  ve `step_xp_test.dart` ile bağlı (15/9 günlük ulaşma süreleri testli).
+- **Neden 100'ün altına inilmedi:** `economy_pacing_test.dart` en ucuz item'ın
+  günlük kazancın yarısından ucuz olmamasını da bağlıyor; bedava sayılan bir
+  giriş item'ı ekonominin ilk basamağını yok ederdi.
+- **Diğer dört katmana dokunulmadı:** ölçüm hepsini bandın içinde buldu.
+
 ### GD18. Çark tohumlu ve saklanan bir rastgelelikle çalışıyor (2026-08-20)
 - **Nerede:** `core/utils/wheel_rewards.dart`, `UserProfile.wheelSeed`
 - **Karar:** çarkın hem dilim havuzu hem kazanan dilimi tek bir tohumdan
@@ -2333,7 +2368,11 @@ verilen "dokunma" kararı nihai, tekrar açılmasına gerek yok.
 
 ## 4. AÇIK KALANLAR — öncelik sırası
 
-### 4.1. Seviye ↔ fiyat hizalama kontrolü ⚠️ YAPILMADI
+### 4.1. Seviye ↔ fiyat hizalama kontrolü ✅ YAPILDI (2026-08-20)
+
+> **Bu bölüm kapandı.** Ölçüm yapıldı, tek düzeltme uygulandı ve hesap
+> `test/economy_pacing_test.dart` içine taşındı. Sonuç ve tablo için dosya
+> sonundaki "Aşama 3e" bölümüne bak. Aşağıdaki metin ölçüm öncesine ait.
 
 Aşama 3'te seviye kilidi ve fiyat **ayrı ayrı** türetildi; ikisinin aynı
 ilerleme hızına oturup oturmadığı **hiç ölçülmedi**.
@@ -2411,7 +2450,10 @@ Aşama 4a'nın savaş statlarını beklemiyor; özel buff'lar bekliyor.
 **Ayrıca düzeltilecek:** GD9'daki bilinçli tuhaflık — **kalkanlar şu an para
 veriyor.** Savunma istatistiği tanımlanır tanımlanmaz kalkanlar oraya taşınmalı.
 
-### 4.3. #16 — Çark item ödülü verebilsin ⚠️ YAPILMADI
+### 4.3. #16 — Çark item ödülü verebilsin ✅ YAPILDI (2026-08-20)
+
+> **Bu bölüm kapandı.** Ayrıntı: dosya sonundaki "Aşama 3d" bölümü.
+> Aşağıdaki metin iş öncesine ait.
 
 Katalog hazır (`ItemCatalog.byId`, `unlockedAt`, `forCharacterClass`) ama çark
 hâlâ yalnızca XP veriyor (`MockData.wheelXpOptions`, 6 sabit değer).
@@ -2690,3 +2732,66 @@ Yeni alan: `UserProfile.wheelSeed`. 9 → 10 taşıması içerik değiştirmiyor
   tohumun çevirdikten sonra ilerlemesi (`RootShell` üzerinden).
 
 Toplam **322 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# Aşama 3e — Ekonomi hizalama ölçümü ✅ (2026-08-20)
+
+CLAUDE.md §4.1 kapandı. Ölçüm yapıldı, **tek** düzeltme uygulandı ve hesap
+`test/economy_pacing_test.dart` içine taşındı — prosa tahmini olarak
+bırakılmadı. Kararlar **GD20–GD21**.
+
+## Ölçüm
+
+Referans oyuncu **6.000 adım/gün** → 3.000 XP/gün, 120 coin/gün.
+Katman değerleri katalogun **medyanı** (784 item üzerinden).
+Kümülatif XP: `baseXpPerLevel/2 · N · (N−1)`.
+
+| Nadirlik | Adet | Medyan seviye | Seviyeye ulaşma | Medyan fiyat | Fiyatı biriktirme (2 item) | Oran |
+|---|---|---|---|---|---|---|
+| Sıradan | 371 | 2 | 0,3 gün | 100 | 1,7 gün | *ölçüm dışı* |
+| Az Bulunur | 271 | 5 | 3,3 gün | 325 | 5,4 gün | **1,63** |
+| Nadir | 81 | 10 | 15,0 gün | 825 | 13,8 gün | **0,92** |
+| Epik | 43 | 17 | 45,3 gün | 2.600 | 43,3 gün | **0,96** |
+| Efsanevi | 18 | 27 | 117,0 gün | 8.450 | 140,8 gün | **1,20** |
+
+**Sonuç: fiyat eğrisi zaten hizalı.** Nadir, epik ve efsanevi oranları 1'e
+çok yakın; az bulunur bandın üst ucunda ama içinde.
+
+## §4.1'in "~2× sapma" okuması neden yanlıştı
+
+O hesap **tek item/katman** varsayıyordu ve notun kendisi bu tuzağı uyarmıştı.
+Varsayıma göre oranlar tamamen değişiyor:
+
+| Katman başına item | Nadir | Epik | Efsanevi |
+|---|---|---|---|
+| 1 | 0,46 | 0,48 | 0,60 |
+| **2** | **0,92** | **0,96** | **1,20** |
+| 3 | 1,38 | 1,43 | 1,81 |
+
+Kesişim tam **ikide**. Yani mevcut fiyatlar "oyuncu katman başına iki item
+alır" varsayımına kalibre; bu varsayım artık testin içinde yazılı (GD20).
+
+## Uygulanan tek düzeltme
+
+**Sıradan taban 120 → 100** (GD21). Ölçüm dışı bıraktığımız katmanda gerçek
+bir sorun vardı: en ucuz item 125 coin'di, günlük hedefin karşılığı 120 coin.
+Oyuncu **beş coin** farkla ilk gününü eli boş kapatıyordu.
+
+Diğer dört katmana dokunulmadı; XP eğrisine hiç dokunulmadı.
+
+## Test
+
+`test/economy_pacing_test.dart` — 10 test:
+- kümülatif XP formülünün doğrulanması (10. seviye = 45.000 XP),
+- referans oyuncunun günlük kazancı,
+- dört katmanın oran bandında ([0,5–1,8]) kalması,
+- nadirlik yükseldikçe **iki kapının da** uzaması,
+- günlük hedefi tutturan oyuncunun ilk akşam alışveriş yapabilmesi,
+- en ucuz item'ın ilk seviyede açık ve bedava olmaması.
+
+Sabitlerden biri (`stepsPerCoin`, `stepsPerXp`, `maxDailyStepCoins`,
+`baseXpPerLevel`, `_costBase`, `_levelBand`) değişirse bu test alarm verir.
+
+Toplam **332 test geçiyor**, `flutter analyze` temiz.

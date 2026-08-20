@@ -96,7 +96,12 @@ int requiredLevelFor(RewardRarity rarity, String id) {
 /// Mevcut mağaza fiyatlarıyla (300/500/800/1200) ve Aşama 1b ekonomisiyle
 /// aynı ölçekte tutuldu: 6.000 adım/gün = 120 coin/gün.
 int _costBase(RewardRarity rarity) => switch (rarity) {
-  RewardRarity.common => 120,
+  // 120 değil 100: 120 coin/gün kazanan oyuncu (6.000 adım) günlük hedefini
+  // tutturduğu **ilk akşam** ilk ekipmanını alabilmeli. 120 tabanı en ucuz
+  // sıradan item'ı 125'e çıkarıyordu ve oyuncu 5 coin farkla ikinci güne
+  // sarkıyordu — mağazanın ilk gün ölü görünmesinin tek sebebi buydu.
+  // Ayrıntı: "Ekonomi hizalama ölçümü" bölümü ve `economy_pacing_test.dart`.
+  RewardRarity.common => 100,
   RewardRarity.uncommon => 260,
   RewardRarity.rare => 550,
   RewardRarity.epic => 1400,
