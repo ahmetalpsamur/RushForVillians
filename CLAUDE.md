@@ -2795,3 +2795,147 @@ Sabitlerden biri (`stepsPerCoin`, `stepsPerXp`, `maxDailyStepCoins`,
 `baseXpPerLevel`, `_costBase`, `_levelBand`) değişirse bu test alarm verir.
 
 Toplam **332 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# OTURUM KAPANIŞI — 2026-08-20
+
+> **Sonraki oturum buradan başlasın.** Hiçbir şey sormadan devam edebilmek
+> için gereken her şey burada. Bir önceki kapanış ("OTURUM KAPANIŞI —
+> 2026-08-19") hâlâ geçerli; bu bölüm onun üstüne yazıyor.
+
+## 1. Bu oturumda ne yapıldı
+
+Oturum "mağazayı sağlama al" göreviyle başladı; denetimde beş gerçek hata
+çıktı ve iş oradan büyüdü. Beş bölüm tamamlandı, hepsi ayrı commit edildi.
+
+| Bölüm | Ne | Test |
+|---|---|---|
+| **Aşama 3b** | Mağaza denetimi — 5 gerçek hata düzeltildi (GD11–GD14) | 245 → 252 |
+| — | Mağaza regresyon testleri (satın alma, kilit, kalıcılık, çark jetonu) | 252 → 295 |
+| **Aşama 3c** | Sınıf dağılımı + sınıfa özel ad/buff + 8 türlü buff sistemi (GD15–GD17) | 295 → 299 |
+| **Aşama 3d** | #16 çark item ödülü + gerçek dilimli çark (GD18–GD19) | 299 → 322 |
+| **Aşama 3e** | Ekonomi hizalama ölçümü + sıradan fiyat düzeltmesi (GD20–GD21) | 322 → **332** |
+
+Oturum sonunda: `flutter analyze` temiz, `flutter test` **332/332 geçiyor**.
+
+**Kapanan kartlar/maddeler:** #16 (çark item ödülü), CLAUDE.md §4.1 (ekonomi
+hizalama), §4.3 (çark), `daily_wheel_screen.dart:TODO(#16)`, GD9'un
+"kalkanlar para veriyor" tuhaflığı.
+
+**Şema sürümü: v7 → v10.**
+- v9: `extraWheelSpins`, `xpBoostUntil` (mağaza yükseltmeleri tüketilir oldu)
+- v10: `wheelSeed` (çark determinizmi)
+
+### Commit durumu
+Beş bölümün beşi de kullanıcı tarafından commit edildi. **Bu kapanış
+bölümünün eklendiği `CLAUDE.md` değişikliği commit edilmedi.**
+
+## 2. Verilen kararlar (GD11–GD21)
+
+Hepsi "GERİ DÖNÜLECEK KARARLAR" bölümünde gerekçesiyle yazılı. Özet:
+
+| # | Karar | Tek cümlelik gerekçe |
+|---|---|---|
+| GD11 | Mağaza itilmiyor, sekmeye geçiliyor | İtilen rota `RootShell`'in alt ağacında değil; `setState` onu tazelemiyordu |
+| GD12 | Ekipman kartı sabit yükseklikte (302 px) | `childAspectRatio` dar ekranda satın alma düğmesini kartın dışında bırakıyordu |
+| GD13 | İki yükseltme gerçekten tüketiliyor | 800 ve 300 coin alıp hiçbir şey yapmıyorlardı |
+| GD14 | "Alabileceklerim" sahip olunanları eliyor | Alınamayacak şey o listede olmamalı |
+| GD15 | Her sınıf en az 3 kategori görüyor | Magic tek kategori görüyordu, süzgeç işlevsizdi |
+| GD16 | Aynı görsel sınıfa göre farklı ad + buff | Kimlik **değişmiyor**; sınıf değişince envanter kaybolmasın |
+| GD17 | 8 buff türü, nadirliğe göre 1–3 bonus | Hepsi bugün var olan bir uygulama noktasına karşılık geliyor |
+| GD18 | Çark tohumlu ve tohum saklanıyor | Kalıcı ödül üreten rastgelelik §4.4 kapsamında |
+| GD19 | Çarkta epik/efsanevi yok, en fazla 3 item dilimi | Aylık birikimler günlük çarktan düşerse mağaza anlamsız |
+| GD20 | Fiyat "katman başına 2 item"e kalibre | §4.1'in "2× sapma" okuması tek item varsayımının artefaktıydı |
+| GD21 | Sıradan taban 120 → 100 | Oyuncu 5 coin farkla ilk gününü eli boş kapatıyordu |
+
+## 3. SIRADAKİ İŞ — #9: envanter + kuşanma
+
+**Bu oturumun bıraktığı en büyük açık:** `ItemBuff` üretiliyor, sınıfa göre
+farklılaşıyor ve mağazada gösteriliyor ama **hiçbir yere uygulanmıyor**.
+Kuşanma (equip) kavramı yok; `ownedItemIds` yalnızca sahiplik tutuyor.
+
+### Uygulama noktaları hazır (GD17 tablosu)
+
+| Buff türü | Nereye bağlanacak | Durum |
+|---|---|---|
+| `stepCoin` | `coin_calculator.dart` → `calculateStepCoins(multiplier:)` | **Kanca var, boş** (`TODO(items)`) |
+| `stepXp` | `xp_calculator.dart` → `calculateStepXp(multiplier:)` | **Kanca var, boş** (`TODO(items)`) |
+| `wheelXp` | `root_shell.dart:_spinWheel` → `_awardXp` | Bağlanacak |
+| `enemyXp` | `root_shell.dart:_onStepsReported` düşman yenilme dalı | Bağlanacak |
+| `dailyCoinCap` | `GameConstants.maxDailyStepCoins` + buff | Bağlanacak |
+| `streakFreezeCap` | `GameConstants.maxStreakFreezes` + buff | Bağlanacak |
+| `wheelSpinCap` | `GameConstants.maxExtraWheelSpins` + buff | Bağlanacak |
+| `streakRelief` | `GameConstants.streakStepThreshold` eksi buff | Bağlanacak |
+
+### Önerilen sıra
+
+1. **Kuşanma modeli.** `UserProfile.equippedItemIds` (kategori başına bir
+   slot mu, yoksa sabit N slot mu — karar gerekli). Şema v11.
+   - **Uyarı:** kuşanılan itemin buff'ı **sınıfa göre çözülmeli**
+     (`ItemCatalog.byId(id, characterClass: ...)`), yoksa temel buff uygulanır
+     ve GD16 anlamını yitirir.
+2. **Toplam buff hesabı.** Saf fonksiyon (`core/utils/equipped_buffs.dart`
+   gibi): kuşanılan itemlerin `ItemBuff`'larını toplayan tek nokta. Proje
+   deseni bu (`calculateStepCoins`, `limitStepBatch`, `archiveStepDay`).
+3. **Envanter ekranı.** Bugün yok. Sahip olunan itemleri gösterip
+   kuşandıran ekran. Mağaza kartı deseni (`_EquipmentCard`) yeniden
+   kullanılabilir — **sabit yükseklik kuralına dikkat** (GD12).
+4. **Çarpanların bağlanması.** Yukarıdaki tablo sırayla.
+5. **Özel (elle yazılmış) buff'lar** — 18 efsanevi + seçilmiş epikler için
+   koşullu/tetiklenen etkiler. Bu, Aşama 4a savaş statlarını **bekliyor**;
+   ilk dördü beklemiyor. (Bkz. bir önceki kapanışın §4.2'si.)
+
+### Dikkat edilecekler
+
+- **Buff'lar günlük tavanı aşamamalı** — 1b'deki kural: çarpan yalnızca ödemeyi
+  büyütür, tüketilen adımı değiştirmez.
+- **`dailyCoinCap` buff'ı `DailyProgress.coinsEarned` karşılaştırmasına
+  girmeli**, `maxDailyStepCoins` sabitine değil.
+- **`streakRelief` seri eşiğini düşürüyor** — kuşanmayı çıkarınca serinin
+  geriye dönük bozulmaması gerekir; eşik kontrolü yalnızca **o an** yapılıyor
+  (`_onStepsReported`), yani sorun yok, ama testle bağlanmalı.
+- `economy_pacing_test.dart` buff'sız dünyayı ölçüyor. Buff'lar bağlanınca
+  o testin varsayımı ("günlük 120 coin") hâlâ **taban** olarak doğru kalır;
+  buff'lı senaryo ayrı ölçülmeli.
+
+## 4. Sıradaki işten sonra (sıra değişmedi)
+
+- **Aşama 4a — savaş sistemi (#4).** ⚠️ **Determinizm şartı geçerli:**
+  `Random()` savaş kodunda yasak, tohum enjekte edilip durumla saklanacak.
+  Çark için yapılan şey (`wheel_rewards.dart` + `UserProfile.wheelSeed`)
+  **birebir izlenecek desen** — artık projede çalışan bir örneği var.
+  Ayrıca: iki HP kavramının birleştirilmesi (B2'nin açık yarısı), A2
+  (düşman canı = adım hedefi), A3 (`stepGoal` üç iş birden).
+- **Aşama 4b — #14 canavara göre ödül.** `Reward.icon` bir `IconData`;
+  Model Kuralları #1 gereği `String` anahtara çevrilmeli. `RootShell`'de
+  düşman yenilme hook'u hazır. `WheelReward` modeli izlenecek örnek:
+  ödül **tüketilip** atıldığı için framework tipi tutmuyor.
+- **Aşama 5 — #3 (slide scroll), #6 (VS ekranı), #18 (avatar asset).**
+- **Aşama 6 — #13b Firebase → #7 takım savaşları.**
+
+## 5. Hâlâ açık duran küçük maddeler
+
+Bir önceki kapanışın §5 tablosu **aynen geçerli** (C3, C4, C5, C6, C7, C9,
+C10, C11, C13, iOS derleme borçları, saat dilimi boşlukları, GD1). Bu oturumda
+eklenenler:
+
+| Kaynak | Ne | Not |
+|---|---|---|
+| GD11 | `_openWheel`, `_openRewards`, `_editCharacter` hâlâ `_push` kullanıyor | Bugün güvenli (kendi durumlarını tutuyorlar / salt-okunur). Canlı state yansıtması gereken **yeni** ekran eklenirse sekmeye alınmalı |
+| GD13 | `skin_dragon_cape` ve `title_villain_hunter` hiçbir yerde gösterilmiyor | Sanat/ekran işi (pelerin görseli, profilde unvan satırı), kod hatası değil |
+| GD17 | Buff'lar hiçbir yere uygulanmıyor | **Yukarıdaki §3'ün konusu** |
+| Aşama 3d | Çark ekranı itilen rotada; tohumu kendi kopyasında ilerletiyor | İki taraf da `nextWheelSeed` kullanıyor, uyumlular. Riverpod geçişinde sadeleşir |
+| Aşama 3e | `economy_pacing_test.dart` buff'sız dünyayı ölçüyor | Buff'lar bağlanınca buff'lı senaryo ayrıca ölçülmeli |
+
+## 6. Bu oturumda eklenen dosyalar
+
+    lib/core/utils/wheel_rewards.dart      # çark havuzu + tohum (saf)
+    lib/models/wheel_reward.dart           # çark ödülü (XP ya da item)
+    test/store_purchase_test.dart          # RootShell üzerinden satın alma (32)
+    test/wheel_rewards_test.dart           # çark havuz kuralları (17)
+    test/economy_pacing_test.dart          # seviye/fiyat hizalaması (10)
+
+`test/daily_wheel_test.dart` bu oturumda yazıldı ve #16 ile birlikte
+yeniden yazıldı (12 test).
