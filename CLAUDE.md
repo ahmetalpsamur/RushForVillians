@@ -1634,8 +1634,12 @@ Toplam **159 test geçiyor**, `flutter analyze` temiz.
 
 # Not — şema sürümü
 
-Aşama 0 bölümünde "Şema sürümü: 2" yazıyor; o bölüm yazıldığında güncel
-sürüm buydu. **Güncel sürüm v7** (bkz. Aşama 2c).
+Bölümlerin içindeki sürüm numaraları **o bölüm yazıldığı andaki** güncel
+sürümdür (Aşama 0'da v2, Aşama 2c'de v7, Aşama 3d'de v10...).
+
+**Güncel sürüm: v11** — `UserProfile.equippedItemIds` (bkz. Aşama 3g).
+Tek doğruluk kaynağı `GameStorage.schemaVersion`; yeni alan eklerken sürümü
+artır **ve** `_migrations` haritasına bir satır ekle.
 
 ---
 
@@ -3560,3 +3564,197 @@ Dokunmanın anlamı aşamaya göre değişiyor ve **hiçbir aşama sessiz değil
   (12 test, hiçbiri silinmedi).
 
 Toplam **436 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# OTURUM KAPANIŞI — 2026-08-20 (ikinci oturum)
+
+> **Sonraki oturum buradan başlasın.** Hiçbir şey sormadan devam edebilmek
+> için gereken her şey burada. Önceki iki kapanış (2026-08-19 ve 2026-08-20
+> birinci) hâlâ geçerli; bu bölüm onların üstüne yazıyor ve **çelişki varsa
+> bu bölüm kazanır**.
+
+## 0. Otuz saniyede durum
+
+| | |
+|---|---|
+| Branch | `feature/market_addfixes` |
+| Son commit | `1f741a4 Rebuild Wheel Spin with Tiered Reveal, Haptics and Skip` |
+| Çalışma ağacı | **temiz** — bu oturumun dört bölümünün dördü de commit edildi |
+| `flutter analyze` | temiz |
+| `flutter test` | **436/436 geçiyor** (oturum başında 333) |
+| Şema sürümü | **v11** |
+| Firebase | **hiç dokunulmadı** — takım arkadaşının işi (bkz. §5) |
+
+## 1. Bu oturumda ne yapıldı
+
+| Bölüm | Ne | Test | Commit |
+|---|---|---|---|
+| **Aşama 3f** | Buff sistemi efektler üstüne yeniden kuruldu + 166 isim yeniden yazıldı | 333 → 379 | `0547db8` |
+| **Aşama 3g** | Envanter, kuşanma ve buff'ların gerçekten uygulanması (#9) | 379 → 411 | `9427574` |
+| **Aşama 3h** | Macera yokken kazanç + günlük tavan açığı | 411 → 422 | `428bb1c` |
+| **Aşama 3i** | Çark: kademeli açılış, haptic, atlama | 422 → **436** | `1f741a4` |
+
+Ayrıntı için yukarıdaki dört "Aşama 3f/3g/3h/3i" bölümü.
+
+**Kapanan kart:** #9 (item buff'ları oyuna işlesin) — tasarım **ve** uygulama.
+**Kapanan `TODO`:** `coin_calculator.dart` ve `xp_calculator.dart` içindeki
+`TODO(items)` çarpan kancaları.
+
+### Yol boyunca bulunan üç gerçek hata
+
+Hiçbiri kartlarda yazmıyordu; kodu okurken çıktılar ve üçü de düzeltildi:
+
+1. **Macera seçmek günlük coin tavanını sıfırlıyordu** (Aşama 3h). Tavana
+   dayanan oyuncu macera seçip bırakarak 400 coin daha kazanabiliyordu. Çift
+   sayma *değildi*, o yüzden mevcut testler yakalamıyordu.
+2. **Çarkta atlama, çevirmeyi sessizce yutuyordu** (Aşama 3i). `value = 1`
+   ticker'ı iptal ediyor, `forward()`'ın future'ı hiç tamamlanmıyor, ödül veren
+   kod hiç çalışmıyordu: hak gider, ödül gelmez.
+3. **Aynı öğeyi ikinci kez satın almak** — bu oturumda değil, önceki oturumda
+   kapanmıştı; burada yalnızca regresyon testleri korunuyor.
+
+### Test yazarken yakalanan iki tuzak (sonraki oturum bilsin)
+
+- **`pumpWidget` ikinci kez çağrılınca yeni state kurulmuyor.** Flutter aynı
+  tipteki elemanı yeniden kullanıp `initState` yerine `didUpdateWidget`
+  çalıştırıyor; `RootShell._profile` `late final` olduğu için **eski profil
+  yerinde kalıyor** ve test sessizce yanlış şeyi ölçüyor. Çözüm: her kurulum
+  ayrı bir `ValueKey` alıyor (`inventory_test.dart`,
+  `earning_without_adventure_test.dart`).
+- **Macera ekranında `pumpAndSettle` asla dönmüyor** (sürekli animasyon).
+  Sabit sayıda kare pompalayan bir `settle` yardımcısı kullanılıyor. Ayrıca
+  macera ekranı görsel çiziyor; testlerde yalnızca **görsel yükleme** hataları
+  yutuluyor, diğerleri testi düşürmeye devam ediyor.
+
+## 2. SIRADAKİ İŞ — Aşama 4a: savaş sistemi (#4)
+
+Bu oturumun bıraktığı en büyük iş ve **her şey onu bekliyor**.
+
+### ⚠️ Değişmeyen şart: determinizm
+
+`Random()` savaş kodunda **yasak**. Tohum dışarıdan enjekte edilecek ve savaş
+durumuyla birlikte diske yazılacak. Gerekçe: Aşama 6b'de aynı motor sunucuda
+çalışacak.
+
+**İzlenecek desen artık projede iki kez çalışıyor:**
+- `GameClock` — enjekte edilebilir zaman kaynağı,
+- `wheel_rewards.dart` + `UserProfile.wheelSeed` — tohumlu ve saklanan
+  rastgelelik. Çark bunu **uçtan uca** yapıyor: havuz, kazanan dilim ve hatta
+  parçacık geometrisi aynı tohumdan çıkıyor. Savaş motoru bunu kopyalasın.
+
+### Savaş motoru gelince kendiliğinden canlanacak olanlar
+
+Aşama 3f'te **yedi savaş statı** modellendi ve item tablosuna yazıldı, ama
+hiçbiri uygulanmıyor: `attack`, `defense`, `maxHealth`, `critChance`,
+`critDamage`, `lifeSteal`, `dodge`.
+
+`EquippedBuffs` bunları zaten topluyor ve ayrı listede tutuyor
+(`combatEffects`, `flatBonusFor`, `rateBonusFor`, `touchedCombatStats`);
+envanterdeki karakter paneli de gösteriyor ve "savaş sistemiyle birlikte
+etkinleşecek" diye **açıkça söylüyor**. Savaş motoru bu API'yi okuyacak;
+yeniden toplama yazılmayacak.
+
+Aynı şekilde **dört savaş tetikleyicisi** de bekliyor:
+`lowHealth`, `highHealth`, `onHit`, `onKill`, `untouchedRounds`. Etiketleri
+üretiliyor ve gösteriliyor; uygulanmıyor.
+
+### Aşama 4a'nın geri kalanı (değişmedi)
+
+- **İki HP kavramının birleştirilmesi** — `UserProfile.hp` (5000, hiç
+  azalmıyor, şema v2'de persist'ten çıkarıldı) vs `AdventureQuest.playerHealth`
+  (0-100). Triaj B2'nin açık yarısı.
+- **A2** — düşman canı = günlük adım hedefi, her adım 1 hasar
+  (`adventure_quest.dart:TODO(combat)`).
+- **A3** — `stepGoal` üç işi birden yapıyor: düşman canı, kilit eşiği, günlük
+  hedef.
+- **A1** — biriken turların hepsinin çözülmesi (`resolveExpiredRounds`); motor
+  yeniden yazılırken korunmalı.
+- Bitince **#14** (canavara göre ödül): `RootShell`'de düşman yenilme hook'u
+  hazır, `Reward.icon` bir `IconData` → Model Kuralları #1 gereği `String`
+  anahtara çevrilmeli. İzlenecek örnek `WheelReward` (tüketilip atıldığı için
+  framework tipi tutmuyor).
+  - **Yeni kolaylık:** #14 geldiğinde `RewardRevealOverlay` hazır bekliyor.
+    Kademe kuralı "nadir ve üstü" yazıldığı için (GD31) epik/efsanevi düşman
+    ödülleri kendiliğinden tam ekran açılır.
+
+## 3. Savaş sistemini beklemeyen küçük işler
+
+Sıradaki iş büyükse, bunlar tek başına yapılabilir:
+
+| # | İş | Nerede | Boyut |
+|---|---|---|---|
+| 1 | **`nightWalk` ve `streakActive` koşullu buff'larını bağla** | `_onStepsReported` — gece saatini `GameDay`/`GameClock`'tan, seriyi `profile.streakCompletedOn`'dan oku | küçük |
+| 2 | Buff'lı ekonomi ölçümü | `economy_pacing_test.dart` buff'sız dünyayı ölçüyor; kuşanmalı senaryo ayrıca ölçülmeli | küçük |
+| 3 | `skin_dragon_cape` ve `title_villain_hunter` hâlâ hiçbir yerde gösterilmiyor | sanat/ekran işi (pelerin görseli, profilde unvan satırı) | küçük |
+| 4 | Triaj **C4** — hatırlatma metinleri iki yerde kopyalanmış | `root_shell.dart:_reminderMessages` + `adventure_notification_service.dart:_messages` | küçük |
+| 5 | Triaj **C6** — `sideBySideWindowMinutes` ölü sabit | #7'ye ait | küçük |
+| 6 | Triaj **C10** — `README.md` hâlâ "A new Flutter project." | | küçük |
+
+**1. madde için not:** `nightWalk` bugün hiç uygulanmıyor ve item kartlarında
+gösteriliyor — yani kullanıcıya söz verilip tutulmayan tek şey bu. Sıradaki
+küçük iş olarak en yüksek öncelikli olan o.
+
+## 4. Bu oturumda eklenen dosyalar
+
+    lib/models/item_effect.dart              # ItemStat/Trigger/Effect (saf model)
+    lib/data/item_effects.dart               # 61 imzalı itemin etkileri (veri)
+    lib/core/utils/equipped_buffs.dart       # kuşanma toplama + tavanlar (saf)
+    lib/core/utils/item_comparison.dart      # item farkı (saf)
+    lib/features/inventory/inventory_screen.dart
+    lib/widgets/reward_reveal.dart           # kademeli ödül açılışı
+
+    test/item_effects_test.dart              (33)
+    test/equipped_buffs_test.dart            (13)
+    test/item_comparison_test.dart           (10)
+    test/inventory_test.dart                 (22)
+    test/earning_without_adventure_test.dart (11)
+    test/wheel_reveal_test.dart              (14)
+
+## 5. FIREBASE — dokunulmadı, arkadaşımın işi
+
+Bu oturumda Firebase'e **hiç dokunulmadı**: `pubspec.yaml`'a firebase paketi
+eklenmedi, `firebase_options.dart` / `google-services.json` /
+`GoogleService-Info.plist` yok, Firestore ve Auth kodu yazılmadı.
+
+Kart **#13b (Firebase)** ve ona bağlı **#7 (takım savaşları)** takım
+arkadaşının sorumluluğunda. Bu oturumun kararları o entegrasyonu
+kolaylaştıracak şekilde alındı:
+
+- `GameState.toJson()` çıktısı hâlâ doğrudan bir Firestore dokümanı;
+  bu oturumda eklenen tek alan `equippedItemIds` (düz `Map<String, String>`).
+- Model Kuralları #1'e uyuldu: `Item`, `ItemEffect`, `ItemBuff` **diske hiç
+  yazılmıyor**; kalıcı olan tek şey `String` kimlikler.
+- Rastgelelik tohumlu ve saklanan (`wheelSeed`), yani sunucuda tekrar
+  üretilebilir.
+
+## 6. Hâlâ açık duran küçük maddeler (birikmiş liste)
+
+Önceki iki kapanışın listeleri **aynen geçerli**: triaj C3, C4, C5, C6, C7,
+C9, C10, C11, C13; iOS derleme borçları (`ios/Podfile` yok,
+`AppDelegate.swift`'teki pedometer ve açılış sesi kanalları Windows'ta
+derlenmedi); saat dilimi boşlukları; GD1 (kayıt okunamazken üzerine yazma);
+gün değişiminde macera düşmesi (Aşama 5a).
+
+Bu oturumda eklenenler:
+
+| Kaynak | Ne | Not |
+|---|---|---|
+| GD24 | İmzalı itemlerin çoğu ağırlıkla savaş statı veriyor; savaş motoru gelene kadar bir epik silah bir nadirden az *görünür* fayda sağlayabilir | Bilinçli. Her **efsanevinin** en az bir canlı etkisi olması şart koşuldu ve testle bağlandı |
+| GD27 | `_openWheel`, `_openRewards`, `_editCharacter` hâlâ `_push` kullanıyor | Envanter `_revision` sayacıyla çözüldü; diğer üçü bugün güvenli. Canlı state yansıtması gereken **yeni** bir ekran eklenirse aynı deseni kullan |
+| Aşama 3i | `MaskFilter.blur`'lu ışık patlaması gerçek cihazda ölçülmedi | Pahalı çıkarsa `_BurstPainter.paint` içindeki ilk çizim tek satırla kaldırılabilir |
+| Aşama 3i | Kare başı 0,9 ms ölçüldü ama bu **cihaz FPS'i değil** | `flutter test` GPU'suz; gerçek cihazda doğrulanmalı |
+| Aşama 3g | Koşullu buff tetikleyicileri gösteriliyor ama uygulanmıyor | §3 madde 1 ve §2 |
+
+## 7. Sonraki oturum için önerilen sıra
+
+1. **`nightWalk` + `streakActive` buff'larını bağla** (§3 madde 1) — küçük,
+   bağımsız ve kullanıcıya verilmiş tek tutulmamış sözü kapatıyor.
+2. **Aşama 4a savaş motoru** (§2) — determinizm şartıyla; `wheel_rewards.dart`
+   birebir izlenecek desen.
+3. **#14 canavara göre ödül** — `RewardRevealOverlay` hazır.
+4. **Aşama 5** — #3 (slide scroll, `_NumberWheel` hazır bekliyor), #6 (VS
+   ekranı, arka planlar `lib/Backgrounds/` altında var), #18 (avatar asset,
+   hâlâ belirsiz).
+5. **Aşama 6** — arkadaşımın Firebase işi bitince #7.
