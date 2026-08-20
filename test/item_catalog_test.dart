@@ -7,6 +7,18 @@ import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
 
+/// Karakter kataloğundaki sınıflar (`lib/Characters/` klasör adları).
+const _allClasses = [
+  'Archer',
+  'DarkMagic',
+  'Faith',
+  'Magic',
+  'Nature',
+  'Paladin',
+  'SwordMan',
+  'Thief',
+];
+
 /// Item kataloğu sanat klasöründen üretiliyor; kod yalnızca dosya adına anlam
 /// veriyor. Bu testler iki şeyi koruyor: türetme kurallarının kararlılığı
 /// (seviye kilidi kayarsa oyuncunun sahip olduğu item kilitlenir) ve sanatın
@@ -167,41 +179,110 @@ void main() {
   });
 
   group('buff dağılımı', () {
-    test('yakın dövüş XP verir', () {
-      final buff = buffFor(RewardRarity.rare, ItemCategory.swords);
+    test('nadirlik yükseldikçe bonus sayısı artar', () {
+      expect(buffCountFor(RewardRarity.common), 1);
+      expect(buffCountFor(RewardRarity.uncommon), 2);
+      expect(buffCountFor(RewardRarity.rare), 2);
+      expect(buffCountFor(RewardRarity.epic), 3);
+      expect(buffCountFor(RewardRarity.legendary), 3);
 
-      expect(buff.stepXpBonus, greaterThan(0));
-      expect(buff.stepCoinBonus, 0);
-    });
-
-    test('menzil ve savunma para verir', () {
-      for (final category in [ItemCategory.arch, ItemCategory.shields]) {
-        final buff = buffFor(RewardRarity.rare, category);
-        expect(buff.stepCoinBonus, greaterThan(0));
-        expect(buff.stepXpBonus, 0);
+      for (final rarity in RewardRarity.values) {
+        final buff = buffFor(rarity, ItemCategory.swords);
+        expect(
+          buff.count,
+          buffCountFor(rarity),
+          reason: '$rarity için üretilen bonus sayısı tabloyla uyuşmuyor',
+        );
       }
-    });
-
-    test('büyü ikisini yarı yarıya paylaştırır', () {
-      final buff = buffFor(RewardRarity.epic, ItemCategory.magic);
-
-      expect(buff.stepCoinBonus, buff.stepXpBonus);
-      expect(buff.stepCoinBonus + buff.stepXpBonus, closeTo(0.12, 1e-9));
     });
 
     test('nadirlik yükseldikçe toplam bonus büyür', () {
       double total(RewardRarity rarity) {
         final buff = buffFor(rarity, ItemCategory.swords);
-        return buff.stepCoinBonus + buff.stepXpBonus;
+        return buff.stepCoinBonus + buff.stepXpBonus + buff.enemyXpBonus;
       }
 
       expect(total(RewardRarity.common), lessThan(total(RewardRarity.rare)));
       expect(total(RewardRarity.rare), lessThan(total(RewardRarity.legendary)));
     });
 
+    test('sınıfsız temel buff kategori rolünden çıkar', () {
+      // Yakın dövüş → adım XP, menzil → adım parası.
+      expect(
+        buffFor(RewardRarity.common, ItemCategory.swords).stepXpBonus,
+        greaterThan(0),
+      );
+      expect(
+        buffFor(RewardRarity.common, ItemCategory.arch).stepCoinBonus,
+        greaterThan(0),
+      );
+    });
+
+    test('her sınıfın imza bonusu ayrı ve her itemde bulunur', () {
+      final signatures = <String, ItemBuffType>{};
+      for (final characterClass in _allClasses) {
+        final order = buffTypeOrder(
+          ItemCategory.magic,
+          characterClass: characterClass,
+        );
+        signatures[characterClass] = order.first;
+      }
+
+      expect(
+        signatures.values.toSet(),
+        hasLength(_allClasses.length),
+        reason: 'iki sınıf aynı imza bonusunu paylaşmamalı',
+      );
+    });
+
+    test('aynı görsel sınıfa göre farklı item olur', () {
+      final base = buildItemFromAsset('lib/Items/magic/holy_staff.png')!;
+      final mage = flavorForClass(base, 'Magic');
+      final darkMage = flavorForClass(base, 'DarkMagic');
+
+      expect(mage.id, base.id, reason: 'kimlik sınıfa göre değişmemeli');
+      expect(darkMage.id, base.id);
+      expect(mage.name, isNot(darkMage.name));
+      expect(mage.buff.labels, isNot(darkMage.buff.labels));
+      // Sınıf imzaları: Büyücü adım XP, Kara Büyücü çark XP.
+      expect(mage.buff.stepXpBonus, greaterThan(0));
+      expect(darkMage.buff.wheelXpBonus, greaterThan(0));
+    });
+
+    test('tek sınıfa özel kategoride ad değişmez', () {
+      final base = ItemCatalog.fromAssetPaths([
+        'lib/Items/swords/sword.png',
+      ]).single;
+      // Kılıçlar paylaşılan bir kategori: lakap eklenir.
+      expect(flavorForClass(base, 'SwordMan').name, startsWith('Çelik '));
+      expect(flavorForClass(base, 'Thief').name, startsWith('Gölge '));
+    });
+
+    test('sayısal bonuslar hiçbir zaman sıfır olmaz', () {
+      // Etiketi görünüp etkisi olmayan bonus olmamalı.
+      for (final rarity in RewardRarity.values) {
+        for (final characterClass in _allClasses) {
+          for (final category in ItemCategory.values) {
+            final buff = buffFor(
+              rarity,
+              category,
+              characterClass: characterClass,
+              id: '$category/$characterClass',
+            );
+            expect(buff.labels, hasLength(buffCountFor(rarity)));
+            for (final line in buff.labels) {
+              expect(line, isNot(contains('+0')));
+              expect(line, isNot(contains('-0 adım')));
+            }
+          }
+        }
+      }
+    });
+
     test('bonusu olmayan buff etiket üretmez', () {
       expect(ItemBuff.none.isEmpty, isTrue);
       expect(ItemBuff.none.label, isNull);
+      expect(ItemBuff.none.labels, isEmpty);
     });
 
     test('etiket yüzdeyi okunur yazar', () {
@@ -209,6 +290,10 @@ void main() {
       expect(
         const ItemBuff(stepCoinBonus: 0.06, stepXpBonus: 0.06).label,
         'adım parası +%6 · adım XP +%6',
+      );
+      expect(
+        const ItemBuff(dailyCoinCapBonus: 30, streakStepRelief: 200).labels,
+        ['günlük coin sınırı +30', 'seri eşiği -200 adım'],
       );
     });
   });
@@ -405,25 +490,36 @@ void main() {
       }
     });
 
-    test('her karakter sınıfının kuşanabileceği item var', () {
+    test('her karakter sınıfı en az üç kategori görür', () {
+      // Magic eskiden tek kategori (yalnızca Büyü) görüyordu; mağazanın
+      // kategori süzgeci o sınıfta fiilen işlevsizdi.
       final items = ItemCatalog.fromAssetPaths(allAssetPaths());
-      const classes = [
-        'Archer',
-        'DarkMagic',
-        'Faith',
-        'Magic',
-        'Nature',
-        'Paladin',
-        'SwordMan',
-        'Thief',
-      ];
+      for (final characterClass in _allClasses) {
+        final usable =
+            items.where((item) => item.isUsableBy(characterClass)).toList();
+        final categories = usable.map((item) => item.category).toSet();
 
-      for (final characterClass in classes) {
         expect(
-          items.any((item) => item.isUsableBy(characterClass)),
-          isTrue,
-          reason: '$characterClass için item yok',
+          categories.length,
+          greaterThanOrEqualTo(3),
+          reason:
+              '$characterClass yalnızca ${categories.length} kategori '
+              'görüyor; süzgeç anlamsız kalır',
         );
+        expect(
+          usable.length,
+          greaterThanOrEqualTo(150),
+          reason: '$characterClass için yeterli item yok',
+        );
+      }
+    });
+
+    test('hiçbir sınıf kataloğun yarısından fazlasını görmez', () {
+      // Sınıf kimliği korunmalı: herkes her şeyi görüyorsa kısıt anlamsız.
+      final items = ItemCatalog.fromAssetPaths(allAssetPaths());
+      for (final characterClass in _allClasses) {
+        final usable = items.where((i) => i.isUsableBy(characterClass)).length;
+        expect(usable, lessThan(items.length ~/ 2 + items.length ~/ 10));
       }
     });
 

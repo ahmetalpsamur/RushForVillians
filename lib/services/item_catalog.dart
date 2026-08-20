@@ -26,7 +26,14 @@ class ItemCatalog {
 
   /// Kimlikten item çözer. Katalogdan kaldırılmış (ya da henüz yüklenmemiş)
   /// bir kimlik için `null` döner — kayıtta duran eski item oyunu bozmasın.
-  static Item? byId(String id) => _byId[id];
+  ///
+  /// [characterClass] verilirse item o sınıfa uyarlanmış (adı ve buff'ı
+  /// sınıfa özel) hâliyle döner; kimlik her iki durumda da aynıdır.
+  static Item? byId(String id, {String? characterClass}) {
+    final item = _byId[id];
+    if (item == null || characterClass == null) return item;
+    return flavorForClass(item, characterClass);
+  }
 
   /// Kataloğu yükler. İkinci çağrı önbellekten döner.
   ///
@@ -84,9 +91,16 @@ class ItemCatalog {
   static List<Item> unlockedAt(int level) =>
       items.where((item) => item.isUnlockedAt(level)).toList();
 
-  /// [characterClass] sınıfının kullanabileceği itemler.
+  /// [characterClass] sınıfının kullanabileceği itemler, **o sınıfa uyarlanmış**
+  /// hâlleriyle: paylaşılan kategorilerde ad sınıf lakabını alır ve buff sınıfın
+  /// imza bonusuna göre yeniden türetilir (`item_rules.dart:flavorForClass`).
+  ///
+  /// Kimlikler değişmez; sahiplik kaydı sınıftan bağımsızdır.
   static List<Item> forCharacterClass(String characterClass) =>
-      items.where((item) => item.isUsableBy(characterClass)).toList();
+      items
+          .where((item) => item.isUsableBy(characterClass))
+          .map((item) => flavorForClass(item, characterClass))
+          .toList();
 
   static List<Item> byCategory(ItemCategory category) =>
       items.where((item) => item.category == category).toList();

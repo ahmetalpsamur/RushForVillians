@@ -114,36 +114,231 @@ int costFor(RewardRarity rarity, int requiredLevel) {
   return (raw / 25).round() * 25;
 }
 
-/// Nadirliğin toplam bonus oranı (0.07 = +%7).
+/// Nadirliğin toplam bonus bütçesi (0.07 = +%7). Bütçe, item'ın taşıdığı
+/// bonuslara [_buffShares] oranlarıyla bölünür.
 double _buffTotal(RewardRarity rarity) => switch (rarity) {
   RewardRarity.common => 0.02,
-  RewardRarity.uncommon => 0.04,
-  RewardRarity.rare => 0.07,
-  RewardRarity.epic => 0.12,
-  RewardRarity.legendary => 0.20,
+  RewardRarity.uncommon => 0.05,
+  RewardRarity.rare => 0.09,
+  RewardRarity.epic => 0.15,
+  RewardRarity.legendary => 0.26,
 };
 
-/// Kategorinin rolüne göre bonusun dağılımı.
+/// Nadirliğin taşıdığı **bonus sayısı**.
 ///
-/// Bugün yalnızca **adım kazancı** bonusu var; savaş istatistikleri Aşama
-/// 4a'da tanımlanacak (bkz. [ItemBuff]). Dağılım rolden çıkıyor:
-/// - yakın dövüş → XP (savaş gücü hızlı seviye demek),
-/// - menzil ve savunma → para (hazırlıklı gezgin daha çok toplar),
-/// - büyü → ikisi yarı yarıya.
+/// Sıradan bir item tek şey yapar; efsanevi bir item üç şey birden. Üçte
+/// duruyoruz: mağaza kartı sabit yükseklikte (bkz. GD12) ve dört satır
+/// bonus okunmaz hâle geliyor.
+int buffCountFor(RewardRarity rarity) => switch (rarity) {
+  RewardRarity.common => 1,
+  RewardRarity.uncommon => 2,
+  RewardRarity.rare => 2,
+  RewardRarity.epic => 3,
+  RewardRarity.legendary => 3,
+};
+
+/// Bütçenin bonuslara dağılımı. Birincil bonus her zaman en büyük payı alır;
+/// item'ın "ne işe yaradığı" tek bakışta anlaşılsın.
+List<double> _buffShares(int count) => switch (count) {
+  1 => const [1.0],
+  2 => const [0.6, 0.4],
+  _ => const [0.5, 0.3, 0.2],
+};
+
+/// Karakter sınıfının **imza bonusu**: o sınıfın itemlerinde her zaman
+/// birincil sırada durur.
 ///
-/// **Kalkanlar geçici olarak menzille aynı yerde.** Doğru cevap savunma
-/// istatistiği vermek; o istatistik henüz yok ve uydurmak, Aşama 4a'da ikinci
-/// kez yazmak olurdu.
-ItemBuff buffFor(RewardRarity rarity, ItemCategory category) {
+/// Aynı görselin Büyücüde ve Kara Büyücüde farklı bir item olmasını sağlayan
+/// şey bu. Sekiz sınıfa sekiz ayrı tür düşüyor; hiçbiri tekrar etmiyor.
+ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
+  // Savaşçı düşmandan daha çok ders çıkarır.
+  'SwordMan' => ItemBuffType.enemyXp,
+  // Paladin kararlıdır: serisini korur.
+  'Paladin' => ItemBuffType.streakFreezeCap,
+  // Hırsız günlük kazanç tavanını zorlar.
+  'Thief' => ItemBuffType.dailyCoinCap,
+  // Okçu gezgindir: yol para eder.
+  'Archer' => ItemBuffType.stepCoin,
+  // Büyücü öğrenir.
+  'Magic' => ItemBuffType.stepXp,
+  // Kara büyücü kaderi kendine çevirir.
+  'DarkMagic' => ItemBuffType.wheelXp,
+  // İnanç disiplindir: seri eşiği düşer.
+  'Faith' => ItemBuffType.streakRelief,
+  // Doğa döngüseldir: çark hakkı birikir.
+  'Nature' => ItemBuffType.wheelSpinCap,
+  _ => ItemBuffType.stepCoin,
+};
+
+/// Kategorinin rolüne göre ikincil bonus eğilimi.
+///
+/// - yakın dövüş → XP ve düşman XP'si (savaş gücü hızlı seviye demek),
+/// - menzil → para ve kazanç tavanı (hazırlıklı gezgin daha çok toplar),
+/// - savunma → dayanıklılık (seri koruma, eşik indirimi),
+/// - büyü → çark ve XP (şans ve bilgi).
+///
+/// **Kalkanlar artık menzille aynı yerde değil** — savunma rolü kendi
+/// eğilimini aldı (bkz. GD9'daki bilinçli tuhaflık). Savaş istatistiği hâlâ
+/// yok; verilen şey "dayanıklılığın oyun dışı karşılığı".
+List<ItemBuffType> _roleOrder(ItemRole role) => switch (role) {
+  ItemRole.melee => const [
+    ItemBuffType.stepXp,
+    ItemBuffType.enemyXp,
+    ItemBuffType.streakRelief,
+  ],
+  ItemRole.ranged => const [
+    ItemBuffType.stepCoin,
+    ItemBuffType.dailyCoinCap,
+    ItemBuffType.wheelSpinCap,
+  ],
+  ItemRole.defense => const [
+    ItemBuffType.stepCoin,
+    ItemBuffType.streakFreezeCap,
+    ItemBuffType.streakRelief,
+  ],
+  ItemRole.magic => const [
+    ItemBuffType.stepXp,
+    ItemBuffType.wheelXp,
+    ItemBuffType.stepCoin,
+  ],
+};
+
+/// Bir item'ın bonus türlerini sırayla verir: önce sınıf imzası, sonra
+/// kategori eğilimi, sonra kalanlar.
+///
+/// Kuyruk [stableSpread] ile döndürülür; böylece aynı sınıf ve kategorideki
+/// yüzlerce item aynı ikincil bonusa yapışmaz. Döndürme kimlikten çıktığı için
+/// **kararlı**: aynı item her açılışta aynı bonusları verir (bkz. GD8).
+List<ItemBuffType> buffTypeOrder(
+  ItemCategory category, {
+  String? characterClass,
+  String id = '',
+}) {
+  final signature =
+      characterClass == null
+          ? _roleOrder(category.role).first
+          : _classSignature(characterClass);
+
+  final seen = <ItemBuffType>{signature};
+  final tail = <ItemBuffType>[];
+  for (final type in [..._roleOrder(category.role), ...ItemBuffType.values]) {
+    if (seen.add(type)) tail.add(type);
+  }
+
+  if (tail.isEmpty) return [signature];
+  final offset = stableSpread(id, tail.length);
+  return [signature, ...tail.sublist(offset), ...tail.sublist(0, offset)];
+}
+
+/// Item'ın buff'ı. [characterClass] verilmezse sınıftan bağımsız temel buff
+/// üretilir; sınıfa uyarlama [flavorForClass] üzerinden yapılır.
+///
+/// Sayı olarak verilen bonuslar (tavan, eşik) oranla ölçeklenip okunur
+/// değerlere yuvarlanır ve hiçbiri sıfıra düşmez: etiketi görünüp etkisi
+/// olmayan bir bonus olmamalı.
+ItemBuff buffFor(
+  RewardRarity rarity,
+  ItemCategory category, {
+  String? characterClass,
+  String id = '',
+}) {
+  final count = buffCountFor(rarity);
+  final shares = _buffShares(count);
   final total = _buffTotal(rarity);
-  return switch (category.role) {
-    ItemRole.melee => ItemBuff(stepXpBonus: total),
-    ItemRole.ranged || ItemRole.defense => ItemBuff(stepCoinBonus: total),
-    ItemRole.magic => ItemBuff(
-      stepCoinBonus: total / 2,
-      stepXpBonus: total / 2,
+  final types = buffTypeOrder(
+    category,
+    characterClass: characterClass,
+    id: id,
+  ).take(count);
+
+  var stepCoin = 0.0;
+  var stepXp = 0.0;
+  var wheelXp = 0.0;
+  var enemyXp = 0.0;
+  var coinCap = 0;
+  var freezeCap = 0;
+  var spinCap = 0;
+  var relief = 0;
+
+  var index = 0;
+  for (final type in types) {
+    final value = total * shares[index++];
+    switch (type) {
+      case ItemBuffType.stepCoin:
+        stepCoin += value;
+      case ItemBuffType.stepXp:
+        stepXp += value;
+      // Çark ve düşman XP'si nadir olaylar: aynı bütçe payı orada daha az
+      // hissedilir, bu yüzden iki katına çıkarılıyor.
+      case ItemBuffType.wheelXp:
+        wheelXp += value * 2;
+      case ItemBuffType.enemyXp:
+        enemyXp += value * 2;
+      case ItemBuffType.dailyCoinCap:
+        coinCap += _roundTo(value * 600, 5);
+      case ItemBuffType.streakFreezeCap:
+        freezeCap += _atLeastOne(value * 12);
+      case ItemBuffType.wheelSpinCap:
+        spinCap += _atLeastOne(value * 12);
+      case ItemBuffType.streakRelief:
+        relief += _roundTo(value * 3000, 25);
+    }
+  }
+
+  return ItemBuff(
+    stepCoinBonus: stepCoin,
+    stepXpBonus: stepXp,
+    wheelXpBonus: wheelXp,
+    enemyXpBonus: enemyXp,
+    dailyCoinCapBonus: coinCap,
+    streakFreezeCapBonus: freezeCap,
+    wheelSpinCapBonus: spinCap,
+    streakStepRelief: relief,
+  );
+}
+
+int _roundTo(double value, int step) {
+  final rounded = (value / step).round() * step;
+  return rounded < step ? step : rounded;
+}
+
+int _atLeastOne(double value) {
+  final rounded = value.round();
+  return rounded < 1 ? 1 : rounded;
+}
+
+/// Karakter sınıfının, paylaşılan itemlerin adına eklenen lakabı.
+///
+/// Sıfat kullanılıyor, tamlama değil: "Şövalyenin Hançer" gibi bozuk Türkçe
+/// üretmesin. Sıfat her ada takılabilir ve ek gerektirmez.
+String classEpithet(String characterClass) => switch (characterClass) {
+  'SwordMan' => 'Çelik',
+  'Paladin' => 'Kutsanmış',
+  'Thief' => 'Gölge',
+  'Archer' => 'Çevik',
+  'Magic' => 'Esrarlı',
+  'DarkMagic' => 'Lanetli',
+  'Faith' => 'Adanmış',
+  'Nature' => 'Yabani',
+  _ => '',
+};
+
+/// Item'ı bir karakter sınıfına uyarlar: paylaşılan kategorilerde ad lakapla
+/// değişir, buff sınıfın imzasına göre yeniden türetilir.
+///
+/// Kimlik **değişmez** (bkz. [Item.copyWith] yorumu): sahiplik kaydı sınıftan
+/// bağımsız durur, oyuncu sınıf değiştirdiğinde envanteri kaybolmaz.
+Item flavorForClass(Item item, String characterClass) {
+  final epithet = item.category.isShared ? classEpithet(characterClass) : '';
+  return item.copyWith(
+    name: epithet.isEmpty ? item.name : '$epithet ${item.name}',
+    buff: buffFor(
+      item.rarity,
+      item.category,
+      characterClass: characterClass,
+      id: item.id,
     ),
-  };
+  );
 }
 
 /// Tanımsız bir dosya adını okunur hâle getirir: `fire_sword` → `Fire Sword`.

@@ -371,10 +371,19 @@ void main() {
     // çocuğu — **satın alma düğmesi** — kartın dışında kalıyordu. Ayrıca
     // nadirlik rozeti + "Sv. N" satırı her genişlikte yatay taşıyordu.
     //
-    // En uzun adlı itemler en kötü durum: ad iki satıra çıkıyor.
-    final longest = [...allItems]
-      ..sort((a, b) => b.name.length.compareTo(a.name.length));
-    final worst = longest.take(20).toList();
+    // En kötü durum: **sınıfa uyarlanmış** (lakaplı, yani en uzun) adlar ve
+    // üç bonus taşıyan itemler. Mağaza itemleri her zaman uyarlanmış gösterir.
+    // 'Kutsanmış' katalogdaki en uzun sınıf lakabı.
+    final worst =
+        [for (final item in allItems) flavorForClass(item, 'Paladin')]..sort((
+          a,
+          b,
+        ) {
+          final byBuff = b.buff.count.compareTo(a.buff.count);
+          if (byBuff != 0) return byBuff;
+          return b.name.length.compareTo(a.name.length);
+        });
+    final sample = worst.take(20).toList();
 
     for (final width in [320.0, 360.0, 390.0, 412.0, 480.0, 800.0]) {
       testWidgets('$width dp genişlikte ekipman kartı taşmıyor', (
@@ -391,7 +400,7 @@ void main() {
         };
         addTearDown(() => FlutterError.onError = previous);
 
-        await pumpStore(tester, equipment: worst, coins: 10, level: 1);
+        await pumpStore(tester, equipment: sample, coins: 10, level: 1);
 
         expect(errors, isEmpty, reason: errors.join(' | '));
       });

@@ -114,9 +114,13 @@ void main() {
   /// Ekipman kartındaki düğmeye dokunur. Kart adından bulunuyor: satın alma
   /// sonrası düğmenin yazısı fiyattan "Sahipsin"e döndüğü için fiyata göre
   /// aramak ikinci dokunuşta kartı bulamazdı.
+  ///
+  /// Mağaza itemleri **sınıfa uyarlanmış** hâlde gösterir (ad sınıf lakabını
+  /// alır), bu yüzden aranan ad da uyarlanmış addır.
   Future<void> tapEquipment(WidgetTester tester, Item item) async {
+    final shown = flavorForClass(item, _avatar.characterClass);
     final card = find.ancestor(
-      of: find.text(item.name),
+      of: find.text(shown.name),
       matching: find.byType(SectionCard),
     );
     final button = find.descendant(

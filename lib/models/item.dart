@@ -62,20 +62,32 @@ extension ItemCategoryX on ItemCategory {
   /// Bu kategoriyi kuşanabilen karakter sınıfları
   /// ([AvatarProfile.classLabels] anahtarları).
   ///
-  /// Her sınıfa en az iki kategori düşecek şekilde dağıtıldı; kimse
-  /// kuşanacak item bulamamakla kalmasın.
+  /// **Her sınıfa en az üç kategori** düşer. Önceki dağılımda Magic tek
+  /// kategori (yalnızca Büyü) görüyordu; süzgeç çubuğu "Tümü + Büyü"ye
+  /// düşüyor ve fiilen işlevsiz kalıyordu. Archer ve DarkMagic de ikide
+  /// kalmıştı. Kapsam `item_catalog_test.dart` içinde doğrulanıyor.
   List<String> get characterClasses => switch (this) {
     ItemCategory.swords => const ['SwordMan', 'Thief'],
     ItemCategory.axesHalberds => const ['SwordMan', 'Paladin'],
-    ItemCategory.macesHammers => const ['Paladin', 'Faith'],
-    ItemCategory.spears => const ['Paladin', 'Nature'],
-    ItemCategory.scythes => const ['DarkMagic', 'Thief'],
+    ItemCategory.macesHammers => const ['Paladin', 'Faith', 'SwordMan'],
+    // Cirit: okçunun da menzilli silahı.
+    ItemCategory.spears => const ['Paladin', 'Nature', 'Archer'],
+    // Tırpan hasat aletidir; Nature'a doğal olarak düşer.
+    ItemCategory.scythes => const ['DarkMagic', 'Thief', 'Nature'],
     ItemCategory.magic => const ['Magic', 'DarkMagic', 'Faith', 'Nature'],
     ItemCategory.shields => const ['SwordMan', 'Paladin', 'Faith'],
-    ItemCategory.arch => const ['Archer', 'Nature'],
-    ItemCategory.rangedOther => const ['Archer', 'Thief'],
-    ItemCategory.specialOther => const ['Thief'],
+    // Arbalet hırsızın da işine yarar.
+    ItemCategory.arch => const ['Archer', 'Nature', 'Thief'],
+    // Fırlatma silahları: büyücülerin de uzaktan seçeneği.
+    ItemCategory.rangedOther => const ['Archer', 'Thief', 'Magic', 'DarkMagic'],
+    ItemCategory.specialOther => const ['Thief', 'Magic', 'DarkMagic'],
   };
+
+  /// Bu kategori birden fazla sınıf tarafından paylaşılıyor mu.
+  ///
+  /// Paylaşılan itemler sınıfa göre farklı ad ve farklı buff alır
+  /// ([Item.withClassFlavor]); tek sınıfa özel olanlar temel adıyla kalır.
+  bool get isShared => characterClasses.length > 1;
 
   static ItemCategory? fromFolder(String folder) {
     for (final category in ItemCategory.values) {
@@ -85,36 +97,98 @@ extension ItemCategoryX on ItemCategory {
   }
 }
 
-/// Bir item'ın sağladığı kalıcı bonus.
+/// Bir item'ın verebileceği bonus türü.
 ///
-/// Bugün yalnızca **adım kazancını** büyüten iki çarpan var, çünkü Aşama 1b/2b
-/// bu iki noktaya (`calculateStepCoins`, `calculateStepXp`) zaten birer
-/// `TODO(items)` çarpan kancası bıraktı. Savaş istatistikleri (can, saldırı,
-/// savunma) Aşama 4a'da tanımlanacak; onlar netleşmeden buraya savaş alanı
-/// eklemek, iki kez yazmak demek olurdu.
+/// Sekiz tür var ve her karakter sınıfının **imzası** ayrı bir tür
+/// (`item_rules.dart:_classSignature`); aynı görsel bu sayede sınıfa göre
+/// farklı bir item oluyor.
+enum ItemBuffType {
+  stepCoin,
+  stepXp,
+  wheelXp,
+  enemyXp,
+  dailyCoinCap,
+  streakFreezeCap,
+  wheelSpinCap,
+  streakRelief,
+}
+
+/// Bir item'ın sağladığı kalıcı bonuslar.
+///
+/// Nadirlik yükseldikçe **hem bonus miktarı hem bonus sayısı** artar
+/// (sıradan 1, az bulunur/nadir 2, epik/efsanevi 3) ve hangi bonusların
+/// düştüğü oyuncunun **karakter sınıfına** göre değişir: aynı görsel, Büyücüde
+/// başka bir item, Kara Büyücüde başka.
+///
+/// Buradaki her alan **bugün var olan** bir uygulama noktasına karşılık gelir.
+/// Savaş istatistiği (can, saldırı, savunma) bilerek yok: o statlar Aşama 4a'da
+/// tanımlanacak ve şimdi uydurmak iki kez yazmak olurdu (bkz. GD9).
 class ItemBuff {
   /// Adımdan kazanılan paraya eklenen oran (0.05 = +%5).
+  /// Uygulama noktası: `calculateStepCoins` çarpanı.
   final double stepCoinBonus;
 
-  /// Adımdan kazanılan XP'ye eklenen oran (0.05 = +%5).
+  /// Adımdan kazanılan XP'ye eklenen oran.
+  /// Uygulama noktası: `calculateStepXp` çarpanı.
   final double stepXpBonus;
 
-  const ItemBuff({this.stepCoinBonus = 0, this.stepXpBonus = 0});
+  /// Çarktan kazanılan XP'ye eklenen oran.
+  /// Uygulama noktası: `RootShell._spinWheel` → `_awardXp`.
+  final double wheelXpBonus;
+
+  /// Düşman yenince kazanılan XP'ye eklenen oran.
+  /// Uygulama noktası: `RootShell._onStepsReported` düşman yenilme dalı.
+  final double enemyXpBonus;
+
+  /// Günlük adım-para tavanına eklenen coin
+  /// ([GameConstants.maxDailyStepCoins] üstüne).
+  final int dailyCoinCapBonus;
+
+  /// Seri dondurma stoğuna eklenen hak
+  /// ([GameConstants.maxStreakFreezes] üstüne).
+  final int streakFreezeCapBonus;
+
+  /// Ekstra çark hakkı stoğuna eklenen hak
+  /// ([GameConstants.maxExtraWheelSpins] üstüne).
+  final int wheelSpinCapBonus;
+
+  /// Seri eşiğinden ([GameConstants.streakStepThreshold]) düşülen adım.
+  final int streakStepRelief;
+
+  const ItemBuff({
+    this.stepCoinBonus = 0,
+    this.stepXpBonus = 0,
+    this.wheelXpBonus = 0,
+    this.enemyXpBonus = 0,
+    this.dailyCoinCapBonus = 0,
+    this.streakFreezeCapBonus = 0,
+    this.wheelSpinCapBonus = 0,
+    this.streakStepRelief = 0,
+  });
 
   static const none = ItemBuff();
 
-  bool get isEmpty => stepCoinBonus == 0 && stepXpBonus == 0;
+  bool get isEmpty => labels.isEmpty;
 
-  /// Kullanıcıya gösterilecek kısa açıklama; bonus yoksa `null`.
-  String? get label {
-    if (isEmpty) return null;
-    final parts = <String>[];
-    if (stepCoinBonus > 0) {
-      parts.add('adım parası +%${_percent(stepCoinBonus)}');
-    }
-    if (stepXpBonus > 0) parts.add('adım XP +%${_percent(stepXpBonus)}');
-    return parts.join(' · ');
-  }
+  /// Kaç ayrı bonus taşıdığı. Nadirlikle birlikte büyür.
+  int get count => labels.length;
+
+  /// Kullanıcıya gösterilecek satırlar; her bonus için bir satır.
+  ///
+  /// Sıra sabit tutuluyor ki aynı item her açılışta aynı görünsün.
+  List<String> get labels => [
+    if (stepCoinBonus > 0) 'adım parası +%${_percent(stepCoinBonus)}',
+    if (stepXpBonus > 0) 'adım XP +%${_percent(stepXpBonus)}',
+    if (wheelXpBonus > 0) 'çark XP +%${_percent(wheelXpBonus)}',
+    if (enemyXpBonus > 0) 'düşman XP +%${_percent(enemyXpBonus)}',
+    if (dailyCoinCapBonus > 0) 'günlük coin sınırı +$dailyCoinCapBonus',
+    if (streakFreezeCapBonus > 0) 'dondurma stoğu +$streakFreezeCapBonus',
+    if (wheelSpinCapBonus > 0) 'çark hakkı stoğu +$wheelSpinCapBonus',
+    if (streakStepRelief > 0) 'seri eşiği -$streakStepRelief adım',
+  ];
+
+  /// Tek satırlık özet; bonus yoksa `null`.
+  String? get label => labels.isEmpty ? null : labels.join(' · ');
 
   static String _percent(double value) {
     final percent = value * 100;
@@ -163,6 +237,23 @@ class Item {
     required this.cost,
     required this.buff,
   });
+
+  /// Aynı kimlikle, yalnızca [name] ve [buff] değiştirilmiş bir kopya.
+  ///
+  /// Sınıfa uyarlama bunun üzerinden yapılır (`item_rules.dart:flavorForClass`).
+  /// **[id] hiçbir zaman değişmez:** kalıcı olan tek şey o
+  /// ([UserProfile.ownedItemIds]). Kimliğe sınıf gömseydik, oyuncu karakterini
+  /// düzenleyip sınıf değiştirdiğinde envanteri sessizce boşalırdı.
+  Item copyWith({String? name, ItemBuff? buff}) => Item(
+    id: id,
+    name: name ?? this.name,
+    assetPath: assetPath,
+    category: category,
+    rarity: rarity,
+    requiredLevel: requiredLevel,
+    cost: cost,
+    buff: buff ?? this.buff,
+  );
 
   /// Bu item'ı [characterClass] sınıfı kuşanabilir mi.
   bool isUsableBy(String characterClass) =>

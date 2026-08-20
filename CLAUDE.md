@@ -2093,6 +2093,91 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
 - **Şema v9.** 8 → 9 taşıması içerik değiştirmiyor (varsayılanlar 0 / null
   doğru); sürüm yine de artırıldı. `fromJson` stoğu savunma amaçlı kırpıyor.
 
+### GD15. Sınıf ↔ kategori dağılımı dengelendi (2026-08-20)
+- **Nerede:** `lib/models/item.dart:ItemCategoryX.characterClasses`
+- **Sorun:** Magic **tek** kategori (yalnızca Büyü) görüyordu; mağazanın
+  kategori süzgeci o sınıfta "Tümü + Büyü"ye düşüp fiilen işlevsiz kalıyordu.
+  Archer ve DarkMagic ikide kalmıştı. Item sayısı 140–341 arasında saçılıyordu.
+- **Karar:** her sınıfa **en az üç kategori**. Eklenenler tematik:
+  cirit → Archer, tırpan (hasat aleti) → Nature, arbalet → Thief,
+  fırlatma silahları → Magic/DarkMagic, topuz → SwordMan.
+- **Sonuç:** 200–394 item, 3–5 kategori.
+
+| Sınıf | Item | Kategori | İmza bonusu |
+|---|---|---|---|
+| SwordMan | 394 | 4 | düşman XP |
+| Faith | 341 | 3 | seri eşiği indirimi |
+| Thief | 338 | 5 | günlük coin sınırı |
+| Nature | 331 | 4 | çark hakkı stoğu |
+| Paladin | 274 | 4 | dondurma stoğu |
+| DarkMagic | 246 | 4 | çark XP |
+| Magic | 231 | 3 | adım XP |
+| Archer | 200 | 3 | adım parası |
+
+- **Neden sınıf kısıtı büsbütün kaldırılmadı:** herkes 784'ü görürse sınıf
+  seçiminin oyun içi bir karşılığı kalmaz. Test iki yönü de bağlıyor: her sınıf
+  ≥3 kategori **ve** ≥150 item görmeli, ama hiçbiri kataloğun %60'ından
+  fazlasını görmemeli.
+
+### GD16. Aynı görsel sınıfa göre farklı item (2026-08-20)
+- **Nerede:** `item_rules.dart:flavorForClass` / `classEpithet`,
+  `services/item_catalog.dart:forCharacterClass`
+- **Karar:** paylaşılan bir kategorideki item, oyuncunun sınıfına göre **farklı
+  ad** ve **farklı buff** alır. Ad, sınıf lakabıyla önden genişler
+  ("Kadim Büyü Kitabı" → Büyücüde *Esrarlı* Kadim Büyü Kitabı, Kara Büyücüde
+  *Lanetli* Kadim Büyü Kitabı). Tek sınıfa özel kategorilerde ad değişmez.
+- **Neden sıfat, tamlama değil:** "Şövalyenin Hançer" bozuk Türkçe; iyelik eki
+  ada göre değişiyor ve 166 tanımın hepsini elle çekimlemek gerekirdi. Sıfat
+  her ada eksiz takılır.
+- **KRİTİK — kimlik değişmez.** `Item.id` sınıftan bağımsız kalır. Kimliğe
+  sınıf gömseydik, oyuncu karakter düzenleme ekranından sınıf değiştirdiğinde
+  `ownedItemIds` içindeki kimlikler katalogda karşılık bulamaz ve **envanter
+  sessizce boşalırdı**. Şimdi sınıf değişince aynı item yeni adını ve yeni
+  buff'ını alır, sahiplik korunur. Testle bağlandı.
+
+### GD17. Buff sistemi: sekiz tür, nadirliğe göre 1–3 bonus (2026-08-20)
+- **Nerede:** `models/item.dart:ItemBuffType` / `ItemBuff`,
+  `item_rules.dart:buffFor` / `buffCountFor` / `buffTypeOrder`
+- **Karar:** iki alanlık buff (`stepCoinBonus`, `stepXpBonus`) **sekiz türe**
+  çıktı ve nadirlik hem miktarı hem **sayıyı** büyütüyor:
+  sıradan 1, az bulunur 2, nadir 2, epik 3, efsanevi 3 bonus.
+  Bütçe paylaşımı 1→[%100], 2→[%60,%40], 3→[%50,%30,%20].
+- **Sekiz tür ve uygulama noktaları** — hepsi **bugün var olan** bir yere
+  bağlanabilir; savaş istatistiği (can/saldırı/savunma) bilerek yok, o statlar
+  Aşama 4a'nın konusu (GD9 hâlâ geçerli):
+
+| Tür | Etki | Uygulama noktası |
+|---|---|---|
+| `stepCoin` | adım parası +%X | `calculateStepCoins` çarpanı |
+| `stepXp` | adım XP +%X | `calculateStepXp` çarpanı |
+| `wheelXp` | çark XP +%X | `_spinWheel` → `_awardXp` |
+| `enemyXp` | düşman XP +%X | `_onStepsReported` düşman yenilme dalı |
+| `dailyCoinCap` | günlük coin sınırı +N | `GameConstants.maxDailyStepCoins` |
+| `streakFreezeCap` | dondurma stoğu +N | `GameConstants.maxStreakFreezes` |
+| `wheelSpinCap` | çark hakkı stoğu +N | `GameConstants.maxExtraWheelSpins` |
+| `streakRelief` | seri eşiği −N adım | `GameConstants.streakStepThreshold` |
+
+- **Sıralama nasıl belirleniyor:** birincil bonus her zaman **sınıfın imzası**
+  (yukarıdaki tablo), ardından kategori rolünün eğilimi, sonra kalanlar. Kuyruk
+  `stableSpread(id, ...)` ile döndürülüyor ki aynı sınıf+kategorideki yüzlerce
+  item aynı ikincil bonusa yapışmasın. Döndürme kimlikten çıktığı için
+  **kararlı** (GD8): aynı item her açılışta aynı bonusları verir.
+- **Çark ve düşman XP'si iki katı çarpanla ölçekleniyor:** nadir olaylar,
+  aynı bütçe payı orada daha az hissedilir.
+- **Sayısal bonuslar sıfıra düşmez** (`_atLeastOne` / `_roundTo`): etiketi
+  görünüp etkisi olmayan bonus olmamalı. Beş nadirlik × sekiz sınıf × on
+  kategori kombinasyonunun tamamı testle taranıyor.
+- **GD9'un tuhaflığı kapandı:** kalkanlar artık menzille aynı eğilimde değil;
+  savunma rolü kendi eğilimini (seri koruma, eşik indirimi) aldı. Savaş
+  istatistiği hâlâ yok; verilen şey "dayanıklılığın oyun dışı karşılığı".
+- **Neden üçte duruldu:** mağaza kartı sabit yükseklikte (GD12) ve dört satır
+  bonus okunmaz hâle geliyor. Kart 280 → **302** px'e çıkarıldı ve altı ekran
+  genişliğinde yeniden ölçüldü.
+- **HÂLÂ AÇIK:** buff'lar **hiçbir yere uygulanmıyor** — kuşanma (equip)
+  kavramı yok (#9). Bu birim buff'ları modelledi ve gösterdi; uygulama Aşama
+  4a'da envanter/kuşanma ile birlikte gelecek. Yukarıdaki tablo o işin
+  yol haritası.
+
 ### GD14. "Alabileceklerim" süzgeci sahip olunanları eliyor (2026-08-20)
 - **Nerede:** `xp_store_screen.dart:_visibleEquipment`
 - Süzgeç yalnızca seviye + paraya bakıyordu; zaten sahip olunan item de
@@ -2457,3 +2542,63 @@ etkileyebilir; bu testlerin görevi o anda alarm vermek.
 fonksiyona çıkarmak çalışan mimariye dokunmak olurdu (Kural 1/3); widget
 testi aynı garantiyi mevcut yapıyı bozmadan veriyor. M1 regresyon testi
 ("satın alma sonrası ekran tazelenir") ancak bu seviyede yazılabiliyordu.
+
+---
+---
+
+# Aşama 3c — Item dağılımı ve buff sistemi ✅ (2026-08-20)
+
+Mağaza denetimi sırasında kullanıcı "neden sadece 3 kategori görüyorum"
+sorusunu sordu; cevabı sınıf süzgeciydi ama dağılımda gerçek bir dengesizlik
+çıktı. Üç iş birlikte yapıldı — kararlar **GD15–GD17**.
+
+## 1. Dağılım dengelendi (GD15)
+
+Her sınıf artık **en az üç kategori** ve **en az 150 item** görüyor;
+hiçbiri kataloğun %60'ından fazlasını görmüyor. Aralık 140–341'den
+**200–394**'e daraldı. Detay tablosu GD15'te.
+
+## 2. Aynı görsel, sınıfa göre farklı item (GD16)
+
+`ItemCatalog.forCharacterClass` artık itemleri **uyarlanmış** döndürüyor:
+
+```
+lib/Items/magic/ancient_spell_book_type_1_variant_01.png
+  Magic     → "Esrarlı Kadim Büyü Kitabı 1"  [adım XP +%5,4 · düşman XP +%7,2]
+  DarkMagic → "Lanetli Kadim Büyü Kitabı 1"  [çark XP +%10,8 · düşman XP +%7,2]
+```
+
+**Kimlik ikisinde de aynı** (`magic/ancient_spell_book_type_1_variant_01`).
+Sınıf değiştiren oyuncunun envanteri bu yüzden kaybolmuyor — testle bağlandı.
+
+## 3. Buff sistemi zenginleşti (GD17)
+
+İki alandan **sekiz türe**; nadirlik hem miktarı hem sayıyı büyütüyor.
+Sekiz sınıfın sekiz ayrı **imza bonusu** var, hiçbiri tekrar etmiyor.
+
+| Nadirlik | Bonus sayısı | Toplam bütçe |
+|---|---|---|
+| Sıradan | 1 | %2 |
+| Az Bulunur | 2 | %5 |
+| Nadir | 2 | %9 |
+| Epik | 3 | %15 |
+| Efsanevi | 3 | %26 |
+
+Mağaza kartı her bonusu kendi satırında gösteriyor; kart yüksekliği
+280 → **302** px oldu ve altı ekran genişliğinde yeniden ölçüldü.
+
+> **Buff'lar hâlâ hiçbir yere uygulanmıyor** — kuşanma (equip) kavramı yok.
+> Bu birim buff'ları modelledi, türetti ve gösterdi. Uygulama noktalarının
+> tam listesi GD17'deki tabloda; #9 (Aşama 4a) o tabloyu takip edecek.
+
+## Test
+
+- `test/item_catalog_test.dart` (39 → 43): bonus sayısı tablosu, sınıf
+  imzalarının benzersizliği, aynı görselin sınıfa göre farklılaşması,
+  kimliğin sabit kalması, **5 nadirlik × 8 sınıf × 10 kategori** taramasında
+  hiçbir sayısal bonusun sıfıra düşmemesi, her sınıfın ≥3 kategori/≥150 item
+  görmesi, hiçbir sınıfın kataloğun yarısından fazlasını görmemesi.
+- `test/store_screen_test.dart`: dar ekran testleri artık **sınıfa uyarlanmış**
+  (en uzun lakaplı, üç bonuslu) itemlerle çalışıyor — gerçek en kötü durum.
+
+Toplam **299 test geçiyor**, `flutter analyze` temiz.

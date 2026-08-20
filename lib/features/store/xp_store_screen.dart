@@ -55,11 +55,12 @@ class XpStoreScreen extends StatefulWidget {
 
 /// Ekipman kartının sabit yüksekliği (logical piksel).
 ///
-/// Kart içeriği sabit: görsel kutusu, en fazla iki satır ad, nadirlik satırı,
-/// tek satır buff ve fiyat düğmesi. En dar desteklenen ekranda (320 dp) bile
-/// taşmayacak şekilde ölçüldü; `store_screen_test.dart` her genişlikte taşma
+/// Kart içeriği sınırlı: görsel kutusu, en fazla iki satır ad, nadirlik rozeti,
+/// **en fazla üç satır bonus** (efsanevi itemler üç bonus taşıyor) ve fiyat
+/// düğmesi. En dar desteklenen ekranda (320 dp), en uzun sınıf lakabı ve en
+/// uzun Türkçe adlarla ölçüldü; `store_screen_test.dart` altı genişlikte taşma
 /// olmadığını doğruluyor.
-const double _equipmentCardHeight = 280;
+const double _equipmentCardHeight = 302;
 
 class _XpStoreScreenState extends State<XpStoreScreen> {
   /// `null` = bütün kategoriler.
@@ -435,7 +436,7 @@ class _EquipmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final locked = !item.isUnlockedAt(level);
     final reason = _blockedReason;
-    final buffLabel = item.buff.label;
+    final buffLabels = item.buff.labels;
 
     return Opacity(
       opacity: locked ? 0.55 : 1,
@@ -500,10 +501,13 @@ class _EquipmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             RarityBadge(rarity: item.rarity),
-            if (buffLabel != null) ...[
-              const SizedBox(height: 4),
+            // Her bonus kendi satırında: nadirlik yükseldikçe sayıları artıyor
+            // (sıradan 1, epik/efsanevi 3) ve tek satıra sıkıştırmak okunmaz
+            // hâle getiriyordu.
+            for (final line in buffLabels) ...[
+              const SizedBox(height: 2),
               Text(
-                buffLabel,
+                line,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11, color: AppColors.xp),
