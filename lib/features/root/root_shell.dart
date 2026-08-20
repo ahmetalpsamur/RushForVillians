@@ -10,6 +10,7 @@ import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
+import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
 import '../../models/adventure_quest.dart';
@@ -20,6 +21,7 @@ import '../../models/game_state.dart';
 import '../../models/item.dart';
 import '../../models/reward.dart';
 import '../../models/user_profile.dart';
+import '../../models/wheel_reward.dart';
 import '../../models/xp_store_item.dart';
 import '../../services/adventure_notification_service.dart';
 import '../../services/game_storage.dart';
@@ -743,12 +745,25 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
-  /// Çark sonucu geldi. Hak tüketimi [UserProfile.consumeWheelSpin] üzerinden:
-  /// günlük hak duruyorsa o, kullanılmışsa bir ekstra jeton düşer.
-  void _spinWheel(int xpWon) {
+  /// Çark sonucu geldi (#16). Hak tüketimi [UserProfile.consumeWheelSpin]
+  /// üzerinden: günlük hak duruyorsa o, kullanılmışsa bir ekstra jeton düşer.
+  ///
+  /// Ödül XP ya da ekipman olabilir. Ekipmanın seviye kilidi ve sahiplik
+  /// süzgeci havuz kurulurken uygulanıyor (`buildWheelSlices`); burada ikinci
+  /// bir kontrol **yok** — kilidin tek kaynağı [Item.isUnlockedAt].
+  void _spinWheel(WheelReward reward) {
     setState(() {
       _profile.consumeWheelSpin(GameClock.now());
-      _awardXp(xpWon);
+      // Tohum ilerletilir: bir sonraki çevirme aynı sonucu vermesin.
+      // Çark ekranı da aynı adımı kendi içinde uyguluyor.
+      _profile.wheelSeed = nextWheelSeed(_profile.wheelSeed);
+
+      final item = reward.item;
+      if (item == null) {
+        _awardXp(reward.xp);
+      } else if (!_profile.ownedItemIds.contains(item.id)) {
+        _profile.ownedItemIds.add(item.id);
+      }
     });
     _persist();
   }
@@ -822,13 +837,28 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   void _openAdventure() => setState(() => _tabIndex = 1);
 
-  void _openWheel() => _push(
-    DailyWheelScreen(
-      alreadySpunToday: _profile.wheelSpunToday,
-      extraSpins: _profile.extraWheelSpins,
-      onSpinResult: _spinWheel,
-    ),
-  );
+  void _openWheel() {
+    // Tohum ilk kullanımda oyuncuya özel kurulur; `0` "henüz kurulmadı"
+    // demek. Böylece herkes aynı çarkı görmez ama çark yine deterministik
+    // kalır (CLAUDE.md §4.4).
+    if (_profile.wheelSeed == 0) {
+      _profile.wheelSeed = initialWheelSeed(
+        '${_profile.avatar.name}|${_profile.avatar.characterClass}',
+      );
+      _persist();
+    }
+    _push(
+      DailyWheelScreen(
+        alreadySpunToday: _profile.wheelSpunToday,
+        extraSpins: _profile.extraWheelSpins,
+        level: _profile.level,
+        equipment: _equipment,
+        ownedItemIds: _profile.ownedItemIds,
+        seed: _profile.wheelSeed,
+        onSpinResult: _spinWheel,
+      ),
+    );
+  }
 
   void _openRewards() => _push(RewardsScreen(rewards: _rewards));
 

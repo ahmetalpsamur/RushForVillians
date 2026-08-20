@@ -2093,6 +2093,39 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
 - **Şema v9.** 8 → 9 taşıması içerik değiştirmiyor (varsayılanlar 0 / null
   doğru); sürüm yine de artırıldı. `fromJson` stoğu savunma amaçlı kırpıyor.
 
+### GD18. Çark tohumlu ve saklanan bir rastgelelikle çalışıyor (2026-08-20)
+- **Nerede:** `core/utils/wheel_rewards.dart`, `UserProfile.wheelSeed`
+- **Karar:** çarkın hem dilim havuzu hem kazanan dilimi tek bir tohumdan
+  çıkıyor. Tohum `UserProfile.wheelSeed` olarak **diske yazılıyor** ve her
+  çevirmeden sonra bir adım ilerletiliyor.
+- **Neden:** CLAUDE.md §4.4 — kalıcı oyun sonucunu (XP, item) etkileyen
+  rastgelelik tohumlu olmalı ve tohum durumla birlikte saklanmalı. Çark
+  eskiden `Random()` çağırıyordu; sonuç kalıcı bir ödüle dönüştüğü için bu
+  kuralın tam kapsamındaydı. Aşama 6b'de aynı mantık sunucuda çalışacak.
+- **Başlangıç tohumu oyuncuya özel:** `initialWheelSeed('<ad>|<sınıf>')`,
+  `stableSpread` üzerinden. `String.hashCode` **kullanılmadı** (GD8) — sürümler
+  arası sabit değil, bir güncelleme sonrası çark sıralaması değişirdi.
+  `0` "henüz kurulmadı" anlamında; çark ilk açıldığında dolduruluyor.
+- **Ekran ve state aynı adımı ayrı ayrı uyguluyor:** çark ekranı itilen bir
+  rotada duruyor ve `RootShell` `setState`'i onu tazelemiyor (bkz. GD11), bu
+  yüzden ikinci çevirmenin yeni dilimleri ekranın kendi kopyasından geliyor.
+  İki taraf da `nextWheelSeed` kullandığı için aynı yerde kalıyorlar.
+
+### GD19. Çarkta epik ve efsanevi yok, en fazla üç item dilimi var (2026-08-20)
+- **Nerede:** `wheel_rewards.dart:maxWheelRarity` / `maxItemSlices`
+- **Karar:** çark yalnızca **nadir ve altı** item verir; sekiz dilimin en fazla
+  üçü item olur, kalanı XP.
+- **Neden:** epik ~üç haftalık, efsanevi ~iki aylık birikim (bkz. Aşama 3
+  denge tablosu). Günde bir dönen bir çarktan düşmeleri hem mağazayı hem
+  seviye kilidini anlamsız kılardı. Item dilimlerini azınlıkta tutmak da aynı
+  gerekçe: çark bir bonus, ekipmanın ana kaynağı değil.
+- **Süzgeçler:** seviye kilidi **tek kaynaktan** — `Item.isUnlockedAt` (#10),
+  ikinci bir kontrol yazılmadı. Sahip olunanlar eleniyor (sahip olduğun şeyin
+  çıkması ödül değil). Sınıf süzgeci çağıran tarafta
+  (`ItemCatalog.forCharacterClass`), sözleşme testle bağlandı.
+- **Boş dilim yok:** uygun item bulunamazsa (seviye düşük, hepsi alınmış,
+  katalog okunamadı) sekiz dilimin tamamı XP olur.
+
 ### GD15. Sınıf ↔ kategori dağılımı dengelendi (2026-08-20)
 - **Nerede:** `lib/models/item.dart:ItemCategoryX.characterClasses`
 - **Sorun:** Magic **tek** kategori (yalnızca Büyü) görüyordu; mağazanın
@@ -2602,3 +2635,58 @@ Mağaza kartı her bonusu kendi satırında gösteriyor; kart yüksekliği
   (en uzun lakaplı, üç bonuslu) itemlerle çalışıyor — gerçek en kötü durum.
 
 Toplam **299 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# Aşama 3d — Çark item ödülü (#16) ✅ (2026-08-20)
+
+Kart **#16** kapandı. `daily_wheel_screen.dart` içindeki `TODO(#16)` (gerçek
+dilimli çark grafiği) de kapandı. Kararlar **GD18–GD19**.
+
+## Ne değişti
+
+| Önce | Sonra |
+|---|---|
+| `Random()`, sonuç yalnızca XP | Tohumlu, sonuç XP **ya da ekipman** |
+| Jenerik daire, gösterecek dilimi yok | 8 dilimli gerçek çark; ibre kazanan dilimin üstünde durur |
+| Ödül havuzu 6 sabit XP değeri | Seviyeye ve sınıfa göre süzülmüş havuz + XP |
+| Tohum yok | `UserProfile.wheelSeed` diske yazılıyor, her çevirmede ilerliyor |
+
+## Havuz kuralları (`core/utils/wheel_rewards.dart` — saf)
+
+- 8 dilim, **boş dilim yok**: her dilim ya XP ya item.
+- En fazla **3** item dilimi (`maxItemSlices`), kalanı XP.
+- Item adayları: sınıfa göre süzülmüş katalog → **seviye kilidi**
+  (`Item.isUnlockedAt`, tek kaynak, ikinci kontrol yok) → sahip olunanlar
+  elenir → **nadir ve altı** (`maxWheelRarity`).
+- Uygun item yoksa dilimlerin tamamı XP olur.
+- Aynı item iki dilimde birden çıkmaz.
+
+## Görsel
+
+`CustomPainter` ile dilimli çark: XP dilimleri tema renginde, item dilimleri
+**nadirlik renginde** ve nadirlik etiketiyle — oyuncu çark dönmeden neyin
+peşinde olduğunu görüyor. Kazanan dilimin **ortası** ibrenin altına gelecek
+şekilde döndürülüyor; animasyon sonucu üretmiyor, önceden belirlenmiş sonucu
+gösteriyor.
+
+## Şema v10
+
+Yeni alan: `UserProfile.wheelSeed`. 9 → 10 taşıması içerik değiştirmiyor
+(varsayılan `0` = "henüz kurulmadı", ilk açılışta oyuncuya özel dolduruluyor).
+
+## Test
+
+- `test/wheel_rewards_test.dart` (17 test): determinizm (aynı tohum → aynı
+  çark ve aynı kazanan), tohum ilerlemesinin döngüye düşmemesi, başlangıç
+  tohumunun oyuncuya özel ve kararlı olması; havuz kuralları — boş dilim yok,
+  seviye kilidi tutuyor, sahip olunan çıkmıyor, epik/efsanevi çıkmıyor, item
+  dilimi tavanı, aynı item iki kez çıkmıyor, ekipmansız çarkın çalışması.
+- `test/daily_wheel_test.dart` (12 test): hak yönetimi + item ödülünün
+  gösterimi, sabit tohumla tekrarlanabilirlik, ikinci çevirmenin farklı sonuç
+  vermesi.
+- `test/store_purchase_test.dart` (+2): ödülün gerçekten profile işlemesi ve
+  tohumun çevirdikten sonra ilerlemesi (`RootShell` üzerinden).
+
+Toplam **322 test geçiyor**, `flutter analyze` temiz.

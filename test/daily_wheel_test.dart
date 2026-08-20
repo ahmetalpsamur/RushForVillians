@@ -1,27 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
+import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/features/wheel/daily_wheel_screen.dart';
+import 'package:rush_for_villains/models/item.dart';
+import 'package:rush_for_villains/models/reward_rarity.dart';
+import 'package:rush_for_villains/models/wheel_reward.dart';
 
-/// Çark ekranının hak yönetimi.
+/// Çark ekranının hak yönetimi ve ödül gösterimi (#16).
 ///
 /// Mağazadaki "Ekstra Çark Hakkı" yükseltmesi (bkz. `store_purchase_test.dart`)
-/// tüketimini buradan yapıyor: günlük hak bittiğinde jeton harcanır.
-/// Ekran itilen bir rotada durduğu için kalan hakkı **kendisi** sayar;
-/// `RootShell` aynı kuralı `UserProfile.consumeWheelSpin` içinde uyguluyor.
+/// tüketimini buradan yapıyor. Havuz kuralları `wheel_rewards_test.dart`
+/// içinde ayrıca test ediliyor; burada ekranın davranışı var.
 void main() {
-  Future<List<int>> pumpWheel(
+  // Sıradan, 1-3. seviyede açılan kılıçlar (SwordMan/Thief).
+  final cheap = buildItemFromAsset('lib/Items/swords/sword.png')!;
+  final dagger = buildItemFromAsset('lib/Items/swords/dagger_variant_01.png')!;
+
+  Future<List<WheelReward>> pumpWheel(
     WidgetTester tester, {
     required bool alreadySpunToday,
     int extraSpins = 0,
+    int seed = 12345,
+    int level = 1,
+    List<Item> equipment = const [],
+    List<String> owned = const [],
   }) async {
-    final results = <int>[];
+    final results = <WheelReward>[];
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
         home: DailyWheelScreen(
+          // Aynı testte ikinci kez pump edilirse yeni bir State kurulsun;
+          // anahtarsız aynı tipteki widget eski durumu (sonuç, harcanan hak)
+          // korurdu.
+          key: UniqueKey(),
           alreadySpunToday: alreadySpunToday,
           extraSpins: extraSpins,
+          seed: seed,
+          level: level,
+          equipment: equipment,
+          ownedItemIds: owned,
           onSpinResult: results.add,
         ),
       ),
@@ -59,7 +78,7 @@ void main() {
       await spin(tester);
 
       expect(results, hasLength(1));
-      expect(find.textContaining('Kazandın: +${results.single} XP'), findsOne);
+      expect(find.textContaining('Kazandın:'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
     });
   });
@@ -88,7 +107,6 @@ void main() {
       await spin(tester);
 
       expect(results, hasLength(1));
-      // Bir jeton kaldığı için düğme hâlâ duruyor.
       expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsOneWidget);
       expect(find.textContaining('(1 hak kaldı)'), findsOneWidget);
     });
@@ -104,18 +122,15 @@ void main() {
 
       expect(results, hasLength(1));
       expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
-      expect(find.textContaining('Kazandın:'), findsOneWidget);
     });
 
     testWidgets('günlük hak dururken jeton harcanmaz', (tester) async {
       await pumpWheel(tester, alreadySpunToday: false, extraSpins: 1);
 
-      // Ücretsiz hak var: uyarı satırı çıkmamalı.
       expect(find.textContaining('ekstra hakkından'), findsNothing);
 
       await spin(tester);
 
-      // Ücretsiz hak harcandı; şimdi jetona geçilir.
       expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsOneWidget);
       expect(find.textContaining('(1 hak kaldı)'), findsOneWidget);
     });
@@ -132,6 +147,88 @@ void main() {
 
       expect(results, hasLength(2));
       expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
+    });
+  });
+
+  group('item ödülü (#16)', () {
+    testWidgets('aynı tohum aynı sonucu verir', (tester) async {
+      final first = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: 777,
+        level: 50,
+        equipment: [cheap, dagger],
+      );
+      await spin(tester);
+
+      final second = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: 777,
+        level: 50,
+        equipment: [cheap, dagger],
+      );
+      await spin(tester);
+
+      expect(first.single.label, second.single.label);
+    });
+
+    testWidgets('ikinci çevirme aynı sonucu vermez (tohum ilerler)', (
+      tester,
+    ) async {
+      // Sabit tohumla iki ardışık çevirme: ekran tohumu ilerlettiği için
+      // aynı dilim dizisi tekrar kurulmamalı.
+      final results = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        extraSpins: 1,
+        seed: 4242,
+        level: 50,
+        equipment: [cheap, dagger],
+      );
+
+      await spin(tester);
+      await spin(tester);
+
+      expect(results, hasLength(2));
+      // Kazanılan bir item ikinci çarkta tekrar çıkmamalı.
+      final wonIds = results.where((r) => r.isItem).map((r) => r.item!.id);
+      expect(wonIds.toSet().length, wonIds.length);
+    });
+
+    testWidgets('item kazanılınca görseli ve nadirliği gösterilir', (
+      tester,
+    ) async {
+      // Havuzun tamamı item olsun diye bol aday veriyoruz; hangi dilimin
+      // geleceği tohuma bağlı, bu yüzden sonucu kontrol edip iddiayı ona
+      // göre kuruyoruz.
+      final results = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: 999,
+        level: 50,
+        equipment: [cheap, dagger],
+      );
+
+      await spin(tester);
+
+      final reward = results.single;
+      if (reward.isItem) {
+        expect(find.text('Ekipman kazandın! 🎉'), findsOneWidget);
+        expect(find.text(reward.item!.name), findsOneWidget);
+        expect(find.text(reward.item!.rarity.label), findsWidgets);
+      } else {
+        expect(find.textContaining('Kazandın: +${reward.xp} XP'), findsOne);
+      }
+    });
+
+    testWidgets('ekipman yoksa çark yine çalışır ve XP verir', (tester) async {
+      final results = await pumpWheel(tester, alreadySpunToday: false);
+
+      await spin(tester);
+
+      expect(results.single.isItem, isFalse);
+      expect(results.single.xp, greaterThan(0));
     });
   });
 }

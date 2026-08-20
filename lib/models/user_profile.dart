@@ -102,6 +102,13 @@ class UserProfile {
   /// [GameConstants.maxExtraWheelSpins] ile sınırlı.
   int extraWheelSpins;
 
+  /// Günlük çarkın tohumu (#16).
+  ///
+  /// Çark ödülü kalıcı bir sonuç üretiyor (XP ya da item), bu yüzden
+  /// rastgeleliği tohumlu ve **saklanan** olmak zorunda — CLAUDE.md §4.4.
+  /// Her çevirmeden sonra bir adım ilerletilir; `0` = henüz kurulmadı.
+  int wheelSeed;
+
   /// "2x XP" yükseltmesinin bitiş anı (UTC). `null` = etkin değil.
   ///
   /// Satın alındığı oyun gününün sonunda ([GameDay.nextResetAfter]) düşer;
@@ -130,6 +137,7 @@ class UserProfile {
     List<String>? ownedItemIds,
     this.lastWheelSpinAt,
     this.extraWheelSpins = 0,
+    this.wheelSeed = 0,
     this.xpBoostUntil,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
@@ -356,6 +364,7 @@ class UserProfile {
     'ownedItemIds': ownedItemIds,
     'lastWheelSpinAt': lastWheelSpinAt?.toIso8601String(),
     'extraWheelSpins': extraWheelSpins,
+    'wheelSeed': wheelSeed,
     'xpBoostUntil': xpBoostUntil?.toUtc().toIso8601String(),
   };
 
@@ -396,6 +405,7 @@ class UserProfile {
         0,
         GameConstants.maxExtraWheelSpins,
       ),
+      wheelSeed: json['wheelSeed'] as int? ?? 0,
       xpBoostUntil: _parseDate(json['xpBoostUntil']),
     );
   }

@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 9;
+  static const int schemaVersion = 10;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -91,6 +91,9 @@ class GameStorage {
     // (extraWheelSpins, xpBoostUntil). Varsayılanları (0 / null) doğru
     // olduğu için içerik değişmiyor; sürüm yine de artırıldı.
     8: (state) => state,
+    // 9 -> 10: çark tohumu eklendi (#16). Varsayılan 0 "henüz kurulmadı"
+    // demek; ilk çevirmede oyuncuya özel bir tohumla dolduruluyor.
+    9: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

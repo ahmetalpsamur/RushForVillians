@@ -431,6 +431,74 @@ void main() {
     });
   });
 
+  group('çark ödülü (#16)', () {
+    // Çarkın havuz kuralları `wheel_rewards_test.dart`, ekran davranışı
+    // `daily_wheel_test.dart` içinde. Burada tek soru var: ödül gerçekten
+    // profile işliyor mu? Harness bu dosyada olduğu için buraya alındı.
+    testWidgets('kazanılan item envantere girer, XP profile eklenir', (
+      tester,
+    ) async {
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(level: 50),
+        catalog: [cheapItem, midItem],
+        openStoreTab: false,
+      );
+
+      // Çark 3.000 adımda açılıyor.
+      await simulateSteps(tester, 5000);
+      final xpBeforeSpin = profile.xp;
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.text('Günlük Çark'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
+      await tester.pumpAndSettle();
+
+      // Ödül ya item ya XP; ikisi de profile işlemeli.
+      final gotItem = profile.ownedItemIds.isNotEmpty;
+      final gotXp = profile.xp > xpBeforeSpin;
+      expect(
+        gotItem || gotXp,
+        isTrue,
+        reason: 'çark ödülü profile hiç işlemedi',
+      );
+      expect(profile.wheelSpunToday, isTrue);
+    });
+
+    testWidgets('tohum çevirdikten sonra ilerler', (tester) async {
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(level: 50),
+        catalog: [cheapItem],
+        openStoreTab: false,
+      );
+
+      await simulateSteps(tester, 5000);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.text('Günlük Çark'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tohum ekran açılırken oyuncuya özel kuruluyor.
+      final seedBefore = profile.wheelSeed;
+      expect(seedBefore, isNot(0));
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
+      await tester.pumpAndSettle();
+
+      expect(profile.wheelSeed, isNot(seedBefore));
+    });
+  });
+
   group('kalıcılık', () {
     testWidgets('satın alma diske yazılır', (tester) async {
       final profile = await pumpShell(
