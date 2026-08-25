@@ -9,11 +9,11 @@ Bu dosyadaki kurallar tüm oturumlarda geçerlidir.
 >
 > 1. Bu baştaki **Çalışma Kuralları** + **Model Kuralları** bölümünü oku
 >    (zorunlu, kısa).
-> 2. **Dosyanın en sonuna git:** "⭐ OTURUM KAPANIŞI — 2026-08-25 (AKŞAM) ·
+> 2. **Dosyanın en sonuna git:** "⭐ OTURUM KAPANIŞI — 2026-08-26 ·
 >    SONRAKİ OTURUM BURADAN BAŞLASIN". Ne bitti, ne açık, sıradaki işin
->    şartnamesi nerede — hepsi orada. Ondan bir önceki kapanış (aynı tarih,
->    başlığı "SABAH") **Bölüm 5/6/7'nin tam şartnamesini** taşıyor ve hâlâ
->    geçerli; akşam kapanışı oraya yönlendiriyor.
+>    (**Bölüm 8 — iki fazlı macera**) tam şartnamesi — hepsi orada ve
+>    **tek başına yeterli**. Daha eski kapanışlar (2026-08-19, 08-20,
+>    08-25 SABAH/AKŞAM) tarihsel kayıt.
 > 3. Test çalıştırmadan önce **"Test ortamı — testler neden `--no-test-assets`
 >    ile çalışıyor"** bölümünü oku. Bu bayrak olmadan hiçbir test çalışmaz.
 > 4. Verilmiş kararları değiştirmeden önce **"GERİ DÖNÜLECEK KARARLAR"**
@@ -5104,11 +5104,11 @@ Toplam **664 test geçiyor**, `flutter analyze` temiz.
 ---
 ---
 
-# ⭐ OTURUM KAPANIŞI — 2026-08-25 (AKŞAM) · SONRAKİ OTURUM BURADAN BAŞLASIN
+# OTURUM KAPANIŞI — 2026-08-25 (AKŞAM)
 
-> Bu bölüm devam noktasıdır. Sıradaki işin **tam şartnamesi** bir önceki
-> kapanışın ("OTURUM KAPANIŞI — 2026-08-25 (SABAH) · ŞARTNAME ARŞİVİ") §5
-> bölümünde; oraya yönlendiriliyor, kopyalanmıyor.
+> ⚠️ **ESKİ — güncel devam noktası dosyanın en sonundaki 2026-08-26
+> kapanışıdır.** Bu bölüm tarihsel kayıt; §2'deki "SIRADAKİ İŞ — BÖLÜM 5"
+> tamamlandı (Bölüm 5C), §3'teki Bölüm 6 ve Bölüm 7 de tamamlandı.
 
 ## 0. Bu oturumda ne bitti
 
@@ -5232,3 +5232,262 @@ okumalı, beşinci bir hesap yazmamalı.
 - **Arkadaşımın kodu — varsayılan: dokunma.** Yalnızca gerçek hataları düzelt.
 - Her adımdan sonra `flutter analyze` temiz + testler yeşil.
 
+
+
+---
+---
+---
+
+# ⭐ OTURUM KAPANIŞI — 2026-08-26 · SONRAKİ OTURUM BURADAN BAŞLASIN
+
+> Bu bölüm **tek başına yeterlidir**. Kullanıcıya hiçbir şey sormadan devam
+> edebilmek için gereken her şey burada: ne bitti, ne açık, sıradaki işin tam
+> şartnamesi ne. Kullanıcının bağlamı (usage) sınırlı — soru sorma, karar
+> gerektiren yerde en makul seçeneği kendin seç ve gerekçesini yaz.
+
+## 0. Bu oturumda ne bitti
+
+| Bölüm | Ne | Test | Kararlar |
+|---|---|---|---|
+| **Bölüm 5C** | Seri savaş stat bonusu (her gün rastgele bir stat, kalıcı birikim) | 554 → 588 | GD44–GD46 |
+| **Bölüm 6** | Faz 0'da bulunan 5 gerçek hata | 588 → 600 | GD47–GD48 |
+| **Bölüm 7** | Aşama 4a — savaş motoru (kart #4) | 600 → **664** | GD49–GD54 |
+
+Ayrıntılar: dosyadaki "Bölüm 5C", "Bölüm 6" ve "Bölüm 7" bölümleri.
+
+**Durum:** `flutter analyze` temiz · **664/664 test geçiyor** · paket
+eklenmedi · şema **v14**.
+
+### ⚠️ Commit durumu
+
+- **Bölüm 5C commit edildi** (`1a9b8ca`).
+- **Bölüm 6 commit edildi** (kullanıcı onayladı).
+- **Bölüm 7 için commit onayı alınmadı** — oturum orada kesildi.
+  Önerilen mesaj:
+  `feat(combat): add a deterministic stat-driven combat engine with enemy archetypes`
+
+Bölüm 7'nin dosyaları (commit edilmemişse):
+
+```
+M  CLAUDE.md
+M  lib/data/enemy_catalog.dart                (20 düşmana arketip)
+M  lib/features/adventure/adventure_screen.dart
+M  lib/features/home/home_screen.dart
+M  lib/features/inventory/inventory_screen.dart  (karakter paneli canlı statlar)
+M  lib/features/profile/profile_screen.dart
+M  lib/features/root/root_shell.dart          (motor bağlantısı)
+M  lib/models/adventure_quest.dart            (savaş durumu)
+M  lib/models/enemy.dart                      (CombatStats + arketip)
+M  lib/models/item_effect.dart                (speed + luck)
+M  lib/services/adventure_notification_service.dart
+M  lib/services/game_storage.dart             (şema v14 + taşıma)
+M  lib/widgets/hero_progress_rings.dart
+M  test/adventure_progress_test.dart
+M  test/adventure_quest_test.dart
+M  test/golden/goldens/adventure_{320,390}.png
+M  test/golden/goldens/streak_bonus_{320,390}.png
+?? lib/core/utils/base_combat_stats.dart
+?? lib/core/utils/combat_engine.dart
+?? lib/core/utils/effective_stats.dart
+?? lib/core/utils/enemy_stats.dart
+?? lib/models/combat_stats.dart
+?? test/combat_balance_test.dart              (21)
+?? test/combat_engine_test.dart               (32)
+?? test/combat_persistence_test.dart          (9)
+```
+
+`git status --short` ile doğrula: liste boşsa commit atılmış demektir.
+
+## 1. ⚠️ İLK İŞ: test ortamı
+
+```powershell
+flutter test --no-test-assets
+```
+
+Bu bayrak **olmadan hiçbir test çalışmaz** (araç çöker). Gerekçe ve
+`ink_sparkle.frag` kopyalama adımı için dosyadaki **"Test ortamı — testler
+neden `--no-test-assets` ile çalışıyor"** bölümünü oku.
+
+**Bash üzerinden `flutter test` bir hook tarafından engelleniyor** (Very Good
+CLI istiyor). Testleri **PowerShell** aracıyla çalıştır. `flutter analyze` ve
+`flutter pub get` her iki yoldan da çalışıyor.
+
+Golden üretmek: `flutter test --no-test-assets --update-goldens <yol>`.
+`pumpAndSettle` yerine sabit kare dizisi kullan (sonsuz animasyonlar var).
+
+**Bu oturumdan çıkan iki pratik not:**
+- Uzun içerikli `python - <<'PY'` heredoc'ları Bash aracında bazen
+  "unexpected EOF" ile düşüyor. Büyük yamaları scratchpad'e bir `.py` dosyası
+  olarak yazıp `python <dosya>` ile çalıştır.
+- **Yeni test dosyası oluşturmadan önce aynı adda dosya olup olmadığını
+  kontrol et.** Bu oturumda `character_catalog_test.dart` yanlışlıkla üzerine
+  yazıldı ve 7 test kayboldu; toplam test sayısı beklenenden düşük çıkınca
+  fark edildi. Her bölüm sonunda toplam test sayısını beklenen değerle
+  karşılaştır.
+
+## 2. SIRADAKİ İŞ — BÖLÜM 8: MACERA İKİ FAZLI OLSUN
+
+> Kullanıcının orijinal şartnamesi, birebir. Bölüm 7'nin zemini hazır:
+> güçlü oyuncu düşmanı adım hedefinden **önce** deviriyor ve bu
+> `combat_balance_test.dart` içinde testle bağlı.
+
+Şu an düşman ölünce macera bitiyor. Değişiyor: macera iki faza bölünecek.
+
+### 8.1 Faz yapısı
+
+- **SAVAŞ FAZI:** düşmanla mücadele, şu anki gibi.
+- **YÜRÜYÜŞ FAZI:** düşman öldükten sonra başlar, macera orijinal adım
+  hedefine ulaşana kadar sürer.
+- Macera, ancak adım hedefi tamamlanınca gerçekten biter.
+
+Düşmanı erken öldüren oyuncu ödülünü alır ve kalan yolu bonuslu yürür.
+
+**Bugünkü kod durumu:** `AdventureQuest.isEnemyDefeated` düşman canına bakıyor;
+`questSteps(currentSteps) >= stepGoal` de ayrı bir bilgi. İki fazın ayrımı
+bu ikisinden çıkarılabilir — yeni bir `phase` alanı gerekiyorsa şemayı
+artır (v14 → v15) ve migration yaz.
+
+### 8.2 Hız ödülü
+
+Düşman ne kadar hızlı öldürülürse savaş ödülü o kadar artar.
+
+- "Hız" nasıl ölçülür — kullanılan round / beklenen round mu, harcanan adım /
+  hedef adım mı? **Karar ver, gerekçelendir.**
+  (İpucu: `expectedRoundsForTier` zaten `core/utils/enemy_stats.dart` içinde
+  var ve düşmanın kilit eşiğinden geliyor.)
+- Ödül çarpanı tanımla ve **TAVAN** koy (öneri: en fazla ×2).
+- Oyuncuya net göster: "3 round'da bitirdin — ödül ×1.8".
+- Çarpan hem XP hem coin ödülüne mi uygulanacak, sadece birine mi?
+  **Karar ver, gerekçelendir.**
+
+### 8.3 Yürüyüş fazında bonus kazanç
+
+Yürüyüş fazı boyunca 50 adım = 1 coin yerine **30 adım = 1 coin**.
+Macera tamamen bitince 50'ye geri döner.
+
+- ⚠️ **EKONOMİ KONTROLÜ — bunu atlama:** günlük tavan (400 coin) **AYNEN
+  GEÇERLİ**. Hesabını yap ve tabloyu CLAUDE.md'ye yaz: günde bir macera yapıp
+  erken bitiren oyuncu günde kaç coin kazanır? Mevcut 120 coin/gün dengesi ne
+  kadar bozuluyor? Sapma büyükse yürüyüş fazının uzunluğunu veya oranı ayarla
+  — ama 30 adım = 1 coin hedefini koru.
+  (`test/economy_pacing_test.dart` mevcut dengeyi ölçüyor; bozulursa alarm
+  verir. Yeni senaryo ayrıca ölçülmeli.)
+- XP oranı da değişsin mi? **Öneri: HAYIR, sadece coin.** İki kaldıracı birden
+  oynatmak dengeyi zorlaştırır. Karar senin, gerekçelendir.
+- Oran config'de sabit dursun, koda gömme (`GameConstants` deseni).
+- Arayüzde faz ve oran net görünsün: "Yürüyüş fazı · 30 adım = 1 altın".
+- Faz bitince oranın normale döndüğü bildirilsin.
+
+**Bağlanacak yer:** `core/utils/coin_calculator.dart:calculateStepCoins` —
+`stepsPerCoin` şu an `GameConstants`'tan sabit okunuyor. Çağrı noktası
+`RootShell._onStepsReported`.
+
+### 8.4 Yürüyüş görseli
+
+Yürüyüş fazında macera ekranında karakter yürüyor gibi gösterilsin.
+
+- **Asset hazır, yeni sanat gerekmiyor:**
+  `lib/All_Assets/Avatars/Classes/Characters(100x100 split)/<Sınıf>/<Sınıf>/`
+  altında 22 sınıfın hepsinde `_Walk.gif`, `_Idle.gif`, `_Hurt.gif`,
+  `_Death.gif`, `_Attack01..03.gif` var. `AvatarProfile.walkAssetForClass`
+  zaten yürüyüş GIF'ini çözüyor ve `avatar.characterAsset` **zaten** o.
+- Savaş fazı ile yürüyüş fazı görsel olarak net ayrışsın (öneri: savaşta
+  `_Idle`, yürüyüşte `_Walk`; düşman sahneden çıkar).
+- `lib/GIF Animations/Soldier/` (triaj C9) ölü kopya — **kullanma**.
+- Performans: animasyon 60 FPS'i düşürmesin, ölç ve raporla.
+- Golden test ile iki fazı da gözle doğrula.
+
+### 8.5 ⚠️ ZİNCİRLEME SONUÇ — STREAK VE ÇARK
+
+**ÖNEMLİ — Bölüm 5a ve 5b hiç yapılmadı.** Seri tetikleyicisi hâlâ **2000
+adım** (`GameConstants.streakStepThreshold`), çark kilidi hâlâ **3000 adım**
+(`GameConstants.dailyWheelUnlockSteps`). "Bir macera tamamlamak" şartına geçiş
+bu bölümde yapılacak, çünkü iki fazlı macerada "tamamlamak"ın ne demek olduğu
+ancak burada cevaplanıyor.
+
+Yapılacaklar (Bölüm 5a + 5b, orijinal şartnameden):
+
+- **(a) Streak tetikleyicisi:** 2000 adım **değil**, günde **bir macera
+  tamamlamak**. `streakStepThreshold` kullanımdan çıkacak.
+  ⚠️ `EquippedBuffs.streakStepThreshold` ve `ItemStat.streakRelief` buff türü
+  ona bağlı — **o buff türü yeniden anlamlandırılmalı**, yoksa ölü bir bonus
+  kalır ve GD36'nın "boşta tür kalmasın" invariantı kırılır.
+  "Tamamlamak" kazanmak mı bitirmek mi? Öneri: **kazan-kaybet fark etmez,
+  bitirmek yeter** — kaybetmenin zaten cezası var.
+  Arayüzdeki tüm "2000 adım" metinleri güncellenmeli:
+  `home_screen.dart` (`_StreakCard`), `inventory_screen.dart` (karakter
+  paneli), `root_shell.dart` (`_onStepsReported` tetikleyici dalı).
+- **(b) Çark kilidi:** `dailyWheelUnlockSteps` (3000 adım) yerine 1 macera
+  tamamlama. Tekrarlama mantığına (günlük hak, `wheelSpunToday`,
+  `extraWheelSpins`) **dokunma** — sadece koşulu değiştir. Kilitliyken sessiz
+  kalmasın: "Çarkı açmak için bir macera tamamla".
+- **(c) İki fazlı macerada hangi an sayılır?**
+  Öneri: **DÜŞMANI ÖLDÜRMEK** yeter — streak ve çark orada açılsın. Yürüyüş
+  fazı bonus, zorunluluk değil. Gerekçe: streak ulaşılabilir kalmalı;
+  oyuncuyu hedefin tamamını yürümeye mecbur bırakmak seriyi kırılgan yapar.
+  Karar senin ama **açıkça ver**, CLAUDE.md'ye yaz ve arayüzde de net olsun —
+  oyuncu streak'ini ne zaman güvenceye aldığını bilmeli.
+
+**Dikkat:** `test/streak_test.dart` (20), `test/streak_freeze_test.dart` (21)
+ve `test/streak_stat_bonus_test.dart` (25) adım eşiğine dayanıyor.
+**Silme, birlikte güncelle.**
+
+### 8.6 Test
+
+Faz geçişi, hız ödülü çarpanı ve tavanı, yürüyüş fazında 30/1 oranı, faz
+bitince 50/1'e dönüş, günlük tavanın hâlâ geçerli olması, çift sayma olmaması,
+streak/çark tetikleyicisi, gün değişiminde faz durumu, kalıcılık.
+
+## 3. BÖLÜM 9+ — kalan açık işler
+
+Firebase gerektirenler **hariç** (⛔ arkadaşımın işi).
+
+- **Aşama 4b — #14 canavara göre ödül.** `RootShell._rewards` hiç
+  doldurulmuyor → Ödüllerim ekranı hep boş (triaj C5). `Reward.icon` bir
+  `IconData`; Model Kuralları #1 gereği `String` anahtara çevrilmeli.
+  Düşman yenilme hook'u hazır (`_onStepsReported`). İzlenecek örnek:
+  `WheelReward` (framework tipi tutmuyor). Ayrıca `boss_battle_screen.dart`
+  ölü zinciri (triaj A7) burada ya yeniden bağlanacak ya kaldırılacak —
+  **silme kararı için onay gerekir** (Kural 2/6).
+- **Aşama 5 — #3 slide scroll adım seçimi** (`_NumberWheel` hazır;
+  `_showGoalPicker` zaten `ListWheelScrollView` kullanıyor, bu iş kısmen
+  yapılmış olabilir — önce oku), **#6 VS ekranı** (arka planlar
+  `lib/Backgrounds/` altında var), **#18 avatar asset** (hâlâ belirsiz: kod
+  işi mi sanat işi mi).
+- **Round süresi hâlâ test dengesi:** `AdventureQuest.roundDuration` = 30
+  saniye, kodda "Geçici test dengesi" yorumuyla işaretli. Yayına çıkmadan
+  önce gerçek değere alınmalı.
+- **Itemler `speed` / `luck` vermiyor** (GD52). Ayrı bir denge geçişinin işi;
+  tek yer `lib/data/item_archetypes.dart`.
+- **Küçük borçlar:** C3 (`tz.setLocalLocation(tz.UTC)` sabit), C4 (hatırlatma
+  metinleri iki yerde), C6 (`sideBySideWindowMinutes` ölü sabit), C7, C9, C10,
+  C11, C13; iOS derleme borçları (`ios/Podfile` yok, `AppDelegate.swift`
+  Windows'ta derlenmedi); GD1 (kayıt okunamazken salt-okunur oturum yok).
+- **Aşama 6 — Firebase → takım savaşları. ⛔ ARKADAŞIMIN İŞİ, DOKUNMA.**
+
+## 4. Savaş motorunu bekleyen birikim — artık bekleyen yok
+
+Bölüm 3/4/5C'nin ürettiği savaş statlarının hepsi Bölüm 7'de canlandı:
+
+| Kaynak | Ne üretiyor | Durum |
+|---|---|---|
+| Arketip (Bölüm 3) | Her itemde 1–3 savaş statı | ✅ uygulanıyor |
+| Eşya seviyesi (4.2) | Seviye başına +%10 savaş statı | ✅ uygulanıyor |
+| Birleştirme (4.3) | Nadirlik yükselince daha büyük stat | ✅ uygulanıyor |
+| Seri bonusu (5C) | Gün başına +%1 savaş statı | ✅ uygulanıyor |
+
+Toplama noktası **tek**: `core/utils/effective_stats.dart`. Yeni bir kaynak
+eklenirse oraya bağlanmalı, beşinci bir hesap yazılmamalı.
+
+## 5. Değişmeyen kurallar (hatırlatma)
+
+- ⛔ **Firebase'e dokunma.**
+- ⚠️ **`flutter run` çalışmıyor** (Smart App Control). Görsel iş = **golden**;
+  PNG'yi üret, **oku ve gerçekten bak**, birden çok genişlik için üret.
+- **Commit atma.** Bölüm bitince değişen dosyaları listele, özetle, tek satır
+  conventional-commit mesajı öner; commit'i kullanıcı atıyor.
+- **Arkadaşımın kodu — varsayılan: dokunma.** Yalnızca gerçek hataları düzelt.
+- **Silme yok:** hiçbir dosyayı silme, mevcut testi devre dışı bırakma,
+  çalışan özelliği bozma.
+- Her adımdan sonra `flutter analyze` temiz + testler yeşil.
+- Kararları "GERİ DÖNÜLECEK KARARLAR" başlığına gerekçesiyle yaz.
