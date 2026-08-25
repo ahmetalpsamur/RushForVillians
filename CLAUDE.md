@@ -3327,3 +3327,136 @@ Toplam **411 test geçiyor**, `flutter analyze` temiz.
   bağlanabilir.
 - `economy_pacing_test.dart` hâlâ buff'sız dünyayı ölçüyor; buff'lı senaryo
   ayrıca ölçülmedi (tavanlar `equipped_buffs_test.dart` ile bağlı).
+
+---
+---
+
+# Test ortamı — testler neden `--no-test-assets` ile çalışıyor (2026-08-25)
+
+Bu makinede **Smart App Control `impellerc.exe`'yi engelliyor.** Bu yalnızca
+`flutter run`'ı değil test komutunu da düşürüyor: Flutter, test asset paketini
+kurarken Material'ın `ink_sparkle.frag` shader'ını derlemek zorunda ve
+derleyici çalışmayınca **araç çöküyor** (testler bile başlamıyor).
+
+Flutter'ın bu durum için bir tutamacı var (`ShaderCompiler` içindeki
+`_SecurityPolicyBlockException`) ama yalnızca Windows hata kodu **1260** için;
+bu makinede gelen kod **4551**, dolayısıyla tutamak devreye girmiyor.
+Flutter tarafında bir eksik, bizim kodumuzda değil.
+
+**Kullanılan çözüm — SDK'ya dokunmadan:**
+
+```powershell
+# 1) Bir kereye mahsus: eski başarılı Android build'inden kalan DERLENMİŞ
+#    shader'ı test paketine kopyala
+copy build\app\intermediates\flutter\debug\flutter_assets\shaders\ink_sparkle.frag `
+     build\unit_test_assets\shaders\ink_sparkle.frag
+
+# 2) Bundan sonra testler böyle çalıştırılır
+flutter  test --no-test-assets
+```
+
+`--no-test-assets` "asset yok" demek değil; "asset paketini **yeniden kurma**"
+demek. `build/unit_test_assets/` zaten dolu (784 item görseli, avatar GIF'leri,
+`AssetManifest.bin`), yalnızca shader eksikti.
+
+⚠️ **`pubspec.yaml`'a yeni asset eklenirse** paket bayatlar. O zaman bir kez
+normal test komutu çalıştırılır (çökecek ama paketi yazacak), sonra shader
+tekrar kopyalanır, sonra `--no-test-assets` ile devam edilir.
+
+`flutter analyze` ve `flutter pub get` etkilenmiyor.
+
+## Golden testler
+
+Golden altyapısı bu ortamda **çalışıyor**. Bir uyarı: test ortamında gerçek
+font yok, bütün yazılar **dolu kutu** olarak çiziliyor. Bu hizalama ve taşma
+denetimi için avantaj (metin sınırları birebir görünür) ama "yazı doğru mu"
+sorusunu golden cevaplayamaz — o `find.text` ile ayrıca doğrulanmalı.
+
+`pumpAndSettle` **kullanılamıyor**: sonsuz tekrar eden animasyonlar var
+(ör. `_equipmentBobController.repeat()`). Bunun yerine sabit kare dizisi
+(`pump(Duration)` × N) kullanılıyor; bu aynı zamanda golden'ları
+tekrarlanabilir kılıyor.
+
+Golden dosyaları `test/golden/goldens/` altında ve repoya giriyor: arayüz
+sessizce bozulduğunda alarm versinler.
+
+---
+
+# Bölüm 1 — Sınıf seçme ekranı ✅ (2026-08-25)
+
+Cihazda görülen üç sorun düzeltildi, ekranın tamamı gözden geçirildi.
+Kararlar **GD30–GD33**.
+
+| Sorun | Kök neden | Çözüm |
+|---|---|---|
+| Tanıtım ekranında geri yok | `_ClassReveal` bir overlay, rota değil; `PopScope` de yoktu | Sol üstte geri butonu + `PopScope` |
+| Çift onay | `_confirmClassReveal` yalnızca seçimi işaretliyor, ızgarada ikinci kez "DEVAM ET" gerekiyordu | Onay tanıtım ekranında, doğrudan özet adımına ilerliyor |
+| Eşya görselleri sola kayık | Yatay `ListView` içerik sığsa bile sola yaslar | Sığdığında ortalayan, taşınca kayan şerit |
+
+**Eşya şeridi ayrıca ekrana uyarlanıyor:** kart genişliği görüntüden
+türetiliyor (64–92 px arası), böylece en dar destekli ekranda (320 dp) üç kart
+**tam** sığıyor. Dörtten fazla kategori gören sınıflarda şerit yine kayıyor;
+kırpılan kart "devamı var" işaretidir.
+
+## Gözden geçirmede çıkan üç sessiz hata
+
+1. **Varsayılan sınıf sessizce kabul ediliyordu.** Katalog yüklenirken
+   `classes.first` seçili geliyor ve oyuncu hiçbir karta dokunmadan
+   "DEVAM ET"e basabiliyordu. Artık `_classConfirmed` bayrağı var; onaylanmadan
+   devam kapalı ve **nedeni yazılı** (Model Kuralları #4).
+2. **Vurgu yalan söylüyordu.** Izgaradaki "seçili" çerçevesi de varsayılan
+   seçimi gösteriyordu. Artık yalnızca onaylanmış seçim vurgulanıyor.
+3. **Navigasyon haptik geri bildirimi bekliyordu.** `_goToStep` ve `_complete`
+   `await HapticFeedback…` yapıyordu; titreşim kanalı yanıt vermezse sihirbaz
+   **tamamen kilitleniyor**. Bu widget testinde birebir gözlendi (platform
+   kanalı mock'lanmadan hiçbir adım ilerlemiyordu). Haptik artık beklenmiyor.
+
+## Test
+
+`test/character_creation_test.dart` — 18 test: katalog yükleme, tanıtımın
+açılması, geri butonu, donanım geri tuşunun iki dalı (tanıtımı kapat / bir
+adım geri), onaysız devamın kapalı olması ve nedeninin yazılı olması, tek
+onayın doğrudan özete geçirmesi, düzenleme modunda kayıtlı sınıfın onaylı
+sayılması, **beş ekran genişliğinde şerit hizalaması** ve **beş golden**
+(ızgara 320/360, tanıtım 320/360/800).
+
+Toplam **440 test geçiyor**, `flutter analyze` temiz.
+
+---
+
+### GD30. Tanıtım ekranı onayı doğrudan özet adımına geçiriyor (2026-08-25)
+- **Nerede:** `character_creation_screen.dart:_confirmClassReveal`
+- **Karar:** "BU SINIFI SEÇ" hem sınıfı seçiyor hem bir sonraki adıma
+  ilerletiyor. Izgaradaki "DEVAM ET" duruyor ama artık yalnızca özetten geri
+  dönen oyuncu için anlamlı.
+- **Neden:** karar karakteri incelediğin yerde verilmeli. İki onay, ikincisini
+  "ne onayladım ben?" sorusuna çeviriyordu.
+- **Geri dönülecek nokta:** ileride sınıf karşılaştırma ekranı eklenirse
+  (iki sınıfı yan yana koymak) tanıtımdan ızgaraya dönüp başka bir sınıfa
+  bakmak yeniden değerli olur; o zaman "seç ve kal" ikinci bir düğme olabilir.
+
+### GD31. Onaylanmamış varsayılan sınıf artık geçerli seçim sayılmıyor (2026-08-25)
+- **Nerede:** `_classConfirmed`
+- **Karar:** katalogdan gelen varsayılan seçim ne vurgulanıyor ne de "DEVAM
+  ET"i açıyor. Düzenleme modunda kayıtlı sınıf onaylı sayılıyor (o zaten
+  verilmiş bir karar).
+- **Neden:** oyuncu 18 sınıfın hiçbirini açmadan varsayılan sınıfla oyuna
+  başlayabiliyordu ve bunu fark etmesinin bir yolu yoktu.
+
+### GD32. Tanıtımdaki örnek ekipman ve saldırı animasyonu kararlı (2026-08-25)
+- **Nerede:** `_showcaseEquipmentFor`, `_selectClass`
+- **Karar:** tohumsuz `math.Random` yerine `stableSpread('<sınıf>|<kategori>')`.
+  Aynı sınıf her açılışta aynı silahları ve aynı saldırı animasyonunu gösterir.
+- **Neden:** (a) sınıfın kimlik kartı her açılışta değişince sınıf keyfî
+  görünüyor, (b) proje kuralı — kimliğe dönüşen rastgelelik tohumlu olmalı
+  (GD8/GD18), (c) golden ile doğrulanamıyordu.
+- **Kaybedilen:** her açılışta yeni silah görme sürprizi. Karşılığında sınıf
+  tanınabilir hâle geldi; takas bilinçli.
+
+### GD33. Haptik geri bildirim artık beklenmiyor (2026-08-25)
+- **Nerede:** `_goToStep`, `_complete`
+- **Karar:** `await HapticFeedback…` → `HapticFeedback…` (bekleme yok).
+- **Neden:** titreşim bir süstür; adım geçişini ve karakter kaydını ona
+  bağlamak, kanal yanıt vermeyen cihazda sihirbazı kilitler. Widget testinde
+  bu kilit birebir gözlendi. Aynı desen ekranın başka yerlerinde (`_selectClass`,
+  `_dismissClassReveal`) zaten beklemesiz kullanılıyordu.

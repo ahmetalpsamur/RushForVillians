@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/item_rules.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/character_class.dart';
 import '../../models/item.dart';
@@ -40,6 +41,14 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
   List<CharacterClass> _classes = const [];
   String? _selectedClassId;
   String? _selectedAsset;
+
+  /// Sınıf, tanıtım ekranında bilerek onaylandı mı.
+  ///
+  /// Katalog yüklenirken bir sınıf **varsayılan olarak** seçili geliyor; bu
+  /// bayrak olmadan oyuncu hiçbir karta dokunmadan "DEVAM ET"e basıp
+  /// habersizce ilk sınıfa razı olabiliyordu. Düzenleme modunda kayıtlı sınıf
+  /// zaten bir karar olduğu için onaylı sayılır.
+  bool _classConfirmed = false;
   String? _catalogError;
   String? _nameError;
   int _step = 0;
@@ -48,7 +57,6 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
   String? _revealedAttackAsset;
   List<Item> _revealedItems = const [];
   int _revealSerial = 0;
-  final math.Random _random = math.Random();
   late final AnimationController _equipmentBobController;
 
   @override
@@ -91,6 +99,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
         _classes = classes;
         _selectedClassId = selectedClass.id;
         _selectedAsset = selectedAsset;
+        _classConfirmed = initial?.characterClass == selectedClass.id;
         _catalogError = null;
       });
     } catch (_) {
@@ -134,7 +143,10 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
   Future<void> _goToStep(int nextStep) async {
     if (_transitioning || nextStep == _step) return;
     FocusScope.of(context).unfocus();
-    await HapticFeedback.mediumImpact();
+    // Haptik **beklenmez**: dokunsal geri bildirim bir süstür, adım geçişini
+    // ona bağlamak titreşim kanalının yanıt vermediği cihazda sihirbazı
+    // kilitler.
+    HapticFeedback.mediumImpact();
     setState(() => _transitioning = true);
     await Future<void>.delayed(const Duration(milliseconds: 260));
     if (!mounted) return;
@@ -159,12 +171,20 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
     setState(() {
       _revealSerial++;
       _revealedClass = characterClass;
-      _revealedAttackAsset = attacks[_random.nextInt(attacks.length)];
-      _revealedItems = _randomEquipmentFor(characterClass);
+      _revealedAttackAsset =
+          attacks[stableSpread(characterClass.id, attacks.length)];
+      _revealedItems = _showcaseEquipmentFor(characterClass);
     });
   }
 
-  List<Item> _randomEquipmentFor(CharacterClass characterClass) {
+  /// Tanıtım ekranında gösterilecek örnek ekipman.
+  ///
+  /// Seçim **kararlı**: aynı sınıf her açılışta aynı silahları gösterir.
+  /// Eskiden tohumsuz `Random` kullanılıyordu; sınıfın kimlik kartı her
+  /// açılışta değişince sınıf keyfî görünüyor ve ekran golden ile
+  /// doğrulanamıyordu (proje kuralı: kimliğe dönüşen rastgelelik tohumlu
+  /// olmalı — bkz. GD8/GD18).
+  List<Item> _showcaseEquipmentFor(CharacterClass characterClass) {
     final result = <Item>[];
     for (final category in ItemCategory.values) {
       if (!category.characterClasses.contains(characterClass.id)) continue;
@@ -176,11 +196,33 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
                     item.isUsableBy(characterClass.id),
               )
               .toList();
-      if (pool.isNotEmpty) result.add(pool[_random.nextInt(pool.length)]);
+      if (pool.isEmpty) continue;
+      final index = stableSpread(
+        '${characterClass.id}|${category.folder}',
+        pool.length,
+      );
+      result.add(pool[index]);
     }
     return result;
   }
 
+  /// Tanıtım ekranını seçim yapmadan kapatır.
+  void _dismissClassReveal() {
+    if (_revealedClass == null) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _revealSerial++;
+      _revealedClass = null;
+      _revealedAttackAsset = null;
+      _revealedItems = const [];
+    });
+  }
+
+  /// Tanıtım ekranındaki tek onay.
+  ///
+  /// Eskiden burada yalnızca seçim işaretleniyor, oyuncu ızgaraya dönüp bir de
+  /// "DEVAM ET"e basıyordu. Karar karakteri incelediği yerde verilsin diye
+  /// onay doğrudan özet adımına ilerletiyor.
   void _confirmClassReveal() {
     final characterClass = _revealedClass;
     if (characterClass == null) return;
@@ -188,22 +230,54 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
     setState(() {
       _selectedClassId = characterClass.id;
       _selectedAsset = characterClass.walkingAsset;
+      _classConfirmed = true;
       _revealedClass = null;
       _revealedAttackAsset = null;
       _revealedItems = const [];
     });
+    _goToStep(_step + 1);
   }
 
-  Future<void> _complete() async {
+  /// Donanım geri tuşunun karşılığı.
+  ///
+  /// Sırasıyla: açık tanıtım ekranını kapat, değilse bir önceki adıma dön.
+  /// İkisi de yoksa rotanın kendisi kapanır.
+  bool _handleBack() {
+    if (_revealedClass != null) {
+      _dismissClassReveal();
+      return true;
+    }
+    if (_step > 0) {
+      _goToStep(_step - 1);
+      return true;
+    }
+    return false;
+  }
+
+  void _complete() {
     final avatar = _avatar;
     if (avatar == null) return;
-    await HapticFeedback.heavyImpact();
+    // Aynı gerekçe: kaydı haptik yanıtına bağlamıyoruz.
+    HapticFeedback.heavyImpact();
     widget.onCompleted(avatar);
   }
 
   @override
   Widget build(BuildContext context) {
     final editing = widget.initialAvatar != null;
+    return PopScope(
+      // Tanıtım ekranı açıkken ya da ilk adımda değilken geri tuşu rotayı
+      // kapatmaz; önce ekran içi bir adım geri alınır.
+      canPop: _revealedClass == null && _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: _buildBody(editing),
+    );
+  }
+
+  Widget _buildBody(bool editing) {
     return Scaffold(
       body: Stack(
         children: [
@@ -277,6 +351,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
                         equipment: _revealedItems,
                         bobAnimation: _equipmentBobController,
                         onSelect: _confirmClassReveal,
+                        onBack: _dismissClassReveal,
                       ),
             ),
           ),
@@ -287,7 +362,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
 
   bool get _canContinue => switch (_step) {
     0 => _nameController.text.trim().length >= 2,
-    4 => _selectedClass != null,
+    4 => _selectedClass != null && _classConfirmed,
     5 => _avatar != null,
     _ => true,
   };
@@ -424,6 +499,13 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
       title: 'Hangi sınıfa aitsin?',
       subtitle: 'Yürüyüşünü ve savaş yolunu birlikte seç.',
       wide: true,
+      // Kilitli/edilgen kontrol sessiz kalmaz: onay verilmeden "DEVAM ET"
+      // kapalı, sebebi burada yazılı.
+      hint:
+          _classConfirmed
+              ? null
+              : 'Devam etmek için bir sınıfa dokun, tanıt ekranında incele ve '
+                  '“BU SINIFI SEÇ”e bas.',
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -436,7 +518,11 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
         ),
         itemBuilder: (context, index) {
           final characterClass = _classes[index];
-          final selected = characterClass.id == _selectedClassId;
+          // Vurgu yalnızca **onaylanmış** seçimi gösterir; katalog yüklenirken
+          // gelen varsayılan seçim, oyuncu hiçbir şey yapmamışken "seçtin"
+          // demiş gibi görünmemeli.
+          final selected =
+              _classConfirmed && characterClass.id == _selectedClassId;
           return _ClassTile(
             label: characterClass.name,
             asset: characterClass.walkingAsset,
@@ -705,12 +791,19 @@ class _QuestionFrame extends StatelessWidget {
   final Widget child;
   final bool wide;
 
+  /// Başlığın altında duran açıklama; devam düğmesi kapalıysa nedenini söyler.
+  ///
+  /// Bilerek **içeriğin üstünde**: 18 sınıflık ızgaranın altına konsaydı
+  /// oyuncu nedeni görmek için listeyi sonuna kadar kaydırmak zorunda kalırdı.
+  final String? hint;
+
   const _QuestionFrame({
     required this.eyebrow,
     required this.title,
     required this.subtitle,
     required this.child,
     this.wide = false,
+    this.hint,
   });
 
   @override
@@ -742,6 +835,26 @@ class _QuestionFrame extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white60, height: 1.4),
         ),
+        if (hint != null) ...[
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  hint!,
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 36),
         child,
       ],
@@ -949,6 +1062,7 @@ class _ClassReveal extends StatelessWidget {
   final List<Item> equipment;
   final Animation<double> bobAnimation;
   final VoidCallback onSelect;
+  final VoidCallback onBack;
 
   const _ClassReveal({
     super.key,
@@ -959,6 +1073,7 @@ class _ClassReveal extends StatelessWidget {
     required this.equipment,
     required this.bobAnimation,
     required this.onSelect,
+    required this.onBack,
   });
 
   @override
@@ -971,16 +1086,31 @@ class _ClassReveal extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                characterClass.name.toUpperCase(),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.4,
-                  shadows: [Shadow(color: color, blurRadius: 18)],
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back),
+                    color: Colors.white,
+                    tooltip: 'Sınıf listesine dön',
+                  ),
+                  Expanded(
+                    child: Text(
+                      characterClass.name.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.4,
+                        shadows: [Shadow(color: color, blurRadius: 18)],
+                      ),
+                    ),
+                  ),
+                  // Başlığın gerçekten ortada kalması için geri butonuyla
+                  // aynı genişlikte görünmez bir denge.
+                  const SizedBox(width: 48),
+                ],
               ),
               const SizedBox(height: 8),
               Flexible(
@@ -1021,33 +1151,20 @@ class _ClassReveal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'KULLANABİLDİĞİ EŞYA TÜRLERİ',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.6,
+              if (equipment.isNotEmpty) ...[
+                const Text(
+                  'KULLANABİLDİĞİ EŞYA TÜRLERİ',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.6,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: equipment.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder:
-                      (context, index) => _RevealEquipmentItem(
-                        item: equipment[index],
-                        index: index,
-                        animation: bobAnimation,
-                        color: color,
-                      ),
-                ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 6),
+                SizedBox(height: 112, child: _buildEquipmentStrip()),
+                const SizedBox(height: 8),
+              ],
               Text(
                 '“${characterClass.selectionSlogan}”',
                 textAlign: TextAlign.center,
@@ -1066,7 +1183,7 @@ class _ClassReveal extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onSelect,
                   icon: const Icon(Icons.auto_awesome),
-                  label: const Text('SEÇ'),
+                  label: const Text('BU SINIFI SEÇ'),
                   style: FilledButton.styleFrom(
                     backgroundColor: color,
                     foregroundColor: Colors.black,
@@ -1083,6 +1200,51 @@ class _ClassReveal extends StatelessWidget {
       ),
     );
   }
+
+  /// Eşya şeridi: sığdığında **ortalanır**, sığmadığında yatay kayar.
+  ///
+  /// Düz bir yatay `ListView` içeriği sığsa bile sola yaslıyor ve üç eşyalı
+  /// sınıflarda görseller ekranın solunda kalıyordu. `minWidth` kısıtı satırı
+  /// en az görüntü kadar geniş yapıp ortalamayı mümkün kılıyor; içerik
+  /// taşarsa satır kendi genişliğine çıkıyor ve kaydırma devreye giriyor.
+  Widget _buildEquipmentStrip() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // En dar destekli ekranda (320 dp) üç kart tam sığsın diye kart
+        // genişliği görüntüden türetiliyor. Dörtten fazla kategori gören
+        // sınıflarda şerit yine kayar; kırpılan kart "devamı var" işaretidir.
+        const gap = 8.0;
+        const visibleTarget = 3;
+        final slots = math.min(equipment.length, visibleTarget);
+        final available = constraints.maxWidth - gap * (slots - 1);
+        final itemWidth = (available / slots).clamp(64.0, 92.0);
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var index = 0; index < equipment.length; index++) ...[
+                  if (index > 0) const SizedBox(width: gap),
+                  _RevealEquipmentItem(
+                    item: equipment[index],
+                    index: index,
+                    animation: bobAnimation,
+                    color: color,
+                    width: itemWidth,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _RevealEquipmentItem extends StatelessWidget {
@@ -1090,18 +1252,20 @@ class _RevealEquipmentItem extends StatelessWidget {
   final int index;
   final Animation<double> animation;
   final Color color;
+  final double width;
 
   const _RevealEquipmentItem({
     required this.item,
     required this.index,
     required this.animation,
     required this.color,
+    required this.width,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 92,
+      width: width,
       child: Column(
         children: [
           Text(
