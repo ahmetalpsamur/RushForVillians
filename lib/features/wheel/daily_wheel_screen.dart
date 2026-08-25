@@ -513,7 +513,7 @@ class _GearSprite extends StatelessWidget {
     final tone = silver ? 'silver' : 'normal';
     final asset = 'lib/ChanceWheel/${tone}_gear_$number.gif';
     if (!running) {
-      return _StillGifFrame(asset: asset);
+      return StillGifFrame(asset: asset);
     }
     return Image.asset(
       asset,
@@ -525,16 +525,21 @@ class _GearSprite extends StatelessWidget {
   }
 }
 
-class _StillGifFrame extends StatefulWidget {
+/// Bir GIF'in **ilk karesini** durağan olarak çizer.
+///
+/// Çark dönmüyorken dişlilerin donmuş görünmesi için kullanılıyor.
+/// Kasıtlı olarak public: yükleme hatasının sessiz kalmadığı ancak doğrudan
+/// widget testiyle doğrulanabiliyor (asset yolunu dışarıdan vermek gerekiyor).
+class StillGifFrame extends StatefulWidget {
   final String asset;
 
-  const _StillGifFrame({required this.asset});
+  const StillGifFrame({super.key, required this.asset});
 
   @override
-  State<_StillGifFrame> createState() => _StillGifFrameState();
+  State<StillGifFrame> createState() => _StillGifFrameState();
 }
 
-class _StillGifFrameState extends State<_StillGifFrame> {
+class _StillGifFrameState extends State<StillGifFrame> {
   ui.Image? _frame;
   ui.Codec? _codec;
   int _loadSerial = 0;
@@ -546,25 +551,41 @@ class _StillGifFrameState extends State<_StillGifFrame> {
   }
 
   @override
-  void didUpdateWidget(covariant _StillGifFrame oldWidget) {
+  void didUpdateWidget(covariant StillGifFrame oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.asset != widget.asset) _load();
   }
 
+  /// Asset eksik ya da bozuk olabilir; hata sessizce yutulmaz ama uygulamayı
+  /// da düşürmez. `_load` bekletilmediği için yakalanmayan bir istisna
+  /// buradan çıkıp çark ekranını açan çağrı noktasına düşüyordu (triaj A6).
+  /// Aynı dosyadaki `GifTiming._measure` bu deseni zaten izliyor.
   Future<void> _load() async {
     final serial = ++_loadSerial;
-    final data = await rootBundle.load(widget.asset);
-    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-    final frame = await codec.getNextFrame();
+    ui.Codec? codec;
+    ui.Image? image;
+    try {
+      final data = await rootBundle.load(widget.asset);
+      codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      image = (await codec.getNextFrame()).image;
+    } catch (error, stackTrace) {
+      debugPrint('Çark karesi yüklenemedi (${widget.asset}): $error');
+      debugPrintStack(stackTrace: stackTrace);
+      // Yarım kalan kaynaklar bırakılmaz.
+      image?.dispose();
+      codec?.dispose();
+      return;
+    }
+
     if (!mounted || serial != _loadSerial) {
-      frame.image.dispose();
+      image.dispose();
       codec.dispose();
       return;
     }
     _frame?.dispose();
     _codec?.dispose();
     setState(() {
-      _frame = frame.image;
+      _frame = image;
       _codec = codec;
     });
   }

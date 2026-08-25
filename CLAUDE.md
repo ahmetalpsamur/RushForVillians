@@ -3785,6 +3785,35 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
 ---
 ---
 
+### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
+- **Nerede:** `root_shell.dart:_onStepsReported`
+- **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
+  ve kendisi frame sonunda gösteriliyor. Senkron gösterilen bildirimler
+  kuyruğa **önce** girip seviye kutlaması gelir gelmez, hiç görülmeden
+  kapanıyordu. Ölçüldü: 6 günlük seriyle 5000 adım atan 1. seviye oyuncu
+  **7 günlük kilometre taşı bildirimini hiç görmüyordu** — üstelik o bildirim
+  kazanılan dondurma hakkını duyuran tek yer.
+- **Karar:** günlük coin tavanı, seri stat bonusu ve kilometre taşı — üçü de
+  tek bir `addPostFrameCallback` içinde, sabit sırayla kuyruğa giriyor.
+  Frame sonu callback'leri kayıt sırasıyla çalıştığı için seviye kutlaması
+  (setState içinde kaydediliyor) önce geliyor, bunlar arkasından.
+- **Neden `_showLevelUp` değiştirilmedi:** `hideCurrentSnackBar()` doğru
+  davranış — seviye atlamak manşet, kuyrukta beklememeli. Sorun sırada, o
+  çağrıda değil.
+
+### GD48. `StillGifFrame` test edilebilmek için public yapıldı (2026-08-25)
+- **Nerede:** `features/wheel/daily_wheel_screen.dart`
+- **Karar:** `_StillGifFrame` → `StillGifFrame` (state sınıfı private kaldı).
+- **Neden:** triaj A6'nın (yükleme hatası yönetimi) düzeltmesi ancak asset
+  yolunu dışarıdan verebilen bir testle doğrulanabiliyordu. Widget yalnızca
+  `_GearSprite` içinden ve sabit bir asset yoluyla kuruluyor; hatalı asset
+  enjekte etmenin başka yolu yok.
+- **Neden başka yol seçilmedi:** `rootBundle`'ı test içinde düşürmek
+  (`flutter/assets` kanalını mock'lamak) aynı testte `Image.asset`'i de
+  düşürür ve alakasız hatalar üretirdi.
+- **Kapsam:** yalnızca görünürlük değişti; davranış, dosya konumu ve
+  isimlendirme deseni aynı (`PixelSprite`, `AvatarView` da public).
+
 ### GD44. Seri bonusu her gün **rastgele bir** savaş statını büyütür (2026-08-25)
 - **Nerede:** `models/streak_stat_bonuses.dart`, `core/utils/streak_bonus.dart`,
   `UserProfile.grantStreakStatBonus`
@@ -4747,6 +4776,80 @@ bonusu dördü birden canlanacak. Toplama noktası tek olmalı.
   (PNG'ler üretildi ve gözle doğrulandı) + bonus yokken bölümün hiç çıkmaması.
 
 Toplam **588 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+
+# Bölüm 6 — Kalan gerçek hatalar ✅ (2026-08-25)
+
+Faz 0'da bulunan beş hata kapatıldı. Her biri için **önce hatayı yakalayan
+test** yazıldı, sonra düzeltildi. Kararlar **GD47–GD48**.
+
+## 1. Hasar mesajı savaş sahnesini örtüyordu · **yüksek**
+
+- **Nerede:** `adventure_screen.dart`, `_pendingDamage > 0` katmanı
+- **Ne:** "Düşmanın N canını aldın. Böyle devam et!" mesajı `titleLarge` ile ve
+  **satır sınırı olmadan** çiziliyordu. Sahne 260 px yüksekliğinde; ölçülen
+  mesaj yüksekliği **320 dp'de 168 px, 390 dp'de 112 px**. Yani mesaj sahnenin
+  yarısından fazlasını kaplıyor, hem oyuncuyu hem düşmanı örtüyordu.
+- **Düzeltme:** `titleSmall`, `maxLines: 2`, okunurluk için yarı saydam koyu
+  şerit, metin kısaltıldı ("Böyle devam et!" düştü). Ölçülen yeni yükseklik
+  ikisinde de 65 px'in altında.
+- **Test:** `adventure_progress_test.dart` → "hasar mesajı savaş sahnesini
+  örtmez" (320/390 dp, gerçek yükseklik ölçülüyor). Golden'lar yeniden
+  üretildi ve gözle doğrulandı: iki figür de tam görünüyor.
+
+## 2. Kilometre taşı bildirimi hiç görünmüyordu · **yüksek**
+
+Ayrıntı ve gerekçe **GD47**. Ölçülen: 6 günlük seriyle 5000 adım atan
+1. seviye oyuncu, kazandığı dondurma hakkını duyuran tek bildirimi
+görmüyordu. Günlük coin tavanı bildirimi de aynı riski taşıyordu.
+
+**Test:** `streak_bonus_shell_test.dart` → "kilometre taşı bildirimi de
+yutulmaz" (aynı partide seviye + seri bonusu + kilometre taşı; üçünün de
+görüldüğü doğrulanıyor).
+
+## 3. Çark GIF karesi yüklemesinde hata yönetimi yoktu (triaj A6) · **orta**
+
+- **Nerede:** `daily_wheel_screen.dart:StillGifFrame`
+- **Ne:** `rootBundle.load` ve `instantiateImageCodec` `try/catch` içinde
+  değildi. Asset eksik ya da bozuksa **yakalanmayan asenkron istisna**
+  çıkıyordu; `_load()` bekletilmediği için hata çark ekranını açan başka bir
+  yere düşüyordu. Hata yolunda yarım kalan `Codec`/`Image` de bırakılıyordu.
+- **Düzeltme:** `try/catch`, `debugPrint` ile loglama, yarım kaynakların
+  dispose'u, widget boş çizerek ayakta kalıyor. Aynı dosyadaki
+  `GifTiming._measure` bu deseni zaten izliyordu.
+- **Test:** `still_gif_frame_test.dart` — 3 test. Widget public yapıldı
+  (**GD48**); test ortamında yükleme gerçek asenkron iş olduğu için
+  `runAsync` kullanılıyor.
+
+## 4. `CharacterCatalog` önbelleği geçersizleşmiyordu (triaj A7) · **düşük**
+
+`reset([List<CharacterClass>?])` eklendi — `ItemCatalog.reset` ile birebir
+aynı sözleşme. **Test:** `character_catalog_test.dart` içine `reset` grubu
+eklendi (mevcut 7 test korundu, 3 test eklendi).
+
+## 5. Adım hedefi seçicide denetleyici sızıntısı · **düşük**
+
+- **Nerede:** `adventure_screen.dart:_showGoalPicker`
+- **Ne:** `FixedExtentScrollController`, `showModalBottomSheet` `await`'inden
+  **sonra** dispose ediliyordu. Bekleyiş bir istisnayla sonlanırsa
+  `dispose()` hiç çalışmıyordu.
+- **Düzeltme:** `try/finally`.
+- **Test:** `goal_picker_test.dart` — 3 test (seçim, vazgeçme, arka arkaya
+  açıp kapatma; hiçbir yolda istisna çıkmıyor). Seçicinin daha önce hiç
+  testi yoktu.
+
+## Süreç notu — üzerine yazılan test dosyası
+
+Bu birim sırasında `test/character_catalog_test.dart` yanlışlıkla **sıfırdan
+yazıldı** ve mevcut 7 test kayboldu. Testlerin toplam sayısı beklenenden 7
+eksik çıkınca fark edildi (595 yerine 602 bekleniyordu), dosya `git checkout`
+ile geri alındı ve yeni testler **eklendi**. Ders: yeni bir test dosyası
+oluşturmadan önce aynı adda dosya olup olmadığı kontrol edilmeli; toplam test
+sayısı her birimden sonra beklenen değerle karşılaştırılmalı.
+
+Toplam **600 test geçiyor**, `flutter analyze` temiz.
 
 ---
 ---

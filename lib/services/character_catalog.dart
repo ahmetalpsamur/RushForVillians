@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/avatar_profile.dart';
@@ -17,6 +18,18 @@ class CharacterCatalog {
     if (cached != null) return cached;
     final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
     return _cache = fromAssetPaths(manifest.listAssets());
+  }
+
+  /// Testlerin kataloğu sabitleyebilmesi ve önbelleğin geçersizleştirilebilmesi
+  /// için (triaj A7). [ItemCatalog.reset] ile aynı sözleşme: argümansız çağrı
+  /// önbelleği boşaltır, listeyle çağrı kataloğu sabitler.
+  ///
+  /// Önbellek eskiden hiç geçersizleşmiyordu; sınıf listesi bugün sabit olduğu
+  /// için zararsızdı ama kataloğu sabitleyemeyen testler gerçek asset paketine
+  /// bağımlı kalıyordu.
+  @visibleForTesting
+  static void reset([List<CharacterClass>? classes]) {
+    _cache = classes;
   }
 
   /// Asset manifestindeki avatar animasyonlarını sınıflara dönüştürür.

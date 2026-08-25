@@ -679,21 +679,30 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
     });
     _persist();
-    if (capJustReached) _showCoinCapNotice();
+
+    // Bu partinin bildirimleri **frame sonuna** bırakılır ve tek bir
+    // callback'te sıraya girer.
+    //
+    // Gerekçe: [_showLevelUp] `hideCurrentSnackBar()` çağırıyor (seviye
+    // kutlaması manşet olmalı) ve kendisi frame sonunda gösteriliyor. Senkron
+    // gösterilen bildirimler kuyruğa **önce** girip seviye kutlaması gelir
+    // gelmez, hiç görülmeden kapanıyordu. Frame sonu callback'leri kayıt
+    // sırasıyla çalıştığı için burada kaydedilenler kutlamanın arkasına
+    // düşüyor ve sırayla gösteriliyor.
     final statGained = streakStatGained;
-    if (statGained != null) {
-      // Frame sonuna bırakılıyor: aynı partide seviye atlandıysa
-      // [_showLevelUp] `hideCurrentSnackBar()` çağırıp bu bildirimi yutuyordu.
-      // Seviye kutlaması frame sonunda kuyruğa girdiği için burada da frame
-      // sonunu beklemek, seri bildirimini onun **arkasına** koyuyor — ikisi
-      // de görülüyor.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showStreakStatBonus(statGained);
-      });
-    }
     final milestone = milestoneReached;
-    if (milestone != null) {
-      _showStreakMilestone(milestone, freezeGranted: milestoneFreezeGranted);
+    if (capJustReached || statGained != null || milestone != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (capJustReached) _showCoinCapNotice();
+        if (statGained != null) _showStreakStatBonus(statGained);
+        if (milestone != null) {
+          _showStreakMilestone(
+            milestone,
+            freezeGranted: milestoneFreezeGranted,
+          );
+        }
+      });
     }
     if (enemyDefeated) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());

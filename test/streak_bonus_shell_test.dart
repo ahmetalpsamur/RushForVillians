@@ -130,6 +130,40 @@ void main() {
     expect(find.textContaining('1. gün:'), findsOneWidget);
   });
 
+  testWidgets('kilometre taşı bildirimi de yutulmaz', (tester) async {
+    // Aynı partide üç bildirim birden çıkıyor: seviye kutlaması, günün seri
+    // bonusu ve 7 günlük kilometre taşı. `_showLevelUp` `hideCurrentSnackBar()`
+    // çağırdığı için senkron gösterilen kilometre taşı bildirimi hiç
+    // görülmeden kapanıyordu.
+    final yesterday = GameClock.now().subtract(const Duration(days: 1));
+    await pumpShell(
+      tester,
+      profile: UserProfile(
+        avatar: _avatar,
+        streakDays: 6,
+        lastActiveDay: yesterday,
+      ),
+    );
+
+    await addSteps(tester, 5000);
+
+    final seen = <String>{};
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+      if (find.textContaining('SEVİYE').evaluate().isNotEmpty) {
+        seen.add('level');
+      }
+      if (find.textContaining('7. gün:').evaluate().isNotEmpty) {
+        seen.add('stat');
+      }
+      if (find.textContaining('7 günlük seri').evaluate().isNotEmpty) {
+        seen.add('milestone');
+      }
+      if (seen.length == 3) break;
+    }
+    expect(seen, {'level', 'stat', 'milestone'});
+  });
+
   testWidgets('aynı gün ikinci parti yeni bonus vermez', (tester) async {
     final profile = await pumpShell(
       tester,

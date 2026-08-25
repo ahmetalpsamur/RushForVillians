@@ -2,10 +2,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/character_class.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/services/character_catalog.dart';
 
 void main() {
+  // `CharacterCatalog.load()` gerçek asset manifestini okuyor; bağlama
+  // kurulmadan çalışmaz. Diğer testler saf `fromAssetPaths` kullandığı için
+  // etkilenmiyor.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final avatarRoot = Directory(
     'lib/All_Assets/Avatars/Classes/Characters(100x100 split)',
   );
@@ -135,5 +141,47 @@ void main() {
         reason: '$retiredClass artık paketlenmemeli',
       );
     }
+  });
+
+  /// Triaj A7: `_cache` bir kez dolduktan sonra hiç geçersizleşmiyordu ve
+  /// `reset()` yoktu. Sınıf listesi bugün sabit olduğu için zararsızdı, ama
+  /// kataloğu sabitleyemeyen testler gerçek asset paketine bağımlı kalıyordu —
+  /// `ItemCatalog` bu deseni zaten sunuyordu.
+  group('reset', () {
+    tearDown(CharacterCatalog.reset);
+
+    const stub = CharacterClass(
+      id: 'Testçi',
+      name: 'Testçi',
+      walkingAsset: 'a.gif',
+      attackAssets: ['b.gif'],
+      selectionSlogan: 'slogan',
+    );
+
+    test('verilen liste kataloğu sabitler', () async {
+      CharacterCatalog.reset([stub]);
+      expect(await CharacterCatalog.load(), [stub]);
+    });
+
+    test('argümansız çağrı önbelleği boşaltır', () async {
+      CharacterCatalog.reset([stub]);
+      expect((await CharacterCatalog.load()).single.id, 'Testçi');
+
+      CharacterCatalog.reset();
+      // Önbellek boşaldı: sonraki okuma gerçek manifestten gelir ve stub
+      // sınıf artık listede olmamalı.
+      final reloaded = await CharacterCatalog.load();
+      expect(reloaded.where((entry) => entry.id == 'Testçi'), isEmpty);
+      expect(reloaded, isNotEmpty);
+    });
+
+    test('saldırı animasyonu olmayan sınıf katalogda görünmez', () {
+      const id = 'Soldier';
+      final classes = CharacterCatalog.fromAssetPaths([
+        '${CharacterCatalog.root}$id/$id/${id}_Walk.gif',
+        '${CharacterCatalog.root}$id/$id/${id}_Idle.gif',
+      ]);
+      expect(classes, isEmpty);
+    });
   });
 }

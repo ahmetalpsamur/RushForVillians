@@ -197,6 +197,38 @@ void main() {
     });
   });
 
+  group('hasar mesajı savaş sahnesini örtmez', () {
+    // Bulunan hata (Bölüm 6): "Düşmanın N canını aldın" mesajı `titleLarge`
+    // ile ve satır sınırı olmadan çiziliyordu. 320 dp'de sahne genişliği
+    // ~256 px; mesaj **altı satıra** çıkıp oyuncuyu da düşmanı da örtüyordu
+    // (bkz. `golden/goldens/adventure_320.png`). Sahne 260 px yüksekliğinde,
+    // yani mesaj tek başına yarısını kaplıyordu.
+    for (final width in const [320.0, 390.0]) {
+      testWidgets('${width.toInt()} dp: mesaj sahnenin dörtte birini aşmaz', (
+        tester,
+      ) async {
+        await pumpAdventure(
+          tester,
+          stepGoal: 2000,
+          steps: 1342,
+          startingSteps: 0,
+          size: Size(width, 1500),
+        );
+
+        final message = find.textContaining('canını aldın');
+        expect(message, findsOneWidget);
+        final height = tester.getSize(message).height;
+        expect(
+          height,
+          lessThanOrEqualTo(65),
+          reason:
+              'Sahne 260 px; hasar mesajı 65 px üstüne çıkarsa karakterlerin '
+              'üstüne biniyor (ölçülen: $height)',
+        );
+      });
+    }
+  });
+
   group('golden', () {
     for (final width in const [320.0, 390.0]) {
       testWidgets('golden: macera ilerlemesi (${width.toInt()} dp)', (

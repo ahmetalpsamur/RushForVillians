@@ -463,182 +463,188 @@ class _AdventureScreenState extends State<AdventureScreen>
       initialItem: (_stepGoal ~/ increment) - 1,
     );
 
-    final selectedGoal = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              height: MediaQuery.sizeOf(context).height * 0.68,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                border: Border(
-                  top: BorderSide(color: AppColors.primary, width: 2),
+    final int? selectedGoal;
+    // `try/finally`: sayfa açıkken bir istisna çıkarsa (ör. rota beklenmedik
+    // şekilde kapanırsa) `controller.dispose()` hiç çalışmıyor ve denetleyici
+    // sızıyordu.
+    try {
+      selectedGoal = await showModalBottomSheet<int>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Container(
+                height: MediaQuery.sizeOf(context).height * 0.68,
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                  border: Border(
+                    top: BorderSide(color: AppColors.primary, width: 2),
+                  ),
                 ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(99),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Icon(
-                      Icons.gps_fixed,
-                      color: AppColors.primary,
-                      size: 42,
-                      shadows: [
-                        Shadow(color: AppColors.primary, blurRadius: 24),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'GÜNLÜK HEDEFİNİ SEÇ',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                    const Text(
-                      '500 adımlık aralıklarla yukarı veya aşağı kaydır',
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          ShaderMask(
-                            shaderCallback:
-                                (bounds) => const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.white,
-                                    Colors.white,
-                                    Colors.transparent,
-                                  ],
-                                  stops: [0, 0.18, 0.82, 1],
-                                ).createShader(bounds),
-                            blendMode: BlendMode.dstIn,
-                            child: ListWheelScrollView.useDelegate(
-                              controller: controller,
-                              itemExtent: 78,
-                              diameterRatio: 1.5,
-                              perspective: 0.0025,
-                              physics: const FixedExtentScrollPhysics(),
-                              useMagnifier: true,
-                              magnification: 1.12,
-                              overAndUnderCenterOpacity: 0.3,
-                              onSelectedItemChanged: (index) {
-                                final nextGoal = (index + 1) * increment;
-                                if (nextGoal == draftGoal) return;
-                                HapticFeedback.selectionClick();
-                                setSheetState(() => draftGoal = nextGoal);
-                              },
-                              childDelegate: ListWheelChildBuilderDelegate(
-                                // Negatif indeksleri tamamen kapatır; pratikte
-                                // sınırsız bir üst aralık bırakırken ilk değer
-                                // her zaman 500 adım olarak kalır.
-                                childCount: 0x7fffffff,
-                                builder: (context, index) {
-                                  final goal = (index + 1) * increment;
-                                  final selected = goal == draftGoal;
-                                  return Center(
-                                    child: AnimatedDefaultTextStyle(
-                                      duration: const Duration(
-                                        milliseconds: 140,
-                                      ),
-                                      style: TextStyle(
-                                        color:
-                                            selected
-                                                ? Colors.white
-                                                : Colors.white70,
-                                        fontSize: selected ? 43 : 27,
-                                        fontWeight:
-                                            selected
-                                                ? FontWeight.w900
-                                                : FontWeight.w500,
-                                        shadows:
-                                            selected
-                                                ? const [
-                                                  Shadow(
-                                                    color: AppColors.primary,
-                                                    blurRadius: 20,
-                                                  ),
-                                                ]
-                                                : null,
-                                      ),
-                                      child: Text(
-                                        '${_formatNumber(goal)} adım',
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          IgnorePointer(
-                            child: Container(
-                              height: 82,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.08,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.symmetric(
-                                  horizontal: BorderSide(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.9,
-                                    ),
-                                    width: 2,
-                                  ),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.25,
-                                    ),
-                                    blurRadius: 28,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                      const SizedBox(height: 18),
+                      const Icon(
+                        Icons.gps_fixed,
+                        color: AppColors.primary,
+                        size: 42,
+                        shadows: [
+                          Shadow(color: AppColors.primary, blurRadius: 24),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: FilledButton.icon(
-                        onPressed: () => Navigator.pop(context, draftGoal),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: Text('${_formatNumber(draftGoal)} ADIMI SEÇ'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'GÜNLÜK HEDEFİNİ SEÇ',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                        ),
                       ),
-                    ),
-                  ],
+                      const Text(
+                        '500 adımlık aralıklarla yukarı veya aşağı kaydır',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ShaderMask(
+                              shaderCallback:
+                                  (bounds) => const LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.white,
+                                      Colors.white,
+                                      Colors.transparent,
+                                    ],
+                                    stops: [0, 0.18, 0.82, 1],
+                                  ).createShader(bounds),
+                              blendMode: BlendMode.dstIn,
+                              child: ListWheelScrollView.useDelegate(
+                                controller: controller,
+                                itemExtent: 78,
+                                diameterRatio: 1.5,
+                                perspective: 0.0025,
+                                physics: const FixedExtentScrollPhysics(),
+                                useMagnifier: true,
+                                magnification: 1.12,
+                                overAndUnderCenterOpacity: 0.3,
+                                onSelectedItemChanged: (index) {
+                                  final nextGoal = (index + 1) * increment;
+                                  if (nextGoal == draftGoal) return;
+                                  HapticFeedback.selectionClick();
+                                  setSheetState(() => draftGoal = nextGoal);
+                                },
+                                childDelegate: ListWheelChildBuilderDelegate(
+                                  // Negatif indeksleri tamamen kapatır; pratikte
+                                  // sınırsız bir üst aralık bırakırken ilk değer
+                                  // her zaman 500 adım olarak kalır.
+                                  childCount: 0x7fffffff,
+                                  builder: (context, index) {
+                                    final goal = (index + 1) * increment;
+                                    final selected = goal == draftGoal;
+                                    return Center(
+                                      child: AnimatedDefaultTextStyle(
+                                        duration: const Duration(
+                                          milliseconds: 140,
+                                        ),
+                                        style: TextStyle(
+                                          color:
+                                              selected
+                                                  ? Colors.white
+                                                  : Colors.white70,
+                                          fontSize: selected ? 43 : 27,
+                                          fontWeight:
+                                              selected
+                                                  ? FontWeight.w900
+                                                  : FontWeight.w500,
+                                          shadows:
+                                              selected
+                                                  ? const [
+                                                    Shadow(
+                                                      color: AppColors.primary,
+                                                      blurRadius: 20,
+                                                    ),
+                                                  ]
+                                                  : null,
+                                        ),
+                                        child: Text(
+                                          '${_formatNumber(goal)} adım',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            IgnorePointer(
+                              child: Container(
+                                height: 82,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.symmetric(
+                                    horizontal: BorderSide(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.25,
+                                      ),
+                                      blurRadius: 28,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.pop(context, draftGoal),
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: Text('${_formatNumber(draftGoal)} ADIMI SEÇ'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    controller.dispose();
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
     if (selectedGoal != null && mounted) _selectGoal(selectedGoal);
   }
 
@@ -1290,29 +1296,48 @@ class _AdventureScreenState extends State<AdventureScreen>
                               ),
                             ),
                           ),
+                          // Hasar mesajı sahnenin **üstünde** durmalı, sahneyi
+                          // kaplamamalı. Eskiden `titleLarge` ve satır sınırı
+                          // yoktu: 320 dp'de altı satıra çıkıp hem oyuncuyu hem
+                          // düşmanı örtüyordu (ölçülen 168 px / 260 px sahne).
+                          // Artık daha küçük punto, iki satır sınırı ve okunur
+                          // kalması için koyu bir şerit var.
                           if (_pendingDamage > 0)
                             Positioned(
                               left: 8,
                               right: 8,
-                              top: 8,
+                              top: 6,
                               child: FadeTransition(
                                 opacity: _damageMessageOpacity,
-                                child: Text(
-                                  'Düşmanın $_pendingDamage canını aldın. '
-                                  'Böyle devam et!',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleLarge?.copyWith(
-                                    color: AppColors.xp,
-                                    fontWeight: FontWeight.w900,
-                                    shadows: const [
-                                      Shadow(
-                                        color: Colors.black,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 2),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.45),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    child: Text(
+                                      'Düşmanın $_pendingDamage canını aldın!',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall?.copyWith(
+                                        color: AppColors.xp,
+                                        fontWeight: FontWeight.w900,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black,
+                                            blurRadius: 6,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
