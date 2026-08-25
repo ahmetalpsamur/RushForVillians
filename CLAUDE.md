@@ -3669,6 +3669,78 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
   ile esnek satıra dönmüştü; altı ekran genişliğindeki taşma testleri hâlâ
   geçiyor.
 
+### GD39. Envanter kimlik listesinden **örnek** listesine geçti (2026-08-25)
+- **Nerede:** `models/owned_item.dart` (yeni), `UserProfile.ownedItems` /
+  `ownedUpgradeIds` / `nextItemInstanceId`, `GameStorage` şema **v12**
+- **Karar:** `List<String> ownedItemIds` → `List<OwnedItem>`; her örnek
+  `{instanceId, itemId, level, rarity, equipped}` taşıyor.
+- **Neden `instanceId` var (şartnamede yoktu):** aynı eşyadan üç adet varsa
+  "hangisini yükselt / sat / kuşan" sorusunun bir cevabı olmalı. Liste indeksi
+  kullanılamazdı: envanter ekranı her çizimde durumu yeniden okuyor (GD27) ve
+  indeks aradaki bir değişiklikte kayabilir. Kimlik kalıcı bir sayaçtan
+  geliyor — rastgele değil, tohum gerektirmiyor, kayıt tekrarlanabilir.
+- **Neden `rarity` nullable:** `null` = "katalog nadirliği". Taşıma anında
+  `AssetManifest` okunamıyor, dolayısıyla v11 kayıtlarına katalog nadirliği
+  yazılamazdı. Yan fayda: katalog nadirliği ileride dengelenirse
+  birleştirilmemiş örnekler onu izliyor.
+- **İki namespace ayrıldı.** `ownedItemIds` hem katalog itemlerini hem mağaza
+  yükseltmelerini (`boost_double_xp`) taşıyordu. Ayrımı **kimliğin biçimi**
+  yapıyor: katalog kimlikleri her zaman `<kategori>/<dosya>`, yükseltme
+  kimlikleri hiç `/` içermiyor. Taşıma katalogsuz ve güvenilir.
+- **⚠️ ZİNCİRLEME SONUÇ — mağaza aynı eşyayı tekrar satıyor.** Birleştirme
+  aynı eşyadan birkaç adet istiyor; ikinci satın alma artık reddedilmiyor,
+  gerçekten ikinci bir örnek veriyor. Kart "Sahipsin" yerine **"N adet"**
+  gösteriyor ve düğme açık kalıyor.
+  - **GD14 güncellendi:** "Alabileceklerim" süzgeci sahipliğe artık
+    bakmıyor — sahip olduğun eşya da "bugün alabileceklerim" listesine ait.
+  - **GD26 kısmen taşındı:** "slot başına tek eşya" kuralını `Map` yapısı
+    veri düzeyinde zorluyordu. Örnek listesinde bu garanti yok; kural
+    `RootShell._refreshEquipment` içinde normalleştiriliyor ve testle bağlı.
+  - Kırılan dört test **güncellendi, silinmedi** (davranış bilerek değişti).
+- **Şema v12 taşıması veri kaybetmiyor:** her kimlik seviye 1 + katalog
+  nadirliğiyle örneğe dönüşüyor, kuşanılı olanlar kuşanılı kalıyor,
+  yükseltmeler ayrı listeye gidiyor. Sayaç kayıttaki en büyük kimliğin
+  altına düşemiyor — yoksa sonraki satın alma var olan bir örneğin kimliğini
+  yeniden kullanırdı.
+
+### GD40. Nadirlik yükselince seviye kilidi **değişmez** (2026-08-25)
+- **Nerede:** `item_rules.dart:withRarity`
+- **Karar:** birleştirmeyle bir üst nadirliğe çıkan bir örneğin
+  `requiredLevel` değeri **korunuyor**; yalnızca buff ve fiyat yeni nadirlikten
+  hesaplanıyor.
+- **Neden:** üç sıradan eşyayı (kilit Sv. 1–3) birleştiren oyuncunun elinde
+  birden Sv. 4–7 kilitli bir eşya kalırdı ve kuşanamazdı. Emek verip
+  birleştirdiği şeyin kullanılamaz hâle gelmesi cezalandırıcı; birleştirme bir
+  ödül olmalı.
+- **Fiyat neden yeni nadirlikten:** satış değeri fiyata bağlı; birleştirilmiş
+  bir eşyanın hâlâ sıradan fiyatından değerlenmesi yatırımı yok sayardı.
+  Alım-satım döngüsünün para üretemediği ayrıca testle bağlı.
+- **İmzalı itemler karakterini koruyor** (GD22): elle yazılmış etkileri
+  yeniden türetilmiyor, nadirlik bütçesi oranında ölçekleniyor. Ekonomi
+  oranları yine tek item tavanına kırpılıyor.
+
+### GD41. Yükseltme yalnızca **savaş** statlarını büyütür (2026-08-25)
+- **Nerede:** `core/utils/item_leveling.dart:scaleForLevel`,
+  `GameConstants.itemStatGrowthPerLevel`
+- **Karar:** eşya seviyesi savaş statlarını seviye başına **+%10** büyütüyor
+  (Sv. 1 = ×1.00, Sv. 10 = ×1.90, Sv. 50 = ×5.90). **Ekonomi bonusları
+  (adım→para, adım→XP, çark XP, düşman XP, tavanlar, seri eşiği) sabit
+  kalıyor.**
+- **Neden:** ekonomi dikkatle dengelendi (`economy_pacing_test.dart` ve dört
+  tavan). Çarpanlar eşya seviyesiyle büyüseydi günlük coin tavanı katlanır ve
+  denge çökerdi. Kural `scaleForLevel` içinde **kodla** zorlanıyor
+  (`stat.isCombat` olmayan her etki olduğu gibi geçiyor) ve iki ayrı testle
+  bağlı.
+- **Çift etkili itemlerin bedeli de büyüyor:** yükselen bir eşyanın hem gücü
+  hem bedeli artıyor, yoksa dezavantaj seviyeyle erirdi.
+- **İki tavan birden geçerli:** nadirlik tavanı (10/20/30/40/50) ve oyuncunun
+  kendi seviyesi. Hangisinin bağladığı kullanıcıya **ayrı ayrı** söyleniyor
+  (Model Kuralları #4); "yükseltilemiyor" tek başına bir cevap değil.
+- **Maliyet eğrisi tek sayıdan:** 1'den tavana çıkarmak eşya fiyatının
+  **7 katı**. Bir seviyenin payı `0.5 + seviye / tavan`; ağırlıkların toplamı
+  tam olarak `tavan − 1` ettiği için toplam oranla birebir tutuyor. Ölçüm
+  tablosu aşağıda, `item_leveling_test.dart` ile bağlı.
+
 ---
 ---
 ---
@@ -3792,6 +3864,143 @@ Toplam **470 test geçiyor**, `flutter analyze` temiz.
 Savaş statları hâlâ uyuyor (Aşama 4a). Bölüm 4'te eşya seviyesi savaş
 statlarını büyütecek; arketip o noktada "hangi stat büyüyor" sorusunun da
 cevabı olacak.
+
+---
+---
+
+# Bölüm 4.1–4.2 — Eşya örnekleri ve seviye ✅ (2026-08-25)
+
+Demircinin **temeli**: envanter örnek listesine geçti, mağaza aynı eşyayı
+tekrar satıyor, eşyalar coin harcanarak yükseliyor. Birleştirme, ayrı demirci
+ekranı ve mağaza duyurusu **Bölüm 4.3–4.6**'nın konusu.
+
+Kararlar **GD39–GD41**. Şema **v11 → v12**.
+
+## 1. Veri yapısı
+
+| Önce | Sonra |
+|---|---|
+| `List<String> ownedItemIds` (ekipman + yükseltmeler karışık) | `List<OwnedItem> ownedItems` + `List<String> ownedUpgradeIds` |
+| `Map<slot, itemId> equippedItemIds` | `OwnedItem.equipped` + `_refreshEquipment` normalleştirmesi |
+| Nadirlik ve seviye katalogdan | Nadirlik ve seviye **örnekten**; katalog nadirliği "başlangıç" |
+
+`OwnedItem` = `{instanceId, itemId, level, rarity, equipped}`. Model Kuralları
+#1 temiz: yalnızca `String` ve sayı; item her açılışta katalogdan çözülüyor ve
+sınıfa uyarlanıyor (GD16).
+
+**Taşıma veri kaybetmiyor** ve testle bağlı: her kimlik seviye 1 + katalog
+nadirliğiyle örneğe dönüşüyor, kuşanılı olanlar kuşanılı kalıyor, `/`
+içermeyen kimlikler (yükseltmeler) ayrı listeye gidiyor.
+
+## 2. Mağaza artık aynı eşyayı tekrar satıyor
+
+Birleştirmenin zorunlu sonucu. Kart "Sahipsin" yerine **"N adet"** rozeti
+gösteriyor, satın alma düğmesi açık kalıyor, "Alabileceklerim" süzgeci
+sahipliğe bakmıyor (GD14 güncellendi).
+
+Para kontrolü yerinde: bakiye bir adede yetiyorsa ikincisi alınmıyor ve coin
+negatife düşmüyor. Tüketilen yükseltmelerin (dondurma hakkı, 2x XP) muhafızları
+hiç değişmedi.
+
+## 3. Eşya seviyesi
+
+Her örnek **Sv. 1**'de başlıyor; otomatik seviye atlama yok.
+
+**İki tavan, ikisi de geçerli:**
+
+| Nadirlik | Nadirlik tavanı | 1→tavan toplam maliyet | Coin günü (120/gün) | Oyuncu seviyesi günü (3000 XP/gün) |
+|---|---|---|---|---|
+| Sıradan | 10 | 675 (6,8×) | **6** | 15 |
+| Az Bulunur | 20 | 2.300 (7,1×) | **19** | 63 |
+| Nadir | 30 | 5.775 (7,0×) | **48** | 145 |
+| Epik | 40 | 18.225 (7,0×) | **152** | 260 |
+| Efsanevi | 50 | 59.200 (7,0×) | 493 | 408 |
+
+Fiyatlar katmanın medyan eşyasından (100 / 325 / 825 / 2.600 / 8.450).
+
+**Okuma:** ilk dört katmanda **oyuncunun kendi seviyesi coinden daha sıkı bir
+kısıt.** Yani para gerçek bir maliyet ama duvar değil — "yükseltmek mi, yeni
+eşya mı" sorusu gerçekten sorulabiliyor. Efsanevi bilerek istisna: aylara
+yayılan bir hedef.
+
+Karşılaştırma noktası: 10. seviyedeki oyuncu (15 gün, ~1.800 coin kazanmış)
+ya sıradan bir eşyayı tavana çıkarır (675 coin → saldırı 6 → 11,4) ya da bir
+nadir eşya alır (825 coin → saldırı 13, sonradan 50,7'ye kadar büyüyebilir).
+İkisi de canlı seçenek.
+
+⚠️ **Yükseltme yalnızca savaş statlarını büyütüyor** (GD41). Ekonomi bonusları
+sabit; kural `scaleForLevel` içinde kodla zorlanıyor.
+
+**Katman sıralaması hiç bozulmuyor** (testle bağlı): sıradan tavanı (11,4) <
+az bulunur tavanı (31,9) < nadir (50,7) < epik (107,8) < efsanevi (165,2).
+Sıradan bir eşya asla efsaneviye yetişemiyor.
+
+## 4. Demirci — bu bölümdeki arayüz
+
+Envanterdeki item kartına (bottom sheet) bir **demirci paneli** eklendi:
+mevcut seviye / nadirlik tavanı, sonraki seviyedeki stat farkı, maliyet ve
+"yükselt" düğmesi. Engel **sessiz kalmıyor** ve hangi tavanın bağladığı ayrı
+ayrı söyleniyor:
+
+- "Nadirlik sınırı (Sıradan: 10). Daha ileri gitmek için birleştirerek
+  nadirliğini yükseltmelisin."
+- "Eşya kendi seviyeni geçemez (Sv. 7). Sen yükseldikçe eşyan da yükselebilir."
+- "N coin gerekiyor."
+
+Panel ayrıca "yükseltmek yalnızca savaş istatistiklerini büyütür; ekonomi
+bonusları sabit kalır" diyor — oyuncu neye para verdiğini bilsin.
+
+Envanter listesinde her satır artık bir **örnek**: eşya seviyesi rozet olarak
+görünüyor, aynı eşyanın iki adedi ayrı satırlar.
+
+> **Ayrı demirci/örs ekranı, birleştirme ve mağaza duyurusu Bölüm 4.3–4.6'da.**
+> Bu bölüm yükseltmeyi **ulaşılabilir** kıldı: yarım bir özellik bırakılmadı.
+
+## 5. Yol boyunca bulunan iki gerçek hata
+
+1. **Ana ekrandaki seri kartı 320 dp'de 61 px taşıyordu**
+   (`home_screen.dart` — "Bugün tamamlandı" satırı). Demirci golden'ı
+   yakaladı; metin `Flexible` + ellipsis oldu. Seri sayısı asla kırpılmıyor.
+2. **`FilledButton.icon` etiketini `Flexible`'a sarmak hata veriyor**
+   ("competing ParentDataWidget"): Material etiketi zaten kendi `Flexible`'ına
+   koyuyor. Kırpma doğrudan `Text` üzerinde yapılmalı. İlk denemede bu tuzağa
+   düşüldü; golden yakaladı.
+
+## 6. Test
+
+- `test/item_leveling_test.dart` — **28 test** (yeni): iki tavan ve
+  hangisinin bağladığı, maliyet eğrisi (artan, 25 katı, ~7×), ilk dört
+  katmanda seviye kapısının coin kapısından sıkı olması, **ekonomi
+  bonuslarının seviyeyle büyümediği** (sekiz statın hepsi ayrı ayrı), savaş
+  statlarının büyüdüğü, çift etkili itemin bedelinin de büyüdüğü, katman
+  sıralamasının bozulmadığı, nadirlik yükselmesinin `requiredLevel`'ı
+  değiştirmediği, imzalı itemin karakterini koruduğu, ekonomi tavanının
+  aşılmadığı, örnek modelinin kayıt turu ve bozuk satır davranışı.
+- `test/inventory_test.dart` — **+8 test**: yükseltmenin parayı düşürüp
+  seviyeyi artırması, **yalnızca seçilen örneği** etkilemesi, üç engelin
+  ayrı ayrı söylenmesi, kuşanılı eşyada savaş statının büyüyüp ekonominin
+  değişmemesi, diske yazılması, yükseltilmiş eşyanın satış değeri.
+  Ayrıca "aynı slotta ikinci kuşanılı örnek düşer" (GD26'nın yeni yeri) ve
+  "v11 kaydı örnek listesine taşınır, veri kaybolmaz".
+- `test/golden/blacksmith_golden_test.dart` — **3 golden** (yeni):
+  yükseltilebilir panel (320/390 dp) ve engelli panel (320 dp). PNG'ler
+  okundu ve gözle doğrulandı.
+- Güncellenen (silinmedi): `store_purchase_test.dart` (çoklu satın alma),
+  `store_screen_test.dart` ("N adet" ve süzgeç), `game_storage_test.dart`.
+
+Toplam **511 test geçiyor**, `flutter analyze` temiz.
+
+## 7. Sıradaki bölüm — 4.3–4.6
+
+- **Birleştirme:** aynı eşyadan N örnek + coin → 1 örnek, bir üst nadirlikte.
+  Gereken adet 3/4/5/6 (tek config sabiti). Sonuç örneğin seviyesi ve maliyet
+  kararı orada verilecek. Altyapı hazır: `OwnedItem.rarity` ve
+  `item_rules.dart:withRarity` çalışıyor ve testli — bugün onları **kullanan
+  yol yok**.
+- **Ayrı demirci/örs ekranı:** bu bölümde panel item kartının içinde; 4.4'te
+  envanterde belirgin bir giriş noktası olacak.
+- **Mağaza duyurusu (4.5):** "Yükseltilebilir · Maks Sv. 30",
+  "3 tanesini birleştirerek nadirliğini yükseltebilirsin".
 
 ---
 ---
@@ -4203,8 +4412,9 @@ Firebase gerektirenler **hariç**. Kaynak: bu dosyadaki "OTURUM KAPANIŞI —
 
 1. ~~**Bölüm 3** (buff çeşitliliği) + **A3** + **A4**~~ ✅ **BİTTİ**
    (2026-08-25) — bkz. "Bölüm 3 — Buff çeşitliliği" bölümü, GD36–GD38.
-2. **Bölüm 4.1–4.2** (veri yapısı + eşya seviyesi). Şema v12. Mağazanın tekrar
-   satın almaya açılması burada; kırılan testler burada güncellenir.
+2. ~~**Bölüm 4.1–4.2** (veri yapısı + eşya seviyesi)~~ ✅ **BİTTİ**
+   (2026-08-25) — şema v12, mağaza çoklu satın alma; bkz. "Bölüm 4.1–4.2"
+   bölümü, GD39–GD41.
 3. **Bölüm 4.3–4.6** (birleştirme + demirci arayüzü + mağaza duyurusu).
 4. **Bölüm 5** (streak ↔ macera, çark kilidi, streak stat bonusu).
 5. **Bölüm 6** (A6, A7, savaş sahnesi metin katmanı).

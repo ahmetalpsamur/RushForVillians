@@ -481,9 +481,16 @@ class _StreakCardState extends State<_StreakCard> {
                 color: completed ? AppColors.primary : Colors.white54,
               ),
               const SizedBox(width: 6),
-              Text(
-                completed ? 'Bugün tamamlandı' : 'Bugün bekliyor',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              // Esnek: 320 dp'de "Bugün tamamlandı" satırı 61 px taşıyordu
+              // (demirci golden'ı yakaladı). Seri sayısı asla kırpılmaz,
+              // durum metni gerekirse kırpılır.
+              Flexible(
+                child: Text(
+                  completed ? 'Bugün tamamlandı' : 'Bugün bekliyor',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
               ),
             ],
           ),

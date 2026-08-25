@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
@@ -21,6 +22,7 @@ import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
 import '../../models/item.dart';
+import '../../models/owned_item.dart';
 import '../../models/reward.dart';
 import '../../models/user_profile.dart';
 import '../../models/wheel_reward.dart';
@@ -165,48 +167,56 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     });
   }
 
-  /// Kuşanılan itemleri katalogdan çözer ve toplam buff'ı yeniden hesaplar.
+  /// Kuşanılan örnekleri katalogdan çözer ve toplam buff'ı yeniden hesaplar.
   ///
-  /// Üç şeyi birden temizler:
-  /// - katalogdan kalkmış kimlikler (slot boşalır),
-  /// - artık sahip olunmayan kimlikler (satılmış item kuşanılı kalmasın),
-  /// - oyuncunun sınıfının kullanamadığı kategoriler (sınıf değişimi).
+  /// Dört şeyi birden temizler:
+  /// - katalogdan kalkmış kimlikler (kuşanma düşer),
+  /// - oyuncunun sınıfının kullanamadığı kategoriler (sınıf değişimi),
+  /// - seviye kilidi artık tutmayan örnekler,
+  /// - **aynı slotta ikinci bir örnek** — slot başına tek eşya kuralı
+  ///   eskiden `Map` yapısıyla veri düzeyinde zorlanıyordu (GD26); envanter
+  ///   örnek listesine geçince (GD39) kural buraya taşındı.
   ///
-  /// **Sahiplik kaydına dokunmaz**: yalnızca kuşanma boşaltılır.
+  /// **Sahiplik kaydına dokunmaz**: yalnızca kuşanma düşer (GD28).
   /// `setState` içinden çağrılabilsin diye kendisi `setState` çağırmaz.
   void _refreshEquipment() {
     final characterClass = _profile.avatar.characterClass;
     final resolved = <Item>[];
-    final staleSlots = <String>[];
+    final usedSlots = <String>{};
 
-    _profile.equippedItemIds.forEach((slot, id) {
-      final item = ItemCatalog.byId(id, characterClass: characterClass);
+    for (var i = 0; i < _profile.ownedItems.length; i++) {
+      final instance = _profile.ownedItems[i];
+      if (!instance.equipped) continue;
+
+      final item = _resolveInstance(instance);
       if (item == null ||
-          !_profile.ownedItemIds.contains(id) ||
           !item.isUsableBy(characterClass) ||
-          item.category.folder != slot) {
-        staleSlots.add(slot);
-        return;
+          !usedSlots.add(item.category.folder)) {
+        _profile.ownedItems[i] = instance.copyWith(equipped: false);
+        continue;
       }
       resolved.add(item);
-    });
-
-    for (final slot in staleSlots) {
-      _profile.unequipSlot(slot);
     }
     _buffs = EquippedBuffs.from(resolved);
   }
 
-  /// Kuşanılan itemler, oyuncunun sınıfına uyarlanmış hâlleriyle.
-  List<Item> get _equippedItems {
+  /// Bir envanter örneğini katalogdan çözer: sınıfa uyarlanmış item +
+  /// örneğin nadirliği + örneğin seviyesi. Katalogda yoksa `null`.
+  Item? _resolveInstance(OwnedItem instance) {
     final characterClass = _profile.avatar.characterClass;
-    return [
-      for (final id in _profile.equippedItemIds.values)
-        if (ItemCatalog.byId(id, characterClass: characterClass)
-            case final item?)
-          item,
-    ];
+    final base = ItemCatalog.byId(
+      instance.itemId,
+      characterClass: characterClass,
+    );
+    if (base == null) return null;
+    return resolveOwnedItem(base, instance, characterClass: characterClass);
   }
+
+  /// Kuşanılan itemler, sınıfa uyarlanmış ve seviyesi uygulanmış hâlleriyle.
+  List<Item> get _equippedItems => [
+    for (final instance in _profile.equippedInstances)
+      if (_resolveInstance(instance) case final item?) item,
+  ];
 
   /// Seçili adım kaynağını kurar ve dinlemeye başlar.
   ///
@@ -864,8 +874,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       if (item == null) {
         // Çark XP bonusu: kuşanılan ekipmandan gelir.
         _awardXp((reward.xp * _buffs.wheelXpMultiplier).floor());
-      } else if (!_profile.ownedItemIds.contains(item.id)) {
-        _profile.ownedItemIds.add(item.id);
+      } else {
+        // Çark havuzu sahip olunanları zaten eliyor (GD19); yine de örnek
+        // olarak ekleniyor, kimlik olarak değil.
+        _profile.addItem(item.id);
       }
     });
     _persist();
@@ -877,7 +889,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// coin'i alıyor ama kimliği ikinci kez eklemediği için oyuncu bedavaya
   /// ödüyordu.
   void _purchase(XpStoreItem item) {
-    final alreadyOwned = _profile.ownedItemIds.contains(item.id);
+    final alreadyOwned = _profile.ownedUpgradeIds.contains(item.id);
     if (alreadyOwned && !item.repeatable) return;
     if (_profile.coins < item.cost) return;
 
@@ -910,7 +922,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     setState(() {
       _profile.coins -= item.cost;
-      if (!alreadyOwned) _profile.ownedItemIds.add(item.id);
+      if (!alreadyOwned) _profile.ownedUpgradeIds.add(item.id);
     });
     _persist();
     _showStoreNotice('${item.name} satın alındı!');
@@ -918,17 +930,25 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   /// Ekipman satın alır. Seviye kilidi (#10/#11) ve para kontrolü burada da
   /// yapılır: ekran devre dışı görünse bile son söz state'in.
+  ///
+  /// **Aynı eşya birden fazla kez alınabilir** (GD39): birleştirme aynı
+  /// eşyadan birkaç adet istiyor. Her satın alma envantere **yeni bir örnek**
+  /// ekliyor; eskiden ikinci satın alma sessizce reddediliyordu.
   void _purchaseEquipment(Item item) {
-    if (_profile.ownedItemIds.contains(item.id)) return;
     if (!item.isUnlockedAt(_profile.level)) return;
     if (_profile.coins < item.cost) return;
 
+    final count = _profile.ownedCountOf(item.id) + 1;
     setState(() {
       _profile.coins -= item.cost;
-      _profile.ownedItemIds.add(item.id);
+      _profile.addItem(item.id);
     });
     _persist();
-    _showStoreNotice('${item.name} satın alındı!');
+    _showStoreNotice(
+      count == 1
+          ? '${item.name} satın alındı!'
+          : '${item.name} satın alındı. Artık $count adet.',
+    );
   }
 
   /// Item'ı kategorisine karşılık gelen slota kuşandırır.
@@ -939,9 +959,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   ///
   /// Engellenen her durum **sessiz kalmaz** (Model Kuralları #4): nedeni
   /// söylenir.
-  void _equipItem(Item item) {
-    if (!_profile.ownedItemIds.contains(item.id)) {
-      _showStoreNotice('${item.name} sende yok.');
+  void _equipItem(int instanceId) {
+    final instance = _profile.instanceById(instanceId);
+    if (instance == null) {
+      _showStoreNotice('Bu eşya envanterinde yok.');
+      return;
+    }
+    final item = _resolveInstance(instance);
+    if (item == null) {
+      _showStoreNotice('Bu eşya artık katalogda yok.');
       return;
     }
     if (!item.isUnlockedAt(_profile.level)) {
@@ -955,52 +981,108 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _showStoreNotice('${item.name} senin sınıfın için değil.');
       return;
     }
-    if (_profile.equippedIdInSlot(item.category.folder) == item.id) return;
+    if (instance.equipped) return;
 
-    final replacedId = _profile.equipInSlot(item.category.folder, item.id);
+    // Aynı slottaki önceki örnek çıkarılır; adı bildirimde söylenmeli
+    // (Model Kuralları #4 — sessizce yer değiştirmesin).
+    String? replacedName;
+    for (final other in _profile.equippedInstances) {
+      final resolved = _resolveInstance(other);
+      if (resolved != null && resolved.category == item.category) {
+        replacedName = resolved.name;
+        _profile.updateInstance(other.instanceId, equipped: false);
+      }
+    }
+    _profile.updateInstance(instanceId, equipped: true);
     setState(_refreshEquipment);
     _persist();
 
-    final replaced =
-        replacedId == null
-            ? null
-            : ItemCatalog.byId(
-              replacedId,
-              characterClass: _profile.avatar.characterClass,
-            );
     _showStoreNotice(
-      replaced == null
+      replacedName == null
           ? '${item.name} kuşanıldı.'
-          : '${item.name} kuşanıldı, ${replaced.name} çıkarıldı.',
+          : '${item.name} kuşanıldı, $replacedName çıkarıldı.',
     );
   }
 
   /// Slotu boşaltır.
   void _unequipSlot(ItemCategory category) {
-    final removedId = _profile.unequipSlot(category.folder);
-    if (removedId == null) return;
+    OwnedItem? target;
+    for (final instance in _profile.equippedInstances) {
+      final resolved = _resolveInstance(instance);
+      if (resolved != null && resolved.category == category) {
+        target = instance;
+        break;
+      }
+    }
+    if (target == null) return;
+
+    final name = _resolveInstance(target)?.name ?? 'Item';
+    _profile.updateInstance(target.instanceId, equipped: false);
     setState(_refreshEquipment);
     _persist();
+    _showStoreNotice('$name çıkarıldı.');
+  }
 
-    final removed = ItemCatalog.byId(
-      removedId,
-      characterClass: _profile.avatar.characterClass,
+  /// Bir eşya örneğini bir seviye yükseltir (demirci).
+  ///
+  /// İki tavan ve para kontrolü **burada da** yapılır: ekran devre dışı
+  /// görünse bile son söz state'in. Engel sessiz kalmaz (Model Kuralları #4).
+  void _upgradeItem(int instanceId) {
+    final instance = _profile.instanceById(instanceId);
+    if (instance == null) {
+      _showStoreNotice('Bu eşya envanterinde yok.');
+      return;
+    }
+    final resolved = _resolveInstance(instance);
+    if (resolved == null) {
+      _showStoreNotice('Bu eşya artık katalogda yok.');
+      return;
+    }
+
+    final quote = quoteUpgrade(
+      resolved: resolved,
+      instance: instance,
+      playerLevel: _profile.level,
+      coins: _profile.coins,
     );
-    _showStoreNotice('${removed?.name ?? 'Item'} çıkarıldı.');
+    if (!quote.canUpgrade) {
+      final rarity = instance.effectiveRarity(resolved.rarity);
+      _showStoreNotice(
+        quote.reason(rarity, _profile.level) ?? 'Şu an yükseltilemiyor.',
+      );
+      return;
+    }
+
+    setState(() {
+      _profile.coins -= quote.cost;
+      _profile.updateInstance(instanceId, level: quote.nextLevel);
+      // Kuşanılıysa buff'lar hemen büyümeli.
+      _refreshEquipment();
+    });
+    _persist();
+    _showStoreNotice(
+      '${resolved.name} Sv. ${quote.nextLevel} oldu. -${quote.cost} coin.',
+    );
   }
 
   /// Item'ı satar: sahiplikten düşer, kuşanılıysa önce çıkarılır ve
   /// [sellValueFor] kadar coin geri verilir.
   ///
   /// Onay ekranını çağıran taraf (envanter) gösterir; burası kararı uygular.
-  void _sellItem(Item item) {
-    if (!_profile.ownedItemIds.contains(item.id)) return;
+  void _sellItem(int instanceId) {
+    final instance = _profile.instanceById(instanceId);
+    if (instance == null) return;
+    final item = _resolveInstance(instance);
+    if (item == null) return;
+
+    // Satış değeri **çözülmüş** fiyattan: birleştirilmiş bir örnek yeni
+    // nadirliğinin fiyatı üzerinden değerleniyor. Yükseltmeye harcanan coin
+    // geri gelmiyor — satış geri alınamaz (GD29).
     final value = sellValueFor(item.cost);
-    final wasEquipped = _profile.isEquipped(item.id);
+    final wasEquipped = instance.equipped;
 
     setState(() {
-      _profile.unequipItem(item.id);
-      _profile.ownedItemIds.remove(item.id);
+      _profile.removeInstance(instanceId);
       _profile.coins += value;
       _refreshEquipment();
     });
@@ -1025,20 +1107,32 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       onEquip: _equipItem,
       onUnequip: _unequipSlot,
       onSell: _sellItem,
+      onUpgrade: _upgradeItem,
     ),
   );
 
-  InventoryState _readInventoryState() => InventoryState(
-    profile: _profile,
-    ownedItems: [
-      for (final id in _profile.ownedItemIds)
-        if (ItemCatalog.byId(id, characterClass: _profile.avatar.characterClass)
-            case final item?)
-          item,
-    ],
-    equippedItems: _equippedItems,
-    buffs: _buffs,
-  );
+  InventoryState _readInventoryState() {
+    final entries = <InventoryEntry>[];
+    for (final instance in _profile.ownedItems) {
+      final item = _resolveInstance(instance);
+      if (item != null) entries.add(InventoryEntry(instance, item));
+    }
+    return InventoryState(
+      profile: _profile,
+      entries: entries,
+      equippedItems: _equippedItems,
+      buffs: _buffs,
+    );
+  }
+
+  /// Mağazadaki "N adet" etiketinin kaynağı: kimlik → sahip olunan adet.
+  Map<String, int> get _ownedEquipmentCounts {
+    final counts = <String, int>{};
+    for (final instance in _profile.ownedItems) {
+      counts[instance.itemId] = (counts[instance.itemId] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   void _showStoreNotice(String message) {
     ScaffoldMessenger.of(context)
@@ -1066,7 +1160,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         extraSpins: _profile.extraWheelSpins,
         level: _profile.level,
         equipment: _equipment,
-        ownedItemIds: _profile.ownedItemIds,
+        ownedItemIds: [
+          for (final instance in _profile.ownedItems) instance.itemId,
+        ],
         seed: _profile.wheelSeed,
         onSpinResult: _spinWheel,
       ),
@@ -1076,7 +1172,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _openRewards() => _push(RewardsScreen(rewards: _rewards));
 
   void _editCharacter() {
-    if (!_profile.ownedItemIds.contains(_reincarnationPotionId)) {
+    if (!_profile.ownedUpgradeIds.contains(_reincarnationPotionId)) {
       _showStoreNotice(
         'Karakterini değiştirmek için Reenkarnasyon İksiri gerekli.',
       );
@@ -1088,7 +1184,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onCompleted: (avatar) {
           setState(() {
             _profile.avatar = avatar;
-            _profile.ownedItemIds.remove(_reincarnationPotionId);
+            _profile.ownedUpgradeIds.remove(_reincarnationPotionId);
             _equipment = ItemCatalog.forCharacterClass(avatar.characterClass);
             _refreshEquipment();
           });
@@ -1155,7 +1251,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         equipment: _equipment,
         coins: _profile.coins,
         level: _profile.level,
-        ownedItemIds: _profile.ownedItemIds,
+        ownedUpgradeIds: _profile.ownedUpgradeIds,
+        ownedEquipmentCounts: _ownedEquipmentCounts,
         streakFreezes: _profile.streakFreezes,
         extraWheelSpins: _profile.extraWheelSpins,
         xpBoostActive: _profile.isXpBoostActive,
@@ -1170,7 +1267,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         stepHistory: _stepHistory,
         equippedItems: _equippedItems,
         buffs: _buffs,
-        canEditCharacter: _profile.ownedItemIds.contains(
+        canEditCharacter: _profile.ownedUpgradeIds.contains(
           _reincarnationPotionId,
         ),
         onEditCharacter: _editCharacter,

@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 11;
+  static const int schemaVersion = 12;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -98,6 +98,59 @@ class GameStorage {
     // eski kayıtta boş harita doğru varsayılan: sahip olunan hiçbir item
     // kendiliğinden kuşanılmış sayılmamalı, kuşanmayı oyuncu seçer.
     10: (state) => state,
+    // 11 -> 12: envanter kimlik listesinden **örnek** listesine geçti
+    // (her adedin kendi seviyesi, nadirliği ve kuşanma durumu var) ve
+    // yükseltmeler ayrı bir listeye ayrıldı.
+    //
+    // Veri kaybı yok: sahip olunan her kimlik seviye 1 ve katalog
+    // nadirliğiyle (`rarity: null`) bir örneğe dönüşüyor, kuşanılı olanlar
+    // kuşanılı kalıyor.
+    //
+    // İki namespace'i **kimliğin biçimi** ayırıyor: katalog kimlikleri her
+    // zaman `<kategori>/<dosya>` (ör. `swords/fire_sword`), yükseltme
+    // kimlikleri (`boost_double_xp`) hiç `/` içermiyor. Taşıma anında
+    // `AssetManifest` okunamadığı için katalogdan doğrulama yapılamaz;
+    // bu ayrım katalogsuz ve güvenilir.
+    11: (state) {
+      final profile = state['profile'];
+      if (profile is! Map<String, dynamic>) return state;
+
+      final owned = profile.remove('ownedItemIds');
+      final equipped = profile.remove('equippedItemIds');
+
+      final equippedIds = <String>{};
+      if (equipped is Map) {
+        for (final value in equipped.values) {
+          if (value is String && value.isNotEmpty) equippedIds.add(value);
+        }
+      }
+
+      final instances = <Map<String, Object?>>[];
+      final upgrades = <String>[];
+      var nextId = 1;
+      if (owned is List) {
+        for (final id in owned) {
+          if (id is! String || id.isEmpty) continue;
+          if (!id.contains('/')) {
+            upgrades.add(id);
+            continue;
+          }
+          instances.add({
+            'instanceId': nextId++,
+            'itemId': id,
+            'level': 1,
+            // null = katalog nadirliği; taşıma katalogu okuyamaz.
+            'rarity': null,
+            'equipped': equippedIds.contains(id),
+          });
+        }
+      }
+
+      profile['ownedItems'] = instances;
+      profile['ownedUpgradeIds'] = upgrades;
+      profile['nextItemInstanceId'] = nextId;
+      return state;
+    },
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

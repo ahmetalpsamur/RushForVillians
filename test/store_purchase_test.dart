@@ -14,6 +14,7 @@ import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/item.dart';
+import 'package:rush_for_villains/models/owned_item.dart';
 import 'package:rush_for_villains/models/user_profile.dart';
 import 'package:rush_for_villains/services/game_storage.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
@@ -60,15 +61,32 @@ void main() {
     int extraWheelSpins = 0,
     DateTime? xpBoostUntil,
     List<String>? owned,
-  }) => UserProfile(
-    avatar: _avatar,
-    coins: coins,
-    level: level,
-    streakFreezes: streakFreezes,
-    extraWheelSpins: extraWheelSpins,
-    xpBoostUntil: xpBoostUntil,
-    ownedItemIds: owned,
-  );
+    List<String>? ownedUpgrades,
+  }) {
+    // Envanter artık **örnek** listesi (GD39); testler kimlikle çalışmaya
+    // devam ediyor ve bu yardımcı çeviriyi yapıyor.
+    final instances = <OwnedItem>[];
+    var serial = 1;
+    for (final id in owned ?? const <String>[]) {
+      instances.add(OwnedItem(instanceId: serial++, itemId: id));
+    }
+    return UserProfile(
+      avatar: _avatar,
+      coins: coins,
+      level: level,
+      streakFreezes: streakFreezes,
+      extraWheelSpins: extraWheelSpins,
+      xpBoostUntil: xpBoostUntil,
+      ownedItems: instances,
+      ownedUpgradeIds: ownedUpgrades,
+      nextItemInstanceId: serial,
+    );
+  }
+
+  /// Envanterdeki kimlikler (adetli).
+  List<String> ownedIdsOf(UserProfile profile) => [
+    for (final instance in profile.ownedItems) instance.itemId,
+  ];
 
   /// [RootShell]'i mağaza sekmesi açık şekilde kurar ve profili döner.
   ///
@@ -166,7 +184,7 @@ void main() {
       await tapEquipment(tester, cheapItem);
 
       expect(profile.coins, 5000 - cheapItem.cost);
-      expect(profile.ownedItemIds, [cheapItem.id]);
+      expect(ownedIdsOf(profile), [cheapItem.id]);
     });
 
     testWidgets('satın alma sonrası ekran tazelenir (M1 regresyonu)', (
@@ -182,11 +200,11 @@ void main() {
 
       await tapEquipment(tester, cheapItem);
 
-      // Bakiye ve sahiplik ekranda görünmeli; itilen rota kullanıldığında
+      // Bakiye ve adet ekranda görünmeli; itilen rota kullanıldığında
       // ikisi de eski değerde kalıyordu.
       expect(find.text('5000'), findsNothing);
       expect(find.text('${5000 - cheapItem.cost}'), findsOneWidget);
-      expect(find.text('Sahipsin'), findsOneWidget);
+      expect(find.text('1 adet'), findsOneWidget);
     });
 
     testWidgets('yetersiz bakiyede para değişmez ve sebebi söylenir', (
@@ -202,7 +220,7 @@ void main() {
       await tapEquipment(tester, cheapItem);
 
       expect(profile.coins, short);
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.ownedItems, isEmpty);
       expect(find.textContaining('10 coin daha gerekiyor'), findsOneWidget);
     });
 
@@ -217,10 +235,15 @@ void main() {
       await tapEquipment(tester, midItem);
 
       expect(profile.coins, 0);
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.ownedItems, isEmpty);
     });
 
-    testWidgets('aynı öğe ikinci kez alınamaz, para yanmaz', (tester) async {
+    testWidgets('aynı öğe ikinci kez alınır, ikinci örnek envantere girer', (
+      tester,
+    ) async {
+      // Davranış Bölüm 4.1'de **bilerek** değişti (GD39): birleştirme aynı
+      // eşyadan birkaç adet istiyor. İkinci satın alma parayı yakmıyor,
+      // gerçekten ikinci bir örnek veriyor.
       final profile = await pumpShell(
         tester,
         profile: makeProfile(coins: 5000),
@@ -231,18 +254,41 @@ void main() {
       final afterFirst = profile.coins;
       await tapEquipment(tester, cheapItem);
 
-      expect(profile.coins, afterFirst);
-      expect(profile.ownedItemIds, [cheapItem.id]);
+      expect(profile.coins, afterFirst - cheapItem.cost);
+      expect(ownedIdsOf(profile), [cheapItem.id, cheapItem.id]);
+      // İki örneğin kimliği farklı: "hangisini yükselt" sorusu cevaplanabilir.
+      expect(
+        profile.ownedItems.map((instance) => instance.instanceId).toSet(),
+        hasLength(2),
+      );
     });
 
-    testWidgets('hızlı çift dokunma tek satın alma sayılır', (tester) async {
+    testWidgets('parası yetmeyen ikinci satın alma reddedilir', (tester) async {
+      // Çoklu satın alma açıldı ama para kontrolü yerinde: bakiye bir
+      // adede yetiyorsa ikincisi alınamaz ve para negatife düşmez.
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(coins: cheapItem.cost),
+        catalog: [cheapItem],
+      );
+
+      await tapEquipment(tester, cheapItem);
+      await tapEquipment(tester, cheapItem);
+
+      expect(profile.coins, 0);
+      expect(ownedIdsOf(profile), [cheapItem.id]);
+    });
+
+    testWidgets('hızlı çift dokunma iki satın alma sayılır', (tester) async {
+      // Ekipmanda "aynı kareyi beklemeden iki dokunuş" artık iki adet
+      // demek; para iki kez düşüyor ve iki örnek geliyor. Tüketilen
+      // yükseltmelerde (dondurma hakkı, 2x XP) muhafızlar duruyor.
       final profile = await pumpShell(
         tester,
         profile: makeProfile(coins: 5000),
         catalog: [cheapItem],
       );
 
-      // Aynı kareyi beklemeden iki dokunuş.
       final button = find.descendant(
         of: find.byType(XpStoreScreen),
         matching: find.widgetWithText(FilledButton, '${cheapItem.cost}'),
@@ -251,8 +297,8 @@ void main() {
       await tester.tap(button.first, warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(profile.coins, 5000 - cheapItem.cost);
-      expect(profile.ownedItemIds, [cheapItem.id]);
+      expect(profile.coins, 5000 - cheapItem.cost * 2);
+      expect(ownedIdsOf(profile), [cheapItem.id, cheapItem.id]);
     });
 
     testWidgets('satın alma atomik: para ve sahiplik birlikte değişir', (
@@ -267,7 +313,7 @@ void main() {
       await tapEquipment(tester, cheapItem);
 
       expect(profile.coins, 0);
-      expect(profile.ownedItemIds, [cheapItem.id]);
+      expect(ownedIdsOf(profile), [cheapItem.id]);
     });
   });
 
@@ -282,7 +328,7 @@ void main() {
       await tapEquipment(tester, lockedItem);
 
       expect(profile.coins, 100000);
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.ownedItems, isEmpty);
       expect(find.textContaining('seviye gerekiyor'), findsOneWidget);
     });
 
@@ -297,7 +343,7 @@ void main() {
 
       await tapEquipment(tester, lockedItem);
 
-      expect(profile.ownedItemIds, [lockedItem.id]);
+      expect(ownedIdsOf(profile), [lockedItem.id]);
     });
 
     testWidgets('bir seviye eksikken alınamaz', (tester) async {
@@ -312,7 +358,7 @@ void main() {
 
       await tapEquipment(tester, lockedItem);
 
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.ownedItems, isEmpty);
     });
 
     testWidgets('seviye atlayınca kilit açılır ve ekran güncellenir', (
@@ -336,7 +382,7 @@ void main() {
 
       expect(find.byIcon(Icons.lock), findsNothing);
       await tapEquipment(tester, lockedItem);
-      expect(profile.ownedItemIds, [lockedItem.id]);
+      expect(ownedIdsOf(profile), [lockedItem.id]);
     });
   });
 
@@ -463,7 +509,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 2500));
 
       // Ödül ya item ya XP; ikisi de profile işlemeli.
-      final gotItem = profile.ownedItemIds.isNotEmpty;
+      final gotItem = profile.ownedItems.isNotEmpty;
       final gotXp = profile.xp > xpBeforeSpin;
       expect(
         gotItem || gotXp,
@@ -528,7 +574,10 @@ void main() {
 
       expect(envelope['schemaVersion'], GameStorage.schemaVersion);
       expect(saved['coins'], profile.coins);
-      expect(saved['ownedItemIds'], [cheapItem.id]);
+      expect(
+        (saved['ownedItems'] as List).single,
+        containsPair('itemId', cheapItem.id),
+      );
     });
 
     testWidgets('tüketilen yükseltmeler de diske yazılır', (tester) async {

@@ -8,8 +8,10 @@ import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/item_comparison.dart';
+import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_rules.dart';
 import '../../models/item.dart';
+import '../../models/owned_item.dart';
 import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/user_profile.dart';
@@ -24,11 +26,29 @@ import '../../widgets/section_card.dart';
 /// tazelemiyor (GD11); bu yüzden veriyi tutmaz, her çizimde
 /// [InventoryScreen.readState] ile **yeniden okur**. Böylece arka planda adım
 /// gelip para değiştiğinde ya da seviye atlandığında envanter de güncellenir.
+/// Envanterdeki bir örnek ve onun **çözülmüş** item hâli.
+///
+/// Envanter artık kimlik listesi değil (GD39): aynı eşyadan birden fazla adet
+/// olabiliyor ve her adedin kendi seviyesi, nadirliği ve kuşanma durumu var.
+/// Ekranın her satırı bir örneğe karşılık geliyor, bir kimliğe değil.
+class InventoryEntry {
+  final OwnedItem instance;
+
+  /// Sınıfa uyarlanmış, örneğin nadirliği ve seviyesi uygulanmış item.
+  final Item item;
+
+  const InventoryEntry(this.instance, this.item);
+
+  int get instanceId => instance.instanceId;
+  bool get equipped => instance.equipped;
+  int get level => instance.level;
+}
+
 class InventoryState {
   final UserProfile profile;
 
-  /// Sahip olunan itemler, oyuncunun sınıfına uyarlanmış hâlleriyle.
-  final List<Item> ownedItems;
+  /// Sahip olunan **örnekler**, çözülmüş item'larıyla birlikte.
+  final List<InventoryEntry> entries;
 
   /// Kuşanılan itemler.
   final List<Item> equippedItems;
@@ -37,10 +57,19 @@ class InventoryState {
 
   const InventoryState({
     required this.profile,
-    required this.ownedItems,
+    required this.entries,
     required this.equippedItems,
     required this.buffs,
   });
+
+  /// Bu kimlikten kaç adet var (birleştirme için gereken bilgi).
+  int countOf(String itemId) {
+    var count = 0;
+    for (final entry in entries) {
+      if (entry.item.id == itemId) count++;
+    }
+    return count;
+  }
 
   /// [category] slotunda kuşanılı item; boşsa `null`.
   Item? equippedIn(ItemCategory category) {
@@ -70,9 +99,12 @@ class InventoryScreen extends StatefulWidget {
 
   final InventoryState Function() readState;
 
-  final void Function(Item item) onEquip;
+  /// Kuşanma, satma ve yükseltme **örnek kimliğiyle** çalışır: aynı eşyadan
+  /// üç adet varsa "hangisi" sorusunun cevabı o.
+  final void Function(int instanceId) onEquip;
   final void Function(ItemCategory category) onUnequip;
-  final void Function(Item item) onSell;
+  final void Function(int instanceId) onSell;
+  final void Function(int instanceId) onUpgrade;
 
   const InventoryScreen({
     super.key,
@@ -81,6 +113,7 @@ class InventoryScreen extends StatefulWidget {
     required this.onEquip,
     required this.onUnequip,
     required this.onSell,
+    required this.onUpgrade,
   });
 
   @override
@@ -94,30 +127,50 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// Yalnızca seviyesi yeten itemleri göster.
   bool _onlyUsable = false;
 
-  List<Item> _visible(InventoryState state) {
-    final items =
-        state.ownedItems.where((item) {
-          if (_categoryFilter != null && item.category != _categoryFilter) {
+  List<InventoryEntry> _visible(InventoryState state) {
+    final entries =
+        state.entries.where((entry) {
+          if (_categoryFilter != null &&
+              entry.item.category != _categoryFilter) {
             return false;
           }
-          if (_onlyUsable && !item.isUnlockedAt(state.profile.level)) {
+          if (_onlyUsable && !entry.item.isUnlockedAt(state.profile.level)) {
             return false;
           }
           return true;
         }).toList();
 
-    // Kuşanılanlar önce, sonra nadirlik, sonra seviye: en değerli en üstte.
-    items.sort((a, b) {
-      final aEquipped = state.profile.isEquipped(a.id) ? 0 : 1;
-      final bEquipped = state.profile.isEquipped(b.id) ? 0 : 1;
+    // Kuşanılanlar önce, sonra nadirlik, sonra eşya seviyesi: en değerli
+    // en üstte. Son ölçüt örnek kimliği — aynı eşyanın iki adedi arasında
+    // sıra her çizimde aynı kalsın.
+    entries.sort((a, b) {
+      final aEquipped = a.equipped ? 0 : 1;
+      final bEquipped = b.equipped ? 0 : 1;
       if (aEquipped != bEquipped) return aEquipped.compareTo(bEquipped);
-      final byRarity = b.rarity.index.compareTo(a.rarity.index);
+      final byRarity = b.item.rarity.index.compareTo(a.item.rarity.index);
       if (byRarity != 0) return byRarity;
-      final byLevel = b.requiredLevel.compareTo(a.requiredLevel);
-      if (byLevel != 0) return byLevel;
-      return a.name.compareTo(b.name);
+      final byItemLevel = b.level.compareTo(a.level);
+      if (byItemLevel != 0) return byItemLevel;
+      final byLock = b.item.requiredLevel.compareTo(a.item.requiredLevel);
+      if (byLock != 0) return byLock;
+      final byName = a.item.name.compareTo(b.item.name);
+      if (byName != 0) return byName;
+      return a.instanceId.compareTo(b.instanceId);
     });
-    return items;
+    return entries;
+  }
+
+  /// Slot tahtasından kuşanılı bir item'a dokunulduğunda, o item'a karşılık
+  /// gelen **örneği** bulur. Aynı eşyadan birkaç adet varsa kuşanılı olan
+  /// tektir; onu açıyoruz.
+  void _openEquippedDetails(Item item) {
+    final state = widget.readState();
+    for (final entry in state.entries) {
+      if (entry.equipped && entry.item.category == item.category) {
+        _openDetails(state, entry);
+        return;
+      }
+    }
   }
 
   void _notify(String message) {
@@ -128,7 +181,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       );
   }
 
-  Future<void> _openDetails(InventoryState state, Item item) async {
+  Future<void> _openDetails(InventoryState state, InventoryEntry entry) async {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surface,
@@ -136,28 +189,33 @@ class _InventoryScreenState extends State<InventoryScreen> {
       showDragHandle: true,
       builder:
           (sheetContext) => _ItemSheet(
-            item: item,
+            entry: entry,
             state: state,
             onEquip: () {
               Navigator.of(sheetContext).pop();
-              widget.onEquip(item);
+              widget.onEquip(entry.instanceId);
             },
             onUnequip: () {
               Navigator.of(sheetContext).pop();
-              widget.onUnequip(item.category);
+              widget.onUnequip(entry.item.category);
+            },
+            onUpgrade: () {
+              Navigator.of(sheetContext).pop();
+              widget.onUpgrade(entry.instanceId);
             },
             onSell: () async {
-              final confirmed = await _confirmSell(sheetContext, item);
+              final confirmed = await _confirmSell(sheetContext, entry);
               if (!confirmed) return;
               if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-              widget.onSell(item);
+              widget.onSell(entry.instanceId);
             },
           ),
     );
   }
 
   /// Satış geri alınamaz: onay istenir ve geri gelecek para önceden söylenir.
-  Future<bool> _confirmSell(BuildContext context, Item item) async {
+  Future<bool> _confirmSell(BuildContext context, InventoryEntry entry) async {
+    final item = entry.item;
     final value = sellValueFor(item.cost);
     final result = await showDialog<bool>(
       context: context,
@@ -166,9 +224,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
             backgroundColor: AppColors.surface,
             title: const Text('Item satılsın mı?'),
             content: Text(
-              '${item.name} envanterinden çıkacak ve +$value coin '
-              'kazanacaksın. Bu işlem geri alınamaz; itemi tekrar istersen '
-              '${item.cost} coin ödemen gerekir.',
+              '${item.name}${entry.level > 1 ? ' (Sv. ${entry.level})' : ''} '
+              'envanterinden çıkacak ve +$value coin kazanacaksın. '
+              'Bu işlem geri alınamaz; itemi tekrar istersen ${item.cost} '
+              'coin ödemen gerekir ve yükseltmelerini baştan yapman gerekir.',
             ),
             actions: [
               TextButton(
@@ -196,8 +255,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final categories =
             slots
                 .where(
-                  (category) =>
-                      state.ownedItems.any((item) => item.category == category),
+                  (category) => state.entries.any(
+                    (entry) => entry.item.category == category,
+                  ),
                 )
                 .toList();
 
@@ -239,7 +299,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   child: _SlotBoard(
                     state: state,
                     slots: slots,
-                    onTapEquipped: (item) => _openDetails(state, item),
+                    onTapEquipped: _openEquippedDetails,
                     onTapEmpty: (category) {
                       setState(() => _categoryFilter = category);
                       _notify(
@@ -249,7 +309,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
               ),
-              if (state.ownedItems.isEmpty)
+              if (state.entries.isEmpty)
                 const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
@@ -308,13 +368,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     sliver: SliverList.builder(
                       itemCount: visible.length,
                       itemBuilder: (context, index) {
-                        final item = visible[index];
+                        final entry = visible[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _InventoryRow(
-                            item: item,
-                            state: state,
-                            onTap: () => _openDetails(state, item),
+                            key: ValueKey(entry.instanceId),
+                            entry: entry,
+                            playerLevel: state.profile.level,
+                            onTap: () => _openDetails(state, entry),
                           ),
                         );
                       },
@@ -874,20 +935,22 @@ class _SlotTile extends StatelessWidget {
 
 /// Envanter listesindeki tek satır.
 class _InventoryRow extends StatelessWidget {
-  final Item item;
-  final InventoryState state;
+  final InventoryEntry entry;
+  final int playerLevel;
   final VoidCallback onTap;
 
   const _InventoryRow({
-    required this.item,
-    required this.state,
+    super.key,
+    required this.entry,
+    required this.playerLevel,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final locked = !item.isUnlockedAt(state.profile.level);
-    final equipped = state.profile.isEquipped(item.id);
+    final item = entry.item;
+    final locked = !item.isUnlockedAt(playerLevel);
+    final equipped = entry.equipped;
 
     return InkWell(
       onTap: onTap,
@@ -960,6 +1023,12 @@ class _InventoryRow extends StatelessWidget {
                       children: [
                         RarityBadge(rarity: item.rarity),
                         ArchetypeBadge(archetype: item.archetype),
+                        // Eşya seviyesi: yükseltilmiş bir eşya listede
+                        // hemen ayırt edilebilmeli.
+                        _Tag(
+                          text: 'Sv. ${entry.level}',
+                          color: AppColors.primary,
+                        ),
                         Text(
                           item.category.label,
                           style: const TextStyle(
@@ -1020,26 +1089,30 @@ class _Tag extends StatelessWidget {
 
 /// Item ayrıntısı: etkiler, kuşanılıyla karşılaştırma ve aksiyonlar.
 class _ItemSheet extends StatelessWidget {
-  final Item item;
+  final InventoryEntry entry;
   final InventoryState state;
   final VoidCallback onEquip;
   final VoidCallback onUnequip;
+  final VoidCallback onUpgrade;
   final Future<void> Function() onSell;
 
   const _ItemSheet({
-    required this.item,
+    required this.entry,
     required this.state,
     required this.onEquip,
     required this.onUnequip,
+    required this.onUpgrade,
     required this.onSell,
   });
+
+  Item get item => entry.item;
 
   /// Kuşanmayı engelleyen sebep; engel yoksa `null`.
   ///
   /// Kilidin tek kaynağı [Item.isUnlockedAt]; burada ikinci bir seviye
   /// mantığı yok, yalnızca aynı kontrolün kullanıcıya çevirisi var.
   String? get _blockedReason {
-    if (state.profile.isEquipped(item.id)) return null;
+    if (entry.equipped) return null;
     if (!item.isUnlockedAt(state.profile.level)) {
       return '${item.requiredLevel}. seviye gerekiyor. Şu an '
           '${state.profile.level}. seviyedesin.';
@@ -1049,8 +1122,14 @@ class _ItemSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final equipped = state.profile.isEquipped(item.id);
+    final equipped = entry.equipped;
     final current = state.equippedIn(item.category);
+    final quote = quoteUpgrade(
+      resolved: item,
+      instance: entry.instance,
+      playerLevel: state.profile.level,
+      coins: state.profile.coins,
+    );
     final comparison =
         equipped
             ? ItemComparison.none
@@ -1254,6 +1333,14 @@ class _ItemSheet extends StatelessWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 16),
+              _UpgradePanel(
+                entry: entry,
+                quote: quote,
+                playerLevel: state.profile.level,
+                coins: state.profile.coins,
+                onUpgrade: onUpgrade,
+              ),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -1275,13 +1362,130 @@ class _ItemSheet extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: onSell,
                     icon: const Icon(Icons.sell_outlined),
-                    label: Text('Sat +$sellValue'),
+                    label: Text(
+                      'Sat +$sellValue',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Demirci paneli: mevcut seviye, sonraki seviyedeki statlar, maliyet.
+///
+/// Engel **sessiz kalmaz** (Model Kuralları #4): hangi tavanın bağladığı
+/// ("nadirlik sınırı" mı, "kendi seviyen" mi) ayrı ayrı söylenir.
+class _UpgradePanel extends StatelessWidget {
+  final InventoryEntry entry;
+  final UpgradeQuote quote;
+  final int playerLevel;
+  final int coins;
+  final VoidCallback onUpgrade;
+
+  const _UpgradePanel({
+    required this.entry,
+    required this.quote,
+    required this.playerLevel,
+    required this.coins,
+    required this.onUpgrade,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final item = entry.item;
+    final rarity = entry.instance.effectiveRarity(item.rarity);
+    final reason = quote.reason(rarity, playerLevel);
+    final preview =
+        quote.canUpgrade
+            ? compareLevels(item, entry.level, quote.nextLevel)
+            : const <String>[];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hardware, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Demirci — Sv. ${entry.level} / ${quote.rarityCap}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Yükseltmek yalnızca savaş istatistiklerini büyütür; '
+            'ekonomi bonusları sabit kalır.',
+            style: const TextStyle(fontSize: 10.5, color: Colors.white38),
+          ),
+          if (preview.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Sv. ${quote.nextLevel}: ${preview.join(' · ')}',
+              style: const TextStyle(fontSize: 12, color: AppColors.xp),
+            ),
+          ],
+          if (reason != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lock, size: 14, color: AppColors.streak),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    reason,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.streak,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              // Devre dışı görünse de **dokunulabilir** olmalıydı; bunun
+              // yerine neden zaten yukarıda yazılı. Düğme yalnızca gerçekten
+              // yükseltilebiliyorken etkin.
+              onPressed: quote.canUpgrade ? onUpgrade : null,
+              icon: const Icon(Icons.upgrade),
+              // `FilledButton.icon` etiketi zaten kendi `Flexible`'ına
+              // sarıyor; ikinci bir `Flexible` "competing ParentDataWidget"
+              // hatası veriyor. Kırpma bu yüzden doğrudan `Text` üzerinde.
+              label: Text(
+                quote.canUpgrade
+                    ? 'Sv. ${quote.nextLevel}\'e yükselt — ${quote.cost} coin'
+                    : 'Yükseltilemiyor',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

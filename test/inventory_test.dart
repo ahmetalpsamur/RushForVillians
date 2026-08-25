@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
+import 'package:rush_for_villains/core/utils/item_leveling.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -12,6 +13,7 @@ import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/item_effect.dart';
+import 'package:rush_for_villains/models/owned_item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/models/user_profile.dart';
 import 'package:rush_for_villains/services/game_storage.dart';
@@ -74,18 +76,44 @@ void main() {
   /// dokunmak için görünen adı bulmak zorunda.
   String shown(Item item) => flavorForClass(item, _avatar.characterClass).name;
 
+  /// Envanter artık **örnek** listesi (GD39). Testler hâlâ kimlikle
+  /// çalışıyor; bu yardımcı kimlikleri örneklere çeviriyor.
   UserProfile makeProfile({
     int level = 50,
     int coins = 1000,
     List<String>? owned,
     Map<String, String>? equipped,
-  }) => UserProfile(
-    avatar: _avatar,
-    level: level,
-    coins: coins,
-    ownedItemIds: owned,
-    equippedItemIds: equipped,
-  );
+  }) {
+    final equippedIds = equipped?.values.toSet() ?? const <String>{};
+    final instances = <OwnedItem>[];
+    var serial = 1;
+    for (final id in owned ?? const <String>[]) {
+      instances.add(
+        OwnedItem(
+          instanceId: serial++,
+          itemId: id,
+          equipped: equippedIds.contains(id),
+        ),
+      );
+    }
+    return UserProfile(
+      avatar: _avatar,
+      level: level,
+      coins: coins,
+      ownedItems: instances,
+      nextItemInstanceId: serial,
+    );
+  }
+
+  /// Kuşanılı kimlikler.
+  Set<String> equippedIdsOf(UserProfile profile) => {
+    for (final instance in profile.equippedInstances) instance.itemId,
+  };
+
+  /// Envanterdeki kimlikler (adetli).
+  List<String> ownedIdsOf(UserProfile profile) => [
+    for (final instance in profile.ownedItems) instance.itemId,
+  ];
 
   // Aynı test içinde ikinci kez `pumpWidget` çağrıldığında Flutter aynı
   // tipteki elemanı yeniden kullanıp `initState` yerine `didUpdateWidget`
@@ -149,8 +177,7 @@ void main() {
       await tester.tap(find.text('Kuşan'));
       await tester.pumpAndSettle();
 
-      expect(profile.equippedItemIds[ItemCategory.swords.folder], sword.id);
-      expect(profile.isEquipped(sword.id), isTrue);
+      expect(equippedIdsOf(profile), {sword.id});
     });
 
     testWidgets('aynı slottaki ikinci item öncekinin yerine geçer', (
@@ -169,14 +196,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Slot başına tek item: harita tek anahtar taşıyor.
-      expect(profile.equippedItemIds, hasLength(1));
-      expect(
-        profile.equippedItemIds[ItemCategory.swords.folder],
-        betterSword.id,
-      );
-      expect(profile.isEquipped(sword.id), isFalse);
+      expect(profile.equippedInstances, hasLength(1));
+      expect(equippedIdsOf(profile).single, betterSword.id);
+      expect(equippedIdsOf(profile), isNot(contains(sword.id)));
       // Yerinden edilen item **satılmaz**, sahiplikte kalır.
-      expect(profile.ownedItemIds, contains(sword.id));
+      expect(ownedIdsOf(profile), contains(sword.id));
     });
 
     testWidgets('farklı kategoriler ayrı slot işgal eder', (tester) async {
@@ -192,9 +216,7 @@ void main() {
       await tester.tap(find.text('Kuşan'));
       await tester.pumpAndSettle();
 
-      expect(profile.equippedItemIds, hasLength(2));
-      expect(profile.isEquipped(sword.id), isTrue);
-      expect(profile.isEquipped(shield.id), isTrue);
+      expect(equippedIdsOf(profile), {sword.id, shield.id});
     });
 
     testWidgets('kuşanılan item çıkarılabilir', (tester) async {
@@ -210,7 +232,7 @@ void main() {
       await tester.tap(find.text('Çıkar'));
       await tester.pumpAndSettle();
 
-      expect(profile.equippedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
     });
   });
 
@@ -235,7 +257,7 @@ void main() {
         find.widgetWithText(FilledButton, 'Kuşan'),
       );
       expect(button.onPressed, isNull, reason: 'kilitli item kuşanılamamalı');
-      expect(profile.equippedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
     });
 
     testWidgets('seviye tam sınırdaysa kuşanılır', (tester) async {
@@ -251,7 +273,7 @@ void main() {
       await tester.tap(find.text('Kuşan'));
       await tester.pumpAndSettle();
 
-      expect(profile.isEquipped(lockedSword.id), isTrue);
+      expect(equippedIdsOf(profile), contains(lockedSword.id));
     });
   });
 
@@ -311,7 +333,7 @@ void main() {
       await tester.tap(find.text('Çıkar'));
       await tester.pumpAndSettle();
 
-      expect(profile.equippedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
 
       // Kuşanma kalktı: aynı adım artık bonussuz ödeniyor.
       // Envanter itilen bir rota; ana ekrana dönmek için geri gitmek gerek.
@@ -339,7 +361,7 @@ void main() {
       await tester.tap(find.textContaining('Sat (+'));
       await tester.pumpAndSettle();
 
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.ownedItems, isEmpty);
       expect(profile.coins, sellValueFor(sword.cost));
     });
 
@@ -355,7 +377,7 @@ void main() {
       await tester.tap(find.text('Vazgeç'));
       await tester.pumpAndSettle();
 
-      expect(profile.ownedItemIds, [sword.id]);
+      expect(ownedIdsOf(profile), [sword.id]);
       expect(profile.coins, 0);
     });
 
@@ -375,8 +397,8 @@ void main() {
       await tester.tap(find.textContaining('Sat (+'));
       await tester.pumpAndSettle();
 
-      expect(profile.equippedItemIds, isEmpty);
-      expect(profile.ownedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
+      expect(profile.ownedItems, isEmpty);
       expect(profile.coins, sellValueFor(sword.cost));
     });
 
@@ -405,7 +427,7 @@ void main() {
         ),
       );
 
-      expect(profile.equippedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
     });
 
     testWidgets('sınıfın kullanamadığı kategori kuşanmadan düşer', (
@@ -420,21 +442,34 @@ void main() {
       );
 
       // Yay SwordMan'in değil: slot boşalır ama **sahiplik korunur**.
-      expect(profile.equippedItemIds, isEmpty);
-      expect(profile.ownedItemIds, contains(bow.id));
+      expect(profile.equippedInstances, isEmpty);
+      expect(ownedIdsOf(profile), contains(bow.id));
     });
 
-    testWidgets('yanlış slota yazılmış kimlik düşer', (tester) async {
-      final profile = await pumpInventory(
-        tester,
-        profile: makeProfile(
-          owned: [sword.id],
-          equipped: {ItemCategory.shields.folder: sword.id},
-        ),
+    testWidgets('aynı slotta ikinci kuşanılı örnek düşer', (tester) async {
+      // "Slot başına tek eşya" kuralı eskiden `Map` yapısıyla veri düzeyinde
+      // zorlanıyordu (GD26). Envanter örnek listesine geçince (GD39) kural
+      // `_refreshEquipment` içine taşındı; elle düzenlenmiş bir kayıt iki
+      // kılıcı birden kuşanılı işaretleyebilir.
+      final profile = UserProfile(
+        avatar: _avatar,
+        level: 50,
+        coins: 1000,
+        ownedItems: [
+          OwnedItem(instanceId: 1, itemId: sword.id, equipped: true),
+          OwnedItem(instanceId: 2, itemId: betterSword.id, equipped: true),
+          OwnedItem(instanceId: 3, itemId: shield.id, equipped: true),
+        ],
+        nextItemInstanceId: 4,
       );
 
-      expect(profile.equippedItemIds, isEmpty);
-      expect(profile.ownedItemIds, contains(sword.id));
+      await pumpInventory(tester, profile: profile);
+
+      // Kılıç slotunda tek örnek kalır, kalkan etkilenmez.
+      expect(profile.equippedInstances, hasLength(2));
+      expect(equippedIdsOf(profile), contains(shield.id));
+      // Sahiplik hiç değişmez (GD28).
+      expect(profile.ownedItems, hasLength(3));
     });
 
     testWidgets('katalogdan kalkmış kimlik çökmeye yol açmaz', (tester) async {
@@ -446,7 +481,7 @@ void main() {
         ),
       );
 
-      expect(profile.equippedItemIds, isEmpty);
+      expect(profile.equippedInstances, isEmpty);
       expect(find.text('Envanter'), findsWidgets);
     });
   });
@@ -475,15 +510,17 @@ void main() {
       final stored =
           (envelope['state'] as Map<String, dynamic>)['profile']
               as Map<String, dynamic>;
-      expect(stored['equippedItemIds'], {ItemCategory.swords.folder: sword.id});
+      final storedItems = stored['ownedItems'] as List;
+      expect(storedItems, hasLength(2));
+      expect(
+        storedItems.where((row) => (row as Map)['equipped'] == true).single,
+        containsPair('itemId', sword.id),
+      );
 
       // Diskten geri okunduğunda aynı kuşanma geliyor.
       final restored = await GameStorage.load(avatar: _avatar);
-      expect(
-        restored!.profile.equippedItemIds[ItemCategory.swords.folder],
-        sword.id,
-      );
-      expect(profile.isEquipped(sword.id), isTrue);
+      expect(equippedIdsOf(restored!.profile), {sword.id});
+      expect(equippedIdsOf(profile), {sword.id});
     });
 
     test('v10 kaydı kuşanma alanı olmadan okunabilir', () async {
@@ -503,20 +540,257 @@ void main() {
       expect(restored, isNotNull);
       expect(restored!.profile.coins, 500);
       // Hiçbir şey kendiliğinden kuşanılmış sayılmaz.
-      expect(restored.profile.equippedItemIds, isEmpty);
+      expect(restored.profile.equippedInstances, isEmpty);
+      expect(restored.profile.ownedItems, isEmpty);
     });
 
-    test('bozuk kuşanma satırları atılır, sağlamlar korunur', () {
+    test('bozuk envanter satırları atılır, sağlamlar korunur', () {
       final profile = UserProfile.fromJson(const {
-        'equippedItemIds': {
-          'swords': 'swords/sword',
-          'shields': 42,
-          '': 'swords/other',
-          'spears': null,
-        },
+        'ownedItems': [
+          {'instanceId': 1, 'itemId': 'swords/sword', 'equipped': true},
+          // Kimliksiz, sayısal kimlikli ve boş satırlar atılır.
+          {'itemId': 'swords/other'},
+          {'instanceId': 2, 'itemId': 42},
+          {'instanceId': 3},
+          null,
+          // Çakışan instanceId: ikincisi atılır, "hangisini yükselt"
+          // sorusu cevapsız kalmasın.
+          {'instanceId': 1, 'itemId': 'shields/round_shield'},
+        ],
       }, avatar: _avatar);
 
-      expect(profile.equippedItemIds, {'swords': 'swords/sword'});
+      expect(profile.ownedItems, hasLength(1));
+      expect(profile.ownedItems.single.itemId, 'swords/sword');
+      expect(profile.ownedItems.single.equipped, isTrue);
+      // Sayaç, kayıttaki en büyük kimliğin altına düşemez.
+      expect(profile.nextItemInstanceId, greaterThan(1));
+    });
+
+    test('v11 kaydı örnek listesine taşınır, veri kaybolmaz', () async {
+      SharedPreferences.setMockInitialValues({
+        _storageKey: jsonEncode({
+          'schemaVersion': 11,
+          'savedAt': DateTime(2026, 8, 24).toIso8601String(),
+          'state': {
+            'profile': {
+              'coins': 500,
+              'level': 9,
+              'ownedItemIds': [
+                'swords/sword',
+                'shields/round_shield',
+                // Yükseltme kimliği: `/` içermediği için ayrı listeye gider.
+                'boost_double_xp',
+              ],
+              'equippedItemIds': {'swords': 'swords/sword'},
+            },
+            'today': {'date': DateTime(2026, 8, 24).toIso8601String()},
+          },
+        }),
+      });
+
+      final restored = await GameStorage.load(avatar: _avatar);
+
+      expect(restored, isNotNull);
+      expect(restored!.profile.coins, 500);
+      expect(ownedIdsOf(restored.profile), [
+        'swords/sword',
+        'shields/round_shield',
+      ]);
+      expect(restored.profile.ownedUpgradeIds, ['boost_double_xp']);
+      expect(equippedIdsOf(restored.profile), {'swords/sword'});
+      // Her örnek seviye 1 ve katalog nadirliğiyle başlar.
+      for (final instance in restored.profile.ownedItems) {
+        expect(instance.level, 1);
+        expect(instance.rarity, isNull);
+      }
+      // Sayaç örneklerin üstünde: sonraki satın alma kimlik çakıştırmasın.
+      expect(restored.profile.nextItemInstanceId, greaterThan(2));
+    });
+  });
+
+  group('demirci — yükseltme', () {
+    /// Envanterde bir örneği açıp "yükselt" düğmesine basar.
+    Future<void> tapUpgrade(WidgetTester tester, Item item) async {
+      await openItem(tester, item);
+      await tester.tap(find.textContaining('yükselt'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('yükseltme parayı düşürür ve seviyeyi artırır', (tester) async {
+      final profile = await pumpInventory(
+        tester,
+        profile: makeProfile(coins: 5000, owned: [sword.id]),
+      );
+
+      final resolved = flavorForClass(sword, _avatar.characterClass);
+      final cost = upgradeCostFor(resolved.cost, resolved.rarity, 1);
+
+      await tapUpgrade(tester, sword);
+
+      expect(profile.ownedItems.single.level, 2);
+      expect(profile.coins, 5000 - cost);
+    });
+
+    testWidgets('yükseltme yalnızca seçilen örneği etkiler', (tester) async {
+      // Aynı eşyadan iki adet: biri yükselirse öbürü Sv.1'de kalmalı.
+      final profile = UserProfile(
+        avatar: _avatar,
+        level: 50,
+        coins: 5000,
+        ownedItems: [
+          OwnedItem(instanceId: 1, itemId: sword.id),
+          OwnedItem(instanceId: 2, itemId: sword.id),
+        ],
+        nextItemInstanceId: 3,
+      );
+      await pumpInventory(tester, profile: profile);
+
+      await tapUpgrade(tester, sword);
+
+      final levels = profile.ownedItems.map((i) => i.level).toList()..sort();
+      expect(levels, [1, 2]);
+    });
+
+    testWidgets('para yetmezse yükseltme olmaz ve sebebi söylenir', (
+      tester,
+    ) async {
+      final profile = await pumpInventory(
+        tester,
+        profile: makeProfile(coins: 0, owned: [sword.id]),
+      );
+
+      await openItem(tester, sword);
+      expect(find.text('Yükseltilemiyor'), findsOneWidget);
+      expect(find.textContaining('coin gerekiyor'), findsOneWidget);
+      expect(profile.ownedItems.single.level, 1);
+      expect(profile.coins, 0);
+    });
+
+    testWidgets('oyuncu seviyesi bağlıyorsa sebebi ayrı söylenir', (
+      tester,
+    ) async {
+      // 1. seviyedeki oyuncu eşyasını yükseltemez; nadirlik tavanı dolu
+      // olmadığı hâlde engel var ve bu **söylenmeli** (Model Kuralları #4).
+      final profile = await pumpInventory(
+        tester,
+        profile: makeProfile(level: 1, coins: 99999, owned: [sword.id]),
+      );
+
+      await openItem(tester, sword);
+      expect(find.textContaining('kendi seviyeni'), findsOneWidget);
+      expect(profile.ownedItems.single.level, 1);
+    });
+
+    testWidgets('nadirlik tavanında sebep nadirlik sınırı olur', (
+      tester,
+    ) async {
+      final profile = UserProfile(
+        avatar: _avatar,
+        level: 50,
+        coins: 99999,
+        ownedItems: [
+          // Sıradan bir kılıç tavana (10) çıkarılmış.
+          OwnedItem(instanceId: 1, itemId: sword.id, level: 10),
+        ],
+        nextItemInstanceId: 2,
+      );
+      await pumpInventory(tester, profile: profile);
+
+      await openItem(tester, sword);
+      expect(find.textContaining('Nadirlik sınırı'), findsOneWidget);
+      expect(profile.ownedItems.single.level, 10);
+      expect(profile.coins, 99999);
+    });
+
+    testWidgets('yükseltme savaş statını büyütür, ekonomiye dokunmaz', (
+      tester,
+    ) async {
+      final profile = UserProfile(
+        avatar: _avatar,
+        level: 50,
+        coins: 99999,
+        ownedItems: [
+          OwnedItem(instanceId: 1, itemId: sword.id, equipped: true),
+        ],
+        nextItemInstanceId: 2,
+      );
+      await pumpInventory(tester, profile: profile);
+
+      final base = flavorForClass(sword, _avatar.characterClass);
+      final before = resolveOwnedItem(base, profile.ownedItems.single);
+
+      await tapUpgrade(tester, sword);
+
+      final after = resolveOwnedItem(base, profile.ownedItems.single);
+      expect(profile.ownedItems.single.level, 2);
+
+      // Ekonomi bonusları **sabit**: yükseltme günlük coin tavanını
+      // katlamamalı (`economy_pacing_test.dart` bu dengeyi ölçüyor).
+      expect(after.buff.stepCoinBonus, before.buff.stepCoinBonus);
+      expect(after.buff.stepXpBonus, before.buff.stepXpBonus);
+      expect(after.buff.enemyXpBonus, before.buff.enemyXpBonus);
+      expect(after.buff.dailyCoinCapBonus, before.buff.dailyCoinCapBonus);
+
+      // Savaş statlarından en az biri büyümüş olmalı.
+      final grew = [
+        for (var i = 0; i < before.buff.combatEffects.length; i++)
+          after.buff.combatEffects[i].value.abs() >
+              before.buff.combatEffects[i].value.abs(),
+      ];
+      expect(grew, contains(true));
+    });
+
+    testWidgets('yükseltilmiş seviye diske yazılır', (tester) async {
+      final profile = await pumpInventory(
+        tester,
+        profile: makeProfile(coins: 5000, owned: [sword.id]),
+      );
+
+      await tapUpgrade(tester, sword);
+      await GameStorage.flush();
+
+      final raw = (await SharedPreferences.getInstance()).getString(
+        _storageKey,
+      );
+      final envelope = jsonDecode(raw!) as Map<String, dynamic>;
+      final stored =
+          (envelope['state'] as Map<String, dynamic>)['profile']
+              as Map<String, dynamic>;
+      expect((stored['ownedItems'] as List).single, containsPair('level', 2));
+
+      final restored = await GameStorage.load(avatar: _avatar);
+      expect(restored!.profile.ownedItems.single.level, 2);
+      expect(profile.ownedItems.single.level, 2);
+    });
+
+    testWidgets('yükseltilmiş eşyanın satış değeri fiyattan hesaplanır', (
+      tester,
+    ) async {
+      // Yükseltmeye harcanan coin geri gelmiyor (GD29): satış geri alınamaz
+      // ve alım-satım-yükseltme döngüsü para üretemiyor.
+      final profile = UserProfile(
+        avatar: _avatar,
+        level: 50,
+        coins: 0,
+        ownedItems: [OwnedItem(instanceId: 1, itemId: sword.id, level: 8)],
+        nextItemInstanceId: 2,
+      );
+      await pumpInventory(tester, profile: profile);
+
+      final resolved = flavorForClass(sword, _avatar.characterClass);
+      await openItem(tester, sword);
+      await tester.tap(find.textContaining('Sat +'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Sat (+'));
+      await tester.pumpAndSettle();
+
+      expect(profile.ownedItems, isEmpty);
+      expect(profile.coins, sellValueFor(resolved.cost));
+      expect(
+        profile.coins,
+        lessThan(resolved.cost),
+        reason: 'satış fiyattan ucuz olmalı; döngü para üretmemeli',
+      );
     });
   });
 

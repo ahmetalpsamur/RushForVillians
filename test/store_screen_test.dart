@@ -54,6 +54,7 @@ void main() {
     int streakFreezes = 0,
     int extraWheelSpins = 0,
     bool xpBoostActive = false,
+    Map<String, int> ownedEquipment = const {},
     void Function(Item)? onPurchaseEquipment,
     void Function(XpStoreItem)? onPurchase,
   }) async {
@@ -65,7 +66,10 @@ void main() {
           equipment: equipment,
           coins: coins,
           level: level,
-          ownedItemIds: owned,
+          ownedUpgradeIds: owned,
+          ownedEquipmentCounts: {
+            for (final id in ownedEquipment.keys) id: ownedEquipment[id]!,
+          },
           streakFreezes: streakFreezes,
           extraWheelSpins: extraWheelSpins,
           xpBoostActive: xpBoostActive,
@@ -151,23 +155,28 @@ void main() {
       expect(purchased.single.id, cheapItem.id);
     });
 
-    testWidgets('sahip olunan item tekrar alınamaz', (tester) async {
+    testWidgets('sahip olunan item tekrar alınabilir, adet gösterilir', (
+      tester,
+    ) async {
+      // Davranış Bölüm 4.1'de **bilerek** değişti (GD39): birleştirme aynı
+      // eşyadan birkaç adet istiyor, dolayısıyla mağaza aynı eşyayı tekrar
+      // satabilmeli. Kart "Sahipsin" yerine adet gösteriyor.
       final purchased = <Item>[];
       await pumpStore(
         tester,
         equipment: [cheapItem],
         level: 50,
-        owned: [cheapItem.id],
+        ownedEquipment: {cheapItem.id: 3},
         onPurchaseEquipment: purchased.add,
       );
 
-      expect(find.text('Sahipsin'), findsOneWidget);
+      expect(find.text('Sahipsin'), findsNothing);
+      expect(find.text('3 adet'), findsOneWidget);
 
       await tester.tap(find.byType(FilledButton).last);
       await tester.pump();
 
-      expect(purchased, isEmpty);
-      expect(find.textContaining('zaten sende'), findsOneWidget);
+      expect(purchased, [cheapItem]);
     });
   });
 
@@ -214,24 +223,26 @@ void main() {
       expect(find.text(cheapItem.name), findsNothing);
     });
 
-    testWidgets('"Alabileceklerim" sahip olunan itemi de gizler', (
+    testWidgets('"Alabileceklerim" sahip olunan itemi de gösterir', (
       tester,
     ) async {
-      // Süzgecin sözü "bugün satın alabileceklerim"; alınamayacak bir şey
-      // orada olmamalı.
+      // GD14 güncellendi: sahiplik artık satın almayı engellemediği için
+      // sahip olunan bir eşya da "bugün alabileceklerim" listesine ait —
+      // ikinci adedi birleştirme için oradan alacaksın.
       await pumpStore(
         tester,
         equipment: [cheapItem],
         level: 50,
         coins: 100000,
-        owned: [cheapItem.id],
+        ownedEquipment: {cheapItem.id: 1},
       );
 
       expect(find.text(cheapItem.name), findsOneWidget);
       await tester.tap(find.text('Alabileceklerim'));
       await tester.pump();
 
-      expect(find.text(cheapItem.name), findsNothing);
+      expect(find.text(cheapItem.name), findsOneWidget);
+      expect(find.text('1 adet'), findsOneWidget);
     });
 
     testWidgets('süzgeç sonucu boşsa açıklayıcı metin çıkar', (tester) async {

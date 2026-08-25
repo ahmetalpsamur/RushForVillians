@@ -33,7 +33,7 @@ GameState _sampleState() {
     streakDays: 6,
     lastActiveDay: DateTime(2026, 8, 18),
     totalSteps: 42000,
-    ownedItemIds: ['skin_dragon_cape'],
+    ownedUpgradeIds: ['skin_dragon_cape'],
     lastWheelSpinAt: DateTime(2026, 8, 18, 9, 30),
   );
   final adventure = AdventureQuest(
@@ -101,7 +101,7 @@ void main() {
       expect(profile.coins, 1300);
       expect(profile.streakDays, 6);
       expect(profile.totalSteps, 42000);
-      expect(profile.ownedItemIds, ['skin_dragon_cape']);
+      expect(profile.ownedUpgradeIds, ['skin_dragon_cape']);
       expect(profile.lastActiveDay, DateTime(2026, 8, 18));
       expect(profile.lastWheelSpinAt, DateTime(2026, 8, 18, 9, 30));
       // Avatar ayrı saklandığı için dışarıdan verilen kullanılır.
@@ -318,7 +318,7 @@ void main() {
       expect(restored.profile.xp, 0);
       expect(restored.profile.coins, 0);
       expect(restored.profile.totalSteps, 0);
-      expect(restored.profile.ownedItemIds, isEmpty);
+      expect(restored.profile.ownedItems, isEmpty);
       expect(restored.profile.lastWheelSpinAt, isNull);
       expect(restored.today.steps, 0);
     });

@@ -2,6 +2,8 @@ import '../core/constants/game_constants.dart';
 import '../core/utils/game_clock.dart';
 import '../core/utils/game_day.dart';
 import 'avatar_profile.dart';
+import 'owned_item.dart';
+import 'reward_rarity.dart';
 
 /// Gün döngüsü kontrolünün seri açısından sonucu.
 enum StreakDayOutcome {
@@ -88,22 +90,32 @@ class UserProfile {
   /// diske yazılır.
   DateTime? lastStepReportAt;
 
-  /// Mağazadan satın alınmış ya da çarktan kazanılmış öğelerin kimlikleri.
-  /// Sahiplik kaydı; kuşanma ayrı tutulur ([equippedItemIds]).
-  final List<String> ownedItemIds;
+  /// Envanterdeki ekipman **örnekleri**.
+  ///
+  /// Kimlik listesi değil: aynı eşyadan birden fazla adet bulunabiliyor ve
+  /// her adedin kendi seviyesi, kendi nadirliği ve kendi kuşanma durumu var
+  /// (bkz. [OwnedItem], GD39). Birleştirme aynı eşyanın birkaç adedini
+  /// tüketip bir üst nadirlikte tek örnek ürettiği için bu şart.
+  ///
+  /// Model Kuralları #1: yalnızca `String` ve sayı tutulur; item'ın kendisi
+  /// her açılışta katalogdan çözülür ve sınıfa uyarlanır — kimliğe sınıf
+  /// gömülmediği için (GD16) sınıf değişse de sahiplik kaybolmaz.
+  final List<OwnedItem> ownedItems;
 
-  /// Kuşanılan itemler: **slot anahtarı → item kimliği**.
+  /// Mağazadan alınmış **yükseltmelerin** kimlikleri (kozmetik, unvan,
+  /// dondurma hakkı, 2x XP...).
   ///
-  /// Slot = item kategorisi ([ItemCategory.folder]); yani her kategoriden
-  /// **tek** item kuşanılabilir. Sınıfa göre 3–5 slot açık (bkz. GD15).
-  /// Bu yapı "slot başına tek item" kuralını veri düzeyinde zorluyor: aynı
-  /// anahtara ikinci bir kimlik yazılamaz.
+  /// Ekipmandan ayrı bir liste: ikisi farklı kavram ve eskiden aynı listede
+  /// duruyorlardı. Yükseltme kimlikleri (`boost_double_xp`) hiç `/`
+  /// içermiyor, katalog kimlikleri (`swords/fire_sword`) her zaman içeriyor —
+  /// v11 → v12 taşıması bu ayrımı kullanıyor.
+  final List<String> ownedUpgradeIds;
+
+  /// Bir sonraki [OwnedItem.instanceId] için sayaç.
   ///
-  /// Model Kuralları #1: yalnızca `String` tutulur. Item'ın kendisi her
-  /// açılışta katalogdan çözülür ve sınıfa uyarlanır — kimliğe sınıf
-  /// gömülmediği için (GD16) sınıf değişse de kuşanma kaybolmaz, yalnızca
-  /// artık kullanılamayan slotlar boşaltılır.
-  final Map<String, String> equippedItemIds;
+  /// Rastgele değil, kalıcı ve tekdüze artan: kayıt tekrarlanabilir kalıyor
+  /// ve tohum gerektirmiyor.
+  int nextItemInstanceId;
 
   /// Günlük çarkın en son çevrildiği an. Gün başına tek hak kontrolü ve
   /// kalıcılık için kullanılır.
@@ -147,48 +159,98 @@ class UserProfile {
     this.lastReportedStepCount = 0,
     this.lastSensorReading,
     this.lastStepReportAt,
-    List<String>? ownedItemIds,
-    Map<String, String>? equippedItemIds,
+    List<OwnedItem>? ownedItems,
+    List<String>? ownedUpgradeIds,
+    this.nextItemInstanceId = 1,
     this.lastWheelSpinAt,
     this.extraWheelSpins = 0,
     this.wheelSeed = 0,
     this.xpBoostUntil,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
-       ownedItemIds = ownedItemIds ?? <String>[],
-       equippedItemIds = equippedItemIds ?? <String, String>{};
+       ownedItems = ownedItems ?? <OwnedItem>[],
+       ownedUpgradeIds = ownedUpgradeIds ?? <String>[];
 
   String get name => avatar.name;
 
-  /// [slotKey] slotunda kuşanılı item'ın kimliği; boşsa `null`.
-  String? equippedIdInSlot(String slotKey) => equippedItemIds[slotKey];
-
-  /// Bu kimlik herhangi bir slotta kuşanılı mı.
-  bool isEquipped(String itemId) => equippedItemIds.containsValue(itemId);
-
-  /// Item'ı slotuna kuşandırır ve o slotta duran öncekinin kimliğini döner
-  /// (yoksa `null`). Sahiplik ve seviye kontrolü **burada yapılmaz**;
-  /// çağıran taraf ([RootShell]) yapar — kilidin tek kaynağı
-  /// [Item.isUnlockedAt] (#10) ve ikinci bir kopyası yazılmamalı.
-  String? equipInSlot(String slotKey, String itemId) {
-    final previous = equippedItemIds[slotKey];
-    equippedItemIds[slotKey] = itemId;
-    return previous == itemId ? null : previous;
+  /// Bu kimlikten kaç adet var. Mağazadaki "N adet" etiketi buradan geliyor.
+  int ownedCountOf(String itemId) {
+    var count = 0;
+    for (final instance in ownedItems) {
+      if (instance.itemId == itemId) count++;
+    }
+    return count;
   }
 
-  /// Slotu boşaltır; çıkarılan kimliği döner.
-  String? unequipSlot(String slotKey) => equippedItemIds.remove(slotKey);
+  /// Envanterdeki bir örneği kimliğiyle bulur; yoksa `null`.
+  OwnedItem? instanceById(int instanceId) {
+    for (final instance in ownedItems) {
+      if (instance.instanceId == instanceId) return instance;
+    }
+    return null;
+  }
 
-  /// Kimliği hangi slotta olursa olsun çıkarır. Çıkarıldıysa `true`.
-  bool unequipItem(String itemId) {
-    final slot =
-        equippedItemIds.entries
-            .where((entry) => entry.value == itemId)
-            .map((entry) => entry.key)
-            .firstOrNull;
-    if (slot == null) return false;
-    equippedItemIds.remove(slot);
-    return true;
+  /// Bu kimlikten en az bir adet var mı.
+  bool ownsItem(String itemId) => ownedCountOf(itemId) > 0;
+
+  /// Envantere yeni bir örnek ekler ve eklenen örneği döner.
+  ///
+  /// Sahiplik kontrolü **yok**: aynı eşya birden fazla kez alınabiliyor
+  /// (birleştirme aynı eşyadan birkaç adet istiyor).
+  OwnedItem addItem(String itemId, {RewardRarity? rarity, int level = 1}) {
+    final instance = OwnedItem(
+      instanceId: nextItemInstanceId++,
+      itemId: itemId,
+      level: level < 1 ? 1 : level,
+      rarity: rarity,
+    );
+    ownedItems.add(instance);
+    return instance;
+  }
+
+  /// Bir örneği envanterden çıkarır. Çıkarıldıysa o örnek, yoksa `null`.
+  OwnedItem? removeInstance(int instanceId) {
+    for (var i = 0; i < ownedItems.length; i++) {
+      if (ownedItems[i].instanceId == instanceId) {
+        return ownedItems.removeAt(i);
+      }
+    }
+    return null;
+  }
+
+  /// Bir örneği yerinde günceller. Örnek yoksa hiçbir şey yapmaz.
+  void updateInstance(
+    int instanceId, {
+    int? level,
+    RewardRarity? rarity,
+    bool? equipped,
+  }) {
+    for (var i = 0; i < ownedItems.length; i++) {
+      if (ownedItems[i].instanceId == instanceId) {
+        ownedItems[i] = ownedItems[i].copyWith(
+          level: level,
+          rarity: rarity,
+          equipped: equipped,
+        );
+        return;
+      }
+    }
+  }
+
+  /// Kuşanılı örnekler.
+  List<OwnedItem> get equippedInstances => [
+    for (final instance in ownedItems)
+      if (instance.equipped) instance,
+  ];
+
+  /// Bütün örneklerin kuşanmasını kaldırır — çağıran taraf hangilerinin
+  /// yeniden kuşanılacağına karar verir (`RootShell._refreshEquipment`).
+  void unequipAll() {
+    for (var i = 0; i < ownedItems.length; i++) {
+      if (ownedItems[i].equipped) {
+        ownedItems[i] = ownedItems[i].copyWith(equipped: false);
+      }
+    }
   }
 
   /// Günlük çark bu oyun gününde çevrildi mi? Gün sınırı [GameDay],
@@ -411,8 +473,9 @@ class UserProfile {
     'lastReportedStepCount': lastReportedStepCount,
     'lastSensorReading': lastSensorReading,
     'lastStepReportAt': lastStepReportAt?.toUtc().toIso8601String(),
-    'ownedItemIds': ownedItemIds,
-    'equippedItemIds': equippedItemIds,
+    'ownedItems': [for (final instance in ownedItems) instance.toJson()],
+    'ownedUpgradeIds': ownedUpgradeIds,
+    'nextItemInstanceId': nextItemInstanceId,
     'lastWheelSpinAt': lastWheelSpinAt?.toIso8601String(),
     'extraWheelSpins': extraWheelSpins,
     'wheelSeed': wheelSeed,
@@ -449,10 +512,11 @@ class UserProfile {
       lastReportedStepCount: json['lastReportedStepCount'] as int? ?? 0,
       lastSensorReading: json['lastSensorReading'] as int?,
       lastStepReportAt: _parseDate(json['lastStepReportAt']),
-      ownedItemIds:
-          (json['ownedItemIds'] as List?)?.whereType<String>().toList() ??
+      ownedItems: _parseOwnedItems(json['ownedItems']),
+      ownedUpgradeIds:
+          (json['ownedUpgradeIds'] as List?)?.whereType<String>().toList() ??
           <String>[],
-      equippedItemIds: _parseEquipped(json['equippedItemIds']),
+      nextItemInstanceId: _parseNextInstanceId(json),
       lastWheelSpinAt: _parseDate(json['lastWheelSpinAt']),
       // Dondurma stoğuyla aynı savunma: elle düzenlenmiş kayıt sınırsız
       // ekstra çark hakkı getirmemeli.
@@ -465,20 +529,40 @@ class UserProfile {
     );
   }
 
-  /// Kuşanma haritasını okur. Bozuk satırlar (sayı, null, boş anahtar)
-  /// **sessizce atılır**; tek bozuk kayıt yüzünden bütün kuşanma kaybolmasın.
-  static Map<String, String> _parseEquipped(Object? value) {
-    if (value is! Map) return <String, String>{};
-    final result = <String, String>{};
-    value.forEach((key, item) {
-      if (key is String &&
-          key.isNotEmpty &&
-          item is String &&
-          item.isNotEmpty) {
-        result[key] = item;
-      }
-    });
+  /// Envanteri okur. Bozuk satırlar **sessizce atılır**; tek bozuk kayıt
+  /// yüzünden bütün envanter kaybolmasın.
+  ///
+  /// Çakışan `instanceId` değerleri de eleniyor: elle düzenlenmiş bir kayıt
+  /// iki örneğe aynı kimliği verirse "hangisini yükselt" sorusu cevapsız
+  /// kalırdı.
+  static List<OwnedItem> _parseOwnedItems(Object? value) {
+    if (value is! List) return <OwnedItem>[];
+    final seen = <int>{};
+    final result = <OwnedItem>[];
+    for (final row in value) {
+      final instance = OwnedItem.fromJson(row);
+      if (instance == null) continue;
+      if (!seen.add(instance.instanceId)) continue;
+      result.add(instance);
+    }
     return result;
+  }
+
+  /// Sayaç, kayıttaki en büyük örnek kimliğinin **altına düşemez**: düşerse
+  /// bir sonraki satın alma var olan bir örneğin kimliğini yeniden kullanır.
+  static int _parseNextInstanceId(Map<String, dynamic> json) {
+    final stored = json['nextItemInstanceId'];
+    var next = stored is int && stored > 0 ? stored : 1;
+    final items = json['ownedItems'];
+    if (items is List) {
+      for (final row in items) {
+        if (row is Map) {
+          final id = row['instanceId'];
+          if (id is int && id >= next) next = id + 1;
+        }
+      }
+    }
+    return next;
   }
 
   static DateTime? _parseDate(Object? value) {

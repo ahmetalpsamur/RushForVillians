@@ -485,19 +485,28 @@ class Item {
   /// **[id] hiçbir zaman değişmez:** kalıcı olan tek şey o
   /// ([UserProfile.ownedItemIds]). Kimliğe sınıf gömseydik, oyuncu karakterini
   /// düzenleyip sınıf değiştirdiğinde envanteri sessizce boşalırdı.
-  Item copyWith({String? name, ItemBuff? buff, ItemArchetype? archetype}) =>
-      Item(
-        id: id,
-        name: name ?? this.name,
-        assetPath: assetPath,
-        category: category,
-        rarity: rarity,
-        requiredLevel: requiredLevel,
-        cost: cost,
-        buff: buff ?? this.buff,
-        archetype: archetype ?? this.archetype,
-        lore: lore,
-      );
+  /// [rarity] ve [cost] yalnızca **birleştirilmiş bir örnek** çözülürken
+  /// değişir (`item_leveling.dart:withRarity`): envanterdeki bir eşya
+  /// birleştirmeyle bir üst nadirliğe çıkabiliyor. [requiredLevel] bilerek
+  /// değişmez — bkz. GD40.
+  Item copyWith({
+    String? name,
+    ItemBuff? buff,
+    ItemArchetype? archetype,
+    RewardRarity? rarity,
+    int? cost,
+  }) => Item(
+    id: id,
+    name: name ?? this.name,
+    assetPath: assetPath,
+    category: category,
+    rarity: rarity ?? this.rarity,
+    requiredLevel: requiredLevel,
+    cost: cost ?? this.cost,
+    buff: buff ?? this.buff,
+    archetype: archetype ?? this.archetype,
+    lore: lore,
+  );
 
   /// Bu item'ı [characterClass] sınıfı kuşanabilir mi.
   bool isUsableBy(String characterClass) =>

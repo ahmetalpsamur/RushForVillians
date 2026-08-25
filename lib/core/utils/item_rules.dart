@@ -653,6 +653,61 @@ Item flavorForClass(Item item, String characterClass) {
   );
 }
 
+/// Item'ı **başka bir nadirliğe** taşır (birleştirme, Bölüm 4.3).
+///
+/// Envanterdeki bir eşya birleştirmeyle bir üst nadirliğe çıkabiliyor; o
+/// örnek çözülürken katalog item'ı bu fonksiyondan geçiyor.
+///
+/// - **Kuraldan türeyen** item: buff yeni nadirlikte baştan türetilir. Arketip
+///   korunur — eşyanın karakteri nadirlikle değişmez, yalnızca güçlenir.
+/// - **İmzalı** item: elle yazılmış etkileri korunur (GD22 — karakteri
+///   silinmemeli) ve nadirlik bütçesi oranında ölçeklenir. Ekonomi oranları
+///   yine tek item tavanına kırpılır.
+///
+/// [Item.requiredLevel] **değişmez**: oyuncunun emek verip birleştirdiği bir
+/// eşyanın birden kuşanılamaz hâle gelmesi cezalandırıcı olurdu (GD40).
+/// Fiyat yeni nadirlikten hesaplanır, çünkü satış değeri ona bağlı.
+Item withRarity(Item base, RewardRarity rarity, {String? characterClass}) {
+  if (rarity == base.rarity) return base;
+  final cost = costFor(rarity, base.requiredLevel);
+
+  if (!base.hasSignature) {
+    return base.copyWith(
+      rarity: rarity,
+      cost: cost,
+      buff: buffFor(
+        rarity,
+        base.category,
+        characterClass: characterClass,
+        id: base.id,
+        archetype: base.archetype,
+      ),
+    );
+  }
+
+  final factor = rarityBudgetRatio(base.rarity, rarity);
+  return base.copyWith(
+    rarity: rarity,
+    cost: cost,
+    buff: ItemBuff([
+      for (final effect in base.buff.effects) _scaleSignature(effect, factor),
+    ]),
+  );
+}
+
+/// İki nadirliğin bonus bütçesi oranı. İmzalı itemlerin etkileri bununla
+/// ölçekleniyor.
+double rarityBudgetRatio(RewardRarity from, RewardRarity to) =>
+    _buffTotal(to) / _buffTotal(from);
+
+ItemEffect _scaleSignature(ItemEffect effect, double factor) {
+  final scaled = effect.scaled(factor);
+  // Ekonomi oranları tek item tavanını aşamaz; savaş statları serbest
+  // (savaş motoru Aşama 4a, bkz. GD24).
+  if (!scaled.stat.isEconomyRate) return scaled;
+  return scaled.clampedTo(GameConstants.maxSingleItemEconomyBonus);
+}
+
 /// Item'ın sınıfa uyarlanmış adı.
 ///
 /// İki yol var ve **hiçbir zaman ikisi birden** uygulanmaz (GD23):

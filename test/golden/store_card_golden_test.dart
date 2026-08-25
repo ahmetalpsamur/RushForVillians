@@ -60,7 +60,7 @@ void main() {
           equipment: sampleSwords(),
           coins: 5000,
           level: 10,
-          ownedItemIds: const [],
+          ownedUpgradeIds: const [],
           streakFreezes: 0,
           extraWheelSpins: 0,
           xpBoostActive: false,

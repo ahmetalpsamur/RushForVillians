@@ -26,7 +26,15 @@ class XpStoreScreen extends StatefulWidget {
 
   final int coins;
   final int level;
-  final List<String> ownedItemIds;
+
+  /// Sahip olunan **yükseltmelerin** kimlikleri (kozmetik, unvan, jeton).
+  final List<String> ownedUpgradeIds;
+
+  /// Sahip olunan **ekipman adetleri**: kimlik → adet.
+  ///
+  /// Adet, çünkü aynı eşyadan birden fazla alınabiliyor (birleştirme için
+  /// gerekli, GD39). Kart "Sahipsin" yerine "3 adet" gösteriyor.
+  final Map<String, int> ownedEquipmentCounts;
 
   /// Tüketilen yükseltmelerin eldeki stoğu. Kart altında gösterilir ki
   /// oyuncu stok dolduğunda boşuna satın almaya çalışmasın.
@@ -43,8 +51,9 @@ class XpStoreScreen extends StatefulWidget {
     required this.equipment,
     required this.coins,
     required this.level,
-    required this.ownedItemIds,
+    required this.ownedUpgradeIds,
     required this.streakFreezes,
+    this.ownedEquipmentCounts = const {},
     required this.onPurchase,
     required this.onPurchaseEquipment,
     this.extraWheelSpins = 0,
@@ -75,12 +84,14 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
       if (_categoryFilter != null && item.category != _categoryFilter) {
         return false;
       }
-      // "Alabileceklerim" = **bugün satın alınabilecekler**. Sahip olunan
-      // item de süzgeçten geçiyordu; alınamayacak bir şey o listede olmamalı.
+      // "Alabileceklerim" = **bugün satın alınabilecekler**: seviye kilidi
+      // açık ve para yetiyor.
+      //
+      // Sahiplik artık elemiyor (GD14 güncellendi): aynı eşya birden fazla
+      // kez alınabildiği için sahip olduğun bir eşya da "alabileceklerim"
+      // listesine ait — birleştirme için ikinci adedi oradan alacaksın.
       if (_onlyAffordable &&
-          !(item.isUnlockedAt(widget.level) &&
-              widget.coins >= item.cost &&
-              !widget.ownedItemIds.contains(item.id))) {
+          !(item.isUnlockedAt(widget.level) && widget.coins >= item.cost)) {
         return false;
       }
       return true;
@@ -150,7 +161,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       _UpgradeRow(
                         item: item,
                         coins: widget.coins,
-                        owned: widget.ownedItemIds.contains(item.id),
+                        owned: widget.ownedUpgradeIds.contains(item.id),
                         stockLabel: _stockLabel(item),
                         onPurchase: () => widget.onPurchase(item),
                         onBlocked: _explain,
@@ -268,7 +279,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       item: item,
                       coins: widget.coins,
                       level: widget.level,
-                      owned: widget.ownedItemIds.contains(item.id),
+                      ownedCount: widget.ownedEquipmentCounts[item.id] ?? 0,
                       onPurchase: () => widget.onPurchaseEquipment(item),
                       onBlocked: _explain,
                     );
@@ -413,7 +424,11 @@ class _EquipmentCard extends StatelessWidget {
   final Item item;
   final int coins;
   final int level;
-  final bool owned;
+
+  /// Envanterde bu eşyadan kaç adet var. Satın almayı **engellemez**
+  /// (birleştirme için ikinci adet gerekiyor), yalnızca gösterilir.
+  final int ownedCount;
+
   final VoidCallback onPurchase;
   final ValueChanged<String> onBlocked;
 
@@ -421,14 +436,15 @@ class _EquipmentCard extends StatelessWidget {
     required this.item,
     required this.coins,
     required this.level,
-    required this.owned,
+    required this.ownedCount,
     required this.onPurchase,
     required this.onBlocked,
   });
 
   /// Kart neden alınamıyor? `null` ise alınabilir.
+  ///
+  /// Sahiplik burada **yok**: aynı eşya birden fazla kez alınabilir.
   String? get _blockedReason {
-    if (owned) return '${item.name} zaten sende.';
     if (!item.isUnlockedAt(level)) {
       return '${item.name} için ${item.requiredLevel}. seviye gerekiyor. '
           'Şu an $level. seviyedesin.';
@@ -516,6 +532,29 @@ class _EquipmentCard extends StatelessWidget {
               children: [
                 RarityBadge(rarity: item.rarity),
                 ArchetypeBadge(archetype: item.archetype),
+                // Sahiplik satın almayı engellemiyor; adet **bilgi**.
+                if (ownedCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.xp.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.xp.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    child: Text(
+                      '$ownedCount adet',
+                      style: const TextStyle(
+                        color: AppColors.xp,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
               ],
             ),
             // İmzalı itemlerin kural cümlesi: item'ın karakterini bu taşıyor.
@@ -556,7 +595,9 @@ class _EquipmentCard extends StatelessWidget {
               child: _PriceButton(
                 cost: item.cost,
                 enabled: reason == null,
-                ownedLabel: owned ? 'Sahipsin' : null,
+                // Adet bilgisi düğmeyi kapatmıyor; ikinci adet birleştirme
+                // için gerekli olabilir.
+                ownedLabel: null,
                 onPressed: onPurchase,
                 onBlocked: () => onBlocked(reason ?? ''),
               ),

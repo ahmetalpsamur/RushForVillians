@@ -1,3 +1,5 @@
+import '../../models/reward_rarity.dart';
+
 /// Oyunun temel dengeleme (balance) sabitleri.
 ///
 /// Tasarım fikrindeki sayılar burada tek noktadan yönetilir, böylece
@@ -165,4 +167,48 @@ class GameConstants {
   /// yazmayı yavaşlatır. 400 gün, takvim ekranında bir yıl geriye rahatça
   /// gitmeye yeter (~13 ay) ve ~40 KB'ın altında kalır.
   static const int maxStepHistoryDays = 400;
+
+  // --- Demirci: eşya yükseltme (Bölüm 4) ---
+
+  /// Nadirliğin izin verdiği en yüksek **eşya** seviyesi.
+  ///
+  /// Nadirlik böylece kalıcı bir üstünlük oluyor: sıradan bir eşya sonuna
+  /// kadar yükseltilse bile efsanevi bir eşyaya yetişemiyor. İkinci tavan
+  /// oyuncunun kendi seviyesi ([maxItemLevelFor]).
+  static const Map<RewardRarity, int> itemLevelCapByRarity = {
+    RewardRarity.common: 10,
+    RewardRarity.uncommon: 20,
+    RewardRarity.rare: 30,
+    RewardRarity.epic: 40,
+    RewardRarity.legendary: 50,
+  };
+
+  /// Bir eşyayı **1'den tavanına** çıkarmanın toplam maliyeti, eşyanın
+  /// fiyatının katı olarak.
+  ///
+  /// Tek bir sayı olması bilinçli: maliyet eğrisi bütün nadirliklerde aynı
+  /// şekli koruyor, yalnızca ölçeği değişiyor. Ölçülen sonuç (120 coin/gün
+  /// atan referans oyuncu için) `item_leveling_test.dart` içinde bağlı —
+  /// oyuncunun kendi seviyesi neredeyse her katmanda **coinden daha sıkı**
+  /// bir kısıt, yani yükseltmek pahalı ama imkânsız değil.
+  static const double itemUpgradeTotalMultiplier = 7.0;
+
+  /// Maliyet eğrisinin erken seviye ağırlığı.
+  ///
+  /// Bir seviyenin payı `erken ağırlık + seviye / tavan`. İlk seviyeler ucuz,
+  /// son seviyeler pahalı; ağırlıkların toplamı tam olarak `tavan - 1` ettiği
+  /// için toplam maliyet [itemUpgradeTotalMultiplier] ile birebir tutuyor.
+  static const double itemUpgradeEarlyWeight = 0.5;
+
+  /// Eşya seviyesi başına **savaş** statı artışı.
+  ///
+  /// Seviye 1 = ×1.00, seviye 10 = ×1.90, seviye 50 = ×5.90. Bir katmanın
+  /// tavanı bir üst katmanın tabanının üstüne çıkıyor ama katmanların
+  /// tavanları arasındaki sıra hiç bozulmuyor — "yükseltmek mi, yeni eşya mı"
+  /// sorusunun gerçek bir soru olmasının sebebi bu.
+  ///
+  /// ⚠️ **Ekonomi bonuslarına uygulanmaz.** Ekonomi dikkatle dengelendi
+  /// (`economy_pacing_test.dart`); adım→para ve adım→XP çarpanları seviyeyle
+  /// büyüseydi günlük tavan katlanır ve denge çökerdi.
+  static const double itemStatGrowthPerLevel = 0.10;
 }
