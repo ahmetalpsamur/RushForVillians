@@ -10,6 +10,7 @@ import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/item_leveling.dart';
+import '../../core/utils/item_merging.dart';
 import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
@@ -24,6 +25,7 @@ import '../../models/game_state.dart';
 import '../../models/item.dart';
 import '../../models/owned_item.dart';
 import '../../models/reward.dart';
+import '../../models/reward_rarity.dart';
 import '../../models/user_profile.dart';
 import '../../models/wheel_reward.dart';
 import '../../models/xp_store_item.dart';
@@ -1065,6 +1067,72 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
+  /// Aynı eşyanın birkaç adedini birleştirip bir üst nadirlikte tek örnek
+  /// üretir (demirci, Bölüm 4.3).
+  ///
+  /// Onay ekranını çağıran taraf (demirci) gösterir; burası kararı uygular ve
+  /// **bütün kontrolleri yeniden yapar**: ekran devre dışı görünse bile son
+  /// söz state'in.
+  ///
+  /// Tüketilen örnekler en düşük seviyelilerden seçilir
+  /// ([selectMergeInstances]); kuşanılı bir örnek tüketilecekse önce çıkarılır
+  /// ve bu kullanıcıya **söylenir** (sessizce kaybolmasın).
+  void _mergeItems(String itemId, RewardRarity rarity) {
+    final group = _mergeGroup(itemId, rarity);
+    if (group.isEmpty) return;
+
+    final resolved = _resolveInstance(group.first);
+    if (resolved == null) {
+      _showStoreNotice('Bu eşya artık katalogda yok.');
+      return;
+    }
+
+    final quote = quoteMerge(
+      resolved: resolved,
+      rarity: rarity,
+      group: group,
+      coins: _profile.coins,
+    );
+    if (!quote.canMerge) {
+      _showStoreNotice(quote.reason(rarity) ?? 'Şu an birleştirilemiyor.');
+      return;
+    }
+    final target = quote.target;
+    if (target == null) return;
+
+    final unequipped = quote.consumesEquipped;
+    setState(() {
+      _profile.coins -= quote.cost;
+      for (final instanceId in quote.consumedInstanceIds) {
+        _profile.removeInstance(instanceId);
+      }
+      // Sonuç **Sv. 1**'e döner (GD42); nadirlik yükselir.
+      _profile.addItem(itemId, rarity: target);
+      _refreshEquipment();
+    });
+    _persist();
+
+    _showStoreNotice(
+      unequipped
+          ? '${resolved.name} çıkarıldı ve ${quote.requiredCount} adet '
+              'birleştirildi: artık ${target.label}, Sv. 1.'
+          : '${quote.requiredCount} adet ${resolved.name} birleştirildi: '
+              'artık ${target.label}, Sv. 1.',
+    );
+  }
+
+  /// Aynı kimliğe ve aynı nadirliğe sahip örnekler.
+  List<OwnedItem> _mergeGroup(String itemId, RewardRarity rarity) {
+    final characterClass = _profile.avatar.characterClass;
+    return [
+      for (final instance in _profile.ownedItems)
+        if (instance.itemId == itemId)
+          if (ItemCatalog.byId(itemId, characterClass: characterClass)
+              case final base?)
+            if (instance.effectiveRarity(base.rarity) == rarity) instance,
+    ];
+  }
+
   /// Item'ı satar: sahiplikten düşer, kuşanılıysa önce çıkarılır ve
   /// [sellValueFor] kadar coin geri verilir.
   ///
@@ -1108,6 +1176,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       onUnequip: _unequipSlot,
       onSell: _sellItem,
       onUpgrade: _upgradeItem,
+      onMerge: _mergeItems,
     ),
   );
 

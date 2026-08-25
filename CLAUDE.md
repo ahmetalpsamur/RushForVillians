@@ -3741,6 +3741,44 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
   tam olarak `tavan − 1` ettiği için toplam oranla birebir tutuyor. Ölçüm
   tablosu aşağıda, `item_leveling_test.dart` ile bağlı.
 
+### GD42. Birleştirmenin sonucu Sv. 1'e döner (2026-08-25)
+- **Nerede:** `RootShell._mergeItems`, `item_merging.dart:selectMergeInstances`
+- **Karar:** N örnek + coin → 1 örnek, bir üst nadirlikte ve **Sv. 1**.
+- **Neden en yüksek seviye korunmuyor:** korunsaydı "üç eşyayı yükselt, sonra
+  birleştir" her zaman baskın strateji olurdu — ucuz katmanda kazanılan
+  seviyeler pahalı katmana taşınır, seviye maliyet eğrisi (GD41) anlamını
+  yitirirdi. Nadirlik birleştirmeden, seviye coinden gelmeli; iki sistem
+  birbirini beslememeli.
+- **Sertliği dengeleyen karar:** tüketilecek örnekler **otomatik olarak en
+  düşük seviyeliden** seçiliyor ve kuşanılı olanlar en sona atılıyor. Dört
+  adedi olan oyuncu birleştirdiğinde Sv. 9 olan elinde kalıyor, Sv. 1'ler
+  yanıyor. Pratikte oyuncu bir adedi yükseltip yedekleri Sv. 1'de tutuyor,
+  yani yatırım korunuyor. Testle bağlı.
+- **Onay ekranı harcanacak seviyeleri tek tek yazıyor** ve "geri alınamaz"
+  diyor; kuşanılı bir adet harcanacaksa bu da önceden söyleniyor.
+
+### GD43. Birleştirme ücreti hedef nadirliğin fiyatının %50'si (2026-08-25)
+- **Nerede:** `GameConstants.itemMergeCostRatio`, `item_merging.dart`
+- **Ölçüm:** birleştirerek bir eşyaya sahip olmak, aynı nadirlikteki bir
+  eşyayı doğrudan satın almanın **~2 katına** mal oluyor (test bunu bağlıyor).
+
+| Geçiş | Adet | Ücret | Toplam | Doğrudan alım |
+|---|---|---|---|---|
+| Sıradan → Az Bulunur | 3 | 150 | 450 | 325 |
+| Az Bulunur → Nadir | 4 | 350 | 1.650 | 825 |
+| Nadir → Epik | 5 | 1.050 | 5.175 | 2.600 |
+| Epik → Efsanevi | 6 | 3.325 | 18.925 | 8.450 |
+
+- **Neden pahalı olmalı:** birleştirmenin iki kalıcı avantajı var —
+  **(1)** seviye kilidi değişmiyor (GD40), yani erişemeyeceğin bir nadirliği
+  erken kuşanabiliyorsun; **(2)** nadirlik tavanı yükseldiği için eşya çok
+  daha ileri yükseltilebiliyor. Ücretsiz olsaydı mağaza anlamını yitirirdi.
+- **Neden imkânsız olmamalı:** gereken adet zaten kendi başına bir sürtünme
+  (aynı eşyayı 3–6 kez almak ya da çarktan toplamak). Ücret o sürtünmenin
+  üstüne ikinci bir duvar örmemeli.
+- **Alım-satım-birleştirme döngüsü para üretmiyor:** sonuçtaki örneğin satış
+  değeri (%40) harcanan toplamın altında; testle bağlı.
+
 ---
 ---
 ---
@@ -4001,6 +4039,119 @@ Toplam **511 test geçiyor**, `flutter analyze` temiz.
   envanterde belirgin bir giriş noktası olacak.
 - **Mağaza duyurusu (4.5):** "Yükseltilebilir · Maks Sv. 30",
   "3 tanesini birleştirerek nadirliğini yükseltebilirsin".
+
+---
+---
+
+# Bölüm 4.3–4.6 — Birleştirme ve demirci ✅ (2026-08-25)
+
+Demirci tamamlandı: aynı eşyanın birkaç adedi birleşip bir üst nadirliğe
+çıkıyor, ayrı bir demirci ekranı var ve mağaza satın almayı kalıcı bir yatırım
+olarak duyuruyor. Kararlar **GD42–GD43**. Şema değişmedi (**v12**).
+
+## 1. Birleştirme kuralları
+
+`lib/core/utils/item_merging.dart` — saf, `item_leveling.dart` ile aynı desen.
+
+| Geçiş | Gereken adet | Ücret |
+|---|---|---|
+| Sıradan → Az Bulunur | 3 | 150 |
+| Az Bulunur → Nadir | 4 | 350 |
+| Nadir → Epik | 5 | 1.050 |
+| Epik → Efsanevi | 6 | 3.325 |
+| Efsanevi | — | birleştirilemez |
+
+Adetler **tek config sabitinde** (`GameConstants.itemMergeCounts`); koda gömülü
+sayı yok ve test bunu bağlıyor. Efsanevinin haritada anahtarı **yok** — üstünde
+nadirlik olmadığı için birleştirilemiyor ve nedeni kullanıcıya söyleniyor.
+
+Üç şart: aynı **kimlik**, aynı **nadirlik**, yeterli **adet** + para.
+Seviyeler farklı olabilir.
+
+- **Sonuç Sv. 1'e döner** (GD42). Sertliği dengeleyen karar: tüketilecek
+  örnekler otomatik olarak **en düşük seviyeliden** seçiliyor, kuşanılı olanlar
+  en sona atılıyor. Dört adedi olan oyuncu birleştirdiğinde Sv. 9 olan elinde
+  kalıyor.
+- **Kuşanılı bir adet harcanacaksa** önce çıkarılıyor ve bu hem onay ekranında
+  hem sonuçta söyleniyor — sessizce kaybolmuyor.
+- **Seviye kilidi değişmiyor** (GD40): birleştirdiğin eşya birden
+  kuşanılamaz hâle gelmiyor. Bu, birleştirmenin asıl ödülü.
+- **Nadirlik tavanı yükseliyor**: sıradan bir kılıç Sv. 10'da duruyordu,
+  birleştirilince Sv. 20'ye kadar gidebiliyor.
+
+## 2. Demirci ekranı
+
+`lib/features/inventory/blacksmith_screen.dart` — envanterin AppBar'ındaki
+**örs düğmesinden** açılıyor.
+
+Envanter **kimlik + nadirlik** gruplarına bölünüyor; her grup bir kart:
+
+- **Yükselt** — "Sv. 4 / 10 (en gelişmiş adet)", sonraki seviyedeki stat farkı,
+  maliyet. Yükseltme her zaman **en gelişmiş** adede uygulanıyor; oyuncu
+  yatırımını tek eşyada toplasın.
+- **Birleştirme** — "3/3 adet → Az Bulunur", sonuç bilgisi ("Sv. 1'e döner,
+  nadirlik tavanı 20 olur"), ücret.
+
+Engellerin hiçbiri sessiz değil (Model Kuralları #4): devre dışı düğme
+**dokunulabilir** ve nedeni söylüyor, ayrıca neden kartın içinde de yazılı.
+Beş ayrı engel metni var: nadirlik tavanı, oyuncu seviyesi, yetersiz bakiye
+(yükseltme), yetersiz adet, en üst nadirlik (birleştirme).
+
+Ekran veri **tutmuyor**: `readState` + `revision` ile `RootShell`'i canlı
+okuyor (GD27) — arka planda adım gelip para değiştiğinde demirci de tazeleniyor.
+
+Onay diyaloğu ne kaybedildiğini ve ne kazanıldığını tek tek yazıyor, harcanacak
+adetlerin **seviyelerini** listeliyor ve "Bu işlem geri alınamaz." diyor
+(GD29'un satış onayıyla aynı dil).
+
+## 3. Mağaza duyurusu
+
+Ekipman kartına tek satır eklendi:
+
+> Yükseltilebilir · Maks Sv. 10 · 3 tanesini birleştirince Az Bulunur olur
+
+Efsanevide "en üst nadirlik" yazıyor. Gereken adet nadirliğe göre değiştiği
+için sayı **tablodan** okunuyor, sabit yazılmıyor.
+
+Kart bu satırla uzadı; iki test buna göre güncellendi:
+- "kilitli item satın alınamaz" artık düğmeyi `ensureVisible` ile buluyor
+  (varsayılan 800×600 test görüntüsünde ekran dışına düşüyordu),
+- "az içerikli kart gereksiz boşluk bırakmaz" ölçütü 250 → **302 px**;
+  ölçütün anlamı zaten GD12'nin kaldırdığı **sabit** yükseklikten küçük olmak.
+
+Altı ekran genişliğindeki taşma testleri değişmeden geçiyor.
+
+## 4. Test
+
+- `test/item_merging_test.dart` — **22 test** (yeni): adet tablosu ve tek
+  config kaynağı, efsanevinin birleştirilemezliği, ücretin nadirlikle artması
+  ve doğrudan alımdan pahalı olması, tüketilecek örneklerin seçimi (en düşük
+  seviye önce, kuşanılı en sona, kararlı sıra, gelen liste değiştirilmez),
+  dört engelin ayrı ayrı raporlanması, gruplama (farklı nadirlik ayrı grup),
+  zincirleme yükselmenin efsanevide durması.
+- `test/blacksmith_test.dart` — **16 test** (yeni, gerçek `RootShell`
+  üzerinden): örs düğmesinin ekranı açması, boş durum, adetlerin tek kartta
+  toplanması, farklı nadirliklerin ayrı kartlara düşmesi, birleştirmenin
+  nadirliği yükseltip Sv. 1'e döndürmesi, fazla adette en gelişmiş örneğin
+  elde kalması, vazgeçme, onay ekranının içeriği, kuşanılı adedin çıkarılması,
+  üç engel, diske yazma, döngünün para üretmemesi, demirciden yükseltmenin en
+  gelişmiş adede uygulanması.
+- `test/golden/forge_golden_test.dart` — **2 golden** (320/390 dp): karışık
+  örneklem (birleştirilebilir / adedi yetmeyen / efsanevi). PNG'ler okundu ve
+  gözle doğrulandı.
+- `test/store_screen_test.dart` — **+3 test**: yatırım satırının içeriği,
+  adedin nadirliğe göre değişmesi, efsanevi metni.
+- Yeniden üretilen golden'lar: `store_card_*` (yatırım satırı),
+  `blacksmith_*` (envanter AppBar'ına örs düğmesi eklendi).
+
+Toplam **554 test geçiyor**, `flutter analyze` temiz.
+
+## 5. Bölüm 4 kapandı
+
+4.1 → 4.6'nın tamamı bitti. Açık kalan tek konu, savaş statlarının **hâlâ
+uygulanmıyor** olması — savaş motoru Aşama 4a'nın konusu (bkz. kapanış §7).
+Yükseltme ve birleştirme bugün o statları büyütüyor ve gösteriyor; motor
+gelince kendiliğinden canlanacaklar.
 
 ---
 ---
@@ -4415,7 +4566,8 @@ Firebase gerektirenler **hariç**. Kaynak: bu dosyadaki "OTURUM KAPANIŞI —
 2. ~~**Bölüm 4.1–4.2** (veri yapısı + eşya seviyesi)~~ ✅ **BİTTİ**
    (2026-08-25) — şema v12, mağaza çoklu satın alma; bkz. "Bölüm 4.1–4.2"
    bölümü, GD39–GD41.
-3. **Bölüm 4.3–4.6** (birleştirme + demirci arayüzü + mağaza duyurusu).
+3. ~~**Bölüm 4.3–4.6** (birleştirme + demirci arayüzü + mağaza duyurusu)~~
+   ✅ **BİTTİ** (2026-08-25) — bkz. "Bölüm 4.3–4.6" bölümü, GD42–GD43.
 4. **Bölüm 5** (streak ↔ macera, çark kilidi, streak stat bonusu).
 5. **Bölüm 6** (A6, A7, savaş sahnesi metin katmanı).
 6. Bölüm 7+ — Aşama 4a savaş motoru.

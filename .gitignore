@@ -51,3 +51,6 @@ app.*.map.json
 
 # Golden testlerin uyusmazlik ciktilari (gecici)
 test/failures/
+
+# Golden test karşılaştırma çıktıları (flutter test --update-goldens öncesi)
+**/failures/

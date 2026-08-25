@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/item_leveling.dart';
+import '../../core/utils/item_merging.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/item.dart';
 import '../../models/xp_store_item.dart';
@@ -441,6 +443,22 @@ class _EquipmentCard extends StatelessWidget {
     required this.onBlocked,
   });
 
+  /// "Bu eşya nereye kadar gider" satırı.
+  ///
+  /// İki bilgi: nadirliğin izin verdiği en yüksek eşya seviyesi ve bir üst
+  /// nadirliğe çıkmak için gereken adet. Gereken adet nadirliğe göre
+  /// değiştiği için sayı tablodan okunuyor, sabit yazılmıyor.
+  String get _investmentLine {
+    final cap = itemLevelCap(item.rarity);
+    final needed = mergeCountFor(item.rarity);
+    final target = nextRarity(item.rarity);
+    if (needed == null || target == null) {
+      return 'Yükseltilebilir · Maks Sv. $cap · en üst nadirlik';
+    }
+    return 'Yükseltilebilir · Maks Sv. $cap · $needed tanesini '
+        'birleştirince ${target.label} olur';
+  }
+
   /// Kart neden alınamıyor? `null` ise alınabilir.
   ///
   /// Sahiplik burada **yok**: aynı eşya birden fazla kez alınabilir.
@@ -589,6 +607,19 @@ class _EquipmentCard extends StatelessWidget {
                 ),
               ),
             ],
+            // Satın almayı **kalıcı bir yatırım** olarak göster: bu eşya
+            // nereye kadar yükselir ve kaç tanesi bir üst nadirliğe çıkar.
+            const SizedBox(height: 6),
+            Text(
+              _investmentLine,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10.5,
+                height: 1.25,
+                color: Colors.white54,
+              ),
+            ),
             const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerRight,

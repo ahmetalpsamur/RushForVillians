@@ -19,6 +19,7 @@ import '../../widgets/avatar_view.dart';
 import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
 import '../../widgets/section_card.dart';
+import 'blacksmith_screen.dart';
 
 /// Envanter ekranının okuduğu anlık durum.
 ///
@@ -106,6 +107,9 @@ class InventoryScreen extends StatefulWidget {
   final void Function(int instanceId) onSell;
   final void Function(int instanceId) onUpgrade;
 
+  /// Aynı eşyanın aynı nadirlikteki örneklerini birleştirir (demirci).
+  final void Function(String itemId, RewardRarity rarity) onMerge;
+
   const InventoryScreen({
     super.key,
     required this.revision,
@@ -114,6 +118,7 @@ class InventoryScreen extends StatefulWidget {
     required this.onUnequip,
     required this.onSell,
     required this.onUpgrade,
+    required this.onMerge,
   });
 
   @override
@@ -171,6 +176,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return;
       }
     }
+  }
+
+  /// Demirciyi açar. Ekran veri tutmuyor; aynı [readState] ve `revision`
+  /// üzerinden `RootShell`'i canlı okuyor (GD27).
+  void _openBlacksmith() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => BlacksmithScreen(
+              revision: widget.revision,
+              readState: widget.readState,
+              onUpgrade: widget.onUpgrade,
+              onMerge: widget.onMerge,
+            ),
+      ),
+    );
   }
 
   void _notify(String message) {
@@ -265,6 +286,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
           appBar: AppBar(
             title: const Text('Envanter'),
             actions: [
+              // Demirci belirgin bir örs düğmesi olarak duruyor: yükseltme ve
+              // birleştirme kuşanma listesinin arasında kaybolmasın.
+              IconButton(
+                tooltip: 'Demirci',
+                icon: const Icon(Icons.hardware),
+                onPressed: _openBlacksmith,
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: Center(

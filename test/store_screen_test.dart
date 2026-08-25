@@ -3,9 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
+import 'package:rush_for_villains/core/utils/item_leveling.dart';
+import 'package:rush_for_villains/core/utils/item_merging.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/features/store/xp_store_screen.dart';
 import 'package:rush_for_villains/models/item.dart';
+import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/models/xp_store_item.dart';
 
 /// Mağazanın iki sözü var: kilitli bir kart **sessiz kalmaz** (CLAUDE.md —
@@ -106,7 +109,12 @@ void main() {
         onPurchaseEquipment: purchased.add,
       );
 
-      await tester.tap(find.byType(FilledButton).last);
+      // Kart "Yükseltilebilir · Maks Sv. N" satırıyla uzadı (4.5); varsayılan
+      // 800x600 test görüntüsünde düğme ekran dışına düşebiliyor.
+      final button = find.byType(FilledButton).last;
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
       await tester.pump();
 
       expect(purchased, isEmpty, reason: 'kilit gerçekten tutmalı');
@@ -177,6 +185,44 @@ void main() {
       await tester.pump();
 
       expect(purchased, [cheapItem]);
+    });
+  });
+
+  group('yatırım duyurusu (4.5)', () {
+    testWidgets('kart eşyanın nereye kadar gideceğini söyler', (tester) async {
+      // Amaç: oyuncu satın almayı **kalıcı bir yatırım** olarak görsün.
+      await pumpStore(tester, equipment: [cheapItem], level: 50);
+
+      expect(
+        find.textContaining('Maks Sv. ${itemLevelCap(cheapItem.rarity)}'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Yükseltilebilir'), findsOneWidget);
+    });
+
+    testWidgets('gereken birleştirme adedi nadirliğe göre yazılır', (
+      tester,
+    ) async {
+      // Sayı sabit yazılmamalı: nadirliğe göre 3/4/5/6 değişiyor.
+      await pumpStore(tester, equipment: [cheapItem], level: 50);
+
+      final needed = mergeCountFor(cheapItem.rarity)!;
+      final target = nextRarity(cheapItem.rarity)!;
+      expect(
+        find.textContaining('$needed tanesini birleştirince ${target.label}'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('efsanevi kartta "en üst nadirlik" yazar', (tester) async {
+      // lockedItem efsanevi; birleştirilemez ve bu söylenmeli.
+      await pumpStore(tester, equipment: [lockedItem], level: 50);
+
+      expect(find.textContaining('en üst nadirlik'), findsOneWidget);
+      expect(
+        find.textContaining('Maks Sv. ${itemLevelCap(lockedItem.rarity)}'),
+        findsOneWidget,
+      );
     });
   });
 
@@ -403,7 +449,10 @@ void main() {
         matching: find.byType(Card),
       );
 
-      expect(tester.getSize(card).height, lessThan(250));
+      // Ölçüt, GD12'nin kaldırdığı **sabit** yükseklikten (302 px) küçük
+      // olmak: az bonuslu bir item, en uzun item için ayrılan boşluğu
+      // taşımamalı. Kart 4.5'te bir yatırım satırıyla uzadı.
+      expect(tester.getSize(card).height, lessThan(302));
     });
 
     for (final width in [320.0, 360.0, 390.0, 412.0, 480.0, 800.0]) {

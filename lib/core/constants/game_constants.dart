@@ -211,4 +211,29 @@ class GameConstants {
   /// (`economy_pacing_test.dart`); adım→para ve adım→XP çarpanları seviyeyle
   /// büyüseydi günlük tavan katlanır ve denge çökerdi.
   static const double itemStatGrowthPerLevel = 0.10;
+
+  // --- Demirci: eşya birleştirme (Bölüm 4.3) ---
+
+  /// Bir üst nadirliğe geçmek için gereken **adet**.
+  ///
+  /// Üçten başlıyor ve her kademede bir artıyor: nadirlik yükseldikçe
+  /// birleştirmek zorlaşıyor. Efsanevi anahtarı **yok** — üstünde nadirlik
+  /// olmadığı için efsaneviler birleştirilemiyor.
+  ///
+  /// Tek config sabiti; koda gömülü sayı yok.
+  static const Map<RewardRarity, int> itemMergeCounts = {
+    RewardRarity.common: 3,
+    RewardRarity.uncommon: 4,
+    RewardRarity.rare: 5,
+    RewardRarity.epic: 6,
+  };
+
+  /// Birleştirme ücretinin, **hedef** nadirlikteki eşya fiyatına oranı.
+  ///
+  /// %50: birleştirme yoluyla bir eşyaya sahip olmak, aynı eşyayı doğrudan
+  /// satın almanın kabaca iki katına mal oluyor. Karşılığında iki şey
+  /// kazanılıyor: eşyanın **seviye kilidi değişmiyor** (GD40), yani
+  /// erişemeyeceğin bir nadirliği erken kuşanabiliyorsun; ve nadirlik
+  /// tavanı yükseldiği için eşya çok daha ileri yükseltilebiliyor.
+  static const double itemMergeCostRatio = 0.5;
 }
