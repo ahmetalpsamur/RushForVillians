@@ -1,25 +1,75 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 
 void main() {
   group('macera dengesi', () {
-    test('başlangıçtan ileri seviyeye düşman hedefleri 500 artarak başlar', () {
+    test('20 farklı düşman hedefi 500 adımlık aralıklarla açılır', () {
       expect(EnemyCatalog.enemies.map((enemy) => enemy.minimumDailySteps), [
         500,
         1000,
         1500,
         2000,
+        2500,
+        3000,
+        3500,
+        4000,
+        4500,
         5000,
+        5500,
+        6000,
+        6500,
         7000,
+        7500,
+        8000,
+        8500,
+        9000,
+        9500,
         10000,
       ]);
     });
 
-    test('her round için 20 dakika verir', () {
+    test('her düşman farklı ve bütün All_Assets animasyonları mevcut', () {
+      expect(EnemyCatalog.enemies, hasLength(20));
+      expect(
+        EnemyCatalog.enemies.map((enemy) => enemy.id).toSet(),
+        hasLength(20),
+      );
+      expect(
+        EnemyCatalog.enemies.map((enemy) => enemy.name).toSet(),
+        hasLength(20),
+      );
+
+      for (final enemy in EnemyCatalog.enemies) {
+        final assets = [
+          enemy.idleAsset,
+          enemy.walkAsset,
+          enemy.hurtAsset,
+          ...enemy.attackAssets,
+          enemy.deathAsset,
+        ];
+        expect(
+          enemy.attackAssets.length,
+          greaterThanOrEqualTo(2),
+          reason: '${enemy.name} için saldırı çeşitliliği yetersiz',
+        );
+        expect(
+          assets.every((asset) => asset.startsWith('lib/All_Assets/Enemies/')),
+          isTrue,
+          reason: '${enemy.name} eski Enemies klasörünü kullanıyor',
+        );
+        for (final asset in assets) {
+          expect(File(asset).existsSync(), isTrue, reason: 'Eksik: $asset');
+        }
+      }
+    });
+
+    test('test dengesi her round için 30 saniye verir', () {
       expect(
         AdventureQuest.roundDurationForSteps(1000),
-        const Duration(minutes: 20),
+        const Duration(seconds: 30),
       );
       expect(AdventureQuest.reminderInterval, const Duration(minutes: 5));
     });
@@ -34,7 +84,7 @@ void main() {
 
       final result = quest.resolveRound(
         1000,
-        startedAt.add(const Duration(minutes: 8)),
+        startedAt.add(const Duration(seconds: 10)),
       );
 
       expect(result?.targetReached, isTrue);
@@ -43,7 +93,7 @@ void main() {
       expect(quest.currentRound, 2);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 28)),
+        startedAt.add(const Duration(seconds: 40)),
       );
     });
 
@@ -57,7 +107,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         500,
-        startedAt.add(const Duration(minutes: 20)),
+        startedAt.add(const Duration(seconds: 30)),
       );
 
       expect(result?.walkedSteps, 500);
@@ -77,7 +127,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         1000,
-        startedAt.add(const Duration(minutes: 10)),
+        startedAt.add(const Duration(seconds: 10)),
       );
 
       expect(result?.targetReached, isTrue);
@@ -91,7 +141,7 @@ void main() {
   // kalanları affetmek oyuncunun kalıcı savaş canını yanlış bırakıyordu
   // (triaj A1).
   group('biriken tur çözümü', () {
-    // sinister_monster: attackDamage 12, round hedefi 1000 adım → 20 dakika.
+    // sinister_monster: attackDamage 12, round hedefi 1000 adım → 30 saniye.
     AdventureQuest questAt(DateTime startedAt) => AdventureQuest(
       enemy: EnemyCatalog.byId('sinister_monster')!,
       stepGoal: 5000,
@@ -102,11 +152,11 @@ void main() {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
-      // 60 dakika arka plan, hiç adım atılmadı: 20, 40 ve 60.
-      // dakikalardaki üç round dolmuş olmalı.
+      // 90 saniye arka plan, hiç adım atılmadı: 30, 60 ve 90.
+      // saniyelerdeki üç round dolmuş olmalı.
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(minutes: 60)),
+        startedAt.add(const Duration(seconds: 90)),
       );
 
       expect(result?.playerDamage, 36, reason: '3 round × 12 hasar');
@@ -117,15 +167,15 @@ void main() {
     test('bir sonraki geri sayım geleceğe taşınır', () {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
-      final now = startedAt.add(const Duration(minutes: 60));
+      final now = startedAt.add(const Duration(seconds: 90));
 
       quest.resolveExpiredRounds(0, now);
 
       expect(quest.nextEnemyAttackAt.isAfter(now), isTrue);
-      // Sıra `now`'dan değil, dolan sıradan ileri taşınır: 60 + 20 = 80.
+      // Sıra `now`'dan değil, dolan sıradan ileri taşınır: 90 + 30 = 120.
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 80)),
+        startedAt.add(const Duration(seconds: 120)),
       );
     });
 
@@ -133,10 +183,10 @@ void main() {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
-      // 60 dakikada 2.500 adım: ilk iki round tam, üçüncüsü yarım.
+      // 90 saniyede 2.500 adım: ilk iki round tam, üçüncüsü yarım.
       final result = quest.resolveExpiredRounds(
         2500,
-        startedAt.add(const Duration(minutes: 60)),
+        startedAt.add(const Duration(seconds: 90)),
       );
 
       expect(result?.walkedSteps, 2500);
@@ -150,7 +200,7 @@ void main() {
 
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(minutes: 5)),
+        startedAt.add(const Duration(seconds: 15)),
       );
 
       expect(result, isNull);
@@ -218,7 +268,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         4500,
-        startedAt.add(const Duration(minutes: 20)),
+        startedAt.add(const Duration(seconds: 30)),
       );
 
       expect(result?.walkedSteps, 500);

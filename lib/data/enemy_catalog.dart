@@ -1,136 +1,299 @@
 import '../models/enemy.dart';
 
+const _root = 'lib/All_Assets/Enemies/Characters(100x100 split)';
+
+const _attackVariants = <String, List<String>>{
+  'Black Knight_A': ['Attack01', 'Attack02', 'Attack03'],
+  'Black Knight_B': ['Attack01', 'Attack02', 'Attack03'],
+  'Black Knight_C': ['Attack01', 'Attack02', 'Attack03'],
+  'Blood Monster_A': ['Attack01', 'Attack02'],
+  'Blood Monster_B': ['Attack01', 'Attack02'],
+  'Demoness_A': ['Attack01', 'Attack02', 'Attack03'],
+  'Demoness_B': ['Attack01', 'Attack02'],
+  'Demon_A': ['Attack01', 'Attack02'],
+  'Demon_B': ['Attack01', 'Attack02'],
+  'Demon_C': ['Attack01', 'Attack02'],
+  'Demon_D': ['Attack01', 'Attack02', 'Attack03'],
+  'Demon_E': ['Attack01', 'Attack02', 'Attack03'],
+  'Eyeball Monster': ['Attack01', 'Attack02', 'Attack03'],
+  'Flame Golem': ['Attack01', 'Attack02', 'Attack03'],
+  'Ghostfire': ['Attack01', 'Attack02'],
+  'Hellbat': ['Attack01', 'Attack02'],
+  'Hellhound': ['Attack01', 'Attack02'],
+  'Lava Slime': ['Attack01', 'Attack02'],
+  'Minotaur': ['Attack01', 'Attack02', 'Attack03'],
+  'Warlock': ['Attack01', 'Attack02(With magic effects)', 'Attack02'],
+};
+
+Enemy _enemy({
+  required String id,
+  required String folder,
+  required String name,
+  required String questText,
+  required int minimumDailySteps,
+  required int attackDamage,
+  required int xpReward,
+  String idleAnimation = 'Idle',
+  String walkAnimation = 'Walk',
+  String attackAnimation = 'Attack01',
+  int attackAnimationDurationMs = 700,
+  int deathAnimationDurationMs = 700,
+}) {
+  final base = '$_root/$folder/$folder/$folder';
+  return Enemy(
+    id: id,
+    name: name,
+    idleAsset: '${base}_$idleAnimation.gif',
+    walkAsset: '${base}_$walkAnimation.gif',
+    hurtAsset: '${base}_Hurt.gif',
+    attackAssets: List.unmodifiable(
+      (_attackVariants[folder] ?? [attackAnimation]).map(
+        (animation) => '${base}_$animation.gif',
+      ),
+    ),
+    deathAsset: '${base}_Death.gif',
+    attackAnimationDurationMs: attackAnimationDurationMs,
+    deathAnimationDurationMs: deathAnimationDurationMs,
+    attackDamage: attackDamage,
+    questText: questText,
+    minimumDailySteps: minimumDailySteps,
+    xpReward: xpReward,
+  );
+}
+
 class EnemyCatalog {
   EnemyCatalog._();
 
-  static const enemies = [
-    Enemy(
-      id: 'border_scout',
-      name: 'Sınır Gözcüsü',
-      idleAsset: 'lib/Enemies/Gergin Asker/Soldier_Idle.gif',
-      walkAsset: 'lib/Enemies/Gergin Asker/Soldier_Walk.gif',
-      hurtAsset: 'lib/Enemies/Gergin Asker/Soldier_Hurt.gif',
-      attackAsset: 'lib/Enemies/Gergin Asker/Soldier_Attack01.gif',
-      deathAsset: 'lib/Enemies/Gergin Asker/Soldier_Death.gif',
-      attackAnimationDurationMs: 540,
-      deathAnimationDurationMs: 640,
-      attackDamage: 4,
+  /// All_Assets düşmanları zorluk sırasında. Her 500 adımda yeni
+  /// bir karşılaşma açılır; aynı sprite'ı tekrar kullanan düşman yoktur.
+  static final List<Enemy> enemies = [
+    _enemy(
+      id: 'ash_guardian',
+      folder: 'Black Knight_A',
+      name: 'Kül Muhafızı',
       questText:
-          'İlk yolculuğunda Sınır Gözcüsü karşına çıktı. 500 adımlık '
-          'ritmini tamamla ve maceraya güçlü bir başlangıç yap!',
+          'Kül Muhafızı sessiz geçidi tuttu. İlk 500 adımınla zırhındaki mührü parçala!',
       minimumDailySteps: 500,
+      attackDamage: 8,
       xpReward: 100,
     ),
-    Enemy(
-      id: 'forest_raider',
-      name: 'Orman Yağmacısı',
-      idleAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Idle.gif',
-      walkAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Walk.gif',
-      hurtAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Hurt.gif',
-      attackAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Attack01.gif',
-      deathAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Death.gif',
-      attackAnimationDurationMs: 540,
-      deathAnimationDurationMs: 640,
-      attackDamage: 6,
+    _enemy(
+      id: 'night_oath',
+      folder: 'Black Knight_B',
+      name: 'Gece Yeminlisi',
       questText:
-          'Orman Yağmacısı patikayı kapattı. 1.000 adım at, savunmasını '
-          'kır ve yoluna devam et!',
+          'Gece Yeminlisi kılıcını ay ışığında kaldırdı. 1.000 adımlık ritmini bozmadan onu geride bırak!',
       minimumDailySteps: 1000,
+      attackDamage: 9,
       xpReward: 175,
     ),
-    Enemy(
-      id: 'blood_apprentice',
-      name: 'Kan Çırağı',
-      idleAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Idle.gif',
-      walkAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Walk.gif',
-      hurtAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Hurt.gif',
-      attackAsset:
-          'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Attack01.gif',
-      deathAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Death.gif',
-      attackAnimationDurationMs: 800,
-      deathAnimationDurationMs: 560,
-      attackDamage: 7,
+    _enemy(
+      id: 'void_knight',
+      folder: 'Black Knight_C',
+      name: 'Hiçlik Şövalyesi',
       questText:
-          'Kan Çırağı gücünü sınamak istiyor. 1.500 adımlık hedefini '
-          'tamamlayarak ona ilk gerçek yenilgisini yaşat!',
+          'Hiçlik Şövalyesi yolun üzerine karanlık bir yarık açtı. 1.500 adımla mührü kapat!',
       minimumDailySteps: 1500,
+      attackDamage: 10,
       xpReward: 250,
     ),
-    Enemy(
-      id: 'tense_soldier',
-      name: 'Gergin Asker',
-      idleAsset: 'lib/Enemies/Gergin Asker/Soldier_Idle.gif',
-      walkAsset: 'lib/Enemies/Gergin Asker/Soldier_Walk.gif',
-      hurtAsset: 'lib/Enemies/Gergin Asker/Soldier_Hurt.gif',
-      attackAsset: 'lib/Enemies/Gergin Asker/Soldier_Attack01.gif',
-      deathAsset: 'lib/Enemies/Gergin Asker/Soldier_Death.gif',
-      attackAnimationDurationMs: 540,
-      deathAnimationDurationMs: 640,
-      attackDamage: 8,
+    _enemy(
+      id: 'blood_weaver',
+      folder: 'Blood Monster_A',
+      name: 'Kan Dokuyan',
       questText:
-          'Gergin Asker yolunu kesmeye hazır. Korkusunun seni yavaşlatmasına '
-          'izin verme; ritmini koru ve asla pes etme!',
+          'Kan Dokuyan her tereddüdünden güç alıyor. 2.000 adım boyunca temponu koru ve ağını boz!',
       minimumDailySteps: 2000,
-      xpReward: 300,
-    ),
-    Enemy(
-      id: 'sinister_monster',
-      name: 'Tekinsiz Canavar!',
-      idleAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Idle.gif',
-      walkAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Walk.gif',
-      hurtAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Hurt.gif',
-      attackAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Attack01.gif',
-      deathAsset: 'lib/Enemies/Tekinsiz Canavar!/Orc_Death.gif',
-      attackAnimationDurationMs: 540,
-      deathAnimationDurationMs: 640,
-      attackDamage: 12,
-      questText:
-          'Tekinsiz Canavar’a dikkat et; enerjini emmeye çalışabilir. Her '
-          'adımda gücünü geri kazan, yolundan dönme ve asla pes etme!',
-      minimumDailySteps: 5000,
-      xpReward: 750,
-    ),
-    Enemy(
-      id: 'blood_monster',
-      name: 'Kana Susamış Canavar',
-      idleAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Idle.gif',
-      walkAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Walk.gif',
-      hurtAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Hurt.gif',
-      attackAsset:
-          'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Attack01.gif',
-      deathAsset: 'lib/Enemies/Blood_Monster_A_GIFs/Blood Monster_A_Death.gif',
+      attackDamage: 11,
+      xpReward: 325,
       attackAnimationDurationMs: 800,
-      deathAnimationDurationMs: 560,
-      attackDamage: 16,
-      questText:
-          'Kana Susamış Canavar karşında. Cesaretini topla, adımlarınla '
-          'gücünü tüket ve karanlığa boyun eğme!',
-      minimumDailySteps: 7000,
-      xpReward: 1100,
     ),
-    Enemy(
-      id: 'demon',
-      name: 'Şişli Şeytan',
-      idleAsset: 'lib/Enemies/Demon_A_GIFs/Demon_A_Idle.gif',
-      walkAsset: 'lib/Enemies/Demon_A_GIFs/Demon_A_Walk.gif',
-      hurtAsset: 'lib/Enemies/Demon_A_GIFs/Demon_A_Hurt.gif',
-      attackAsset: 'lib/Enemies/Demon_A_GIFs/Demon_A_Attack01.gif',
-      deathAsset: 'lib/Enemies/Demon_A_GIFs/Demon_A_Death.gif',
-      attackAnimationDurationMs: 700,
-      deathAnimationDurationMs: 560,
-      attackDamage: 20,
+    _enemy(
+      id: 'crimson_wing',
+      folder: 'Blood Monster_B',
+      name: 'Kızıl Kanat',
       questText:
-          'Şişli Şeytan yoluna dikildi. Temponu koru, her adımda onu '
-          'zayıflat ve zafere doğru ilerle!',
+          'Kızıl Kanat gökyüzünü kana boyadı. 2.500 adım at, gölgesinin dışına çık!',
+      minimumDailySteps: 2500,
+      attackDamage: 12,
+      xpReward: 400,
+      idleAnimation: 'Flying',
+      walkAnimation: 'Flying',
+      attackAnimationDurationMs: 800,
+    ),
+    _enemy(
+      id: 'ember_siren',
+      folder: 'Demoness_A',
+      name: 'Kor Sireni',
+      questText:
+          'Kor Sireni ateşli ezgisiyle adımlarını yavaşlatıyor. 3.000 adımla büyüyü sustur!',
+      minimumDailySteps: 3000,
+      attackDamage: 13,
+      xpReward: 500,
+    ),
+    _enemy(
+      id: 'dusk_temptress',
+      folder: 'Demoness_B',
+      name: 'Alacakaranlık Cadısı',
+      questText:
+          'Alacakaranlık Cadısı patikayı sahte hayallerle kapladı. 3.500 gerçek adımla sisini dağıt!',
+      minimumDailySteps: 3500,
+      attackDamage: 14,
+      xpReward: 600,
+    ),
+    _enemy(
+      id: 'horned_executioner',
+      folder: 'Demon_A',
+      name: 'Boynuzlu Cellat',
+      questText:
+          'Boynuzlu Cellat baltasını yol taşına vurdu. 4.000 adımla meydan okumasını kabul et!',
+      minimumDailySteps: 4000,
+      attackDamage: 15,
+      xpReward: 700,
+    ),
+    _enemy(
+      id: 'infernal_sentinel',
+      folder: 'Demon_B',
+      name: 'Cehennem Nöbetçisi',
+      questText:
+          'Cehennem Nöbetçisi köprüyü ateşle çevirdi. 4.500 adımla alev çemberini yar!',
+      minimumDailySteps: 4500,
+      attackDamage: 16,
+      xpReward: 800,
+    ),
+    _enemy(
+      id: 'black_claw',
+      folder: 'Demon_C',
+      name: 'Kara Pençe',
+      questText:
+          'Kara Pençe izini buldu. 5.000 adım boyunca avcıdan hızlı ol ve karanlığı geride bırak!',
+      minimumDailySteps: 5000,
+      attackDamage: 17,
+      xpReward: 900,
+    ),
+    _enemy(
+      id: 'ember_heir',
+      folder: 'Demon_D',
+      name: 'Alev Tahtının Varisi',
+      questText:
+          'Alev Tahtının Varisi tacını savunuyor. 5.500 adımla krallığını sars!',
+      minimumDailySteps: 5500,
+      attackDamage: 18,
+      xpReward: 1000,
+    ),
+    _enemy(
+      id: 'abyss_overlord',
+      folder: 'Demon_E',
+      name: 'Uçurum Hükümdarı',
+      questText:
+          'Uçurum Hükümdarı dönüş yolunu yuttu. 6.000 adımla kendi geçidini aç!',
+      minimumDailySteps: 6000,
+      attackDamage: 19,
+      xpReward: 1150,
+    ),
+    _enemy(
+      id: 'eye_of_nothing',
+      folder: 'Eyeball Monster',
+      name: 'Hiçliğin Gözü',
+      questText:
+          'Hiçliğin Gözü her adımını izliyor. 6.500 adımla bakışını yere indir!',
+      minimumDailySteps: 6500,
+      attackDamage: 12,
+      xpReward: 1300,
+    ),
+    _enemy(
+      id: 'cinder_colossus',
+      folder: 'Flame Golem',
+      name: 'Köz Devi',
+      questText:
+          'Köz Devi her darbede dağı uyandırıyor. 7.000 adımla taş kalbini soğut!',
+      minimumDailySteps: 7000,
+      attackDamage: 21,
+      xpReward: 1450,
+    ),
+    _enemy(
+      id: 'spirit_flame',
+      folder: 'Ghostfire',
+      name: 'Ruh Alevi',
+      questText:
+          'Ruh Alevi sönmeyen bir iz gibi peşinde. 7.500 adımla lanetli ateşi tüket!',
+      minimumDailySteps: 7500,
+      attackDamage: 22,
+      xpReward: 1600,
+      idleAnimation: 'Flying',
+      walkAnimation: 'Flying',
+    ),
+    _enemy(
+      id: 'hell_wing',
+      folder: 'Hellbat',
+      name: 'Cehennem Kanadı',
+      questText:
+          'Cehennem Kanadı göğü kararttı. 8.000 adımla kanatlarının altından şafağa ulaş!',
+      minimumDailySteps: 8000,
+      attackDamage: 23,
+      xpReward: 1800,
+      idleAnimation: 'Flying',
+      walkAnimation: 'Flying',
+    ),
+    _enemy(
+      id: 'ash_fang',
+      folder: 'Hellhound',
+      name: 'Kül Diş',
+      questText:
+          'Kül Diş kokunu aldı ve av başladı. 8.500 adımla cehennem tazısını yıprat!',
+      minimumDailySteps: 8500,
+      attackDamage: 24,
+      xpReward: 2000,
+    ),
+    _enemy(
+      id: 'magma_devourer',
+      folder: 'Lava Slime',
+      name: 'Magma Yutan',
+      questText:
+          'Magma Yutan bastığın zemini eritiyor. 9.000 adımla lav denizinin önüne geç!',
+      minimumDailySteps: 9000,
+      attackDamage: 25,
+      xpReward: 2200,
+    ),
+    _enemy(
+      id: 'maze_butcher',
+      folder: 'Minotaur',
+      name: 'Labirent Kasabı',
+      questText:
+          'Labirent Kasabı çıkışını bekliyor. 9.500 adımla duvarlardan önce iradesini yık!',
+      minimumDailySteps: 9500,
+      attackDamage: 27,
+      xpReward: 2450,
+    ),
+    _enemy(
+      id: 'lord_of_last_seal',
+      folder: 'Warlock',
+      name: 'Son Mührün Efendisi',
+      questText:
+          'Son Mührün Efendisi yolculuğunun sonuna karanlık imzasını attı. 10.000 adımla mührü sonsuza dek kır!',
       minimumDailySteps: 10000,
-      xpReward: 1500,
+      attackDamage: 30,
+      xpReward: 2750,
+      attackAnimationDurationMs: 850,
+      deathAnimationDurationMs: 800,
     ),
   ];
 
-  /// Kayıtlı maceranın düşmanını kimliğinden geri bulur.
+  /// Eski sürümde başlatılmış maceralar yeni kataloğa taşınır.
+  static const _legacyIds = {
+    'border_scout': 'ash_guardian',
+    'forest_raider': 'ash_fang',
+    'blood_apprentice': 'blood_weaver',
+    'tense_soldier': 'ash_guardian',
+    'sinister_monster': 'eye_of_nothing',
+    'blood_monster': 'blood_weaver',
+    'demon': 'horned_executioner',
+  };
+
   static Enemy? byId(String id) {
+    final resolvedId = _legacyIds[id] ?? id;
     for (final enemy in enemies) {
-      if (enemy.id == id) return enemy;
+      if (enemy.id == resolvedId) return enemy;
     }
     return null;
   }

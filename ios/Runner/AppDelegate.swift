@@ -8,6 +8,7 @@ import AVFoundation
 @objc class AppDelegate: FlutterAppDelegate {
   private var stepCounter: StepCountStreamHandler?
   private var launchAudioPlayer: AVAudioPlayer?
+  private var rewardAudioPlayer: AVAudioPlayer?
   private var hasPlayedLaunchSound = false
 
   override func application(
@@ -30,12 +31,41 @@ import AVFoundation
       name: "rush_for_villains/launch_sound",
       binaryMessenger: controller.binaryMessenger
     ).setMethodCallHandler { [weak self] call, result in
-      guard call.method == "play" else {
+      switch call.method {
+      case "play":
+        self?.playLaunchSound()
+      case "playReward":
+        self?.playRewardSound()
+      default:
         result(FlutterMethodNotImplemented)
         return
       }
-      self?.playLaunchSound()
       result(nil)
+    }
+  }
+
+  private func playRewardSound() {
+    rewardAudioPlayer?.stop()
+    rewardAudioPlayer = nil
+
+    let assetKey = FlutterDartProject.lookupKey(
+      forAsset: "lib/SoundEffects/GatherMusic.wav"
+    )
+    guard let path = Bundle.main.path(forResource: assetKey, ofType: nil) else {
+      return
+    }
+
+    do {
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.ambient, options: [.mixWithOthers])
+      try session.setActive(true)
+      let player = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
+      player.numberOfLoops = 0
+      player.prepareToPlay()
+      rewardAudioPlayer = player
+      player.play()
+    } catch {
+      rewardAudioPlayer = nil
     }
   }
 

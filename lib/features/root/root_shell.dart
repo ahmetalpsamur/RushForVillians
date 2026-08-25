@@ -124,6 +124,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   /// "2x XP" yükseltmesinin kimliği ([MockData.storeItems]).
   static const _xpBoostItemId = 'boost_double_xp';
+  static const _reincarnationPotionId = 'reincarnation_potion';
 
   static const _reminderMessages = [
     '{round}. round: {enemy} için {steps} adım kaldı.',
@@ -1063,16 +1064,31 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   void _openRewards() => _push(RewardsScreen(rewards: _rewards));
 
-  void _editCharacter() => _push(
-    CharacterCreationScreen(
-      initialAvatar: _profile.avatar,
-      onCompleted: (avatar) {
-        _profile.avatar = avatar;
-        widget.onAvatarChanged(avatar);
-        Navigator.of(context).pop();
-      },
-    ),
-  );
+  void _editCharacter() {
+    if (!_profile.ownedItemIds.contains(_reincarnationPotionId)) {
+      _showStoreNotice(
+        'Karakterini değiştirmek için Reenkarnasyon İksiri gerekli.',
+      );
+      return;
+    }
+    _push(
+      CharacterCreationScreen(
+        initialAvatar: _profile.avatar,
+        onCompleted: (avatar) {
+          setState(() {
+            _profile.avatar = avatar;
+            _profile.ownedItemIds.remove(_reincarnationPotionId);
+            _equipment = ItemCatalog.forCharacterClass(avatar.characterClass);
+            _refreshEquipment();
+          });
+          widget.onAvatarChanged(avatar);
+          _persist();
+          Navigator.of(context).pop();
+          _showStoreNotice('Reenkarnasyon tamamlandı. İksir tüketildi.');
+        },
+      ),
+    );
+  }
 
   /// Mağazayı açar.
   ///
@@ -1143,6 +1159,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         stepHistory: _stepHistory,
         equippedItems: _equippedItems,
         buffs: _buffs,
+        canEditCharacter: _profile.ownedItemIds.contains(
+          _reincarnationPotionId,
+        ),
         onEditCharacter: _editCharacter,
         onOpenInventory: _openInventory,
       ),

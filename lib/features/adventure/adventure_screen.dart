@@ -7,11 +7,14 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/gif_timing.dart';
 import '../../data/enemy_catalog.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/daily_progress.dart';
 import '../../models/enemy.dart';
+import '../../services/character_catalog.dart';
+import '../../widgets/pixel_sprite.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
 
@@ -56,8 +59,6 @@ class _AdventureScreenState extends State<AdventureScreen>
   Enemy? _selectedEnemy;
   late final AnimationController _damageMessageController;
   late final Animation<double> _damageMessageOpacity;
-  late final AnimationController _walkController;
-  late final Animation<double> _walkAmount;
   late final AnimationController _roundAttackController;
   late final Animation<double> _roundAttackAmount;
   late final AnimationController _roundTransitionController;
@@ -70,8 +71,10 @@ class _AdventureScreenState extends State<AdventureScreen>
   bool _showDeath = false;
   bool _showCongratulations = false;
   bool _showRoundVictory = false;
+  bool _showEnemyRoundVictory = false;
   int _victoryRound = 0;
   int _victoryCycle = 0;
+  int _enemyVictoryCycle = 0;
   bool _isFinalVictory = false;
   bool _showEnemyDeath = false;
   bool _showFrozenEnemy = false;
@@ -80,6 +83,10 @@ class _AdventureScreenState extends State<AdventureScreen>
   ui.Image? _frozenDeathFrame;
   bool _showRoundTransition = false;
   int _transitionRound = 1;
+  String? _roundPlayerAttackAsset;
+  String? _lastRoundPlayerAttackAsset;
+  String? _roundEnemyAttackAsset;
+  String? _lastRoundEnemyAttackAsset;
 
   @override
   void initState() {
@@ -98,13 +105,6 @@ class _AdventureScreenState extends State<AdventureScreen>
         weight: 65,
       ),
     ]).animate(_damageMessageController);
-    _walkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 620),
-    )..repeat(reverse: true);
-    _walkAmount = Tween<double>(begin: -1, end: 1).animate(
-      CurvedAnimation(parent: _walkController, curve: Curves.easeInOut),
-    );
     _roundAttackController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
@@ -155,6 +155,7 @@ class _AdventureScreenState extends State<AdventureScreen>
     _showAttack = false;
     _showDeath = false;
     _showCongratulations = false;
+    _showEnemyRoundVictory = false;
     if (adventure == null) return;
 
     if (adventure.roundOutcomeSerial > adventure.presentedRoundOutcomeSerial) {
@@ -163,7 +164,7 @@ class _AdventureScreenState extends State<AdventureScreen>
         if (adventure.lastRoundWon) {
           _playRoundVictory(adventure);
         } else {
-          _playEnemyAttack();
+          _playEnemyRoundVictory(adventure);
         }
       });
       return;
@@ -215,7 +216,7 @@ class _AdventureScreenState extends State<AdventureScreen>
       if (adventure.lastRoundWon) {
         _playRoundVictory(adventure);
       } else {
-        _playEnemyAttack();
+        _playEnemyRoundVictory(adventure);
       }
     }
   }
@@ -223,6 +224,30 @@ class _AdventureScreenState extends State<AdventureScreen>
   Future<void> _playRoundVictory(AdventureQuest adventure) async {
     _enemyAnimationTimer?.cancel();
     _roundAttackController.stop();
+    final classes = await CharacterCatalog.load();
+    if (!mounted) return;
+    final matchingClasses = classes.where(
+      (characterClass) => characterClass.id == widget.avatar.characterClass,
+    );
+    final attacks =
+        matchingClasses.isEmpty
+            ? const <String>[]
+            : matchingClasses.first.attackAssets;
+    final candidates =
+        attacks.length > 1
+            ? attacks
+                .where((asset) => asset != _lastRoundPlayerAttackAsset)
+                .toList()
+            : attacks;
+    final playerAttackAsset =
+        candidates.isEmpty
+            ? widget.avatar.characterAsset
+            : candidates[Random().nextInt(candidates.length)];
+    _lastRoundPlayerAttackAsset = playerAttackAsset;
+    final playerAttackDuration = await GifTiming.cycle(playerAttackAsset);
+    if (!mounted) return;
+    _roundAttackController.duration = playerAttackDuration;
+
     final isFinalVictory = adventure.isDefeated(widget.today.steps);
     final finalRoundSteps =
         adventure.stepGoal % AdventureQuest.stageStepTarget == 0
@@ -231,6 +256,7 @@ class _AdventureScreenState extends State<AdventureScreen>
     final healthBeforeFinalRound = finalRoundSteps / adventure.stepGoal;
     setState(() {
       _showRoundVictory = true;
+      _showEnemyRoundVictory = false;
       _victoryRound = adventure.lastResolvedRound;
       _victoryCycle = 1;
       _isFinalVictory = isFinalVictory;
@@ -243,6 +269,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               : adventure.healthProgress(widget.today.steps);
       _showHurt = false;
       _showAttack = false;
+      _roundPlayerAttackAsset = playerAttackAsset;
     });
 
     try {
@@ -310,6 +337,7 @@ class _AdventureScreenState extends State<AdventureScreen>
     HapticFeedback.heavyImpact();
     setState(() {
       _showRoundVictory = false;
+      _showEnemyRoundVictory = false;
       _showRoundTransition = true;
       _transitionRound = round;
     });
@@ -341,22 +369,63 @@ class _AdventureScreenState extends State<AdventureScreen>
     }
   }
 
-  void _playEnemyAttack() {
-    final adventure = widget.adventure;
-    if (adventure == null || adventure.lastEnemyDamage <= 0) return;
-    _markRoundOutcomePresented(adventure);
+  Future<void> _playEnemyRoundVictory(AdventureQuest adventure) async {
+    if (adventure.lastEnemyDamage <= 0) {
+      _markRoundOutcomePresented(adventure);
+      return;
+    }
     _enemyAnimationTimer?.cancel();
-    _pendingDamage = 0;
-    _playerDamage = adventure.lastEnemyDamage;
-    _showHurt = false;
-    _showAttack = true;
-    _damageMessageController.forward(from: 0);
-    _enemyAnimationTimer = Timer(
-      Duration(milliseconds: adventure.enemy.attackAnimationDurationMs),
-      () {
-        if (mounted) setState(() => _showAttack = false);
-      },
-    );
+    _roundAttackController.stop();
+    final attacks = adventure.enemy.attackAssets;
+    final candidates =
+        attacks.length > 1
+            ? attacks
+                .where((asset) => asset != _lastRoundEnemyAttackAsset)
+                .toList()
+            : attacks;
+    final attackAsset = candidates[Random().nextInt(candidates.length)];
+    _lastRoundEnemyAttackAsset = attackAsset;
+    final attackDuration = await GifTiming.cycle(attackAsset);
+    if (!mounted) return;
+    _roundAttackController.duration = attackDuration;
+
+    setState(() {
+      _showRoundVictory = false;
+      _showEnemyRoundVictory = true;
+      _victoryRound = adventure.lastResolvedRound;
+      _enemyVictoryCycle = 1;
+      _roundEnemyAttackAsset = attackAsset;
+      _pendingDamage = 0;
+      _playerDamage = adventure.lastEnemyDamage;
+      _showHurt = false;
+      _showAttack = false;
+    });
+
+    try {
+      for (var cycle = 1; cycle <= 2; cycle++) {
+        if (!mounted || !_showEnemyRoundVictory) return;
+        if (_enemyVictoryCycle != cycle) {
+          setState(() => _enemyVictoryCycle = cycle);
+        }
+        await _roundAttackController.forward(from: 0).orCancel;
+        if (cycle < 2) {
+          await Future<void>.delayed(const Duration(milliseconds: 140));
+        }
+      }
+    } on TickerCanceled {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+
+    setState(() {
+      _showEnemyRoundVictory = false;
+      _playerDamage = 0;
+    });
+    _markRoundOutcomePresented(adventure);
+    if (adventure.playerHealth > 0) {
+      await _playRoundTransition(adventure.currentRound);
+    }
   }
 
   void _markRoundOutcomePresented(AdventureQuest adventure) {
@@ -371,7 +440,6 @@ class _AdventureScreenState extends State<AdventureScreen>
   void dispose() {
     _enemyAnimationTimer?.cancel();
     _damageMessageController.dispose();
-    _walkController.dispose();
     _roundAttackController.dispose();
     _roundTransitionController.dispose();
     _frozenDeathFrame?.dispose();
@@ -646,6 +714,8 @@ class _AdventureScreenState extends State<AdventureScreen>
           Positioned.fill(child: content),
           if (_showRoundVictory && adventure != null)
             Positioned.fill(child: _buildRoundVictoryOverlay(adventure)),
+          if (_showEnemyRoundVictory && adventure != null)
+            Positioned.fill(child: _buildEnemyRoundVictoryOverlay(adventure)),
         ],
       ),
     );
@@ -734,21 +804,22 @@ class _AdventureScreenState extends State<AdventureScreen>
                       clipBehavior: Clip.none,
                       children: [
                         Positioned(
-                          left: 4 + attack * 72,
-                          bottom: 12 + attack * 8,
-                          width: 140,
-                          height: 190,
-                          child: Transform.rotate(
-                            angle: attack * 0.09,
-                            child: Image.asset(
-                              widget.avatar.characterAsset,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
+                          left: -12,
+                          bottom: -2,
+                          width: 210,
+                          height: 230,
+                          child: PixelSprite(
+                            asset:
+                                _roundPlayerAttackAsset ??
+                                widget.avatar.characterAsset,
+                            scale: 3,
+                            imageKey: ValueKey(
+                              'player-attack-$_victoryRound-$_victoryCycle',
                             ),
                           ),
                         ),
                         Positioned(
-                          right: -12,
+                          right: 0,
                           bottom: 0,
                           width: 210,
                           height: 230,
@@ -763,6 +834,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                         ? RawImage(
                                           image: _frozenDeathFrame,
                                           fit: BoxFit.contain,
+                                          filterQuality: FilterQuality.none,
                                         )
                                         : Image.asset(
                                           _showEnemyDeath
@@ -774,6 +846,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                                 : 'round-hurt-$_victoryRound-$_victoryCycle',
                                           ),
                                           fit: BoxFit.contain,
+                                          filterQuality: FilterQuality.none,
                                           gaplessPlayback: false,
                                         ),
                               ),
@@ -834,6 +907,151 @@ class _AdventureScreenState extends State<AdventureScreen>
                 minHeight: 5,
                 borderRadius: BorderRadius.circular(99),
                 backgroundColor: Colors.white10,
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnemyRoundVictoryOverlay(AdventureQuest adventure) {
+    final healthProgress =
+        adventure.playerHealth / AdventureQuest.maxPlayerHealth;
+    return ColoredBox(
+      color: Colors.black.withValues(alpha: 0.9),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const Spacer(),
+              Text(
+                '$_victoryRound. ROUND',
+                style: const TextStyle(
+                  color: AppColors.hp,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ROUND CANAVARIN!',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  shadows: const [Shadow(color: AppColors.hp, blurRadius: 28)],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '${adventure.enemy.name}, süre dolunca saldırdı',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white60),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.favorite, color: AppColors.hp, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: healthProgress.clamp(0, 1),
+                      minHeight: 9,
+                      borderRadius: BorderRadius.circular(99),
+                      color: AppColors.hp,
+                      backgroundColor: AppColors.hp.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${adventure.playerHealth} CAN',
+                    style: const TextStyle(
+                      color: AppColors.hp,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              SizedBox(
+                height: 260,
+                child: AnimatedBuilder(
+                  animation: _roundAttackAmount,
+                  builder: (context, _) {
+                    final attack = _roundAttackAmount.value;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          left: -12,
+                          bottom: -2,
+                          width: 210,
+                          height: 230,
+                          child: Transform.translate(
+                            offset: Offset(-attack * 9, attack * 3),
+                            child: PixelSprite(
+                              asset: widget.avatar.characterAsset,
+                              scale: 3,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          width: 210,
+                          height: 230,
+                          child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.diagonal3Values(-1, 1, 1),
+                            child: PixelSprite(
+                              asset:
+                                  _roundEnemyAttackAsset ??
+                                  adventure.enemy.attackAsset,
+                              scale: 3,
+                              offset: const Offset(-8, 0),
+                              imageKey: ValueKey(
+                                'enemy-round-attack-$_victoryRound-$_enemyVictoryCycle-$_roundEnemyAttackAsset',
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (attack > 0.35)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            top: 62,
+                            child: Text(
+                              '-${adventure.lastEnemyDamage} CAN',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.hp,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                fontStyle: FontStyle.italic,
+                                shadows: [
+                                  Shadow(color: Colors.black, blurRadius: 8),
+                                  Shadow(color: AppColors.hp, blurRadius: 18),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${adventure.enemy.name} saldırıyor • '
+                '$_enemyVictoryCycle / 2',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const Spacer(),
             ],
@@ -1018,43 +1236,27 @@ class _AdventureScreenState extends State<AdventureScreen>
                         ),
                       ),
                       Positioned(
-                        left: 0,
-                        bottom: 18,
-                        width: 135,
-                        height: 180,
-                        child: AnimatedBuilder(
-                          animation: _walkAmount,
-                          child: Image.asset(
-                            widget.avatar.characterAsset,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                          builder: (context, child) {
-                            final amount = _walkAmount.value;
-                            return Transform.translate(
-                              offset: Offset(
-                                amount * 6,
-                                -3 * (1 - amount.abs()),
-                              ),
-                              child: Transform.rotate(
-                                angle: amount * 0.018,
-                                child: child,
-                              ),
-                            );
-                          },
+                        left: -8,
+                        // Oyuncu ve düşman aynı 100x100 GIF tuvalini
+                        // kullanıyor; aynı sahne ölçeği ikisini de platforma
+                        // oturtur. Yürüyüşü GIF yapar, ek sağ-sol sallanma yoktur.
+                        bottom: -22,
+                        width: 210,
+                        height: 230,
+                        child: PixelSprite(
+                          asset: widget.avatar.characterAsset,
+                          scale: 3,
                         ),
                       ),
                       Positioned(
-                        right: -8,
+                        right: 0,
                         // Düşman GIF karelerinde altta geniş şeffaf boşluk var;
                         // kutuyu platformun altına taşıyarak görünen ayağı yüzeye oturt.
                         bottom: -22,
                         width: 210,
                         height: 230,
-                        child: ClipRect(
-                          child: Transform.scale(
-                            scale: 3,
-                            child: Image.asset(
+                        child: PixelSprite(
+                          asset:
                               _showDeath
                                   ? adventure.enemy.deathAsset
                                   : _showAttack
@@ -1062,18 +1264,16 @@ class _AdventureScreenState extends State<AdventureScreen>
                                   : _showHurt
                                   ? adventure.enemy.hurtAsset
                                   : adventure.enemy.walkAsset,
-                              key: ValueKey(
-                                _showDeath
-                                    ? 'death'
-                                    : _showAttack
-                                    ? 'attack-${widget.roundSerial}'
-                                    : _showHurt
-                                    ? 'hurt'
-                                    : 'walk',
-                              ),
-                              fit: BoxFit.contain,
-                              gaplessPlayback: true,
-                            ),
+                          scale: 3,
+                          offset: const Offset(-8, 0),
+                          imageKey: ValueKey(
+                            _showDeath
+                                ? 'death'
+                                : _showAttack
+                                ? 'attack-${widget.roundSerial}'
+                                : _showHurt
+                                ? 'hurt'
+                                : 'walk',
                           ),
                         ),
                       ),
@@ -1255,7 +1455,7 @@ class _AdventureScreenState extends State<AdventureScreen>
           const SizedBox(height: 4),
           Text(
             'Her round için ${adventure.roundTargetSteps} adım ve '
-            '${adventure.roundDurationMinutes} dakika süren var. '
+            '${adventure.roundDurationLabel} süren var. '
             'Hedef eksik kalırsa '
             '${adventure.enemy.name}, eksik oranına göre en fazla '
             '${adventure.enemy.attackDamage} can vurur.',
@@ -1586,15 +1786,10 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                             child: SizedBox(
                               width: 240,
                               height: 270,
-                              child: ClipRect(
-                                child: Transform.scale(
-                                  scale: 3,
-                                  child: Image.asset(
-                                    enemy.attackAsset,
-                                    fit: BoxFit.contain,
-                                    gaplessPlayback: true,
-                                  ),
-                                ),
+                              child: PixelSprite(
+                                asset: enemy.attackAsset,
+                                scale: 3,
+                                offset: const Offset(-8, 0),
                               ),
                             ),
                           ),
@@ -1668,7 +1863,8 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Her round 1.000 adım ve 20 dakika. Süreyi '
+                            'Her round 1.000 adım ve '
+                            '${AdventureQuest.configuredRoundDurationLabel}. Süreyi '
                             'kaçırırsan düşman eksik adım oranında saldırır.',
                             style: const TextStyle(
                               color: Colors.white54,
@@ -1792,15 +1988,10 @@ class _EnemyChoiceCard extends StatelessWidget {
                 SizedBox(
                   width: 132,
                   height: 132,
-                  child: ClipRect(
-                    child: Transform.scale(
-                      scale: 3,
-                      child: Image.asset(
-                        enemy.idleAsset,
-                        fit: BoxFit.contain,
-                        gaplessPlayback: true,
-                      ),
-                    ),
+                  child: PixelSprite(
+                    asset: enemy.idleAsset,
+                    scale: 3,
+                    offset: const Offset(-8, 0),
                   ),
                 ),
                 const SizedBox(width: 12),

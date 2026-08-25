@@ -9,6 +9,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var launchPlayer: MediaPlayer? = null
+    private var rewardPlayer: MediaPlayer? = null
     private var hasPlayedLaunchSound = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -18,18 +19,60 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "rush_for_villains/launch_sound",
         ).setMethodCallHandler { call, result ->
-            if (call.method != "play") {
-                result.notImplemented()
-                return@setMethodCallHandler
-            }
-
             try {
-                playLaunchSound()
+                when (call.method) {
+                    "play" -> playLaunchSound()
+                    "playReward" -> playRewardSound()
+                    else -> {
+                        result.notImplemented()
+                        return@setMethodCallHandler
+                    }
+                }
                 result.success(null)
             } catch (error: Exception) {
                 result.error("launch_sound_failed", error.message, null)
             }
         }
+    }
+
+    private fun playRewardSound() {
+        rewardPlayer?.release()
+        rewardPlayer = null
+
+        val assetKey = FlutterInjector.instance().flutterLoader()
+            .getLookupKeyForAsset("lib/SoundEffects/GatherMusic.wav")
+        val player = MediaPlayer()
+        try {
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            assets.openFd(assetKey).use { descriptor ->
+                player.setDataSource(
+                    descriptor.fileDescriptor,
+                    descriptor.startOffset,
+                    descriptor.length,
+                )
+            }
+            player.setOnCompletionListener { completedPlayer ->
+                completedPlayer.release()
+                if (rewardPlayer === completedPlayer) rewardPlayer = null
+            }
+            player.setOnErrorListener { failedPlayer, _, _ ->
+                failedPlayer.release()
+                if (rewardPlayer === failedPlayer) rewardPlayer = null
+                true
+            }
+            player.prepare()
+        } catch (error: Exception) {
+            player.release()
+            throw error
+        }
+
+        rewardPlayer = player
+        player.start()
     }
 
     private fun playLaunchSound() {
@@ -79,6 +122,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         launchPlayer?.release()
         launchPlayer = null
+        rewardPlayer?.release()
+        rewardPlayer = null
         super.onDestroy()
     }
 }

@@ -52,21 +52,26 @@ void main() {
   /// Çarkı çevirir ve animasyonun bitmesini bekler.
   Future<void> spin(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2700));
+    await tester.pump(const Duration(milliseconds: 2500));
+    await tester.pump();
   }
+
+  Finder spinButton() => find.widgetWithText(FilledButton, 'Çarkı Çevir');
 
   group('günlük hak', () {
     testWidgets('hak duruyorsa çevirme düğmesi çıkar', (tester) async {
       await pumpWheel(tester, alreadySpunToday: false);
 
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsOneWidget);
+      expect(spinButton(), findsOneWidget);
       expect(find.textContaining('ekstra hakkından'), findsNothing);
     });
 
     testWidgets('hak bittiyse ve jeton yoksa çevrilemez', (tester) async {
       await pumpWheel(tester, alreadySpunToday: true);
 
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
+      expect(spinButton(), findsNothing);
       expect(find.text('Bugün çarkı zaten çevirdin.'), findsOneWidget);
     });
 
@@ -79,7 +84,24 @@ void main() {
 
       expect(results, hasLength(1));
       expect(find.textContaining('Kazandın:'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
+      expect(spinButton(), findsNothing);
+    });
+
+    testWidgets('sonuç karartıda ışıklı ödül sahnesinde gösterilir', (
+      tester,
+    ) async {
+      final results = await pumpWheel(tester, alreadySpunToday: false);
+
+      await tester.tap(spinButton());
+      await tester.pump();
+      expect(find.text('ŞANS MEKANİZMASI ÇALIŞIYOR'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2700));
+      expect(results, hasLength(1));
+      expect(find.byKey(const ValueKey('wheel-reward-reveal')), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2500));
+      expect(find.byKey(const ValueKey('wheel-reward-reveal')), findsNothing);
     });
   });
 
@@ -89,10 +111,7 @@ void main() {
       (tester) async {
         await pumpWheel(tester, alreadySpunToday: true, extraSpins: 2);
 
-        expect(
-          find.widgetWithText(FilledButton, 'Çarkı Çevir'),
-          findsOneWidget,
-        );
+        expect(spinButton(), findsOneWidget);
         expect(find.textContaining('(2 hak kaldı)'), findsOneWidget);
       },
     );
@@ -107,7 +126,7 @@ void main() {
       await spin(tester);
 
       expect(results, hasLength(1));
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsOneWidget);
+      expect(spinButton(), findsOneWidget);
       expect(find.textContaining('(1 hak kaldı)'), findsOneWidget);
     });
 
@@ -121,7 +140,7 @@ void main() {
       await spin(tester);
 
       expect(results, hasLength(1));
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
+      expect(spinButton(), findsNothing);
     });
 
     testWidgets('günlük hak dururken jeton harcanmaz', (tester) async {
@@ -131,7 +150,7 @@ void main() {
 
       await spin(tester);
 
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsOneWidget);
+      expect(spinButton(), findsOneWidget);
       expect(find.textContaining('(1 hak kaldı)'), findsOneWidget);
     });
 
@@ -146,7 +165,7 @@ void main() {
       await spin(tester);
 
       expect(results, hasLength(2));
-      expect(find.widgetWithText(FilledButton, 'Çarkı Çevir'), findsNothing);
+      expect(spinButton(), findsNothing);
     });
   });
 

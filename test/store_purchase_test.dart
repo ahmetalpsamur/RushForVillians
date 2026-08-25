@@ -458,7 +458,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2700));
+      await tester.pump(const Duration(milliseconds: 2500));
 
       // Ödül ya item ya XP; ikisi de profile işlemeli.
       final gotItem = profile.ownedItemIds.isNotEmpty;
@@ -493,7 +495,9 @@ void main() {
       expect(seedBefore, isNot(0));
 
       await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2700));
+      await tester.pump(const Duration(milliseconds: 2500));
 
       expect(profile.wheelSeed, isNot(seedBefore));
     });

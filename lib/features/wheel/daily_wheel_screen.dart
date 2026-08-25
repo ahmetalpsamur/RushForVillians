@@ -1,12 +1,15 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../models/item.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/wheel_reward.dart';
+import '../../services/reward_sound.dart';
 import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
 
@@ -57,6 +60,8 @@ class DailyWheelScreen extends StatefulWidget {
 
 class _DailyWheelScreenState extends State<DailyWheelScreen> {
   bool _spinning = false;
+  bool _gearsRunning = false;
+  bool _showReward = false;
   WheelReward? _result;
 
   /// Bu ekran açıldığından beri kaç ücretli hak harcandı.
@@ -73,10 +78,8 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
   /// vermesin. [RootShell] de aynı adımı profile uyguluyor.
   late int _seed = widget.seed;
 
-  /// Çarkın toplam dönüşü (tur). Kazanan dilimi ibrenin altına getirir.
-  double _turns = 0;
-
   static const _spinDuration = Duration(milliseconds: 2600);
+  static const _revealDuration = Duration(milliseconds: 2400);
 
   late List<WheelReward> _slices = _buildSlices();
 
@@ -107,11 +110,7 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
 
     setState(() {
       _spinning = true;
-      // Kazanan dilimin **ortası** ibrenin altına gelsin. İbre yukarıda
-      // (saat 12) duruyor; dilimler saat 12'den başlayıp saat yönünde
-      // diziliyor, bu yüzden çark ters yönde o kadar döndürülüyor.
-      final sliceTurn = (winner + 0.5) / _slices.length;
-      _turns += 5 - sliceTurn - (_turns % 1);
+      _gearsRunning = true;
     });
 
     await Future<void>.delayed(_spinDuration);
@@ -120,6 +119,7 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
     setState(() {
       _spinning = false;
       _result = reward;
+      _showReward = true;
       if (reward.isItem) _wonIds.add(reward.item!.id);
       if (usesExtra) {
         _spentExtras++;
@@ -132,6 +132,11 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
       _slices = _buildSlices();
     });
     widget.onSpinResult(reward);
+    RewardSound.play();
+
+    await Future<void>.delayed(_revealDuration);
+    if (!mounted) return;
+    setState(() => _showReward = false);
   }
 
   @override
@@ -141,56 +146,73 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Günlük Çark')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _WheelFace(slices: _slices, turns: _turns, duration: _spinDuration),
-            const SizedBox(height: 24),
-            if (result != null) ...[
-              _ResultCard(reward: result),
-              const SizedBox(height: 12),
-            ],
-            if (spun)
-              SectionCard(
-                child: Column(
-                  children: [
-                    if (result == null)
-                      const Text(
-                        'Bugün çarkı zaten çevirdin.',
-                        textAlign: TextAlign.center,
-                      ),
-                    if (result == null) const SizedBox(height: 8),
-                    // Gün sınırı GameDay'den okunur; burada ayrı bir
-                    // gün/saat hesabı yapılmaz.
-                    const DayResetCountdown(
-                      prefix: 'Yeni çark hakkına kalan süre: ',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _WheelFace(
+                    slices: _slices,
+                    seed: _seed,
+                    running: _gearsRunning,
+                  ),
+                  const SizedBox(height: 24),
+                  if (result != null) ...[
+                    _ResultCard(reward: result),
+                    const SizedBox(height: 12),
                   ],
-                ),
-              )
-            else ...[
-              FilledButton.icon(
-                onPressed: _spinning ? null : _spin,
-                icon: const Icon(Icons.play_arrow),
-                label: Text(_spinning ? 'Çevriliyor...' : 'Çarkı Çevir'),
+                  if (spun)
+                    SectionCard(
+                      child: Column(
+                        children: [
+                          if (result == null)
+                            const Text(
+                              'Bugün çarkı zaten çevirdin.',
+                              textAlign: TextAlign.center,
+                            ),
+                          if (result == null) const SizedBox(height: 8),
+                          const DayResetCountdown(
+                            prefix: 'Yeni çark hakkına kalan süre: ',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    FilledButton.icon(
+                      onPressed: _spinning ? null : _spin,
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(
+                        _spinning ? 'Dişliler dönüyor...' : 'Çarkı Çevir',
+                      ),
+                    ),
+                    if (_dailyUsed) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Bu çevirme ekstra hakkından düşecek '
+                        '($_remainingExtras hak kaldı).',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.streak,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
               ),
-              // Ücretli hak harcanacaksa oyuncu bunu **önceden** bilmeli.
-              if (_dailyUsed) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Bu çevirme ekstra hakkından düşecek '
-                  '($_remainingExtras hak kaldı).',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: AppColors.streak),
-                ),
-              ],
-            ],
-          ],
-        ),
+            ),
+          ),
+          if (_showReward && result != null)
+            Positioned.fill(child: _RewardReveal(reward: result)),
+        ],
       ),
     );
   }
@@ -249,45 +271,225 @@ class _ResultCard extends StatelessWidget {
   }
 }
 
-/// Dilimli çark ve üstündeki sabit ibre.
+class _RewardReveal extends StatelessWidget {
+  final WheelReward reward;
+
+  const _RewardReveal({required this.reward});
+
+  @override
+  Widget build(BuildContext context) {
+    final item = reward.item;
+    final glowColor = item?.rarity.color ?? AppColors.xp;
+
+    return ColoredBox(
+      key: const ValueKey('wheel-reward-reveal'),
+      color: Colors.black.withValues(alpha: 0.92),
+      child: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.72, end: 1),
+          duration: const Duration(milliseconds: 650),
+          curve: Curves.easeOutBack,
+          builder:
+              (context, scale, child) => Transform.scale(
+                scale: scale,
+                child: Opacity(opacity: scale.clamp(0, 1), child: child),
+              ),
+          child: Container(
+            width: 274,
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: glowColor.withValues(alpha: 0.9),
+                width: 1.8,
+              ),
+              gradient: RadialGradient(
+                radius: 1.05,
+                colors: [
+                  glowColor.withValues(alpha: 0.28),
+                  const Color(0xFF211C32),
+                  const Color(0xFF100D18),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.55),
+                  blurRadius: 42,
+                  spreadRadius: 7,
+                ),
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.26),
+                  blurRadius: 90,
+                  spreadRadius: 20,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item == null
+                      ? 'XP KAZANDIN'
+                      : '${item.rarity.label.toUpperCase()} ÖDÜL',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: glowColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    shadows: [Shadow(color: glowColor, blurRadius: 14)],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (item == null)
+                  Icon(
+                    Icons.bolt_rounded,
+                    size: 92,
+                    color: glowColor,
+                    shadows: [Shadow(color: glowColor, blurRadius: 26)],
+                  )
+                else
+                  Image.asset(
+                    item.assetPath,
+                    height: 112,
+                    width: 112,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.none,
+                    errorBuilder:
+                        (_, _, _) => Icon(
+                          Icons.inventory_2_outlined,
+                          size: 74,
+                          color: glowColor,
+                        ),
+                  ),
+                const SizedBox(height: 16),
+                Text(
+                  item?.name ?? '+${reward.xp} XP',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (item?.buff.label case final effect?) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    effect,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: glowColor.withValues(alpha: 0.95),
+                      fontSize: 12,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const Text(
+                  'Ödül envanterine işlendi',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Birbirine geçmiş ChanceWheel dişlileri. İlk çevirmede GIF'ler yüklenir ve
+/// ekran açık kaldığı sürece kendi sonsuz döngülerinde çalışmaya devam eder.
 class _WheelFace extends StatelessWidget {
   final List<WheelReward> slices;
-  final double turns;
-  final Duration duration;
+  final int seed;
+  final bool running;
 
   const _WheelFace({
     required this.slices,
-    required this.turns,
-    required this.duration,
+    required this.seed,
+    required this.running,
   });
 
   @override
   Widget build(BuildContext context) {
+    final random = Random(seed);
+    final gears = List.generate(7, (_) => random.nextInt(11) + 1);
+    const placements = <({double left, double top, double size, bool silver})>[
+      (left: 18, top: 72, size: 132, silver: false),
+      (left: 128, top: 38, size: 112, silver: true),
+      (left: 210, top: 112, size: 94, silver: false),
+      (left: 120, top: 152, size: 88, silver: true),
+      (left: 54, top: 194, size: 72, silver: false),
+      (left: 190, top: 220, size: 66, silver: true),
+      (left: 20, top: 20, size: 62, silver: true),
+    ];
+
     return SizedBox(
-      width: 260,
-      height: 276,
+      width: 320,
+      height: 330,
       child: Stack(
-        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
         children: [
-          Positioned(
-            top: 16,
-            child: AnimatedRotation(
-              turns: turns,
-              duration: duration,
-              curve: Curves.easeOutCubic,
-              child: SizedBox(
-                width: 260,
-                height: 260,
-                child: CustomPaint(painter: _WheelPainter(slices)),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.14),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
-          // İbre saat 12'de sabit; kazanan dilim buraya gelir.
-          const Icon(
-            Icons.arrow_drop_down,
-            size: 40,
-            color: AppColors.streak,
-            shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+          Positioned(
+            left: 10,
+            top: 5,
+            child: Opacity(
+              opacity: 0.14,
+              child: SizedBox(
+                width: 300,
+                height: 300,
+                child: CustomPaint(
+                  painter: _WheelPainter(slices, paintLabels: false),
+                ),
+              ),
+            ),
+          ),
+          for (var index = 0; index < placements.length; index++)
+            Positioned(
+              left: placements[index].left,
+              top: placements[index].top,
+              width: placements[index].size,
+              height: placements[index].size,
+              child: _GearSprite(
+                number: gears[index],
+                silver: placements[index].silver,
+                running: running,
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 300,
+            child: Text(
+              running ? 'ŞANS MEKANİZMASI ÇALIŞIYOR' : 'DİŞLİLERİ UYANDIR',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: running ? AppColors.streak : Colors.white54,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 6)],
+              ),
+            ),
           ),
         ],
       ),
@@ -295,10 +497,103 @@ class _WheelFace extends StatelessWidget {
   }
 }
 
+class _GearSprite extends StatelessWidget {
+  final int number;
+  final bool silver;
+  final bool running;
+
+  const _GearSprite({
+    required this.number,
+    required this.silver,
+    required this.running,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = silver ? 'silver' : 'normal';
+    final asset = 'lib/ChanceWheel/${tone}_gear_$number.gif';
+    if (!running) {
+      return _StillGifFrame(asset: asset);
+    }
+    return Image.asset(
+      asset,
+      key: ValueKey('gear-$tone-$number'),
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.none,
+      gaplessPlayback: false,
+    );
+  }
+}
+
+class _StillGifFrame extends StatefulWidget {
+  final String asset;
+
+  const _StillGifFrame({required this.asset});
+
+  @override
+  State<_StillGifFrame> createState() => _StillGifFrameState();
+}
+
+class _StillGifFrameState extends State<_StillGifFrame> {
+  ui.Image? _frame;
+  ui.Codec? _codec;
+  int _loadSerial = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StillGifFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset != widget.asset) _load();
+  }
+
+  Future<void> _load() async {
+    final serial = ++_loadSerial;
+    final data = await rootBundle.load(widget.asset);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    if (!mounted || serial != _loadSerial) {
+      frame.image.dispose();
+      codec.dispose();
+      return;
+    }
+    _frame?.dispose();
+    _codec?.dispose();
+    setState(() {
+      _frame = frame.image;
+      _codec = codec;
+    });
+  }
+
+  @override
+  void dispose() {
+    _loadSerial++;
+    _frame?.dispose();
+    _codec?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frame = _frame;
+    if (frame == null) return const SizedBox.shrink();
+    return RawImage(
+      image: frame,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.none,
+    );
+  }
+}
+
 class _WheelPainter extends CustomPainter {
   final List<WheelReward> slices;
+  final bool paintLabels;
 
-  _WheelPainter(this.slices);
+  _WheelPainter(this.slices, {this.paintLabels = true});
 
   /// XP dilimleri tek renk; item dilimleri nadirlik rengini alır — oyuncu
   /// çark dönmeden neyin peşinde olduğunu görsün.
@@ -332,7 +627,9 @@ class _WheelPainter extends CustomPainter {
             ..color = Colors.black.withValues(alpha: 0.35);
       canvas.drawArc(rect, start + i * sweep, sweep, true, border);
 
-      _paintLabel(canvas, center, radius, start + i * sweep + sweep / 2, i);
+      if (paintLabels) {
+        _paintLabel(canvas, center, radius, start + i * sweep + sweep / 2, i);
+      }
     }
 
     final ring =
@@ -378,5 +675,6 @@ class _WheelPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WheelPainter oldDelegate) => oldDelegate.slices != slices;
+  bool shouldRepaint(_WheelPainter oldDelegate) =>
+      oldDelegate.slices != slices || oldDelegate.paintLabels != paintLabels;
 }

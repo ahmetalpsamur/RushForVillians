@@ -66,6 +66,7 @@ class HeroProgressRings extends StatelessWidget {
                       avatar: profile.avatar,
                       size: size * 0.68,
                       showBackground: false,
+                      combatLoop: true,
                     ),
                   ),
                   if (completedLaps > 0)

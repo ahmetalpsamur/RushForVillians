@@ -12,6 +12,7 @@ import '../../widgets/avatar_view.dart';
 import '../../widgets/daily_step_ring.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
+import '../inventory/inventory_screen.dart';
 import 'step_history_screen.dart';
 
 /// Oyuncu profili: seviye, XP, adım geçmişi ve genel istatistikler.
@@ -25,6 +26,7 @@ class ProfileScreen extends StatelessWidget {
   final AdventureQuest? adventure;
 
   final VoidCallback onEditCharacter;
+  final bool canEditCharacter;
 
   /// Kuşanılan itemler ve toplam etkileri. Profilde yalnızca **özet**
   /// gösterilir; ayrıntı ve kuşanma envanter ekranında.
@@ -39,6 +41,7 @@ class ProfileScreen extends StatelessWidget {
     required this.today,
     required this.stepHistory,
     required this.onEditCharacter,
+    required this.canEditCharacter,
     required this.onOpenInventory,
     this.equippedItems = const [],
     this.buffs = EquippedBuffs.none,
@@ -86,16 +89,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil'),
-        actions: [
-          IconButton(
-            onPressed: onEditCharacter,
-            tooltip: 'Karakteri düzenle',
-            icon: const Icon(Icons.edit),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Profil')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -105,8 +99,18 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  AvatarView(avatar: profile.avatar, size: 170),
-                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 245,
+                    child: Center(
+                      child: AvatarView(
+                        avatar: profile.avatar,
+                        size: 245,
+                        showBackground: false,
+                        combatLoop: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     profile.name,
                     textAlign: TextAlign.center,
@@ -126,9 +130,13 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: onEditCharacter,
-                    icon: const Icon(Icons.tune),
-                    label: const Text('Karakteri Düzenle'),
+                    onPressed: canEditCharacter ? onEditCharacter : null,
+                    icon: const Icon(Icons.science),
+                    label: Text(
+                      canEditCharacter
+                          ? 'Reenkarnasyon İksirini Kullan'
+                          : 'Reenkarnasyon İksiri Gerekli',
+                    ),
                   ),
                 ],
               ),
@@ -256,6 +264,19 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 12),
+          CharacterPowerPanel(
+            buffs: buffs,
+            equippedCount: equippedItems.length,
+            slotCount:
+                ItemCategory.values
+                    .where(
+                      (category) => category.characterClasses.contains(
+                        profile.avatar.characterClass,
+                      ),
+                    )
+                    .length,
           ),
           const SizedBox(height: 12),
           SectionCard(

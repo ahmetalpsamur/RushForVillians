@@ -23,13 +23,17 @@ const int wheelSliceCount = 8;
 ///
 /// Kalanı XP. Item dilimleri azınlıkta: çark günde bir kez dönüyor ve her
 /// gün ekipman dağıtmak hem mağazayı hem seviye kilidini anlamsız kılar.
-const int maxItemSlices = 3;
+const int maxItemSlices = 4;
 
-/// Çarkta çıkabilecek en yüksek nadirlik.
-///
-/// Epik ve efsanevi bilerek dışarıda: onlar mağazanın uzun vadeli hedefi
-/// (efsanevi ~iki aylık birikim). Çarktan düşmesi ekonomiyi çökertirdi.
-const RewardRarity maxWheelRarity = RewardRarity.rare;
+/// Item seçilirken kullanılan nadirlik ağırlığı. Her nadirlik çarktan
+/// çıkabilir; yüksek nadirlikler giderek daha düşük ağırlık alır.
+double wheelRarityWeight(RewardRarity rarity) => switch (rarity) {
+  RewardRarity.common => 60,
+  RewardRarity.uncommon => 27,
+  RewardRarity.rare => 10,
+  RewardRarity.epic => 2.5,
+  RewardRarity.legendary => 0.5,
+};
 
 /// Tohumu bir sonraki çevirmeye ilerletir.
 ///
@@ -53,7 +57,7 @@ int initialWheelSeed(String salt) => stableSpread(salt, 0x7FFFFFF0) + 1;
 /// - [Item.isUnlockedAt] — kilidin tek kaynağı, ikinci bir kontrol yok (#10),
 /// - zaten sahip olunanlar elenir; çarktan sahip olduğun şeyin çıkması ödül
 ///   değil, hayal kırıklığı,
-/// - [maxWheelRarity] üstü elenir.
+/// - nadirlik seçim ihtimalini [wheelRarityWeight] üzerinden etkiler.
 ///
 /// Uygun item yoksa (seviye düşük, hepsi alınmış, katalog boş) dilimlerin
 /// tamamı XP olur — **boş dilim hiçbir koşulda oluşmaz.**
@@ -69,20 +73,34 @@ List<WheelReward> buildWheelSlices({
       candidates
           .where(
             (item) =>
-                item.isUnlockedAt(level) &&
-                !ownedItemIds.contains(item.id) &&
-                item.rarity.index <= maxWheelRarity.index,
+                item.isUnlockedAt(level) && !ownedItemIds.contains(item.id),
           )
           .toList();
 
-  // Kararlı sıra: katalog sırası zaten kararlı, karıştırma tohumdan geliyor.
-  eligible.shuffle(random);
-
   final itemSliceCount = min(maxItemSlices, eligible.length);
+  final selectedItems = <Item>[];
+  final remaining = [...eligible];
+  while (selectedItems.length < itemSliceCount && remaining.isNotEmpty) {
+    final totalWeight = remaining.fold<double>(
+      0,
+      (sum, item) => sum + wheelRarityWeight(item.rarity),
+    );
+    var cursor = random.nextDouble() * totalWeight;
+    var selectedIndex = remaining.length - 1;
+    for (var index = 0; index < remaining.length; index++) {
+      cursor -= wheelRarityWeight(remaining[index].rarity);
+      if (cursor <= 0) {
+        selectedIndex = index;
+        break;
+      }
+    }
+    selectedItems.add(remaining.removeAt(selectedIndex));
+  }
+
   final xpOptions = MockData.wheelXpOptions;
 
   final slices = <WheelReward>[
-    for (var i = 0; i < itemSliceCount; i++) WheelReward.item(eligible[i]),
+    for (final item in selectedItems) WheelReward.item(item),
     for (var i = itemSliceCount; i < wheelSliceCount; i++)
       WheelReward.xp(xpOptions[random.nextInt(xpOptions.length)]),
   ];

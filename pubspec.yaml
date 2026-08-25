@@ -24,19 +24,47 @@ flutter:
   uses-material-design: true
   assets:
     - lib/Start/
-    - lib/Characters/Archer/
-    - lib/Characters/DarkMagic/
-    - lib/Characters/Faith/
-    - lib/Characters/Magic/
-    - lib/Characters/Nature/
-    - lib/Characters/Paladin/
-    - lib/Characters/SwordMan/
-    - lib/Characters/Thief/
-    - lib/Enemies/Gergin Asker/
-    - lib/Enemies/Tekinsiz Canavar!/
-    - lib/Enemies/Blood_Monster_A_GIFs/
-    - lib/Enemies/Demon_A_GIFs/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Archer/Archer/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Armored Axeman/Armored Axeman/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Armored Orc/Armored Orc/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Armored Skeleton/Armored Skeleton/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Elite Orc/Elite Orc/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Greatsword Skeleton/Greatsword Skeleton/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Knight/Knight/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Knight Templar/Knight Templar/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Orc/Orc/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Priest/Priest/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Skeleton/Skeleton/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Skeleton Archer/Skeleton Archer/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Slime/Slime/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Soldier/Soldier/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Swordsman/Swordsman/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Werebear/Werebear/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Werewolf/Werewolf/
+    - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Wizard/Wizard/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Black Knight_A/Black Knight_A/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Black Knight_B/Black Knight_B/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Black Knight_C/Black Knight_C/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Blood Monster_A/Blood Monster_A/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Blood Monster_B/Blood Monster_B/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demoness_A/Demoness_A/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demoness_B/Demoness_B/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demon_A/Demon_A/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demon_B/Demon_B/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demon_C/Demon_C/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demon_D/Demon_D/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Demon_E/Demon_E/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Eyeball Monster/Eyeball Monster/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Flame Golem/Flame Golem/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Ghostfire/Ghostfire/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Hellbat/Hellbat/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Hellhound/Hellhound/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Lava Slime/Lava Slime/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Minotaur/Minotaur/
+    - lib/All_Assets/Enemies/Characters(100x100 split)/Warlock/Warlock/
     - lib/Backgrounds/
+    - lib/ChanceWheel/
+    - lib/SoundEffects/
     - lib/Items/arch/
     - lib/Items/axes_halberds/
     - lib/Items/maces_hammers/

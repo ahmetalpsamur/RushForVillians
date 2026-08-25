@@ -27,6 +27,15 @@ class MockData {
 
   static List<XpStoreItem> storeItems() => const [
     XpStoreItem(
+      id: 'reincarnation_potion',
+      name: 'Reenkarnasyon İksiri',
+      description:
+          'Karakterini ve sınıfını bir kez yeniden seçmeni sağlar. '
+          'Düzenleme tamamlandığında tüketilir.',
+      cost: 2000,
+      icon: Icons.science,
+    ),
+    XpStoreItem(
       id: 'skin_dragon_cape',
       name: 'Ejderha Pelerini',
       description: 'Karakterin için kozmetik pelerin.',

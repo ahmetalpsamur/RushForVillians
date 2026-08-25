@@ -255,24 +255,23 @@ void main() {
   });
 
   group('buff etkisi', () {
-    testWidgets('kuşanma karakter panelindeki toplamı anında değiştirir', (
+    testWidgets('kuşanma eşya etkisini karakter vitrininde anında gösterir', (
       tester,
     ) async {
       await pumpInventory(tester, profile: makeProfile(owned: [sword.id]));
 
-      // Kuşanmadan önce bütün çarpanlar ×1,00.
-      expect(find.text('×1,00'), findsWidgets);
+      expect(find.text('Henüz kuşanılmış eşya yok'), findsOneWidget);
 
       await openItem(tester, sword);
       await tester.tap(find.text('Kuşan'));
       await tester.pumpAndSettle();
 
-      // Kılıcın bir bonusu var; toplam artık ×1,00'den farklı bir satır
-      // içermeli.
       final bonusLabel = sword.buff.labels.first;
       expect(bonusLabel, isNotEmpty);
-      expect(find.textContaining('slot dolu'), findsOneWidget);
-      expect(find.text('1 / 4 slot dolu'), findsOneWidget);
+      expect(find.text('Henüz kuşanılmış eşya yok'), findsNothing);
+      final effectFinder = find.byKey(ValueKey('equipped-effect-${sword.id}'));
+      expect(effectFinder, findsOneWidget);
+      expect(tester.widget<Text>(effectFinder).data, isNotEmpty);
     });
 
     testWidgets('kuşanılan adım-para bonusu gerçekten para kazandırır', (

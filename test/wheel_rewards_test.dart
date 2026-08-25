@@ -143,8 +143,7 @@ void main() {
       expect(slices.every((reward) => !reward.isItem), isTrue);
     });
 
-    test('epik ve efsanevi çarktan çıkmaz', () {
-      // Aday listesi yalnızca epik + efsanevi olsa bile item dilimi olmamalı.
+    test('epik ve efsanevi de düşük ağırlıkla çarka girebilir', () {
       final rich = [
         ...byRarity(RewardRarity.epic),
         ...byRarity(RewardRarity.legendary),
@@ -158,8 +157,29 @@ void main() {
           ownedItemIds: const [],
           seed: seed,
         );
-        expect(slices.every((reward) => !reward.isItem), isTrue);
+        final rewards = slices.where((reward) => reward.isItem).toList();
+        expect(rewards, isNotEmpty);
+        expect(rewards.every((reward) => rich.contains(reward.item)), isTrue);
       }
+    });
+
+    test('nadirlik arttıkça seçim ağırlığı azalır', () {
+      expect(
+        wheelRarityWeight(RewardRarity.common),
+        greaterThan(wheelRarityWeight(RewardRarity.uncommon)),
+      );
+      expect(
+        wheelRarityWeight(RewardRarity.uncommon),
+        greaterThan(wheelRarityWeight(RewardRarity.rare)),
+      );
+      expect(
+        wheelRarityWeight(RewardRarity.rare),
+        greaterThan(wheelRarityWeight(RewardRarity.epic)),
+      );
+      expect(
+        wheelRarityWeight(RewardRarity.epic),
+        greaterThan(wheelRarityWeight(RewardRarity.legendary)),
+      );
     });
 
     test('item dilimi sayısı tavanı aşmaz', () {

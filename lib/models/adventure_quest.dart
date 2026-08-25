@@ -6,7 +6,8 @@ class AdventureQuest {
       'lib/Backgrounds/versionA_platform.png';
   static const int maxPlayerHealth = 100;
   static const int stageStepTarget = 1000;
-  static const Duration roundDuration = Duration(minutes: 20);
+  // Geçici test dengesi: her round 30 saniye.
+  static const Duration roundDuration = Duration(seconds: 30);
   static const Duration reminderInterval = Duration(minutes: 5);
 
   /// Tek seferde çözülecek en fazla birikmiş tur. Güvenlik ağı: çok eski bir
@@ -90,6 +91,17 @@ class AdventureQuest {
   int get roundDurationMinutes =>
       roundDurationForSteps(roundTargetSteps).inMinutes;
 
+  static String durationLabel(Duration duration) {
+    if (duration.inSeconds < 60) return '${duration.inSeconds} saniye';
+    return '${duration.inMinutes} dakika';
+  }
+
+  static String get configuredRoundDurationLabel =>
+      durationLabel(roundDuration);
+
+  String get roundDurationLabel =>
+      durationLabel(roundDurationForSteps(roundTargetSteps));
+
   int stepsThisRound(int currentSteps) =>
       (currentSteps - roundStartingSteps).clamp(0, roundTargetSteps);
 
@@ -104,7 +116,7 @@ class AdventureQuest {
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
-  /// Round, hedef erken tamamlanırsa anında; tamamlanmazsa 20 dakikalık süre
+  /// Round, hedef erken tamamlanırsa anında; tamamlanmazsa tanımlı süre
   /// dolduğunda çözülür.
   CombatRoundResult? resolveRound(int currentSteps, DateTime now) {
     if (roundTargetSteps <= 0 || playerHealth <= 0) {
@@ -211,6 +223,7 @@ class AdventureQuest {
     'roundStartingSteps': roundStartingSteps,
     'roundTargetSteps': roundTargetSteps,
     'nextEnemyAttackAt': nextEnemyAttackAt.toIso8601String(),
+    'roundDurationSeconds': roundDuration.inSeconds,
     'nextReminderAt': nextReminderAt.toIso8601String(),
     'enemyAttackSerial': enemyAttackSerial,
     'lastEnemyDamage': lastEnemyDamage,
@@ -251,7 +264,13 @@ class AdventureQuest {
     final savedRoundTarget = json['roundTargetSteps'] as int?;
     if (savedRoundTarget != null) quest.roundTargetSteps = savedRoundTarget;
     final savedAttackAt = _parseDate(json['nextEnemyAttackAt']);
-    if (savedAttackAt != null) quest.nextEnemyAttackAt = savedAttackAt;
+    final savedRoundDurationSeconds = json['roundDurationSeconds'] as int?;
+    // Test/denge sırasında round süresi değişmişse eski uzun geri sayımı
+    // taşımak yerine kurucunun güncel süreyle oluşturduğu sayacı kullan.
+    if (savedAttackAt != null &&
+        savedRoundDurationSeconds == roundDuration.inSeconds) {
+      quest.nextEnemyAttackAt = savedAttackAt;
+    }
     final savedReminderAt = _parseDate(json['nextReminderAt']);
     if (savedReminderAt != null) quest.nextReminderAt = savedReminderAt;
     return quest;

@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/character_class.dart';
+import '../../models/item.dart';
 import '../../services/character_catalog.dart';
+import '../../services/item_catalog.dart';
 import '../../widgets/avatar_view.dart';
+import '../../widgets/pixel_sprite.dart';
 
 class CharacterCreationScreen extends StatefulWidget {
   final AvatarProfile? initialAvatar;
@@ -22,8 +27,9 @@ class CharacterCreationScreen extends StatefulWidget {
       _CharacterCreationScreenState();
 }
 
-class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
-  static const _stepCount = 7;
+class _CharacterCreationScreenState extends State<CharacterCreationScreen>
+    with SingleTickerProviderStateMixin {
+  static const _stepCount = 6;
 
   late final TextEditingController _nameController;
   late int _age;
@@ -38,6 +44,12 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
   String? _nameError;
   int _step = 0;
   bool _transitioning = false;
+  CharacterClass? _revealedClass;
+  String? _revealedAttackAsset;
+  List<Item> _revealedItems = const [];
+  int _revealSerial = 0;
+  final math.Random _random = math.Random();
+  late final AnimationController _equipmentBobController;
 
   @override
   void initState() {
@@ -49,16 +61,23 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     _gender = avatar?.gender ?? 'Erkek';
     _ageController = FixedExtentScrollController(initialItem: _age - 16);
     _weightController = FixedExtentScrollController(initialItem: _weight - 40);
+    _equipmentBobController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1700),
+    )..repeat();
     _loadCatalog();
   }
 
   Future<void> _loadCatalog() async {
     try {
       final classes = await CharacterCatalog.load();
+      await ItemCatalog.load();
       if (!mounted) return;
       if (classes.isEmpty) {
         setState(
-          () => _catalogError = 'Characters klasöründe karakter bulunamadı.',
+          () =>
+              _catalogError =
+                  'All_Assets avatar klasöründe karakter bulunamadı.',
         );
         return;
       }
@@ -67,10 +86,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
         (item) => item.id == initial?.characterClass,
         orElse: () => classes.first,
       );
-      final selectedAsset =
-          selectedClass.characterAssets.contains(initial?.characterAsset)
-              ? initial!.characterAsset
-              : selectedClass.characterAssets.first;
+      final selectedAsset = selectedClass.walkingAsset;
       setState(() {
         _classes = classes;
         _selectedClassId = selectedClass.id;
@@ -86,9 +102,11 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
 
   @override
   void dispose() {
+    _revealSerial++;
     _nameController.dispose();
     _ageController.dispose();
     _weightController.dispose();
+    _equipmentBobController.dispose();
     super.dispose();
   }
 
@@ -111,17 +129,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     );
   }
 
-  Color get _neonColor => switch (_selectedClassId) {
-    'Archer' => const Color(0xFF38F59B),
-    'DarkMagic' => const Color(0xFFD65CFF),
-    'Faith' => const Color(0xFFFFD95C),
-    'Magic' => const Color(0xFF4DDCFF),
-    'Nature' => const Color(0xFF77FF66),
-    'Paladin' => const Color(0xFFFFB84D),
-    'SwordMan' => const Color(0xFF5C8CFF),
-    'Thief' => const Color(0xFFFF4F91),
-    _ => AppColors.primary,
-  };
+  Color get _neonColor => _colorForClass(_selectedClassId ?? '');
 
   Future<void> _goToStep(int nextStep) async {
     if (_transitioning || nextStep == _step) return;
@@ -142,15 +150,47 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       return;
     }
     if (_step == 4 && _selectedClass == null) return;
-    if (_step == 5 && _selectedAsset == null) return;
     _goToStep(_step + 1);
   }
 
   void _selectClass(CharacterClass characterClass) {
-    HapticFeedback.selectionClick();
+    HapticFeedback.heavyImpact();
+    final attacks = characterClass.attackAssets;
+    setState(() {
+      _revealSerial++;
+      _revealedClass = characterClass;
+      _revealedAttackAsset = attacks[_random.nextInt(attacks.length)];
+      _revealedItems = _randomEquipmentFor(characterClass);
+    });
+  }
+
+  List<Item> _randomEquipmentFor(CharacterClass characterClass) {
+    final result = <Item>[];
+    for (final category in ItemCategory.values) {
+      if (!category.characterClasses.contains(characterClass.id)) continue;
+      final pool =
+          ItemCatalog.items
+              .where(
+                (item) =>
+                    item.category == category &&
+                    item.isUsableBy(characterClass.id),
+              )
+              .toList();
+      if (pool.isNotEmpty) result.add(pool[_random.nextInt(pool.length)]);
+    }
+    return result;
+  }
+
+  void _confirmClassReveal() {
+    final characterClass = _revealedClass;
+    if (characterClass == null) return;
+    HapticFeedback.heavyImpact();
     setState(() {
       _selectedClassId = characterClass.id;
-      _selectedAsset = characterClass.characterAssets.first;
+      _selectedAsset = characterClass.walkingAsset;
+      _revealedClass = null;
+      _revealedAttackAsset = null;
+      _revealedItems = const [];
     });
   }
 
@@ -220,6 +260,26 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
               ),
             ),
           ),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child:
+                  _revealedClass == null
+                      ? const SizedBox.shrink()
+                      : _ClassReveal(
+                        key: ValueKey(_revealSerial),
+                        characterClass: _revealedClass!,
+                        attackAsset: _revealedAttackAsset!,
+                        color: _colorForClass(_revealedClass!.id),
+                        revealSerial: _revealSerial,
+                        equipment: _revealedItems,
+                        bobAnimation: _equipmentBobController,
+                        onSelect: _confirmClassReveal,
+                      ),
+            ),
+          ),
         ],
       ),
     );
@@ -228,8 +288,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
   bool get _canContinue => switch (_step) {
     0 => _nameController.text.trim().length >= 2,
     4 => _selectedClass != null,
-    5 => _selectedAsset != null,
-    6 => _avatar != null,
+    5 => _avatar != null,
     _ => true,
   };
 
@@ -259,7 +318,6 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       onChanged: (value) => setState(() => _weight = value),
     ),
     4 => _classStep(),
-    5 => _characterStep(),
     _ => _summaryStep(),
   };
 
@@ -364,7 +422,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
     return _QuestionFrame(
       eyebrow: 'GÜCÜNÜ SEÇ',
       title: 'Hangi sınıfa aitsin?',
-      subtitle: 'Her sınıf farklı bir savaş yolunu temsil eder.',
+      subtitle: 'Yürüyüşünü ve savaş yolunu birlikte seç.',
       wide: true,
       child: GridView.builder(
         shrinkWrap: true,
@@ -374,56 +432,20 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.25,
+          childAspectRatio: 0.88,
         ),
         itemBuilder: (context, index) {
           final characterClass = _classes[index];
           final selected = characterClass.id == _selectedClassId;
-          return _NeonOption(
+          return _ClassTile(
             label: characterClass.name,
-            caption: '${characterClass.characterAssets.length} kahraman',
-            icon: _classIcon(characterClass.id),
+            asset: characterClass.walkingAsset,
             selected: selected,
             color:
                 selected
                     ? _colorForClass(characterClass.id)
                     : AppColors.primary,
-            compact: true,
             onTap: () => _selectClass(characterClass),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _characterStep() {
-    final characterClass = _selectedClass;
-    if (characterClass == null) return const SizedBox.shrink();
-    return _QuestionFrame(
-      eyebrow: '${characterClass.name.toUpperCase()} SINIFI',
-      title: 'Kahramanını seç',
-      subtitle: 'Savaş alanında seni temsil edecek görünümü belirle.',
-      wide: true,
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: characterClass.characterAssets.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: 0.86,
-        ),
-        itemBuilder: (context, index) {
-          final asset = characterClass.characterAssets[index];
-          return _CharacterTile(
-            asset: asset,
-            selected: asset == _selectedAsset,
-            color: _neonColor,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _selectedAsset = asset);
-            },
           );
         },
       ),
@@ -462,26 +484,18 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
 
   Color _colorForClass(String id) => switch (id) {
     'Archer' => const Color(0xFF38F59B),
-    'DarkMagic' => const Color(0xFFD65CFF),
-    'Faith' => const Color(0xFFFFD95C),
-    'Magic' => const Color(0xFF4DDCFF),
-    'Nature' => const Color(0xFF77FF66),
-    'Paladin' => const Color(0xFFFFB84D),
-    'SwordMan' => const Color(0xFF5C8CFF),
-    'Thief' => const Color(0xFFFF4F91),
+    'Armored Axeman' || 'Werebear' => const Color(0xFFFF9D4D),
+    'Armored Orc' || 'Elite Orc' || 'Orc' => const Color(0xFFFF5C5C),
+    'Armored Skeleton' ||
+    'Greatsword Skeleton' ||
+    'Skeleton' => const Color(0xFFB7C9E2),
+    'Bat' || 'Necromancer' => const Color(0xFFD65CFF),
+    'Knight' || 'Soldier' || 'Swordsman' => const Color(0xFF5C8CFF),
+    'Knight Templar' || 'Priest' => const Color(0xFFFFD95C),
+    'Lancer' || 'Wizard' => const Color(0xFF4DDCFF),
+    'Orc rider' || 'Slime' => const Color(0xFF77FF66),
+    'Skeleton Archer' || 'Werewolf' => const Color(0xFFFF4F91),
     _ => AppColors.primary,
-  };
-
-  IconData _classIcon(String id) => switch (id) {
-    'Archer' => Icons.gps_fixed,
-    'DarkMagic' => Icons.dark_mode,
-    'Faith' => Icons.church,
-    'Magic' => Icons.auto_fix_high,
-    'Nature' => Icons.park,
-    'Paladin' => Icons.shield,
-    'SwordMan' => Icons.sports_martial_arts,
-    'Thief' => Icons.visibility_off,
-    _ => Icons.person,
   };
 }
 
@@ -737,11 +751,9 @@ class _QuestionFrame extends StatelessWidget {
 
 class _NeonOption extends StatelessWidget {
   final String label;
-  final String? caption;
   final IconData icon;
   final bool selected;
   final Color color;
-  final bool compact;
   final VoidCallback onTap;
 
   const _NeonOption({
@@ -750,8 +762,6 @@ class _NeonOption extends StatelessWidget {
     required this.selected,
     required this.color,
     required this.onTap,
-    this.caption,
-    this.compact = false,
   });
 
   @override
@@ -789,68 +799,42 @@ class _NeonOption extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
             child: Padding(
-              padding: EdgeInsets.all(compact ? 14 : 18),
-              child:
-                  compact
-                      ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            icon,
-                            color: selected ? color : Colors.white54,
-                            size: 30,
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: selected ? color : Colors.white54,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (selected)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color,
+                        boxShadow: [
+                          BoxShadow(
+                            color: color,
+                            blurRadius: 12,
+                            spreadRadius: 3,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            label,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          if (caption != null)
-                            Text(
-                              caption!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.white54,
-                              ),
-                            ),
-                        ],
-                      )
-                      : Row(
-                        children: [
-                          Icon(
-                            icon,
-                            color: selected ? color : Colors.white54,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              label,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          if (selected)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: color,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: color,
-                                    blurRadius: 12,
-                                    spreadRadius: 3,
-                                  ),
-                                ],
-                              ),
-                            ),
                         ],
                       ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -859,13 +843,15 @@ class _NeonOption extends StatelessWidget {
   }
 }
 
-class _CharacterTile extends StatelessWidget {
+class _ClassTile extends StatelessWidget {
+  final String label;
   final String asset;
   final bool selected;
   final Color color;
   final VoidCallback onTap;
 
-  const _CharacterTile({
+  const _ClassTile({
+    required this.label,
     required this.asset,
     required this.selected,
     required this.color,
@@ -907,16 +893,255 @@ class _CharacterTile extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: Image.asset(
-                asset,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final shortestSide = math.min(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      );
+                      final scale = (shortestSide / 62).clamp(2.5, 3.1);
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                        child: PixelSprite(
+                          asset: asset,
+                          scale: scale.toDouble(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 9,
+                  ),
+                  color: Colors.black26,
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected ? color : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ClassReveal extends StatelessWidget {
+  final CharacterClass characterClass;
+  final String attackAsset;
+  final Color color;
+  final int revealSerial;
+  final List<Item> equipment;
+  final Animation<double> bobAnimation;
+  final VoidCallback onSelect;
+
+  const _ClassReveal({
+    super.key,
+    required this.characterClass,
+    required this.attackAsset,
+    required this.color,
+    required this.revealSerial,
+    required this.equipment,
+    required this.bobAnimation,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.94),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                characterClass.name.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.4,
+                  shadows: [Shadow(color: color, blurRadius: 18)],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 250,
+                    maxHeight: 250,
+                  ),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            color.withValues(alpha: 0.26),
+                            color.withValues(alpha: 0.04),
+                            Colors.transparent,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.28),
+                            blurRadius: 55,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: PixelSprite(
+                        asset: attackAsset,
+                        scale: 3,
+                        imageKey: ValueKey(
+                          '${characterClass.id}-$revealSerial',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'KULLANABİLDİĞİ EŞYA TÜRLERİ',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.6,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 112,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: equipment.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder:
+                      (context, index) => _RevealEquipmentItem(
+                        item: equipment[index],
+                        index: index,
+                        animation: bobAnimation,
+                        color: color,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '“${characterClass.selectionSlogan}”',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: onSelect,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('SEÇ'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RevealEquipmentItem extends StatelessWidget {
+  final Item item;
+  final int index;
+  final Animation<double> animation;
+  final Color color;
+
+  const _RevealEquipmentItem({
+    required this.item,
+    required this.index,
+    required this.animation,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      child: Column(
+        children: [
+          Text(
+            item.category.label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                final phase = animation.value * math.pi * 2 + index * 0.85;
+                return Transform.translate(
+                  offset: Offset(0, math.sin(phase) * 5),
+                  child: child,
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color.withValues(alpha: 0.42)),
+                ),
+                child: Image.asset(
+                  item.assetPath,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.none,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

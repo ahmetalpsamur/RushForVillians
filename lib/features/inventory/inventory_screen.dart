@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
@@ -10,6 +13,7 @@ import '../../models/item.dart';
 import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/user_profile.dart';
+import '../../widgets/avatar_view.dart';
 import '../../widgets/rarity_badge.dart';
 import '../../widgets/section_card.dart';
 
@@ -225,7 +229,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverToBoxAdapter(
-                  child: _CharacterPanel(state: state),
+                  child: _EquipmentShowcase(state: state),
                 ),
               ),
               SliverPadding(
@@ -324,23 +328,210 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 }
 
-/// Karakter paneli: taban değer, ekipman katkısı ve toplam ayrı ayrı.
-class _CharacterPanel extends StatelessWidget {
+/// Karakteri saldırısız biçimde merkezde tutar; kuşanılmış itemleri isim
+/// göstermeden, sağladıkları etkilerle birlikte çevresinde sergiler.
+class _EquipmentShowcase extends StatefulWidget {
   final InventoryState state;
 
-  const _CharacterPanel({required this.state});
+  const _EquipmentShowcase({required this.state});
+
+  @override
+  State<_EquipmentShowcase> createState() => _EquipmentShowcaseState();
+}
+
+class _EquipmentShowcaseState extends State<_EquipmentShowcase> {
+  Timer? _waveTimer;
+  bool _waveUp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _waveTimer = Timer.periodic(const Duration(milliseconds: 1650), (_) {
+      if (mounted) setState(() => _waveUp = !_waveUp);
+    });
+  }
+
+  @override
+  void dispose() {
+    _waveTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final buffs = state.buffs;
+    final equipped = widget.state.equippedItems;
 
+    return SectionCard(
+      child: SizedBox(
+        height: 350,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const itemWidth = 104.0;
+            const itemHeight = 112.0;
+            const centerY = 175.0;
+            final centerX = constraints.maxWidth / 2;
+            final radiusX = (centerX - itemWidth / 2).clamp(104.0, 146.0);
+            const radiusY = 118.0;
+
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
+                  child: Center(
+                    child: AvatarView(
+                      avatar: widget.state.profile.avatar,
+                      size: 164,
+                      showBackground: false,
+                    ),
+                  ),
+                ),
+                if (equipped.isEmpty)
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 8,
+                    child: Text(
+                      'Henüz kuşanılmış eşya yok',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ),
+                for (var index = 0; index < equipped.length; index++)
+                  _positionedItem(
+                    item: equipped[index],
+                    index: index,
+                    count: equipped.length,
+                    centerX: centerX,
+                    centerY: centerY,
+                    radiusX: radiusX,
+                    radiusY: radiusY,
+                    itemWidth: itemWidth,
+                    itemHeight: itemHeight,
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _positionedItem({
+    required Item item,
+    required int index,
+    required int count,
+    required double centerX,
+    required double centerY,
+    required double radiusX,
+    required double radiusY,
+    required double itemWidth,
+    required double itemHeight,
+  }) {
+    final angle = _angleFor(index, count);
+    final left = centerX + math.cos(angle) * radiusX - itemWidth / 2;
+    final top = centerY + math.sin(angle) * radiusY - itemHeight / 2;
+    final movesUp = index.isEven ? _waveUp : !_waveUp;
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: itemWidth,
+      height: itemHeight,
+      child: AnimatedSlide(
+        offset: Offset(0, movesUp ? -0.065 : 0.065),
+        duration: Duration(milliseconds: 1320 + index * 85),
+        curve: Curves.easeInOutSine,
+        child: _FloatingEquipment(item: item),
+      ),
+    );
+  }
+
+  static double _angleFor(int index, int count) {
+    if (count == 1) return -math.pi / 2;
+    if (count == 2) return index == 0 ? math.pi : 0;
+    if (count == 3) {
+      return const [-math.pi / 2, 5 * math.pi / 6, math.pi / 6][index];
+    }
+    return -math.pi / 2 + (2 * math.pi * index / count);
+  }
+}
+
+class _FloatingEquipment extends StatelessWidget {
+  final Item item;
+
+  const _FloatingEquipment({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final effect = item.buff.labels.join('\n');
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 43,
+          child: Center(
+            child: Text(
+              key: ValueKey('equipped-effect-${item.id}'),
+              effect.isEmpty ? 'Etki yok' : effect,
+              maxLines: 3,
+              overflow: TextOverflow.fade,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: item.rarity.color,
+                fontSize: 10.5,
+                height: 1.12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.15,
+                shadows: const [
+                  Shadow(color: Colors.black, blurRadius: 5),
+                  Shadow(color: Colors.black87, blurRadius: 2),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Expanded(
+          child: Image.asset(
+            item.assetPath,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.none,
+            errorBuilder:
+                (_, _, _) => const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 42,
+                  color: Colors.white24,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Taban değer, ekipman katkısı ve toplamı ayrı ayrı gösteren güç tablosu.
+/// Profil ekranında istatistiklerin altında kullanılır.
+class CharacterPowerPanel extends StatelessWidget {
+  final EquippedBuffs buffs;
+  final int equippedCount;
+  final int slotCount;
+
+  const CharacterPowerPanel({
+    super.key,
+    required this.buffs,
+    required this.equippedCount,
+    required this.slotCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SectionCard(
       title: 'Karakter Gücü',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${state.equippedItems.length} / ${state.slots.length} slot dolu',
+            '$equippedCount / $slotCount slot dolu',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 10),

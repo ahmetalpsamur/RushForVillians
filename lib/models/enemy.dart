@@ -4,7 +4,7 @@ class Enemy {
   final String idleAsset;
   final String walkAsset;
   final String hurtAsset;
-  final String attackAsset;
+  final List<String> attackAssets;
   final String deathAsset;
   final int attackAnimationDurationMs;
   final int deathAnimationDurationMs;
@@ -19,7 +19,7 @@ class Enemy {
     required this.idleAsset,
     required this.walkAsset,
     required this.hurtAsset,
-    required this.attackAsset,
+    required this.attackAssets,
     required this.deathAsset,
     required this.attackAnimationDurationMs,
     required this.deathAnimationDurationMs,
@@ -28,4 +28,6 @@ class Enemy {
     required this.minimumDailySteps,
     required this.xpReward,
   });
+
+  String get attackAsset => attackAssets.first;
 }

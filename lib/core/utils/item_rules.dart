@@ -185,6 +185,22 @@ ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
   'Faith' => ItemBuffType.streakRelief,
   // Doğa döngüseldir: çark hakkı birikir.
   'Nature' => ItemBuffType.wheelSpinCap,
+  // All_Assets sınıfları görsel savaş rollerine göre mevcut sekiz
+  // ekonomi imzasından birini kullanır.
+  'Armored Axeman' ||
+  'Elite Orc' ||
+  'Greatsword Skeleton' ||
+  'Orc' ||
+  'Swordsman' => ItemBuffType.enemyXp,
+  'Armored Orc' ||
+  'Armored Skeleton' ||
+  'Knight' => ItemBuffType.streakFreezeCap,
+  'Bat' || 'Skeleton Archer' || 'Werewolf' => ItemBuffType.dailyCoinCap,
+  'Lancer' || 'Orc rider' => ItemBuffType.stepCoin,
+  'Soldier' || 'Wizard' => ItemBuffType.stepXp,
+  'Necromancer' => ItemBuffType.wheelXp,
+  'Knight Templar' || 'Priest' => ItemBuffType.streakRelief,
+  'Skeleton' || 'Slime' || 'Werebear' => ItemBuffType.wheelSpinCap,
   _ => ItemBuffType.stepCoin,
 };
 
@@ -424,6 +440,27 @@ String classEpithet(String characterClass) => switch (characterClass) {
   'DarkMagic' => 'Lanetli',
   'Faith' => 'Adanmış',
   'Nature' => 'Yabani',
+  'Armored Axeman' => 'Demir',
+  'Armored Orc' => 'Zırhlı',
+  'Armored Skeleton' => 'Kemik',
+  'Bat' => 'Gece',
+  'Elite Orc' => 'Kızıl',
+  'Greatsword Skeleton' => 'Mezar',
+  'Knight' => 'Kraliyet',
+  'Knight Templar' => 'Şafak',
+  'Lancer' => 'Fırtına',
+  'Necromancer' => 'Ruh',
+  'Orc' => 'Yaban',
+  'Orc rider' => 'Bozkır',
+  'Priest' => 'Işık',
+  'Skeleton' => 'Kadim',
+  'Skeleton Archer' => 'Solgun',
+  'Slime' => 'Öz',
+  'Soldier' => 'Hudut',
+  'Swordsman' => 'Çelik',
+  'Werebear' => 'Pençe',
+  'Werewolf' => 'Ay',
+  'Wizard' => 'Gök',
   _ => '',
 };
 
