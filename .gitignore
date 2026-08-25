@@ -48,3 +48,6 @@ app.*.map.json
 /android/app/build/
 /android/.gradle/
 /ios/build/
+
+# Golden testlerin uyusmazlik ciktilari (gecici)
+test/failures/

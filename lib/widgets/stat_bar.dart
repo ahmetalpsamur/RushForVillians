@@ -26,8 +26,18 @@ class StatBar extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 6),
-            Text(label, style: Theme.of(context).textTheme.labelMedium),
-            const Spacer(),
+            // Etiket esner ve gerekirse kısalır; sayı hiçbir zaman kırpılmaz.
+            // Eskiden ikisi de sabit genişlikteydi ve `Spacer` aradaki boşluğu
+            // doldurmaya çalıştığı için dar ekranda satır taşıyordu.
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(valueText, style: Theme.of(context).textTheme.labelMedium),
           ],
         ),

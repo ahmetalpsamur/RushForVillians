@@ -1211,122 +1211,140 @@ class _AdventureScreenState extends State<AdventureScreen>
                 height: 260,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Image.asset(
-                          adventure.backgroundAsset,
-                          fit: BoxFit.cover,
-                          filterQuality: FilterQuality.none,
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.08),
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.18),
-                              ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Sprite kutuları eskiden sabit 210 px'di. Dar ekranda
+                      // (320 dp, sahne genişliği ~256 px) iki kutu üst üste
+                      // biniyor ve sonra çizilen düşman oyuncuyu **tamamen
+                      // örtüyordu**. Kutu genişliği artık sahneden türetiliyor:
+                      // iki figürün merkezleri arasında en az [minGap] kalır.
+                      const minGap = 110.0;
+                      const playerInset = 8.0;
+                      final spriteWidth = (constraints.maxWidth +
+                              playerInset -
+                              minGap)
+                          .clamp(120.0, 210.0);
+                      return Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              adventure.backgroundAsset,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.none,
                             ),
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        left: -8,
-                        // Oyuncu ve düşman aynı 100x100 GIF tuvalini
-                        // kullanıyor; aynı sahne ölçeği ikisini de platforma
-                        // oturtur. Yürüyüşü GIF yapar, ek sağ-sol sallanma yoktur.
-                        bottom: -22,
-                        width: 210,
-                        height: 230,
-                        child: PixelSprite(
-                          asset: widget.avatar.characterAsset,
-                          scale: 3,
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        // Düşman GIF karelerinde altta geniş şeffaf boşluk var;
-                        // kutuyu platformun altına taşıyarak görünen ayağı yüzeye oturt.
-                        bottom: -22,
-                        width: 210,
-                        height: 230,
-                        child: PixelSprite(
-                          asset:
-                              _showDeath
-                                  ? adventure.enemy.deathAsset
-                                  : _showAttack
-                                  ? adventure.enemy.attackAsset
-                                  : _showHurt
-                                  ? adventure.enemy.hurtAsset
-                                  : adventure.enemy.walkAsset,
-                          scale: 3,
-                          offset: const Offset(-8, 0),
-                          imageKey: ValueKey(
-                            _showDeath
-                                ? 'death'
-                                : _showAttack
-                                ? 'attack-${widget.roundSerial}'
-                                : _showHurt
-                                ? 'hurt'
-                                : 'walk',
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.08),
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.18),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      if (_pendingDamage > 0)
-                        Positioned(
-                          left: 8,
-                          right: 8,
-                          top: 8,
-                          child: FadeTransition(
-                            opacity: _damageMessageOpacity,
-                            child: Text(
-                              'Düşmanın $_pendingDamage canını aldın. '
-                              'Böyle devam et!',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleLarge?.copyWith(
-                                color: AppColors.xp,
-                                fontWeight: FontWeight.w900,
-                                shadows: const [
-                                  Shadow(
-                                    color: Colors.black,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
+                          Positioned(
+                            left: -playerInset,
+                            // Oyuncu ve düşman aynı 100x100 GIF tuvalini
+                            // kullanıyor; aynı sahne ölçeği ikisini de platforma
+                            // oturtur. Yürüyüşü GIF yapar, ek sağ-sol sallanma yoktur.
+                            bottom: -22,
+                            width: spriteWidth,
+                            height: 230,
+                            child: PixelSprite(
+                              asset: widget.avatar.characterAsset,
+                              scale: 3,
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            // Düşman GIF karelerinde altta geniş şeffaf boşluk var;
+                            // kutuyu platformun altına taşıyarak görünen ayağı yüzeye oturt.
+                            bottom: -22,
+                            width: spriteWidth,
+                            height: 230,
+                            child: PixelSprite(
+                              asset:
+                                  _showDeath
+                                      ? adventure.enemy.deathAsset
+                                      : _showAttack
+                                      ? adventure.enemy.attackAsset
+                                      : _showHurt
+                                      ? adventure.enemy.hurtAsset
+                                      : adventure.enemy.walkAsset,
+                              scale: 3,
+                              offset: const Offset(-8, 0),
+                              imageKey: ValueKey(
+                                _showDeath
+                                    ? 'death'
+                                    : _showAttack
+                                    ? 'attack-${widget.roundSerial}'
+                                    : _showHurt
+                                    ? 'hurt'
+                                    : 'walk',
+                              ),
+                            ),
+                          ),
+                          if (_pendingDamage > 0)
+                            Positioned(
+                              left: 8,
+                              right: 8,
+                              top: 8,
+                              child: FadeTransition(
+                                opacity: _damageMessageOpacity,
+                                child: Text(
+                                  'Düşmanın $_pendingDamage canını aldın. '
+                                  'Böyle devam et!',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleLarge?.copyWith(
+                                    color: AppColors.xp,
+                                    fontWeight: FontWeight.w900,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      if (_playerDamage > 0)
-                        Positioned(
-                          left: 8,
-                          width: 135,
-                          top: 40,
-                          child: FadeTransition(
-                            opacity: _damageMessageOpacity,
-                            child: Text(
-                              '-$_playerDamage CAN',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleLarge?.copyWith(
-                                color: AppColors.hp,
-                                fontWeight: FontWeight.w900,
-                                shadows: const [
-                                  Shadow(color: Colors.black, blurRadius: 8),
-                                ],
+                          if (_playerDamage > 0)
+                            Positioned(
+                              left: 8,
+                              width: 135,
+                              top: 40,
+                              child: FadeTransition(
+                                opacity: _damageMessageOpacity,
+                                child: Text(
+                                  '-$_playerDamage CAN',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleLarge?.copyWith(
+                                    color: AppColors.hp,
+                                    fontWeight: FontWeight.w900,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1385,19 +1403,28 @@ class _AdventureScreenState extends State<AdventureScreen>
                     '${adventure.playerHealth} / ${AdventureQuest.maxPlayerHealth}',
               ),
               const SizedBox(height: 14),
+              // Bu bar **günlük** sayacı gösterir, macerayı değil: macera
+              // ilerlemesi geri sayım kartındaki ana barda. Eskiden etiketi
+              // `adventure.stepGoal` diyordu ama değeri günlük ilerlemeydi;
+              // macera başlamadan önce atılan adımlar yüzünden hemen üstteki
+              // "Canavar Canı" barıyla çelişiyordu.
               StatBar(
-                label: 'Adım İlerlemesi',
-                icon: Icons.directions_walk,
+                label: 'Günlük Adım',
+                icon: Icons.calendar_today,
                 color: AppColors.primary,
                 progress: widget.today.stepProgress,
-                valueText: '${widget.today.steps} / ${adventure.stepGoal} adım',
+                valueText:
+                    '${widget.today.steps} / ${widget.today.stepGoal} adım',
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   const Icon(Icons.auto_awesome, color: AppColors.xp),
                   const SizedBox(width: 8),
-                  Text('Zafer ödülü: ${adventure.enemy.xpReward} XP'),
+                  // Esnek: dar ekranda satır taşmasın, yazı sarsın.
+                  Expanded(
+                    child: Text('Zafer ödülü: ${adventure.enemy.xpReward} XP'),
+                  ),
                 ],
               ),
             ],
@@ -1418,6 +1445,9 @@ class _AdventureScreenState extends State<AdventureScreen>
   Widget _buildCountdownCard(BuildContext context, AdventureQuest adventure) {
     final remaining = adventure.countdownRemaining(GameClock.now());
     final roundSteps = adventure.stepsThisRound(widget.today.steps);
+    // Macera başladığından beri atılan adım. `today.steps` kullanılamaz:
+    // macera başlamadan önce atılmış adımları da içerir (bkz. `startingSteps`).
+    final questSteps = adventure.questSteps(widget.today.steps);
     final minutes = remaining.inMinutes
         .remainder(60)
         .toString()
@@ -1438,21 +1468,58 @@ class _AdventureScreenState extends State<AdventureScreen>
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          // ANA BAR: macera ilerlemesi. Round başına **sıfırlanmaz**; oyuncu
+          // tek bakışta maceranın neresinde olduğunu görmeli. Eskiden burada
+          // round içi ilerleme vardı ve her round sıfırlandığı için oyuncu
+          // kazandığı yolu kaybetmiş gibi hissediyordu.
           LinearProgressIndicator(
+            key: const ValueKey('quest-progress-bar'),
+            value:
+                adventure.stepGoal == 0
+                    ? 1
+                    : (questSteps / adventure.stepGoal).clamp(0, 1),
+            minHeight: 10,
+            borderRadius: BorderRadius.circular(8),
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(
+                Icons.directions_walk,
+                size: 15,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$questSteps / ${adventure.stepGoal} adım — macera ilerlemesi',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // İKİNCİL: round içi ilerleme. Bilgi kaybolmuyor ama ana gösterge
+          // değil — ince çizgi ve küçük yazı.
+          LinearProgressIndicator(
+            key: const ValueKey('round-progress-bar'),
             value:
                 adventure.roundTargetSteps == 0
                     ? 1
                     : (roundSteps / adventure.roundTargetSteps).clamp(0, 1),
-            minHeight: 9,
-            borderRadius: BorderRadius.circular(8),
+            minHeight: 3,
+            borderRadius: BorderRadius.circular(3),
+            color: AppColors.streak,
+            backgroundColor: Colors.white12,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Bu round: $roundSteps / ${adventure.roundTargetSteps} adım',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 8),
-          Text(
-            '$roundSteps / ${adventure.roundTargetSteps} round adımı',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
           Text(
             'Her round için ${adventure.roundTargetSteps} adım ve '
             '${adventure.roundDurationLabel} süren var. '

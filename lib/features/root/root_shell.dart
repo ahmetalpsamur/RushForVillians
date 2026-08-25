@@ -677,10 +677,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _adventure = adventure;
       // Günün adımları korunur; macera kendi başlangıç adımını taşır
       // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
+      //
+      // `coinsEarned` / `xpEarned` de taşınmalı: bunlar günlük para tavanının
+      // sayacı. Taşınmazsa macera seçmek tavanı sıfırlıyor ve oyuncu macera
+      // değiştirerek günde sınırsız coin kazanabiliyordu.
       _today = DailyProgress(
         date: _today.date,
         steps: _today.steps,
         stepGoal: adventure.stepGoal,
+        coinsEarned: _today.coinsEarned,
+        xpEarned: _today.xpEarned,
       );
     });
     _persist();
@@ -691,8 +697,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     setState(() {
       _adventure = null;
       // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
-      // varsayılana döner.
-      _today = DailyProgress(date: _today.date, steps: _today.steps);
+      // varsayılana döner. Günlük kazanç sayaçları aynı gerekçeyle taşınır.
+      _today = DailyProgress(
+        date: _today.date,
+        steps: _today.steps,
+        coinsEarned: _today.coinsEarned,
+        xpEarned: _today.xpEarned,
+      );
     });
     _persist();
     unawaited(AdventureNotificationService.cancelAdventureReminders());

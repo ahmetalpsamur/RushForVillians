@@ -3460,3 +3460,110 @@ Toplam **440 test geçiyor**, `flutter analyze` temiz.
   bağlamak, kanal yanıt vermeyen cihazda sihirbazı kilitler. Widget testinde
   bu kilit birebir gözlendi. Aynı desen ekranın başka yerlerinde (`_selectClass`,
   `_dismissClassReveal`) zaten beklemesiz kullanılıyordu.
+
+---
+---
+
+# Bölüm 2 — Macera ilerleme göstergeleri ✅ (2026-08-25)
+
+## Teşhis: bar bozuk değildi, **yanlış şeyi ölçüyordu**
+
+Sürenin altındaki çubuk `stepsThisRound / roundTargetSteps` hesaplıyordu —
+matematiksel olarak **doğru**. Her round sıfırlanması bir hata değil, ölçtüğü
+şeyin doğal sonucuydu. Yanlış hissettiren iki şey vardı:
+
+1. Oyuncunun tek gördüğü ilerleme göstergesi buydu ve her round sıfırlanınca
+   "kazandığım yolu kaybettim" izlenimi veriyordu.
+2. Son roundun hedefi küçülüyor (1000 → ör. 165), yani çubuğun **ölçeği**
+   roundlar arasında sessizce değişiyordu.
+
+Ama aynı ekranda **gerçek bir hata** vardı (aşağıda).
+
+## Değişiklik
+
+| Konum | Önce | Sonra |
+|---|---|---|
+| Geri sayımın altı (ana) | round içi ilerleme, her round sıfırlanır | **macera ilerlemesi** `questSteps / stepGoal`, hiç sıfırlanmaz (10 px, `ValueKey('quest-progress-bar')`) |
+| Ana barın altı (ikincil) | — | round içi ilerleme: 3 px ince çizgi + "Bu round: 200 / 1000 adım" (`ValueKey('round-progress-bar')`) |
+| "Macera durumu" kartı | `StatBar('Adım İlerlemesi')` | `StatBar('Günlük Adım')` — dürüst etiket |
+
+## Düzeltilen gerçek hatalar
+
+### 1. "Adım İlerlemesi" barı yanlış değer gösteriyordu
+`progress: widget.today.stepProgress` (günlük ilerleme) ama etiketi
+`adventure.stepGoal` idi. Macera günün ortasında başlamışsa (`startingSteps > 0`)
+bu bar macera ilerlemesini **olduğundan fazla** gösteriyor ve hemen üstündeki
+"Canavar Canı" barıyla çelişiyordu — o `questSteps` kullanıyor.
+Örnek: 3000 adım atmış oyuncu 2000 hedefli maceraya başlar, 500 adım atar;
+bar "3500 / 2000" diyordu.
+
+Çözüm: macera ilerlemesi artık geri sayım kartındaki ana barda; bu bar günlük
+sayacı gösterip **günlük hedefle** etiketleniyor.
+
+### 2. ⚠️ Macera seçmek günlük para tavanını sıfırlıyordu (ekonomi açığı)
+`root_shell.dart:_selectAdventure` / `_chooseNewAdventure` yeni bir
+`DailyProgress` kuruyor ama `coinsEarned` ve `xpEarned` alanlarını
+**taşımıyordu**. `coinsEarned` günlük para tavanının sayacı olduğu için:
+
+> Tavanı doldur → macera seç → sayaç 0 → tavan yeniden açılır → **günde
+> sınırsız coin.**
+
+Bu B1'in (macera seçmek günün adımlarını sıfırlıyordu) aynısı, bu sefer para
+sayacında. Aynı satırlarda, aynı sebeple: kap nesnesi elle yeniden kuruluyor ve
+bir alan unutuluyor.
+
+Çözüm: iki alan da taşınıyor. **Testler düzeltme geri alınarak doğrulandı** —
+üçü de kırmızıya dönüyor.
+
+### 3. `StatBar` dar ekranda taşıyordu
+`lib/widgets/stat_bar.dart` — `Icon + Text(label) + Spacer + Text(value)`.
+İki metin de esnek olmadığı için uzun etiket + uzun değer satırı taşırıyordu
+(390 dp'de 29 px, ölçüldü). Etiket artık `Expanded` + ellipsis; sayı asla
+kırpılmıyor. Bu **paylaşılan** widget, düzeltme tüm ekranlara yarıyor.
+
+### 4. "Zafer ödülü" satırı 320 dp'de taşıyordu
+`adventure_screen.dart` — aynı desen, `Expanded` eklendi (55 px taşma).
+
+### 5. ⚠️ Dar ekranda düşman oyuncunun üstüne biniyordu
+Savaş sahnesindeki iki sprite kutusu sabit **210 px**'di. 320 dp'de sahne
+genişliği ~256 px; iki kutu üst üste biniyor ve sonra çizilen düşman oyuncuyu
+**tamamen örtüyordu** — golden'da oyuncu hiç görünmüyordu. Kutu genişliği artık
+sahneden türetiliyor (`maxWidth + 8 - 110`, 120–210 arası kırpılı), iki figürün
+merkezleri arasında en az 110 px kalıyor. 390 dp ve üstünde görüntü değişmedi.
+
+## Test
+
+`test/adventure_progress_test.dart` — 13 test:
+- ana barın macera ilerlemesini göstermesi, `startingSteps`'in düşülmesi,
+  **round sınırında sıfırlanmaması**, macera bitince dolması,
+- round çubuğunun ikincil (daha ince) olması ve round içi ilerlemeyi
+  göstermesi — aynı anda ana barın devam ediyor olması,
+- "Günlük Adım" barının dürüst etiketi (eski hatanın regresyonu),
+- **iki golden** (320/390 dp),
+- macera seçmenin ve bırakmanın günlük kazanç sayaçlarını koruması + **tavanın
+  macera seçilerek aşılamaması**.
+
+Toplam **453 test geçiyor**, `flutter analyze` temiz.
+
+---
+
+### GD34. Ana ilerleme göstergesi macera, ikincil gösterge round (2026-08-25)
+- **Nerede:** `adventure_screen.dart:_buildCountdownCard`
+- **Karar:** kalın bar macera ilerlemesi (`questSteps / stepGoal`), ince çizgi
+  round ilerlemesi. Round bilgisi kaybolmadı, ana gösterge olmaktan çıktı.
+- **Neden:** oyuncunun cevaplaması gereken birinci soru "maceranın neresindeyim";
+  "bu roundu tutturur muyum" ikinci soru. Her round sıfırlanan tek bir bar
+  birinci soruyu görünmez kılıyordu.
+- **Geri dönülecek nokta:** Aşama 4a savaş motoru round kavramını değiştirirse
+  ikincil çizginin ölçeği yeniden düşünülmeli. İki barın `ValueKey`'i var,
+  testler ikisini de ayrı ayrı bağlıyor.
+
+### GD35. Sprite kutusu genişliği sahneden türetiliyor (2026-08-25)
+- **Nerede:** `adventure_screen.dart` savaş sahnesi `LayoutBuilder`
+- **Karar:** sabit 210 px yerine `(maxWidth + 8 - 110).clamp(120, 210)`.
+- **Neden:** 320 dp'de düşman oyuncuyu tamamen örtüyordu. Sabit piksel
+  yerleşim, sahne genişliği değişkenken çalışmıyor.
+- **Kabul edilen takas:** dar ekranda figürler biraz küçülüyor. İkisinin de
+  görünmesi, ikisinin de büyük olmasından önemli.
+- **Not:** bu arkadaşımın kodu; "varsayılan dokunma" kuralına rağmen
+  düzeltildi çünkü **gerçek bir görsel hata** (oyuncu görünmüyor).
