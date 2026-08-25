@@ -46,6 +46,6 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSMotionUsageDescription</key>
-	<string>Attığın adımları sayıp maceranı ilerletmek için hareket verine ihtiyacımız var.</string>
+	<string>Attığın adımları sayıp maceranı ilerletmek için hareket verisine ihtiyacımız var.</string>
 </dict>
 </plist>
