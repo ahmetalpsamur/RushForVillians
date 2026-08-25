@@ -2,6 +2,25 @@
 
 Bu dosyadaki kurallar tüm oturumlarda geçerlidir.
 
+> ## 🧭 NEREDEN BAŞLAMALI
+>
+> Bu dosya ~4000 satır ve **kronolojik** — eski bölümler tarihsel kayıt, güncel
+> durum sonda. Yeni bir oturuma başlıyorsan:
+>
+> 1. Bu baştaki **Çalışma Kuralları** + **Model Kuralları** bölümünü oku
+>    (zorunlu, kısa).
+> 2. Sona git: **"⭐ OTURUM KAPANIŞI — 2026-08-25 · SONRAKİ OTURUM BURADAN
+>    BAŞLASIN"**. Ne bitti, ne açık, hangi işin şartnamesi ne, hangi sırayla —
+>    hepsi orada ve tek başına yeterli.
+> 3. Test çalıştırmadan önce **"Test ortamı — testler neden `--no-test-assets`
+>    ile çalışıyor"** bölümünü oku. Bu bayrak olmadan hiçbir test çalışmaz.
+> 4. Verilmiş kararları değiştirmeden önce **"GERİ DÖNÜLECEK KARARLAR"**
+>    (GD1–GD35) içinde gerekçesini ara.
+>
+> Aradaki "Aşama 0…3g", "Bug Triajı", "Trello Kartları" ve eski oturum
+> kapanışları **tarihsel bağlam**. Bir çelişki görürsen **en yeni tarih
+> geçerlidir**.
+
 ## Çalışma Kuralları
 
 1. **MEVCUT KODA SAYGI:** Bu projede zaten yazılmış, çalışan kod var. Hiçbir dosyayı
@@ -2388,7 +2407,10 @@ Gözetimsiz oturumlarda tek başıma verdiğim, ileride tartışmaya açık kara
 
 # OTURUM KAPANIŞI — 2026-08-19
 
-> **Sonraki oturum buradan başlasın.** Bu bölüm, hiçbir şey sormadan devam
+> ⚠️ **ESKİ — güncel devam noktası dosyanın sonundaki 2026-08-25 kapanışıdır.**
+> Bu bölüm tarihsel kayıt olarak duruyor.
+>
+> (Yazıldığı gün geçerliydi:) **Sonraki oturum buradan başlasın.** Bu bölüm, hiçbir şey sormadan devam
 > edebilmek için gereken her şeyi taşıyor: ne yapıldı, hangi kararlar hangi
 > gerekçeyle verildi, ne açık kaldı ve sıradaki iş neyle başlamalı.
 
@@ -2932,7 +2954,11 @@ Toplam **332 test geçiyor**, `flutter analyze` temiz.
 
 # OTURUM KAPANIŞI — 2026-08-20
 
-> **Sonraki oturum buradan başlasın.** Hiçbir şey sormadan devam edebilmek
+> ⚠️ **ESKİ — güncel devam noktası dosyanın sonundaki 2026-08-25 kapanışıdır.**
+> Bu bölüm tarihsel kayıt olarak duruyor; §3'teki "#9 envanter + kuşanma"
+> maddesi **tamamlandı** (Aşama 3g).
+>
+> (Yazıldığı gün geçerliydi:) **Sonraki oturum buradan başlasın.** Hiçbir şey sormadan devam edebilmek
 > için gereken her şey burada. Bir önceki kapanış ("OTURUM KAPANIŞI —
 > 2026-08-19") hâlâ geçerli; bu bölüm onun üstüne yazıyor.
 
@@ -3567,3 +3593,439 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
   görünmesi, ikisinin de büyük olmasından önemli.
 - **Not:** bu arkadaşımın kodu; "varsayılan dokunma" kuralına rağmen
   düzeltildi çünkü **gerçek bir görsel hata** (oyuncu görünmüyor).
+
+---
+---
+---
+
+# ⭐ OTURUM KAPANIŞI — 2026-08-25 · SONRAKİ OTURUM BURADAN BAŞLASIN
+
+> Bu bölüm **tek başına yeterlidir.** Kullanıcıya hiçbir şey sormadan devam
+> edebilmek için gereken her şey burada: ne bitti, ne açık, hangi işin şartnamesi
+> ne, hangi sırayla yapılacak. Kullanıcının bağlamı (usage) sınırlı — soru sorma,
+> karar gerektiren yerde en makul seçeneği kendin seç ve gerekçesini buraya yaz.
+
+## 0. Bu oturumun bağlamı
+
+Oturum gözetimsiz çalıştı. Görev listesi 7 bölümdü; **Bölüm 1 ve 2 bitti**,
+kalanlar aşağıda tam şartnameleriyle duruyor.
+
+Değişmeyen kurallar:
+- ⛔ **FIREBASE'E DOKUNMA.** `firebase_options.dart`, Firestore, Auth, Cloud
+  Functions, `google-services.json`, `GoogleService-Info.plist` — hiçbirine.
+  pubspec'e firebase paketi ekleme. Bir iş Firebase gerektiriyorsa **atla** ve
+  buraya "arkadaşımın işi" diye yaz.
+- ⚠️ **`flutter run` ÇALIŞMIYOR** (Smart App Control). Cihazda gözle doğrulama
+  yok. Görsel işler **golden test** ile doğrulanacak: golden üret, PNG'yi **oku
+  ve gerçekten bak**, farklı ekran genişlikleri için ayrı golden üret.
+- **Commit atma.** Bölüm bitince değişen dosyaları listele, ne yaptığını özetle,
+  tek satırlık conventional-commit mesajı öner. Commit'i kullanıcı atıyor.
+- **Arkadaşımın kodu — varsayılan: dokunma.** Yalnızca gerçek hataları düzelt.
+  Mimari uyum için refactor etme, isim/stil değiştirme, dosya silme.
+- Her adımdan sonra `flutter analyze` temiz + testler yeşil olmalı. **Adım
+  sonunda durma, bölüm bitene kadar devam et.**
+
+## 1. Bu oturumda ne yapıldı
+
+| Bölüm | Ne | Test |
+|---|---|---|
+| Faz 0 | İnceleme + test altyapısının kurtarılması | 421 |
+| **Bölüm 1** | Sınıf seçme ekranı: geri tuşu, tek onay, ortalanmış eşya şeridi + 3 sessiz hata | 421 → 440 |
+| **Bölüm 2** | Macera ilerleme barları + 5 gerçek hata (biri ekonomi açığı) | 440 → **453** |
+
+Ayrıntılar: yukarıdaki "Bölüm 1 — Sınıf seçme ekranı" ve "Bölüm 2 — Macera
+ilerleme göstergeleri" bölümleri. Kararlar **GD30–GD35**.
+
+`flutter analyze` temiz · **453/453 test geçiyor** · paket eklenmedi ·
+şema sürümü hâlâ **v11** (bu oturumda kalıcı alan eklenmedi).
+
+## 2. Commit durumu — DİKKAT
+
+- **Bölüm 1 commit edildi** (`fix(character): add back navigation, single
+  confirmation and centered gear strip to class select`).
+- **Bölüm 2 commit EDİLMEDİ.** Önerilen mesaj:
+  `fix(adventure): show quest progress as primary bar and stop daily coin cap reset on quest change`
+
+Bölüm 2'nin commit edilmemiş dosyaları:
+
+```
+M  .gitignore                                  (test/failures/ eklendi)
+M  CLAUDE.md
+M  lib/features/adventure/adventure_screen.dart
+M  lib/features/root/root_shell.dart
+M  lib/widgets/stat_bar.dart
+?? test/adventure_progress_test.dart
+?? test/golden/goldens/adventure_320.png
+?? test/golden/goldens/adventure_390.png
+```
+
+`pubspec.lock` de değişik görünüyor (oturum öncesinden kalma, dokunulmadı).
+
+## 3. ⚠️ TEST ORTAMI — ilk iş bu
+
+Testleri çalıştırmadan önce yukarıdaki **"Test ortamı — testler neden
+`--no-test-assets` ile çalışıyor"** bölümünü oku. Özet:
+
+```powershell
+# bir kereye mahsus (build/unit_test_assets/shaders/ boşsa)
+copy build\app\intermediates\flutter\debug\flutter_assets\shaders\ink_sparkle.frag `
+     build\unit_test_assets\shaders\ink_sparkle.frag
+# her seferinde
+flutter  test --no-test-assets
+```
+
+Bu bayrak olmadan **hiçbir test çalışmaz** (araç çöker). Golden üretmek için
+`--update-goldens` eklenir. `pumpAndSettle` kullanma — sonsuz animasyonlar var,
+sabit kare dizisi kullan.
+
+## 4. Faz 0'da bulunan, HÂLÂ DÜZELTİLMEMİŞ gerçek hatalar
+
+Bölüm 1 ve 2 kendi kapsamlarındaki hataları kapattı. Kalanlar:
+
+### A3. Item↔sınıf dağılım testi ölü sınıfları doğruluyor · **ORTA**
+- **Nerede:** `test/item_catalog_test.dart:_allClasses` (dosyanın en üstü)
+- **Ne:** Liste hâlâ **eski 8 sınıf** (`Archer, DarkMagic, Faith, Magic,
+  Nature, Paladin, SwordMan, Thief`). Arkadaşım karakterleri `All_Assets`
+  setine taşıdı; oynanabilir sınıflar artık **18 tane** ve hiçbiri
+  denetlenmiyor.
+- **Elle hesaplanan ihlaller** (`ItemCategoryX.characterClasses` üzerinden,
+  kategori sayıları: swords 180 · magic 172 · shields 112 · arch 84 ·
+  spears 60 · maces 57 · ranged_other 56 · axes 45 · scythes 15 ·
+  special_other 3 = **784**):
+
+  | Sınıf | Kategoriler | Item | İhlal |
+  |---|---|---|---|
+  | Skeleton Archer | arch + rangedOther + specialOther | **143** | alt sınır 150 |
+  | Werebear | axes + maces + specialOther | **105** | alt sınır 150 |
+  | Soldier | swords + spears + shields + rangedOther | **408** | üst sınır 392 (%50) |
+
+  Diğer 15 sınıf sınırların içinde.
+- **Yapılacak:** `_allClasses`'ı canlı listeden türet (retired olanlar hariç —
+  `CharacterCatalog.retiredClassIds` = `{Bat, Lancer, Necromancer, Orc rider}`),
+  testi kırmızıya düşür, sonra `ItemCategoryX.characterClasses` haritasını
+  dengele. **Bölüm 3 ile aynı dosyalara dokunuyor, birlikte yapılmalı.**
+
+### A4. Sınıf imzaları çakışıyor · **ORTA (Bölüm 3'ün konusu)**
+- **Nerede:** `lib/core/utils/item_rules.dart:_classSignature`
+- **Ne:** GD17'nin "her sınıfın imza bonusu ayrı" garantisi 18 sınıf × 8 buff
+  türüyle **matematiksel olarak imkânsız**. Beş sınıf `enemyXp` paylaşıyor
+  (`Armored Axeman, Elite Orc, Greatsword Skeleton, Orc, Swordsman`).
+- Bölüm 3 zaten buff türetmesini değiştirecek; invariant orada yeniden
+  tanımlanmalı.
+
+### A6. Çark GIF karesi yüklerken hata yönetimi yok · **DÜŞÜK**
+- **Nerede:** `lib/features/wheel/daily_wheel_screen.dart:_StillGifFrameState._load`
+- `rootBundle.load` ve `instantiateImageCodec` try/catch'siz. Asset eksikse
+  yakalanmayan async exception. `GifTiming._measure` doğru deseni gösteriyor
+  (try/catch + finally dispose).
+
+### A7. `CharacterCatalog._cache` hiç geçersizleşmiyor · **DÜŞÜK**
+- Statik önbellek, `reset()` yok. Bugün zararsız (katalog sabit). `ItemCatalog`
+  test edilebilirlik için `reset()` sunuyor; aynı deseni eklemek yeterli.
+
+### Bölüm 2'de bulunup **kapsam dışı bırakılan**
+- 320 dp'de savaş sahnesindeki görev metni katmanı (yeşil bloklar) altı satıra
+  çıkıp karakterlerin üstüne biniyor. Sprite çakışması düzeltildi (GD35) ama
+  metin katmanı hâlâ sahnenin yarısını kaplıyor. Golden:
+  `test/golden/goldens/adventure_320.png`.
+
+## 5. KALAN İŞ — tam şartname
+
+> Aşağıdaki üç bölüm kullanıcının orijinal talebidir, birebir aktarılmıştır.
+> Bölüm 4 büyük; **4.1–4.2 bir bölüm, 4.3–4.6 ayrı bölüm** olarak yapılacak.
+
+---
+
+### BÖLÜM 3 — Buff çeşitliliği
+
+**Sorun:** aynı sınıftaki üç eşyanın en düşük seviyeli hallerinin buff'ı
+**aynı**. Aynı sınıf + aynı seviye + farklı eşya = aynı sonuç. Bu seçimi
+anlamsız kılıyor.
+
+**Kök neden (Faz 0'da doğrulandı):** `item_rules.dart:buffFor`
+- `count` ve bütçe **yalnızca nadirlikten**, paylar sabit (`_buffShares`).
+- `buffTypeOrder` listesinin **ilk elemanı** her zaman `_classSignature(sınıf)`
+  — yani sınıfın bütün itemlerinde aynı.
+- Sıradan itemde `count == 1`, dolayısıyla **tek** etki var ve o da imza →
+  aynı sınıfın bütün sıradan itemleri **birebir aynı**.
+- Kuyruk `stableSpread(id, …)` ile döndürülüyor ama bu yalnızca **ikincil**
+  bonusu değiştiriyor.
+
+**İstenen:**
+- Aynı sınıf ve aynı seviyedeki eşyalar birbirinden **ayrışsın**.
+- Buff türetmesine eşyanın **kendi kimliğini** kat; sadece kategori ve
+  nadirlikten türetme.
+- Her eşyanın bir "karakteri" olsun: biri saldırıya, biri savunmaya, biri
+  kritiğe, biri hıza eğilimli. **Aynı güç bütçesi farklı dağılsın.**
+- Oyuncu iki eşya arasında gerçek bir tercih yapmalı, "hangisi daha yüksek
+  sayı" değil.
+- Buff'lar **veriyle** tanımlansın. Model Kuralı #1'e uy.
+- Test yaz: aynı sınıf + aynı seviyedeki eşyaların buff'ları farklı olmalı.
+
+**Zemin (hazır):** `lib/models/item_effect.dart` içinde **15 stat** var —
+7 savaş (`attack, defense, combatHealth, critChance, critDamage, lifesteal,
+evasion`) + 8 oyun dışı. Şu an **kural türetmeli itemler yalnızca oyun dışı**
+statlar alıyor; savaş statları sadece elle tasarlanmış imzalı itemlerde
+(`lib/data/item_effects.dart`, 18 efsanevi + 31 epik + 12 nadir).
+
+**Önerilen yaklaşım (uygulanmadı, karar senin):**
+1. `stableSpread(item.id, 4)` ile bir **arketip** türet (vurucu / muhafız /
+   düellocu / çevik) ama kategori rolüne göre ağırlıklandır (kalkan "vurucu"
+   olmasın).
+2. Arketip hem **hangi savaş statının** birincil olacağını hem **bütçe
+   dağılımını** belirlesin. Bütçe toplamı nadirlikten gelmeye devam etsin.
+3. Sınıf imzası korunsun ama artık tek etki olmasın: sıradan itemde bile
+   "1 ekonomi + 1 savaş" olsun.
+4. Arketip tablosu `lib/data/` altında **veri** olarak dursun; `switch (id)`
+   yazma (mevcut `item_effects.dart` bu deseni izliyor).
+
+**Bozulmaması gerekenler (mevcut testler):**
+- `test/item_effects_test.dart` — "her sınıfın imza bonusu ayrı ve her itemde
+  bulunur" invariant'ı **yeniden tanımlanmalı** (A4). Testi silme, kesinleştir.
+- `test/equipped_buffs_test.dart` — dört tavan: tek item ≤ +%15
+  (`GameConstants.maxSingleItemEconomyBonus`), kuşanılan toplam ≤ +%50
+  (`maxEquippedEconomyBonus`), stok bonusu ≤ +2, seri eşiği indirimi ≤ 1000.
+  **Bu tavanlar korunmalı.**
+- `test/economy_pacing_test.dart` — buff'sız dünyayı ölçüyor, etkilenmemeli.
+- A3'ü de burada kapat.
+
+---
+
+### BÖLÜM 4 — Eşya yükseltme ve birleştirme (demirci)
+
+Eşyalar **otomatik seviye atlamayacak**. Oyuncu emek ve para harcayarak
+yükseltecek. Amaç: envanterde her seferinde "yeni eşya mı alsam, yoksa bunu mu
+yükseltsem" sorusu sorulsun.
+
+#### 4.1 Veri yapısı değişikliği (ÖNCE BU)
+
+**Mevcut durum:** `UserProfile.ownedItemIds` bir **`List<String>`** (yalnızca
+kimlik). `UserProfile.equippedItemIds` bir `Map<slotKey, itemId>` (slot =
+`ItemCategory.folder`). Seviye ve nadirlik **katalogdan** türetiliyor.
+**Şema sürümü: v11.**
+
+**İstenen:** envanter artık kimlik listesi olamaz. Her sahip olunan eşya, kendi
+seviyesi ve kendi nadirliği olan bir **ÖRNEK** olmalı:
+
+```
+{ itemId, level, rarity, equipped }
+```
+
+- Nadirlik artık **katalogdan değil örnekten** okunur (birleştirmeyle değişir).
+- Katalog nadirliği "başlangıç nadirliği" olur.
+- **Şema sürümünü artır (v12), migration yaz:** mevcut kimlikler seviye 1 ve
+  katalog nadirliğiyle örneğe dönüşsün. **Veri kaybı olmasın.**
+- Migration deseni: `lib/services/game_storage.dart` içindeki `_migrations`
+  haritası ("sürüm N → N+1"). Serileştirme elle yazılır (`build_runner` yok).
+
+**⚠️ ZİNCİRLEME SONUÇ — ATLAMA:**
+Birleştirme aynı eşyadan birden fazla adet gerektiriyor. Yani mağaza artık
+**aynı eşyayı birden fazla kez satabilmeli.** Şu an ikinci satın alma
+engelleniyor (`root_shell.dart:_purchaseEquipment` ilk satırda
+`if (_profile.ownedItemIds.contains(item.id)) return;`). Bu davranışı değiştir:
+- aynı eşya tekrar alınabilsin, envanterde **ayrı bir örnek** olarak dursun,
+- mağazadaki "Sahipsin" işareti **adet** göstersin ("3 adet"),
+- bu değişikliğin kırdığı satın alma testlerini **güncelle** (silme):
+  `test/store_purchase_test.dart`, `test/store_screen_test.dart`,
+  `test/inventory_test.dart`.
+
+Ayrıca `EquippedBuffs.from` ve `_refreshEquipment` örnek tabanlı hâle gelecek;
+`ItemCatalog.byId(id, characterClass:)` çağrısı **korunmalı** (GD16: buff sınıfa
+göre çözülüyor).
+
+#### 4.2 Eşya seviyesi
+
+- Her örnek **seviye 1**'de başlar.
+- Oyuncu **coin** harcayarak seviye yükseltir.
+- Seviye yükseldikçe **SAVAŞ STATLARI** artar.
+- ⚠️ **EKONOMİ BUFF'LARI (adım→para, adım→XP, çark şansı) ARTMAZ, SABİT KALIR.**
+  Sebep: ekonomi dikkatle dengelendi (`economy_pacing_test.dart`), çarpan
+  büyürse günlük tavan katlanır ve denge çöker. **Bu kuralı koda yorum olarak
+  ve buraya yaz.**
+
+**İKİ TAVAN, ikisi de geçerli — eşya seviyesi ikisinin de altında kalmalı:**
+
+a) **Nadirliğe göre maks seviye.** Öneri (uygun bulmazsan değiştir, gerekçelendir):
+   `Sıradan 10 · Az Bulunur 20 · Nadir 30 · Epik 40 · Efsanevi 50`
+   Böylece nadirlik kalıcı bir üstünlük olur, sıradan bir eşya asla efsaneviye
+   yetişemez.
+
+b) **Oyuncu seviyesi.** Eşya seviyesi oyuncu seviyesini **geçemez.**
+   1. seviyedeki oyuncu eşyasını max'a çıkaramaz — istenen bu.
+
+Yükseltme maliyeti seviyeyle artsın ve nadirlikle ölçeklensin. **Ekonomiye göre
+hesabını yap ve tabloyu buraya yaz:** 6000 adım/gün atan oyuncu (120 coin/gün)
+bir eşyayı 10. seviyeye kaç günde çıkarır? **Hedef: yükseltmek yeni eşya
+almakla YARIŞABİLİR olsun** — ne bariz daha ucuz ne bariz daha pahalı.
+
+Denge zemini (Aşama 3'ten): sıradan item 100–125 coin (seviye 1–3), az bulunur
+300–350 (4–7), nadir 775–875 (8–12), epik 2375–2725 (14–19), efsanevi
+7550–8825 (22–29). Referans oyuncu 120 coin/gün.
+
+#### 4.3 Birleştirme
+
+Aynı eşyadan N örnek + coin → 1 örnek, **bir üst nadirlikte**.
+
+**Gereken adet nadirlikle artar — 3'ten başlar, her kademede +1:**
+```
+Sıradan → Az Bulunur : 3 adet
+Az Bulunur → Nadir   : 4 adet
+Nadir → Epik         : 5 adet
+Epik → Efsanevi      : 6 adet
+```
+Bu sayılar **tek bir config sabitinde** dursun, koda gömülmesin
+(`GameConstants` deseni).
+
+- Birleştirilen örnekler **aynı itemId ve aynı nadirlikte** olmalı.
+- Seviyeleri farklı olabilir; sonuçtaki örneğin seviyesi ne olacak, **karar ver
+  ve gerekçelendir** (öneri: **1'e dönmesi** — en yükseği korumak birleştirmeyi
+  her zaman baskın strateji yapar; maliyeti buna göre ayarla).
+- Efsanevi üstü nadirlik yok → efsaneviler birleştirilemez (ya da başka bir
+  ödüle dönüşür, karar senin).
+- Birleştirme maliyeti nadirlikle artsın.
+- **Kuşanılı bir eşya birleştirmeye girerse önce çıkarılsın**, sessizce
+  kaybolmasın.
+- Onay ekranı: ne kaybediyorum, ne kazanıyorum, **net** gösterilsin.
+- **Geri alınamaz olduğu açıkça söylensin.** (Satış onayı deseni hazır:
+  `inventory_screen.dart`, GD29.)
+
+#### 4.4 Demirci arayüzü
+
+Envanterde belirgin bir **demirci/örs** işareti olsun. Oradan:
+- **Yükseltme:** mevcut seviye, sonraki seviyedeki statlar, maliyet, "yükselt".
+- **Birleştirme:** aynı eşyadan kaç adet var, gereken adete ulaşıldı mı, maliyet.
+- Tavana ulaşıldıysa sebebi **net** söylensin: "Nadirlik sınırı (Sıradan: 10)"
+  veya "Kendi seviyeni geçemez (Sv. 7)" — hangisi bağlayıcıysa o.
+- **Yetersiz bakiye, yetersiz adet, tavan — hiçbiri sessiz kalmasın**
+  (Model Kuralları #4).
+- Yükseltmeden önce/sonra **stat farkı** gösterilsin
+  (`lib/core/utils/item_comparison.dart` hazır desen).
+
+#### 4.5 Mağazada duyur
+
+- Eşya kartında: "Yükseltilebilir · Maks Sv. 30" gibi net bilgi.
+- "3 tanesini birleştirerek nadirliğini yükseltebilirsin" (gereken adet
+  nadirliğe göre değiştiği için **doğru sayıyı** göster).
+- Nadirlik farkını göster: "Efsanevi eşyalar Sv. 50'ye kadar yükselir".
+- Amaç: oyuncu satın almayı **kalıcı bir yatırım** olarak görsün.
+- ⚠️ Mağaza kartı yüksekliği artık **esnek** (K9, `SliverList` + iki hücreli
+  `Row`); yeni satır eklemek serbest ama `test/store_screen_test.dart`
+  içindeki **altı genişlikte taşma testleri** geçmeli.
+
+#### 4.6 Test
+
+Şema migration, iki tavanın da doğru bağlaması, yükseltme maliyeti, **ekonomi
+buff'larının artMAması**, birleştirme (nadirliğe göre değişen adet şartı,
+nadirlik artışı, kuşanılı eşya durumu, efsanevi sınırı), aynı eşyanın tekrar
+satın alınması, kalıcılık.
+
+---
+
+### BÖLÜM 5 — Günlük döngüyü maceraya bağla
+
+#### a) Streak tetikleyicisi
+**2000 adım DEĞİL, günde BİR MACERA TAMAMLAMAK.** Adım eşiği tamamen kalkıyor.
+- `GameConstants.streakStepThreshold`'u **kullanımdan çıkar** (sil değil —
+  `equipped_buffs.dart:streakStepThreshold` ve `streakRelief` buff'ı buna
+  bağlı; o buff türü de yeniden anlamlandırılmalı).
+- "Tamamlamak" kazanmak mı bitirmek mi? **Öneri: kazan-kaybet fark etmez,
+  bitirmek yeter.** Kaybetmenin zaten cezası var, üstüne streak kaybı çifte
+  ceza olur. Karar senin, gerekçelendir.
+- Arayüzdeki **tüm "2000 adım" metinlerini** güncelle. Bugünkü yerler:
+  `home_screen.dart:454,493` (`_StreakCard`), `inventory_screen.dart:583,588`
+  (karakter paneli), `root_shell.dart:645` (tetikleyici).
+- Ana ekrandaki streak kartı **"bugün macera yaptın mı"** göstersin.
+
+#### b) Çark kilidi
+Çarkın ilk açılışı için istenen **3000 adım** şartını kaldır
+(`GameConstants.dailyWheelUnlockSteps`, `DailyProgress.isWheelUnlocked`,
+`home_screen.dart:160`), yerine **1 macera tamamlama** şartı koy.
+- Şartın **tekrarlama mantığına (günlük mü, tek seferlik mi) DOKUNMA** —
+  sadece koşulu değiştir.
+- Kilitliyken sessiz kalmasın: "Çarkı açmak için bir macera tamamla".
+- **Günlük hak kısıtı aynen kalsın** (`UserProfile.wheelSpunToday`,
+  `extraWheelSpins`).
+
+#### c) Streak stat bonusu
+Günlük streak arttıkça **tüm SAVAŞ statları** çok az artsın.
+
+**Öneri (uygun bulmazsan değiştir ama gerekçelendir):**
+> Streak günü başına **+%0,5**, tavan **+%30** (60 günde dolar).
+> 7 gün = +%3,5 · 30 gün = +%15 · 60+ gün = +%30
+
+Gerekçe: her gün küçük ama hissedilir kazanç, uzun vadede anlamlı hedef, tavan
+sayesinde eski oyuncu yeniyi ezmiyor.
+
+- ⚠️ **EKONOMİ BUFF'LARINA UYGULAMA.** Sadece savaş statları.
+- Streak kırılınca bonus da gider. Bu **bilerek** — streak'i değerli kılan bu ve
+  streak dondurma hakkının 600 coin'lik fiyatını haklı çıkarıyor.
+- Karakter panelinde ayrı satır: "Seri bonusu: +%7,5"
+  (`inventory_screen.dart` karakter paneli).
+- Streak kırılma uyarısı bonusu da hatırlatsın: "Serini kaybedersen +%15 stat
+  bonusun gider." (`home_screen.dart:_StreakCard` turuncu uyarı satırı hazır.)
+
+Şema değişikliği gerekiyorsa sürümü artır ve migration yaz.
+
+**Test:** macera tamamlanınca streak artıyor mu, aynı gün ikinci macera
+artırmıyor mu, çark kilidi doğru açılıyor mu, stat bonusu doğru mu, tavan
+çalışıyor mu, streak kırılınca bonus gidiyor mu, ekonomi etkilenmiyor mu.
+
+**Dikkat:** `test/streak_test.dart` (20 test) ve `test/streak_freeze_test.dart`
+(21 test) adım eşiğine dayanıyor. **Silme, birlikte güncelle.**
+
+---
+
+### BÖLÜM 6 — Kalan gerçek hatalar
+Yukarıdaki §4'teki **A3, A4, A6, A7** ve savaş sahnesindeki metin katmanı.
+(A3 ve A4 zaten Bölüm 3 ile birlikte kapanacak.)
+
+### BÖLÜM 7+ — CLAUDE.md'deki kalan açık işler
+Firebase gerektirenler **hariç**. Kaynak: bu dosyadaki "OTURUM KAPANIŞI —
+2026-08-20" bölümünün §4 ve §5 tabloları. Öne çıkanlar:
+- **Aşama 4a — savaş motoru (#4).** ⚠️ Determinizm şartı: `Random()` savaş
+  kodunda **yasak**, tohum enjekte edilip durumla saklanacak. İzlenecek örnek:
+  `wheel_rewards.dart` + `UserProfile.wheelSeed` (GD18). Ayrıca iki HP
+  kavramının birleştirilmesi, A2 (düşman canı = adım hedefi), A3
+  (`stepGoal` üç iş birden).
+  → **Bölüm 4 ve 5'in savaş statları bu motora bağlanacak; ikisi de bugün
+  "gösteriliyor ama uygulanmıyor" durumunda.**
+- **Aşama 4b — #14 canavara göre ödül.** `Reward.icon` bir `IconData`;
+  Model Kuralları #1 gereği `String` anahtara çevrilmeli. `RootShell._rewards`
+  hiç doldurulmuyor (triaj C5).
+- **Aşama 5 — #3 (slide scroll adım seçimi), #6 (VS ekranı), #18 (avatar asset).**
+- **Aşama 6 — Firebase → takım savaşları. ⛔ ARKADAŞIMIN İŞİ, DOKUNMA.**
+- Küçük borçlar: C3 (`tz.UTC` sabit), C4 (hatırlatma metinleri iki yerde),
+  C6 (`sideBySideWindowMinutes` ölü sabit), C7, C9, C10, C11, C13, iOS derleme
+  borçları (`ios/Podfile` yok, `AppDelegate.swift` Windows'ta derlenmedi).
+
+## 6. Önerilen sıra
+
+1. **Bölüm 3** (buff çeşitliliği) + **A3** + **A4** — hepsi `item_rules.dart`,
+   `item.dart`, `item_catalog_test.dart` üçgeninde; birlikte yapılmalı.
+2. **Bölüm 4.1–4.2** (veri yapısı + eşya seviyesi). Şema v12. Mağazanın tekrar
+   satın almaya açılması burada; kırılan testler burada güncellenir.
+3. **Bölüm 4.3–4.6** (birleştirme + demirci arayüzü + mağaza duyurusu).
+4. **Bölüm 5** (streak ↔ macera, çark kilidi, streak stat bonusu).
+5. **Bölüm 6** (A6, A7, savaş sahnesi metin katmanı).
+6. Bölüm 7+ — Aşama 4a savaş motoru.
+
+**Neden bu sıra:** Bölüm 4'ün "savaş statları artar" sözü ile Bölüm 5'in "streak
+savaş statlarını artırır" sözü **aynı stat toplama noktasına** bakıyor
+(`lib/core/utils/equipped_buffs.dart`). Bölüm 3 o statların nasıl üretildiğini
+değiştiriyor. Sıra bozulursa aynı yer üç kez yazılır.
+
+## 7. Bu oturumda eklenen dosyalar
+
+```
+test/character_creation_test.dart        # sınıf seçim ekranı (18 test)
+test/adventure_progress_test.dart        # macera ilerleme + A1 regresyonu (13 test)
+test/golden/_smoke_golden_test.dart      # golden altyapısı duman testi
+test/golden/goldens/_smoke.png
+test/golden/goldens/class_grid_320.png
+test/golden/goldens/class_grid_360.png
+test/golden/goldens/class_reveal_320.png
+test/golden/goldens/class_reveal_360.png
+test/golden/goldens/class_reveal_800.png
+test/golden/goldens/adventure_320.png
+test/golden/goldens/adventure_390.png
+```
