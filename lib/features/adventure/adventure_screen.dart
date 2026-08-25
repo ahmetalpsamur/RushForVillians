@@ -170,8 +170,8 @@ class _AdventureScreenState extends State<AdventureScreen>
       return;
     }
 
-    _pendingDamage = adventure.takePendingDamage(widget.today.steps);
-    if (adventure.isDefeated(widget.today.steps)) {
+    _pendingDamage = adventure.takePendingDamage();
+    if (adventure.isEnemyDefeated) {
       if (adventure.deathAnimationPlayed) {
         _showCongratulations = true;
         return;
@@ -248,7 +248,7 @@ class _AdventureScreenState extends State<AdventureScreen>
     if (!mounted) return;
     _roundAttackController.duration = playerAttackDuration;
 
-    final isFinalVictory = adventure.isDefeated(widget.today.steps);
+    final isFinalVictory = adventure.isEnemyDefeated;
     final finalRoundSteps =
         adventure.stepGoal % AdventureQuest.stageStepTarget == 0
             ? min(adventure.stepGoal, AdventureQuest.stageStepTarget)
@@ -266,7 +266,7 @@ class _AdventureScreenState extends State<AdventureScreen>
       _overlayEnemyHealth =
           isFinalVictory
               ? healthBeforeFinalRound
-              : adventure.healthProgress(widget.today.steps);
+              : adventure.enemyHealthProgress;
       _showHurt = false;
       _showAttack = false;
       _roundPlayerAttackAsset = playerAttackAsset;
@@ -924,7 +924,7 @@ class _AdventureScreenState extends State<AdventureScreen>
 
   Widget _buildEnemyRoundVictoryOverlay(AdventureQuest adventure) {
     final healthProgress =
-        adventure.playerHealth / AdventureQuest.maxPlayerHealth;
+        adventure.playerHealthProgress;
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.9),
       child: SafeArea(
@@ -1205,8 +1205,8 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Widget _buildAdventure(BuildContext context, AdventureQuest adventure) {
-    final defeated = adventure.isDefeated(widget.today.steps);
-    final remaining = adventure.remainingHealth(widget.today.steps);
+    final defeated = adventure.isEnemyDefeated;
+    final remaining = adventure.remainingEnemyHealth;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1414,8 +1414,8 @@ class _AdventureScreenState extends State<AdventureScreen>
                 label: 'Canavar Canı',
                 icon: Icons.favorite,
                 color: AppColors.hp,
-                progress: adventure.healthProgress(widget.today.steps),
-                valueText: '$remaining / ${adventure.stepGoal}',
+                progress: adventure.enemyHealthProgress,
+                valueText: '$remaining / ${adventure.enemy.maxHealth}',
               ),
               const SizedBox(height: 14),
               StatBar(
@@ -1423,9 +1423,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                 icon: Icons.shield,
                 color: AppColors.xp,
                 progress:
-                    adventure.playerHealth / AdventureQuest.maxPlayerHealth,
+                    adventure.playerHealthProgress,
                 valueText:
-                    '${adventure.playerHealth} / ${AdventureQuest.maxPlayerHealth}',
+                    '${adventure.playerHealth} / ${adventure.playerMaxHealth}',
               ),
               const SizedBox(height: 14),
               // Bu bar **günlük** sayacı gösterir, macerayı değil: macera
@@ -1549,8 +1549,8 @@ class _AdventureScreenState extends State<AdventureScreen>
             'Her round için ${adventure.roundTargetSteps} adım ve '
             '${adventure.roundDurationLabel} süren var. '
             'Hedef eksik kalırsa '
-            '${adventure.enemy.name}, eksik oranına göre en fazla '
-            '${adventure.enemy.attackDamage} can vurur.',
+            '${adventure.enemy.name}, eksik oranına göre saldırır; '
+            'savunman gelen hasarı azaltır.',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
@@ -1918,9 +1918,24 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           color: AppColors.xp,
                         ),
                         _EnemyInfoChip(
+                          icon: Icons.favorite,
+                          label: '${_formatNumber(enemy.maxHealth)} can',
+                          color: AppColors.hp,
+                        ),
+                        _EnemyInfoChip(
                           icon: Icons.flash_on,
-                          label: '${enemy.attackDamage} hasar',
+                          label: '${enemy.stats.attack.round()} saldırı',
                           color: AppColors.accent,
+                        ),
+                        _EnemyInfoChip(
+                          icon: Icons.shield_moon,
+                          label: '${enemy.stats.defense.round()} savunma',
+                          color: AppColors.primary,
+                        ),
+                        _EnemyInfoChip(
+                          icon: Icons.speed,
+                          label: enemy.archetype.label,
+                          color: AppColors.streak,
                         ),
                       ],
                     ),
@@ -1951,6 +1966,18 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                             style: const TextStyle(
                               color: Colors.white70,
                               height: 1.45,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Arketip savaşta gerçekten fark yaratıyor; oyuncu
+                          // neyle karşılaştığını önceden bilmeli.
+                          Text(
+                            enemy.archetype.description,
+                            style: const TextStyle(
+                              color: AppColors.streak,
+                              fontStyle: FontStyle.italic,
+                              height: 1.4,
+                              fontSize: 12.5,
                             ),
                           ),
                           const SizedBox(height: 10),

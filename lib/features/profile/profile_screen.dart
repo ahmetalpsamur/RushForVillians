@@ -245,7 +245,7 @@ class ProfileScreen extends StatelessWidget {
                         AdventureQuest.maxPlayerHealth,
                     valueText:
                         '${adventure!.playerHealth} / '
-                        '${AdventureQuest.maxPlayerHealth}',
+                        '${adventure!.playerMaxHealth}',
                   ),
                   const SizedBox(height: 12),
                 ] else ...[
@@ -270,6 +270,7 @@ class ProfileScreen extends StatelessWidget {
             buffs: buffs,
             streakBonuses: profile.streakStatBonuses,
             streakDays: profile.streakDays,
+            level: profile.level,
             equippedCount: equippedItems.length,
             slotCount:
                 ItemCategory.values

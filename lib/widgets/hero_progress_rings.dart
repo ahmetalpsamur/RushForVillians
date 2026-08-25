@@ -154,10 +154,10 @@ class HeroProgressRings extends StatelessWidget {
             label: 'Savaş Canı',
             icon: Icons.favorite,
             color: AppColors.hp,
-            progress: adventure!.playerHealth / AdventureQuest.maxPlayerHealth,
+            progress: adventure!.playerHealthProgress,
             valueText:
                 '${adventure!.playerHealth} / '
-                '${AdventureQuest.maxPlayerHealth}',
+                '${adventure!.playerMaxHealth}',
           ),
           const SizedBox(height: 14),
         ],

@@ -1,3 +1,5 @@
+import '../core/utils/enemy_stats.dart';
+import '../models/adventure_quest.dart';
 import '../models/enemy.dart';
 
 const _root = 'lib/All_Assets/Enemies/Characters(100x100 split)';
@@ -33,6 +35,7 @@ Enemy _enemy({
   required int minimumDailySteps,
   required int attackDamage,
   required int xpReward,
+  required EnemyArchetype archetype,
   String idleAnimation = 'Idle',
   String walkAnimation = 'Walk',
   String attackAnimation = 'Attack01',
@@ -40,7 +43,17 @@ Enemy _enemy({
   int deathAnimationDurationMs = 700,
 }) {
   final base = '$_root/$folder/$folder/$folder';
+  // Savaş statları elle yazılmaz: kademe + arketipten türetilir
+  // (`core/utils/enemy_stats.dart`). Elle verilen tek şey arketip.
+  final tier = (minimumDailySteps / 500).ceil().clamp(1, 999);
   return Enemy(
+    archetype: archetype,
+    stats: enemyCombatStats(
+      tier: tier,
+      archetype: archetype,
+      catalogAttackDamage: attackDamage,
+      stageStepTarget: AdventureQuest.stageStepTarget,
+    ),
     id: id,
     name: name,
     idleAsset: '${base}_$idleAnimation.gif',
@@ -69,6 +82,7 @@ class EnemyCatalog {
   static final List<Enemy> enemies = [
     _enemy(
       id: 'ash_guardian',
+      archetype: EnemyArchetype.tank,
       folder: 'Black Knight_A',
       name: 'Kül Muhafızı',
       questText:
@@ -79,6 +93,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'night_oath',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Black Knight_B',
       name: 'Gece Yeminlisi',
       questText:
@@ -89,6 +104,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'void_knight',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Black Knight_C',
       name: 'Hiçlik Şövalyesi',
       questText:
@@ -99,6 +115,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'blood_weaver',
+      archetype: EnemyArchetype.caster,
       folder: 'Blood Monster_A',
       name: 'Kan Dokuyan',
       questText:
@@ -110,6 +127,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'crimson_wing',
+      archetype: EnemyArchetype.swift,
       folder: 'Blood Monster_B',
       name: 'Kızıl Kanat',
       questText:
@@ -123,6 +141,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'ember_siren',
+      archetype: EnemyArchetype.caster,
       folder: 'Demoness_A',
       name: 'Kor Sireni',
       questText:
@@ -133,6 +152,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'dusk_temptress',
+      archetype: EnemyArchetype.swift,
       folder: 'Demoness_B',
       name: 'Alacakaranlık Cadısı',
       questText:
@@ -143,6 +163,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'horned_executioner',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Demon_A',
       name: 'Boynuzlu Cellat',
       questText:
@@ -153,6 +174,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'infernal_sentinel',
+      archetype: EnemyArchetype.tank,
       folder: 'Demon_B',
       name: 'Cehennem Nöbetçisi',
       questText:
@@ -163,6 +185,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'black_claw',
+      archetype: EnemyArchetype.swift,
       folder: 'Demon_C',
       name: 'Kara Pençe',
       questText:
@@ -173,6 +196,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'ember_heir',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Demon_D',
       name: 'Alev Tahtının Varisi',
       questText:
@@ -183,6 +207,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'abyss_overlord',
+      archetype: EnemyArchetype.caster,
       folder: 'Demon_E',
       name: 'Uçurum Hükümdarı',
       questText:
@@ -193,6 +218,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'eye_of_nothing',
+      archetype: EnemyArchetype.caster,
       folder: 'Eyeball Monster',
       name: 'Hiçliğin Gözü',
       questText:
@@ -203,6 +229,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'cinder_colossus',
+      archetype: EnemyArchetype.tank,
       folder: 'Flame Golem',
       name: 'Köz Devi',
       questText:
@@ -213,6 +240,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'spirit_flame',
+      archetype: EnemyArchetype.swift,
       folder: 'Ghostfire',
       name: 'Ruh Alevi',
       questText:
@@ -225,6 +253,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'hell_wing',
+      archetype: EnemyArchetype.swift,
       folder: 'Hellbat',
       name: 'Cehennem Kanadı',
       questText:
@@ -237,6 +266,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'ash_fang',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Hellhound',
       name: 'Kül Diş',
       questText:
@@ -247,6 +277,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'magma_devourer',
+      archetype: EnemyArchetype.tank,
       folder: 'Lava Slime',
       name: 'Magma Yutan',
       questText:
@@ -257,6 +288,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'maze_butcher',
+      archetype: EnemyArchetype.bruiser,
       folder: 'Minotaur',
       name: 'Labirent Kasabı',
       questText:
@@ -267,6 +299,7 @@ class EnemyCatalog {
     ),
     _enemy(
       id: 'lord_of_last_seal',
+      archetype: EnemyArchetype.caster,
       folder: 'Warlock',
       name: 'Son Mührün Efendisi',
       questText:

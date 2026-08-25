@@ -82,7 +82,7 @@ class AdventureNotificationService {
   ) async {
     if (!_initialized) return;
     await cancelAdventureReminders();
-    if (adventure.isDefeated(currentSteps) || adventure.playerHealth <= 0) {
+    if (adventure.isEnemyDefeated || adventure.playerHealth <= 0) {
       return;
     }
 

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/base_combat_stats.dart';
+import '../../core/utils/effective_stats.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/item_comparison.dart';
 import '../../core/utils/item_leveling.dart';
@@ -613,6 +615,9 @@ class CharacterPowerPanel extends StatelessWidget {
   /// Bugünkü seri; bonus bölümünün başlığında gösterilir.
   final int streakDays;
 
+  /// Oyuncu seviyesi. Savaş statlarının tabanı buradan geliyor.
+  final int level;
+
   const CharacterPowerPanel({
     super.key,
     required this.buffs,
@@ -620,10 +625,29 @@ class CharacterPowerPanel extends StatelessWidget {
     required this.slotCount,
     this.streakBonuses = StreakStatBonuses.empty,
     this.streakDays = 0,
+    this.level = 1,
   });
+
+  /// Panelde gösterilecek savaş statları.
+  ///
+  /// Taban her zaman var (seviyeden geliyor), o yüzden liste ekipmana bağlı
+  /// değil: dokuz statın hepsi gösteriliyor.
+  static List<ItemStat> get combatStatOrder => [
+    for (final stat in ItemStat.values)
+      if (stat.isCombat) stat,
+  ];
 
   @override
   Widget build(BuildContext context) {
+    // Tek toplama noktası: panel de savaşın okuduğu hesabı okuyor, ikinci bir
+    // formül yazmıyor. Koşullu etkiler bilerek kapalı — panel "pasif hâlim"
+    // sorusunu cevaplıyor, onlar ayrı listede duruyor.
+    final baseStats = baseCombatStats(level);
+    final totalStats = effectiveCombatStats(
+      level: level,
+      buffs: buffs,
+      streak: streakBonuses,
+    );
     return SectionCard(
       title: 'Karakter Gücü',
       child: Column(
@@ -688,29 +712,26 @@ class CharacterPowerPanel extends StatelessWidget {
             bonusIsGain: buffs.streakStepRelief > 0,
           ),
           _StreakBonusSection(bonuses: streakBonuses, streakDays: streakDays),
-          if (buffs.combatEffects.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            const Text(
-              'Savaş İstatistikleri',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          const SizedBox(height: 14),
+          const Text(
+            'Savaş İstatistikleri',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Maceradaki savaşta kullanılır: taban seviyeden, bonus ekipman '
+            've seriden gelir.',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 6),
+          const _StatHeader(columns: ['TABAN', 'BONUS', 'TOPLAM']),
+          for (final stat in combatStatOrder)
+            _StatRow(
+              label: _capitalize(stat.label),
+              base: _combatValue(stat, baseStats.statFor(stat)),
+              bonus: _combatBonus(buffs, stat),
+              total: _combatValue(stat, totalStats.statFor(stat)),
             ),
-            const SizedBox(height: 2),
-            // Devre dışı olan şey sessiz kalmaz (Model Kuralları #4).
-            const Text(
-              'Bu değerler savaş sistemiyle birlikte etkinleşecek; şu an '
-              'oyunda bir karşılıkları yok.',
-              style: TextStyle(color: Colors.white54, fontSize: 11),
-            ),
-            const SizedBox(height: 6),
-            for (final stat in buffs.touchedCombatStats)
-              _StatRow(
-                label: _capitalize(stat.label),
-                base: '—',
-                bonus: _combatBonus(buffs, stat),
-                total: '—',
-                dimmed: true,
-              ),
-          ],
           if (buffs.conditionalEffects.isNotEmpty) ...[
             const SizedBox(height: 14),
             const Text(
@@ -734,6 +755,18 @@ class CharacterPowerPanel extends StatelessWidget {
 
   static String _capitalize(String value) =>
       value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
+
+  /// Savaş statının okunur hâli: oran statları yüzde, diğerleri tam sayı.
+  static String _combatValue(ItemStat stat, double value) {
+    const rateStats = {
+      ItemStat.critChance,
+      ItemStat.critDamage,
+      ItemStat.lifeSteal,
+      ItemStat.dodge,
+    };
+    if (rateStats.contains(stat)) return '%${(value * 100).round()}';
+    return value.round().toString();
+  }
 
   static String _rate(double value) =>
       value == 0 ? '—' : '+%${ItemEffect.formatPercent(value)}';

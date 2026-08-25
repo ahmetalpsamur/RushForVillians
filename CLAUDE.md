@@ -3785,6 +3785,102 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
 ---
 ---
 
+### GD49. Düşman canı adımdan koparıldı; `stepGoal` artık yalnızca yürüyüş taahhüdü (2026-08-26)
+- **Nerede:** `models/adventure_quest.dart` (`enemyHealth`, `isEnemyDefeated`),
+  `models/enemy.dart` (`stats`)
+- **Karar:** düşmanın canı kendi statı (`Enemy.stats.maxHealth`). `stepGoal`
+  üç işten ikisini bıraktı: artık yalnızca **round hedefini** ve beklenen
+  round sayısını belirliyor; düşman canı ve kilit eşiği ondan gelmiyor.
+  Triaj **A2** ve **A3** böylece kapandı.
+- **Neden:** "her adım 1 hasar" modelinde saldırı, savunma, kritik gibi hiçbir
+  statın girecek yeri yoktu — 15 statın 9'u tanımlıydı ama okunmuyordu.
+- **Zincirleme sonuç — kilitlenme kapatıldı:** adım hedefi bitip düşman hâlâ
+  ayaktaysa round hedefi **tam boya** dönüyor (`_nextRoundTarget`). Eski
+  formül 0 döndürüyordu ve round çözülemeyeceği için savaş kilitlenirdi.
+- **Yan fayda:** güçlü oyuncu düşmanı adım hedefinden **önce** deviriyor. Bu,
+  Bölüm 8'in yürüyüş fazının zemini — testle bağlandı.
+- **Kabul edilen takas:** oyuncu hedefi bitirdiği hâlde düşmanı devirememiş
+  olabilir. Savaş, taraflardan biri düşene kadar sürüyor; "adımı bitirdim ama
+  kazanamadım" durumu bir çıkmaz değil, devam eden bir dövüş.
+
+### GD50. Savaş motoru saf, deterministik ve tohumu saklanan (2026-08-26)
+- **Nerede:** `core/utils/combat_engine.dart`, `AdventureQuest.combatSeed`
+- **Karar:** motorda `Random()` **yok**; rastgeleliğin tamamı dışarıdan
+  verilen tohumdan geliyor ve tohum sonuçla birlikte geri dönüyor. Tohum
+  macera durumuyla diske yazılıyor.
+- **Neden:** CLAUDE.md §4.4 — aynı motor Aşama 6b'de sunucuda çalışacak.
+  Deterministik olmayan bir motoru sonradan deterministik yapmak, motoru
+  yeniden yazmakla aynı şey.
+- **Ayrı akış:** `nextCombatSeed` çark ve seri bonusuyla aynı LCG ama **ayrı**
+  sayaç. Paylaşsalardı oyuncu çarkı çevirerek savaşın zarını kaydırabilirdi.
+- **Yedek tohum deterministik:** tohum kurulmadan round çözülürse
+  `fallbackCombatSeed(enemyId, startingSteps)` devreye giriyor —
+  `stableSpread`, `String.hashCode` değil (GD8).
+
+### GD51. Düşman statları kademe + arketipten türetiliyor (2026-08-26)
+- **Nerede:** `core/utils/enemy_stats.dart`, `Enemy.archetype`
+- **Karar:** 20 düşmana elle 9'ar stat yazılmadı. Elle verilen tek şey
+  **arketip** (Dengeli / Dayanıklı / Çevik / Büyücü); can, saldırı, savunma,
+  hız, kritik ve sıyrılma kademeden ve arketipten çıkıyor. Item kataloğunda
+  aynı karar GD7'de verilmişti.
+- **İki hedef sayı:**
+  1. **Can** = o kademeye denk seviyedeki ölçüt oyuncunun round başına
+     hasarı × beklenen round sayısı. Yani kilit eşiğini seçen ölçüt oyuncu
+     maceranın sonunda devirir, güçlü oyuncu erken.
+  2. **Saldırı** = tamamen kaçırılan bir roundun oyuncu canının
+     [missedRoundHealthCost] (%15) kadarını götürmesi. Ölçülen: her kademede
+     hiç yürümeyen oyuncu 4–12 round içinde düşüyor (hedef ~7).
+- **Katalogdaki elle yazılmış `attackDamage` korundu:** kademenin doğrusal
+  beklentisine oranlanıp çarpan olarak uygulanıyor. Tasarımcının bilerek
+  zayıf bıraktığı düşman (13. kademedeki Eyeball Monster, 12 yerine 20
+  beklenirdi) zayıf kalıyor — testle bağlı.
+- **Ölçülen sonuç:** ölçüt oyuncu her düşmanı beklenen round + 3 içinde
+  deviriyor; dayanıklı arketip uzatıyor, cam top kısaltıyor. Tam tamamlanan
+  roundda hiçbir kademede hasar alınmıyor.
+
+### GD52. `speed` ve `luck` eklendi ama itemler henüz vermiyor (2026-08-26)
+- **Nerede:** `ItemStat.speed`, `ItemStat.luck`
+- **Karar:** iki yeni savaş statı eklendi (inisiyatif ve şans). Kaynakları
+  **taban stat, düşman statları ve seri bonusu**; item arketip tablolarına
+  eklenmedi.
+- **Neden:** arketip tablolarına eklemek 784 item'ın buff çekilişini yeniden
+  yapardı ve Bölüm 3/4'te ölçülmüş dengeyi (`item_variety_test`,
+  `economy_pacing_test`, mağaza goldenları) geçersiz kılardı. İki stat da
+  savaşta gerçekten iş yapıyor, süs değil: hız inisiyatifi belirliyor, şans
+  kritik/sıyrılma ihtimalini ve hasar bandını kaydırıyor.
+- **Yan etki (bilinçli):** `StreakStatBonuses.pool` `isCombat`'tan türediği
+  için 7'den **9**'a çıktı. Toplam tavan hâlâ bağlayıcı (9 × %25 = %225 >
+  %100) ve eski kayıtlar stat adıyla saklandığı için bozulmuyor.
+- **Geri dönülecek nokta:** ayrı bir denge geçişinde arketiplere eklenebilir;
+  `item_archetypes.dart` tek yer.
+
+### GD53. Oyuncunun savaş canı sabit 100 olmaktan çıktı (2026-08-26)
+- **Nerede:** `AdventureQuest.playerMaxHealth`, `RootShell._syncAdventureStats`
+- **Karar:** can tavanı seviyeden ve kuşanmadan geliyor
+  (`effectiveCombatStats`). Macera nesnesinde tutuluyor; `RootShell` seviye
+  atlandığında ve kuşanma değiştiğinde tazeliyor, mevcut can tavanı aşamıyor.
+- **Bedava iyileşme yok:** tavan büyüyünce mevcut can **yükselmiyor**, yalnızca
+  tavan küçülürse kırpılıyor. Aksi hâlde seviye atlamak ya da eşya takıp
+  çıkarmak savaş ortasında tam iyileşme verirdi.
+- **B2'nin açık yarısı kapandı:** savaş canının tek kaynağı artık
+  `AdventureQuest`. `UserProfile.hp` / `maxHp` hâlâ persist **edilmiyor** ve
+  hiçbir savaş yolunda okunmuyor.
+
+### GD54. `onKill` etkileri bitirici vuruşa katılıyor (2026-08-26)
+- **Nerede:** `combat_engine.dart` — bitirici vuruş bloğu ve `killHeal`
+- **Sorun:** katalogdaki `onKill` etkilerinin bir kısmı "düşman yenince bir
+  sonraki tur +%28 saldırı" diyor. Savaş düşman ölünce bittiği için
+  uygulanacak "sonraki tur" yok — etki ölü kalırdı.
+- **Karar:** iki dal:
+  - `lifeSteal` / `maxHealth` statlı `onKill` etkileri **öldürme anında
+    iyileştiriyor** ("kaybettiğin canın %35'i geri gelir" sözü birebir).
+  - Diğer `onKill` etkileri **bitirici vuruşa** katılıyor: normal hasar
+    yetmiyor ama bonusla yetiyorsa bonus devreye giriyor ve vuruş öldürücü
+    oluyor. Öldürmeyeceği turda hasarı **büyütmüyor** — koşulsuz bir saldırı
+    bonusuna dönüşmesin diye; testle bağlı.
+- **Neden veri değiştirilmedi:** etkiler `item_effects.dart` içinde tasarım
+  verisi. Sözü tutulur hâle getirmek, sözü değiştirmekten yeğ.
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -4850,6 +4946,159 @@ oluşturmadan önce aynı adda dosya olup olmadığı kontrol edilmeli; toplam t
 sayısı her birimden sonra beklenen değerle karşılaştırılmalı.
 
 Toplam **600 test geçiyor**, `flutter analyze` temiz.
+
+---
+---
+---
+
+# Bölüm 7 — Aşama 4a: Savaş motoru ✅ (2026-08-26)
+
+Kart **#4** kapandı. `TODO(combat)` kalktı; triajdaki **A2** (düşman canı =
+adım hedefi) ve **A3** (`stepGoal` üç iş birden) kapandı; **B2**'nin açık
+yarısı (iki can kavramı) çözüldü. Kararlar **GD49–GD54**. Şema **v13 → v14**.
+
+## Öncesinde ne eksikti
+
+| # | Eksik | Durum |
+|---|---|---|
+| 1 | `TODO(combat)`: düşman canı = adım hedefi, her adım 1 hasar | ✅ |
+| 2 | `Enemy` yalnızca `attackDamage` taşıyor | ✅ 9 statlı `CombatStats` |
+| 3 | 7 savaş statı tanımlı ama hiç okunmuyor | ✅ motor okuyor |
+| 4 | Hız/inisiyatif ve şans statları yok | ✅ eklendi (GD52) |
+| 5 | Taban stat kavramı yok; seviyenin savaşa etkisi yok | ✅ `base_combat_stats.dart` |
+| 6 | 6 koşullu/tetiklenen efekt türü uygulanmıyor | ✅ hepsi çalışıyor |
+| 7 | Eşya seviyesi ve birleştirme savaş statlarını büyütüyor → etkisiz | ✅ canlı |
+| 8 | Seri bonusu (5C) → etkisiz | ✅ canlı |
+| 9 | İki can kavramı | ✅ tek kaynak: `AdventureQuest` (GD53) |
+| 10 | Tohum yok; determinizm kazara | ✅ enjekte + saklanan (GD50) |
+| 11 | `stepGoal` üç iş birden | ✅ yalnızca yürüyüş taahhüdü (GD49) |
+
+## Stat seti — dokuzu da savaşta iş yapıyor
+
+`lib/models/combat_stats.dart`. Süs stat yok:
+
+| Stat | Savaşta ne yapıyor |
+|---|---|
+| saldırı | Hasarın çıkış noktası |
+| savunma | `azalma = savunma / (savunma + 50)` — azalan getiri, asla %100 değil |
+| savaş canı | Can tavanı; macera başlarken oyuncunun canı buna eşitlenir |
+| kritik şansı | Vuruşun hasarını `1 + kritik hasarı` ile çarpma ihtimali (tavan %60) |
+| kritik hasarı | O çarpanın büyüklüğü |
+| can çalma | Verilen hasarın bu oranı kadar can yenilenir |
+| sıyrılma | Gelen vuruşu tamamen boşa çıkarma ihtimali (tavan %40) |
+| **hız** | İnisiyatif: turda kim önce vurur. Öldürücü turda belirleyici |
+| **şans** | Kritik/sıyrılma ihtimaline katkı + hasar bandını yukarı kaydırır |
+
+## Stat kaynakları — tek toplama noktası
+
+`core/utils/effective_stats.dart`:
+
+```
+değer = (taban + ekipmanSabit) × (1 + ekipmanOran + seriOran + koşulluOran)
+```
+
+Dört kaynak: **taban** (seviye) + **ekipman** (eşya seviyesi ve birleştirme
+dâhil; `EquippedBuffs` zaten `scaleForLevel` uygulanmış itemleri topluyor) +
+**seri** (Bölüm 5C) + **koşullu etkiler**. Motor ikinci bir hesap yazmıyor;
+karakter paneli de aynı fonksiyonu okuyor.
+
+Sabit katkı çarpandan **önce** giriyor: aksi hâlde "+12 saldırı" veren bir
+item, oran bonusları büyüdükçe kendiliğinden değersizleşirdi.
+
+## Motor
+
+`core/utils/combat_engine.dart` — saf, arayüzden bağımsız, deterministik
+(GD50).
+
+**Adım ↔ savaş bağı korundu:** roundun tamamlanma oranı oyuncunun vuruşunu,
+kaçırılan oran düşmanınkini ölçekliyor. Yani tam round = tam vuruş + hiç hasar
+almama; hiç yürümemek = hiç vuramamak + tam hasar. Motordan önceki davranışın
+statlarla zenginleşmiş hâli.
+
+**Tur akışı:** inisiyatif (hız) → sıyrılma → kritik → değişkenlik (±%12, şans
+bandı yukarı kaydırır) → savunma → can çalma. Savunan ilk vuruşta öldüyse
+ikinci vuruş yapılmıyor — hız bu yüzden gerçek bir stat.
+
+**Altı koşullu tetikleyicinin hepsi çalışıyor:** `lowHealth`, `highHealth`,
+`untouchedRounds`, `nightWalk`, `streakActive` durum üzerinden
+(`CombatConditions`); `onHit` ve `onKill` olay üzerinden, motorun içinde
+(GD54).
+
+## Düşmanlar
+
+20 düşmanın hepsi savaş statı aldı; statlar kademe + arketipten türetiliyor
+(GD51). Dört davranış: **Dengeli** (6), **Dayanıklı** (4), **Çevik** (5),
+**Büyücü** (5).
+
+Ölçülen denge (ölçüt = kademeye denk seviyedeki ekipmansız oyuncu):
+
+| Kademe | Arketip | Can | Saldırı | Devirme | Beklenen | Ölüm |
+|---|---|---|---|---|---|---|
+| 1 | Dayanıklı | 13 | 13,8 | 2 | 1 | 9 |
+| 5 | Çevik | 36 | 23,1 | 3 | 3 | 8 |
+| 10 | Çevik | 88 | 34,1 | 4 | 5 | 7 |
+| 13 | Büyücü | 141 | 34,0 | 5 | 7 | 9 |
+| 14 | Dayanıklı | 252 | 39,3 | 10 | 7 | 8 |
+| 20 | Büyücü | 266 | 91,7 | 8 | 10 | 5 |
+
+"Ölüm" = hiç yürümeyen oyuncunun kaç roundda düştüğü; hedef ~7, ölçülen bant
+4–12. Sayıların hepsi motor çalıştırılarak ölçülüyor ve
+`combat_balance_test.dart` ile bağlı.
+
+## Şema v14 — eski macera sıfırlanmıyor
+
+Yarım kalmış bir macera **sadakatle taşınıyor**: eski modelde düşmanın kalan
+canı `stepGoal - atılanAdım` idi; o oran yeni can tavanına uygulanıyor.
+Oyuncunun canı da 0–100 ölçeğinden oranı korunarak yeni tavana taşınıyor.
+Aksi hâlde neredeyse ölmüş bir düşman güncelleme sonrası tam canla geri
+gelirdi. Düşman kataloğu saf Dart (asset okumuyor), o yüzden taşıma sırasında
+güvenle sorgulanabiliyor.
+
+`acknowledgedDamage` alanının **anlamı değişti** (adım sayısı → gösterilen son
+round serisi); taşıma onu sıfırlıyor, yoksa açılışta sahte bir hasar mesajı
+çıkardı.
+
+## Arayüz
+
+- **Karakter paneli**: savaş statları artık "savaş sistemiyle birlikte
+  etkinleşecek" demiyor — dokuz statın **taban / bonus / toplam** değerleri
+  gerçek sayılarla görünüyor.
+- **Düşman önizlemesi**: can, saldırı, savunma ve arketip rozetleri +
+  tek cümlelik davranış açıklaması ("Yavaş ama çok dayanıklı…"). Oyuncu neyle
+  karşılaştığını savaşa girmeden biliyor.
+- **Can barları**: düşman canı artık adım değil, gerçek can (`87 / 143`).
+- Geri sayım kartındaki "en fazla N can vurur" cümlesi kaldırıldı — savunma
+  devreye girdiği için o sayı artık doğru değildi.
+
+## Test
+
+- `test/combat_engine_test.dart` — **32 test**: determinizm (aynı tohum aynı
+  sonuç, tohum ilerlemesi, motorun kendi başına zar atmaması), adım↔hasar
+  bağı ve sınır dışı oranların kırpılması, dokuz statın her birinin etkisi,
+  inisiyatifin öldürücü turdaki rolü, tavanlar, sonlanma koşulları, `onHit` /
+  `onKill` ve bitirici vuruş.
+- `test/combat_balance_test.dart` — **21 test**: 20 düşmanın statları,
+  kademe ve arketip tutarlılığı, katalogdaki elle yazılmış saldırı farkının
+  korunması, ölçüt oyuncunun devirme süresi, tam yürüyende sıfır hasar,
+  ölüm süresi bandı, seviye farkının savaşı kısaltması, ekipman/seri/koşullu
+  etkilerin statlara işlemesi ve ekonomiye **dokunmaması**.
+- `test/combat_persistence_test.dart` — **9 test** (gerçek `RootShell`):
+  can tavanının açılışta tazelenmesi, yedek tohumun deterministikliği,
+  adımın roundu çözmesi, zafer ve XP, seviye atlayınca tavanın büyümesi,
+  diske yazma, kapat-aç turunda aynı sonuç, **v13 yarım macerasının sadık
+  taşınması**.
+- Güncellenen (silinmedi): `adventure_quest_test.dart` (sabit hasar sayıları
+  yerine ilişkiler bağlandı, düşman canının adımdan bağımsızlığı eklendi),
+  `adventure_progress_test.dart` (hasar mesajı artık round çözümünde çıkıyor).
+
+Toplam **664 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- **Bölüm 8** — iki fazlı macera. Zemin hazır: güçlü oyuncu düşmanı adım
+  hedefinden önce deviriyor ve bu testle bağlı.
+- Itemler `speed` / `luck` vermiyor (GD52) — ayrı bir denge geçişinin işi.
+- Round süresi hâlâ test dengesi (`AdventureQuest.roundDuration` = 30 sn).
 
 ---
 ---

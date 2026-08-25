@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
+import '../../core/utils/effective_stats.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/item_leveling.dart';
@@ -19,6 +20,7 @@ import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
+import '../../models/combat_stats.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
@@ -170,6 +172,48 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     });
   }
 
+  /// Savaş motoruna verilecek anlık koşullar.
+  ///
+  /// Koşullu item etkileri (`lowHealth`, `untouchedRounds`, `nightWalk`,
+  /// `streakActive`) buradan açılıp kapanıyor.
+  CombatConditions _combatConditions(AdventureQuest? adventure) {
+    final now = GameClock.now();
+    return CombatConditions(
+      healthRatio: adventure?.playerHealthProgress ?? 1,
+      untouchedRounds: adventure?.untouchedRounds ?? 0,
+      // Gece yürüyüşü: gün ışığı dışındaki saatler.
+      nightWalk: now.hour < 6 || now.hour >= 18,
+      streakActive: _profile.streakDays > 0,
+    );
+  }
+
+  /// Oyuncunun o andaki savaş statları: taban + ekipman + seri + koşullu.
+  ///
+  /// Tek toplama noktası [effectiveCombatStats]; burada ikinci bir hesap yok.
+  CombatStats _playerCombatStats([AdventureQuest? adventure]) =>
+      effectiveCombatStats(
+        level: _profile.level,
+        buffs: _buffs,
+        streak: _profile.streakStatBonuses,
+        conditions: _combatConditions(adventure),
+      );
+
+  /// Maceradaki can tavanını güncel statlara göre tazeler.
+  ///
+  /// Seviye atlamak ya da ekipman değiştirmek can tavanını büyütür/küçültür;
+  /// mevcut can tavanı aşamaz. Macera nesnesi tek doğruluk kaynağı olduğu
+  /// için ekranlar bunu ayrıca hesaplamıyor.
+  void _syncAdventureStats() {
+    final adventure = _adventure;
+    if (adventure == null) return;
+    final maxHealth = _playerCombatStats(adventure).maxHealth.round();
+    if (maxHealth <= 0) return;
+    adventure.playerMaxHealth = maxHealth;
+    if (adventure.playerHealth > maxHealth) {
+      adventure.playerHealth = maxHealth;
+    }
+  }
+
   /// Kuşanılan örnekleri katalogdan çözer ve toplam buff'ı yeniden hesaplar.
   ///
   /// Dört şeyi birden temizler:
@@ -201,6 +245,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       resolved.add(item);
     }
     _buffs = EquippedBuffs.from(resolved);
+    // Kuşanma can tavanını değiştirmiş olabilir.
+    _syncAdventureStats();
   }
 
   /// Bir envanter örneğini katalogdan çözer: sınıfa uyarlanmış item +
@@ -648,10 +694,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       final adventure = _adventure;
       if (adventure != null) {
         // 1.000 adım süre dolmadan tamamlandıysa round anında kazanılır.
-        roundResult = adventure.resolveRound(_today.steps, now);
+        roundResult = adventure.resolveRound(
+          _today.steps,
+          now,
+          playerStats: _playerCombatStats(adventure),
+          onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
+          onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
+        );
       }
       if (adventure != null &&
-          adventure.isDefeated(_today.steps) &&
+          adventure.isEnemyDefeated &&
           !adventure.xpAwarded) {
         adventure.xpAwarded = true;
         // Düşman XP bonusu: kuşanılan ekipmandan gelir.
@@ -720,6 +772,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _selectAdventure(AdventureQuest adventure) {
     setState(() {
       _adventure = adventure;
+      // Savaş canı ve tohum macera başlarken damgalanır: ekran statları
+      // bilmiyor, `RootShell` biliyor.
+      final stats = _playerCombatStats(adventure);
+      adventure.playerMaxHealth = stats.maxHealth.round();
+      adventure.playerHealth = adventure.playerMaxHealth;
+      if (adventure.combatSeed == 0) {
+        adventure.combatSeed = AdventureQuest.fallbackCombatSeed(
+          '${_profile.avatar.name}|${adventure.enemy.id}',
+          adventure.startingSteps,
+        );
+      }
       // Günün adımları korunur; macera kendi başlangıç adımını taşır
       // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
       //
@@ -758,14 +821,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (!mounted) return;
     final adventure = _adventure;
     if (adventure == null ||
-        adventure.isDefeated(_today.steps) ||
+        adventure.isEnemyDefeated ||
         adventure.playerHealth <= 0) {
       return;
     }
 
     final now = GameClock.now();
     // Biriken turların hepsi çözülür; arka planda geçen süre affedilmez.
-    final result = adventure.resolveExpiredRounds(_today.steps, now);
+    final result = adventure.resolveExpiredRounds(
+      _today.steps,
+      now,
+      playerStats: _playerCombatStats(adventure),
+      onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
+      onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
+    );
     final reminderDue = _isForeground && adventure.takeDueReminder(now);
     setState(() {});
 

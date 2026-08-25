@@ -1,5 +1,10 @@
+import '../core/utils/base_combat_stats.dart';
+import '../core/utils/combat_engine.dart';
+import '../core/utils/item_rules.dart';
 import '../core/utils/game_clock.dart';
+import 'combat_stats.dart';
 import 'enemy.dart';
+import 'item_effect.dart';
 
 class AdventureQuest {
   static const String defaultBackgroundAsset =
@@ -28,12 +33,44 @@ class AdventureQuest {
   int acknowledgedDamage;
   bool deathAnimationPlayed;
   int playerHealth;
+
+  /// Oyuncunun savaş canı tavanı.
+  ///
+  /// Artık sabit değil: seviyeden ve kuşanmadan geliyor
+  /// ([effectiveCombatStats]). Macera nesnesinde tutuluyor ki ekran tek bir
+  /// yerden okusun; `RootShell` statlar değiştikçe (seviye atlama, kuşanma)
+  /// güncelliyor.
+  int playerMaxHealth;
+
+  /// Düşmanın kalan savaş canı.
+  ///
+  /// **Artık adımdan bağımsız** (triaj A2/A3). Eskiden `stepGoal - atılanAdım`
+  /// idi; can, saldırı ve savunma ayrı statlar olunca bu bağ koptu. `stepGoal`
+  /// bugün yalnızca yürüyüş taahhüdü: round hedefini ve beklenen round
+  /// sayısını belirliyor.
+  int enemyHealth;
+
+  /// Savaş rastgeleliğinin tohumu. `0` = henüz kurulmadı.
+  ///
+  /// Motor `Random()` kullanmıyor; tohum durumla birlikte diske yazılıyor,
+  /// yani kapat-aç zar attırmaz ve aynı motor sunucuda aynı sonucu üretir
+  /// (CLAUDE.md §4.4).
+  int combatSeed;
+
+  /// Arka arkaya hiç hasar alınmamış round sayısı.
+  /// `untouchedRounds` tetikleyicili item etkilerinin dayanağı.
+  int untouchedRounds;
+
   int roundStartingSteps;
   int roundTargetSteps;
   DateTime nextEnemyAttackAt;
   DateTime nextReminderAt;
   int enemyAttackSerial;
   int lastEnemyDamage;
+
+  /// Son roundda **düşmana** verilen hasar. Sahnedeki "canını aldın"
+  /// mesajı bunu gösteriyor.
+  int lastPlayerDamage;
   int currentRound;
   int lastResolvedRound;
   int roundOutcomeSerial;
@@ -49,9 +86,14 @@ class AdventureQuest {
     this.acknowledgedDamage = 0,
     this.deathAnimationPlayed = false,
     this.playerHealth = maxPlayerHealth,
+    this.playerMaxHealth = maxPlayerHealth,
+    int? enemyHealth,
+    this.combatSeed = 0,
+    this.untouchedRounds = 0,
     int? roundStartingSteps,
     this.enemyAttackSerial = 0,
     this.lastEnemyDamage = 0,
+    this.lastPlayerDamage = 0,
     this.currentRound = 1,
     this.lastResolvedRound = 0,
     this.roundOutcomeSerial = 0,
@@ -59,11 +101,24 @@ class AdventureQuest {
     this.lastRoundWon = false,
     DateTime? startedAt,
   }) : roundStartingSteps = roundStartingSteps ?? startingSteps,
+       enemyHealth = enemyHealth ?? enemy.maxHealth,
        roundTargetSteps = _targetForRemaining(stepGoal),
        nextEnemyAttackAt = (startedAt ?? GameClock.now()).add(
          roundDurationForSteps(_targetForRemaining(stepGoal)),
        ),
        nextReminderAt = (startedAt ?? GameClock.now()).add(reminderInterval);
+
+  /// Bir sonraki roundun adım hedefi.
+  ///
+  /// Adım hedefi tükendiği hâlde düşman hâlâ ayaktaysa **tam boy** round
+  /// devam eder. Sıfır dönseydi round çözülemez ve savaş kilitlenirdi:
+  /// düşman canı artık adımdan gelmiyor, yani "hedefi bitirdim" savaşın
+  /// bittiği anlamına gelmiyor.
+  int _nextRoundTarget(int questProgress) {
+    final remaining = stepGoal - questProgress;
+    if (remaining <= 0) return stageStepTarget;
+    return remaining < stageStepTarget ? remaining : stageStepTarget;
+  }
 
   static int _targetForRemaining(int remainingSteps) {
     if (remainingSteps <= 0) return 0;
@@ -81,11 +136,19 @@ class AdventureQuest {
   int questSteps(int currentSteps) =>
       (currentSteps - startingSteps).clamp(0, stepGoal);
 
-  int takePendingDamage(int currentSteps) {
-    final totalDamage = questSteps(currentSteps);
-    final pendingDamage = (totalDamage - acknowledgedDamage).clamp(0, stepGoal);
-    acknowledgedDamage = totalDamage;
-    return pendingDamage;
+  /// Ekranın henüz göstermediği **düşmana verilen** hasar; gösterildikten
+  /// sonra ikinci kez dönmez.
+  ///
+  /// Savaş motorundan önce bu sayı doğrudan atılan adımdı (her adım 1 hasar).
+  /// Artık hasar statlardan hesaplanıyor ve yalnızca round çözümünde
+  /// oluşuyor, o yüzden ölçüt de round çıktısı serisi.
+  ///
+  /// [acknowledgedDamage] alanı kayıt uyumluluğu için **korunuyor**, anlamı
+  /// değişti: artık ekranın gösterdiği son round serisi.
+  int takePendingDamage() {
+    if (roundOutcomeSerial == acknowledgedDamage) return 0;
+    acknowledgedDamage = roundOutcomeSerial;
+    return lastPlayerDamage;
   }
 
   int get roundDurationMinutes =>
@@ -118,8 +181,23 @@ class AdventureQuest {
 
   /// Round, hedef erken tamamlanırsa anında; tamamlanmazsa tanımlı süre
   /// dolduğunda çözülür.
-  CombatRoundResult? resolveRound(int currentSteps, DateTime now) {
-    if (roundTargetSteps <= 0 || playerHealth <= 0) {
+  ///
+  /// Hasar artık adımdan değil **statlardan** geliyor: roundun tamamlanma
+  /// oranı oyuncunun vuruşunu ölçekliyor, kaçırılan oran da düşmanınkini.
+  /// Hesabın tamamı `combat_engine.dart` içinde, saf ve deterministik.
+  ///
+  /// [playerStats] verilmezse ölçüt (1. seviye, ekipmansız) statlar kullanılır.
+  /// Gerçek oyunda `RootShell` her zaman güncel statları veriyor; varsayılan,
+  /// statı bilmeyen çağrı noktalarının (ör. bildirim servisi) ve testlerin
+  /// sessizce yanlış sonuç üretmemesi için var.
+  CombatRoundResult? resolveRound(
+    int currentSteps,
+    DateTime now, {
+    CombatStats? playerStats,
+    List<ItemEffect> onHitEffects = const [],
+    List<ItemEffect> onKillEffects = const [],
+  }) {
+    if (roundTargetSteps <= 0 || playerHealth <= 0 || enemyHealth <= 0) {
       return null;
     }
 
@@ -130,17 +208,34 @@ class AdventureQuest {
     final expiredAt = nextEnemyAttackAt;
     final walked = stepsThisRound(currentSteps);
     final missedSteps = (roundTargetSteps - walked).clamp(0, roundTargetSteps);
-    final damage =
-        missedSteps == 0
-            ? 0
-            : (enemy.attackDamage * missedSteps / roundTargetSteps).ceil();
 
+    final stats = (playerStats ?? defaultPlayerStats).sanitized();
+    if (combatSeed == 0) combatSeed = fallbackCombatSeed(enemy.id, startingSteps);
+    final outcome = resolveCombatRound(
+      player: stats,
+      enemy: enemy.stats,
+      playerHealth: playerHealth,
+      enemyHealth: enemyHealth,
+      completion: roundTargetSteps == 0 ? 1 : walked / roundTargetSteps,
+      seed: combatSeed,
+      onHitEffects: onHitEffects,
+      onKillEffects: onKillEffects,
+    );
+    combatSeed = outcome.nextSeed;
+
+    playerMaxHealth = stats.maxHealth.round();
+    playerHealth = outcome.playerHealthAfter.clamp(0, playerMaxHealth);
+    enemyHealth = outcome.enemyHealthAfter;
+
+    lastPlayerDamage = outcome.damageDealt;
+    final damage = outcome.damageTaken;
     if (damage > 0) {
-      playerHealth = (playerHealth - damage).clamp(0, maxPlayerHealth);
       lastEnemyDamage = damage;
       enemyAttackSerial += 1;
+      untouchedRounds = 0;
     } else {
       lastEnemyDamage = 0;
+      untouchedRounds += 1;
     }
 
     final resolvedRound = currentRound;
@@ -150,7 +245,7 @@ class AdventureQuest {
     currentRound += 1;
 
     roundStartingSteps += walked;
-    roundTargetSteps = _targetForRemaining(remainingHealth(currentSteps));
+    roundTargetSteps = _nextRoundTarget(questSteps(currentSteps));
     // Erken biten roundun yeni süresi başarı anından başlar. Arka planda süresi
     // geçmiş roundlar ise eski zaman çizgisinde ilerler ve bedavaya silinmez.
     final nextRoundStartsAt = expired ? expiredAt : now;
@@ -164,12 +259,29 @@ class AdventureQuest {
       walkedSteps: walked,
       targetSteps: walked + missedSteps,
       playerDamage: damage,
+      enemyDamage: outcome.damageDealt,
+      playerCrit: outcome.playerCrit,
+      playerDodged: outcome.playerDodged,
+      enemyDefeated: outcome.enemyDefeated,
+      playerDefeated: outcome.playerDefeated,
+      playerActedFirst: outcome.firstMover == Combatant.player,
     );
   }
 
   /// Eski çağrı noktaları ve kayıt uyumluluğu için adını koruyan yönlendirme.
-  CombatRoundResult? resolveExpiredRound(int currentSteps, DateTime now) =>
-      resolveRound(currentSteps, now);
+  CombatRoundResult? resolveExpiredRound(
+    int currentSteps,
+    DateTime now, {
+    CombatStats? playerStats,
+    List<ItemEffect> onHitEffects = const [],
+    List<ItemEffect> onKillEffects = const [],
+  }) => resolveRound(
+    currentSteps,
+    now,
+    playerStats: playerStats,
+    onHitEffects: onHitEffects,
+    onKillEffects: onKillEffects,
+  );
 
   /// Süresi dolmuş **tüm** turları sırayla çözer ve toplamlarını döner.
   ///
@@ -178,19 +290,43 @@ class AdventureQuest {
   ///
   /// [maxCatchUpRounds] yalnızca güvenlik ağıdır: can sıfırlanınca ya da
   /// düşman yenilince döngü zaten durur.
-  CombatRoundResult? resolveExpiredRounds(int currentSteps, DateTime now) {
+  CombatRoundResult? resolveExpiredRounds(
+    int currentSteps,
+    DateTime now, {
+    CombatStats? playerStats,
+    List<ItemEffect> onHitEffects = const [],
+    List<ItemEffect> onKillEffects = const [],
+  }) {
     var walked = 0;
     var target = 0;
     var damage = 0;
+    var dealt = 0;
     var rounds = 0;
+    var crit = false;
+    var dodged = false;
     var lastRoundNumber = currentRound;
+    var enemyDown = false;
+    var playerDown = false;
+    var actedFirst = true;
 
     while (rounds < maxCatchUpRounds) {
-      final result = resolveExpiredRound(currentSteps, now);
+      final result = resolveExpiredRound(
+        currentSteps,
+        now,
+        playerStats: playerStats,
+        onHitEffects: onHitEffects,
+        onKillEffects: onKillEffects,
+      );
       if (result == null) break;
       walked += result.walkedSteps;
       target += result.targetSteps;
       damage += result.playerDamage;
+      dealt += result.enemyDamage;
+      crit = crit || result.playerCrit;
+      dodged = dodged || result.playerDodged;
+      enemyDown = result.enemyDefeated;
+      playerDown = result.playerDefeated;
+      actedFirst = result.playerActedFirst;
       lastRoundNumber = result.roundNumber;
       rounds++;
     }
@@ -201,6 +337,12 @@ class AdventureQuest {
       walkedSteps: walked,
       targetSteps: target,
       playerDamage: damage,
+      enemyDamage: dealt,
+      playerCrit: crit,
+      playerDodged: dodged,
+      enemyDefeated: enemyDown,
+      playerDefeated: playerDown,
+      playerActedFirst: actedFirst,
     );
   }
 
@@ -220,6 +362,10 @@ class AdventureQuest {
     'acknowledgedDamage': acknowledgedDamage,
     'deathAnimationPlayed': deathAnimationPlayed,
     'playerHealth': playerHealth,
+    'playerMaxHealth': playerMaxHealth,
+    'enemyHealth': enemyHealth,
+    'combatSeed': combatSeed,
+    'untouchedRounds': untouchedRounds,
     'roundStartingSteps': roundStartingSteps,
     'roundTargetSteps': roundTargetSteps,
     'nextEnemyAttackAt': nextEnemyAttackAt.toIso8601String(),
@@ -227,6 +373,7 @@ class AdventureQuest {
     'nextReminderAt': nextReminderAt.toIso8601String(),
     'enemyAttackSerial': enemyAttackSerial,
     'lastEnemyDamage': lastEnemyDamage,
+    'lastPlayerDamage': lastPlayerDamage,
     'currentRound': currentRound,
     'lastResolvedRound': lastResolvedRound,
     'roundOutcomeSerial': roundOutcomeSerial,
@@ -251,9 +398,14 @@ class AdventureQuest {
       acknowledgedDamage: json['acknowledgedDamage'] as int? ?? 0,
       deathAnimationPlayed: json['deathAnimationPlayed'] as bool? ?? false,
       playerHealth: json['playerHealth'] as int? ?? maxPlayerHealth,
+      playerMaxHealth: json['playerMaxHealth'] as int? ?? maxPlayerHealth,
+      enemyHealth: json['enemyHealth'] as int?,
+      combatSeed: json['combatSeed'] as int? ?? 0,
+      untouchedRounds: json['untouchedRounds'] as int? ?? 0,
       roundStartingSteps: json['roundStartingSteps'] as int?,
       enemyAttackSerial: json['enemyAttackSerial'] as int? ?? 0,
       lastEnemyDamage: json['lastEnemyDamage'] as int? ?? 0,
+      lastPlayerDamage: json['lastPlayerDamage'] as int? ?? 0,
       currentRound: json['currentRound'] as int? ?? 1,
       lastResolvedRound: json['lastResolvedRound'] as int? ?? 0,
       roundOutcomeSerial: json['roundOutcomeSerial'] as int? ?? 0,
@@ -281,29 +433,75 @@ class AdventureQuest {
     return DateTime.tryParse(value);
   }
 
-  // TODO(combat): Şimdilik düşman canı doğrudan günlük adım hedefine eşit ve
-  // her adım 1 hasar veriyor. Can, saldırı ve hasar değerleri ileride ayrı
-  // combat istatistikleri olarak modellenmeli.
-  int remainingHealth(int currentSteps) =>
-      (stepGoal - questSteps(currentSteps)).clamp(0, stepGoal);
+  /// Düşmanın kalan canı. Adımdan **bağımsız**; savaş motoru düşürüyor.
+  int get remainingEnemyHealth => enemyHealth < 0 ? 0 : enemyHealth;
 
-  double healthProgress(int currentSteps) =>
-      (remainingHealth(currentSteps) / stepGoal).clamp(0, 1);
+  /// Düşmanın canının tavanına oranı (0..1). Can barı bunu çiziyor.
+  double get enemyHealthProgress {
+    final max = enemy.maxHealth;
+    if (max <= 0) return 0;
+    return (remainingEnemyHealth / max).clamp(0.0, 1.0);
+  }
 
-  bool isDefeated(int currentSteps) => questSteps(currentSteps) >= stepGoal;
+  /// Oyuncunun canının tavanına oranı (0..1).
+  double get playerHealthProgress {
+    final max = playerMaxHealth <= 0 ? 1 : playerMaxHealth;
+    return (playerHealth / max).clamp(0.0, 1.0);
+  }
+
+  /// Düşman devrildi mi.
+  bool get isEnemyDefeated => enemyHealth <= 0;
+
+  /// Oyuncu düştü mü.
+  bool get isPlayerDefeated => playerHealth <= 0;
+
+  /// Ölçüt oyuncu statları.
+  ///
+  /// Statı bilmeyen bir çağrı noktası roundu çözerse sessizce yanlış sonuç
+  /// üretmesin diye açık bir varsayılan var: 1. seviye, ekipmansız oyuncu.
+  static CombatStats get defaultPlayerStats => baseCombatStats(1);
+
+  /// Tohum kurulmadan round çözülürse kullanılan yedek tohum.
+  ///
+  /// Deterministik: aynı düşman ve aynı başlangıç adımı her zaman aynı
+  /// tohumu verir. `String.hashCode` **kullanılmaz** (GD8).
+  static int fallbackCombatSeed(String enemyId, int startingSteps) =>
+      stableSpread('combat|$enemyId|$startingSteps', 0x7FFFFFF0) + 1;
 }
 
 class CombatRoundResult {
   final int roundNumber;
   final int walkedSteps;
   final int targetSteps;
+
+  /// Oyuncunun **aldığı** hasar. (Ad tarihsel; alan adı korunuyor.)
   final int playerDamage;
+
+  /// Oyuncunun **verdiği** hasar.
+  final int enemyDamage;
+
+  final bool playerCrit;
+
+  /// Oyuncu düşmanın vuruşunu sıyırdı mı.
+  final bool playerDodged;
+
+  final bool enemyDefeated;
+  final bool playerDefeated;
+
+  /// Turu oyuncu mu açtı (inisiyatif).
+  final bool playerActedFirst;
 
   const CombatRoundResult({
     required this.roundNumber,
     required this.walkedSteps,
     required this.targetSteps,
     required this.playerDamage,
+    this.enemyDamage = 0,
+    this.playerCrit = false,
+    this.playerDodged = false,
+    this.enemyDefeated = false,
+    this.playerDefeated = false,
+    this.playerActedFirst = true,
   });
 
   bool get targetReached => walkedSteps >= targetSteps;

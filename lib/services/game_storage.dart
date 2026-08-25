@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/utils/base_combat_stats.dart';
+import '../data/enemy_catalog.dart';
+
 import '../models/avatar_profile.dart';
 import '../models/game_state.dart';
 
@@ -21,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 13;
+  static const int schemaVersion = 14;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -157,6 +160,63 @@ class GameStorage {
     // yokken geçen günler geriye dönük stat kazandırmamalı. Tohum ilk
     // kullanımda oyuncuya özel kurulacak.
     12: (state) => state,
+    // 13 -> 14: savaş motoru (Aşama 4a). Düşman canı artık adımdan değil
+    // kendi statından geliyor; oyuncunun can tavanı da sabit 100 değil.
+    //
+    // Yarım kalmış bir macera **sıfırlanmıyor**: eski ilerleme sadakatle
+    // taşınıyor. Eskiden düşmanın kalan canı `stepGoal - atılanAdım` idi;
+    // o oran yeni can tavanına uygulanıyor. Aksi hâlde neredeyse ölmüş bir
+    // düşman güncelleme sonrası tam canla geri gelirdi.
+    //
+    // Düşman kataloğu saf Dart (asset okumuyor), bu yüzden taşıma sırasında
+    // güvenle sorgulanabiliyor.
+    13: (state) {
+      final adventure = state['adventure'];
+      if (adventure is! Map<String, dynamic>) return state;
+
+      final enemyId = adventure['enemyId'];
+      final enemy = enemyId is String ? EnemyCatalog.byId(enemyId) : null;
+      if (enemy == null) {
+        // Katalogdan kalkmış düşman: macera zaten yüklenemeyecek.
+        return state;
+      }
+
+      final stepGoal = adventure['stepGoal'] as int? ?? enemy.minimumDailySteps;
+      final startingSteps = adventure['startingSteps'] as int? ?? 0;
+      final today = state['today'];
+      final steps =
+          today is Map<String, dynamic> ? (today['steps'] as int? ?? 0) : 0;
+
+      final questSteps = (steps - startingSteps).clamp(0, stepGoal);
+      final remainingRatio =
+          stepGoal <= 0 ? 1.0 : (stepGoal - questSteps) / stepGoal;
+      adventure['enemyHealth'] = (enemy.maxHealth * remainingRatio).round();
+
+      // Oyuncunun canı 0-100 ölçeğindeydi; oranı korunarak yeni tavana
+      // taşınıyor. Gerçek tavan (ekipman dâhil) açılışta
+      // `RootShell._syncAdventureStats` tarafından tazeleniyor.
+      final profile = state['profile'];
+      final level =
+          profile is Map<String, dynamic> ? (profile['level'] as int? ?? 1) : 1;
+      final newMax =
+          (baseHealthAtLevelOne + healthPerLevel * (level - 1)).round();
+      final oldHealth = adventure['playerHealth'] as int? ?? 100;
+      adventure['playerMaxHealth'] = newMax;
+      adventure['playerHealth'] = (oldHealth / 100 * newMax).round().clamp(
+        0,
+        newMax,
+      );
+
+      // `acknowledgedDamage` artık "gösterilen son round serisi" demek.
+      // Eski değeri adım sayısıydı; olduğu gibi bırakmak açılışta sahte bir
+      // hasar mesajı gösterirdi.
+      adventure['acknowledgedDamage'] =
+          adventure['roundOutcomeSerial'] as int? ?? 0;
+      adventure['combatSeed'] = 0;
+      adventure['untouchedRounds'] = 0;
+      adventure['lastPlayerDamage'] = 0;
+      return state;
+    },
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

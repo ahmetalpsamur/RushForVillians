@@ -110,11 +110,33 @@ void main() {
         startedAt.add(const Duration(seconds: 30)),
       );
 
+      // Savaş motoruyla hasar artık adımdan değil statlardan geliyor; sabit
+      // sayı yerine ilişki bağlanıyor: yarısı yürünen round hem hasar aldırır
+      // hem hasar verdirir.
       expect(result?.walkedSteps, 500);
-      expect(result?.playerDamage, 4);
-      expect(quest.playerHealth, 96);
-      expect(quest.remainingHealth(500), 1500);
+      expect(result!.playerDamage, greaterThan(0));
+      expect(result.enemyDamage, greaterThan(0));
+      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
+      expect(quest.enemyHealth, lessThan(quest.enemy.maxHealth));
       expect(quest.enemyAttackSerial, 1);
+    });
+
+    test('hiç yürünmeyen round yalnızca oyuncuya hasar verir', () {
+      final startedAt = DateTime(2026, 8, 17, 12);
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 2000,
+        startedAt: startedAt,
+      );
+
+      final result = quest.resolveExpiredRound(
+        0,
+        startedAt.add(const Duration(seconds: 30)),
+      );
+
+      expect(result!.enemyDamage, 0, reason: 'yürümeyen vuramaz');
+      expect(result.playerDamage, greaterThan(0));
+      expect(quest.enemyHealth, quest.enemy.maxHealth);
     });
 
     test('tur hedefi tamamlanırsa oyuncu hasar almaz', () {
@@ -132,8 +154,10 @@ void main() {
 
       expect(result?.targetReached, isTrue);
       expect(result?.playerDamage, 0);
-      expect(quest.playerHealth, AdventureQuest.maxPlayerHealth);
+      expect(result!.enemyDamage, greaterThan(0), reason: 'tam round tam vurur');
+      expect(quest.playerHealth, quest.playerMaxHealth);
       expect(quest.roundStartingSteps, 1000);
+      expect(quest.untouchedRounds, 1);
     });
   });
 
@@ -159,9 +183,12 @@ void main() {
         startedAt.add(const Duration(seconds: 90)),
       );
 
-      expect(result?.playerDamage, 36, reason: '3 round × 12 hasar');
-      expect(quest.playerHealth, 64);
+      // Hasar artık stattan geliyor; bağlanan şey sabit sayı değil, üç
+      // roundun da çözüldüğü.
       expect(quest.enemyAttackSerial, 3);
+      expect(quest.currentRound, 4);
+      expect(result!.playerDamage, greaterThan(0));
+      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
     });
 
     test('bir sonraki geri sayım geleceğe taşınır', () {
@@ -190,8 +217,10 @@ void main() {
       );
 
       expect(result?.walkedSteps, 2500);
-      expect(result?.playerDamage, 6);
-      expect(quest.playerHealth, 94);
+      // İlk iki round tam (hasar yok), üçüncüsü yarım (hasar var).
+      expect(result!.playerDamage, greaterThan(0));
+      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
+      expect(quest.enemyAttackSerial, 1);
     });
 
     test('süresi dolmamış turda hiçbir şey olmaz', () {
@@ -204,7 +233,7 @@ void main() {
       );
 
       expect(result, isNull);
-      expect(quest.playerHealth, AdventureQuest.maxPlayerHealth);
+      expect(quest.playerHealth, quest.playerMaxHealth);
     });
 
     test('can bitince döngü durur, can eksiye düşmez', () {
@@ -234,16 +263,29 @@ void main() {
 
       expect(quest.questSteps(4000), 0);
       expect(quest.questSteps(5000), 1000);
-      expect(quest.remainingHealth(4000), 2000);
-      expect(quest.remainingHealth(5000), 1000);
-      expect(quest.healthProgress(5000), 0.5);
     });
 
-    test('düşman ancak hedef kadar yeni adım atılınca yenilir', () {
+    test('düşman canı artık adımdan bağımsız', () {
+      // Savaş motorundan önce düşman canı = kalan adım hedefiydi (A2/A3).
+      // Artık ayrı bir stat: adım atmak tek başına düşmanı öldürmez, round
+      // çözülmesi gerekir.
       final quest = questAt(4000);
 
-      expect(quest.isDefeated(5999), isFalse);
-      expect(quest.isDefeated(6000), isTrue);
+      expect(quest.enemyHealth, quest.enemy.maxHealth);
+      expect(quest.isEnemyDefeated, isFalse);
+      expect(quest.enemyHealthProgress, 1);
+
+      // Hedefin tamamı kadar adım atmak, round çözülmeden canı düşürmez.
+      expect(quest.questSteps(6000), 2000);
+      expect(quest.isEnemyDefeated, isFalse);
+    });
+
+    test('düşman canı bitince yenilmiş sayılır', () {
+      final quest = questAt(4000);
+      quest.enemyHealth = 0;
+
+      expect(quest.isEnemyDefeated, isTrue);
+      expect(quest.enemyHealthProgress, 0);
     });
 
     test('ilk tur da başlangıç adımından başlar', () {
@@ -254,12 +296,20 @@ void main() {
       expect(quest.roundStepsRemaining(4500), 500);
     });
 
-    test('bekleyen hasar başlangıç adımına göre hesaplanır', () {
-      final quest = questAt(4000);
+    test('bekleyen hasar round çıktısından gelir ve bir kez gösterilir', () {
+      // Eskiden bu sayı doğrudan atılan adımdı; artık düşmana **gerçekten**
+      // verilen hasar ve yalnızca round çözümünde oluşuyor.
+      final startedAt = DateTime(2026, 8, 18, 12);
+      final quest = questAt(4000, startedAt: startedAt);
 
-      expect(quest.takePendingDamage(4500), 500);
-      expect(quest.takePendingDamage(4700), 200);
-      expect(quest.takePendingDamage(4700), 0);
+      expect(quest.takePendingDamage(), 0, reason: 'henüz round çözülmedi');
+
+      quest.resolveExpiredRound(5000, startedAt.add(const Duration(seconds: 5)));
+
+      final shown = quest.takePendingDamage();
+      expect(shown, quest.lastPlayerDamage);
+      expect(shown, greaterThan(0));
+      expect(quest.takePendingDamage(), 0, reason: 'ikinci kez gösterilmez');
     });
 
     test('tur çözümü başlangıç adımlı macerada da doğru hasar verir', () {
@@ -272,9 +322,9 @@ void main() {
       );
 
       expect(result?.walkedSteps, 500);
-      expect(result?.playerDamage, 4);
-      expect(quest.playerHealth, 96);
-      expect(quest.remainingHealth(4500), 1500);
+      expect(result!.playerDamage, greaterThan(0));
+      expect(result.enemyDamage, greaterThan(0));
+      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
     });
 
     test('başlangıç adımı verilmezse eski davranış korunur', () {
@@ -285,7 +335,7 @@ void main() {
 
       expect(quest.startingSteps, 0);
       expect(quest.roundStartingSteps, 0);
-      expect(quest.remainingHealth(500), 1500);
+      expect(quest.questSteps(500), 500);
     });
   });
 }

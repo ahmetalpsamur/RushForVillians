@@ -2,17 +2,16 @@
 ///
 /// İki kümeye ayrılır ve ayrım [ItemStatX.isCombat] üzerinden okunur:
 ///
-/// - **Savaş statları** (saldırı, savunma, kritik...) bugün **hiçbir yere
-///   uygulanmıyor**; savaş motoru Aşama 4a'da yazılacak. Modelde şimdiden
-///   duruyorlar ki item tasarımı savaş sistemini beklemek zorunda kalmasın —
-///   dengeleri orada yapılacak.
+/// - **Savaş statları** (saldırı, savunma, kritik...) savaş motoruna girer
+///   (`core/utils/combat_engine.dart`). Her birinin savaşta ne yaptığı
+///   [CombatStats] üzerinde yazılı; süs stat yok.
 /// - **Oyun dışı statlar** (adım parası, adım XP, tavanlar...) **bugün canlı**
 ///   ve dikkatle dengelenmiş bir ekonomiye bağlı. Bu yüzden tek bir item'ın
 ///   koşulsuz oyun dışı yüzdesi [GameConstants.maxSingleItemEconomyBonus] ile,
 ///   kuşanılan toplam ise [GameConstants.maxEquippedEconomyBonus] ile
 ///   sınırlıdır.
 enum ItemStat {
-  // --- Savaş: Aşama 4a'da canlanacak ---
+  // --- Savaş: `combat_engine.dart` bunları okur ---
   attack,
   defense,
   maxHealth,
@@ -20,6 +19,14 @@ enum ItemStat {
   critDamage,
   lifeSteal,
   dodge,
+
+  // [speed] ve [luck] savaş motoruyla birlikte eklendi. Bugün **itemler
+  // bunları vermiyor**: arketip tablolarına eklemek 784 item'ın buff'ını
+  // yeniden çeker ve Bölüm 3/4'te ölçülmüş dengeyi (item_variety,
+  // economy_pacing, goldenlar) geçersiz kılardı. Kaynakları: taban stat,
+  // düşman statları ve seri bonusu.
+  speed,
+  luck,
 
   // --- Oyun dışı: bugün canlı ---
   stepCoin,
@@ -41,6 +48,8 @@ extension ItemStatX on ItemStat {
     ItemStat.critDamage => 'kritik hasarı',
     ItemStat.lifeSteal => 'can çalma',
     ItemStat.dodge => 'sıyrılma',
+    ItemStat.speed => 'hız',
+    ItemStat.luck => 'şans',
     ItemStat.stepCoin => 'adım parası',
     ItemStat.stepXp => 'adım XP',
     ItemStat.wheelXp => 'çark XP',
@@ -59,7 +68,9 @@ extension ItemStatX on ItemStat {
     ItemStat.critChance ||
     ItemStat.critDamage ||
     ItemStat.lifeSteal ||
-    ItemStat.dodge => true,
+    ItemStat.dodge ||
+    ItemStat.speed ||
+    ItemStat.luck => true,
     _ => false,
   };
 

@@ -51,18 +51,32 @@ void main() {
     int startingSteps = 0,
     int? roundStartingSteps,
     Size size = const Size(390, 1400),
+    bool resolveFirstRound = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
+    final startedAt = GameClock.now();
     final quest = AdventureQuest(
       enemy: enemy,
       stepGoal: stepGoal,
       startingSteps: startingSteps,
       roundStartingSteps: roundStartingSteps,
-      startedAt: GameClock.now(),
+      startedAt: startedAt,
     );
+    if (resolveFirstRound) {
+      // "Düşmanın N canını aldın" mesajı artık round çözümünde oluşuyor:
+      // savaş motorundan önce her adım 1 hasardı, şimdi hasar statlardan
+      // geliyor ve yalnızca round kapanınca hesaplanıyor.
+      quest.resolveExpiredRound(
+        steps,
+        startedAt.add(const Duration(seconds: 30)),
+      );
+      // Round sonucu animasyonu oynatılmış kabul ediliyor; hasar mesajı o
+      // animasyondan **sonraki** karede çıkıyor.
+      quest.presentedRoundOutcomeSerial = quest.roundOutcomeSerial;
+    }
 
     await tester.pumpWidget(
       MaterialApp(
@@ -213,6 +227,7 @@ void main() {
           steps: 1342,
           startingSteps: 0,
           size: Size(width, 1500),
+          resolveFirstRound: true,
         );
 
         final message = find.textContaining('canını aldın');

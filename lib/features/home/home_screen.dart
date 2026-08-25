@@ -141,9 +141,9 @@ class HomeScreen extends StatelessWidget {
                           label: 'Canavar Canı',
                           icon: Icons.favorite,
                           color: AppColors.hp,
-                          progress: adventure!.healthProgress(today.steps),
+                          progress: adventure!.enemyHealthProgress,
                           valueText:
-                              '${adventure!.remainingHealth(today.steps)} / ${adventure!.stepGoal}',
+                              '${adventure!.remainingEnemyHealth} / ${adventure!.enemy.maxHealth}',
                         ),
                       ],
                     ),
