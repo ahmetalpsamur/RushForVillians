@@ -162,10 +162,15 @@ void main() {
     });
 
     test('en ucuz item ilk seviyede açık', () {
-      final cheapest = catalog.reduce((a, b) => a.cost <= b.cost ? a : b);
+      final cheapestCost = catalog
+          .map((item) => item.cost)
+          .reduce((a, b) => a < b ? a : b);
+      final hasUnlockedCheapest = catalog.any(
+        (item) => item.cost == cheapestCost && item.isUnlockedAt(1),
+      );
 
       expect(
-        cheapest.isUnlockedAt(1),
+        hasUnlockedCheapest,
         isTrue,
         reason: 'parası yeten yeni oyuncu seviye kilidine takılmamalı',
       );
