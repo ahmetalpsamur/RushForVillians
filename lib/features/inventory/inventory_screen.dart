@@ -14,6 +14,7 @@ import '../../models/item.dart';
 import '../../models/owned_item.dart';
 import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
+import '../../models/streak_stat_bonuses.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/archetype_badge.dart';
@@ -606,11 +607,19 @@ class CharacterPowerPanel extends StatelessWidget {
   final int equippedCount;
   final int slotCount;
 
+  /// Serinin biriktirdiği savaş stat bonusları (Bölüm 5C).
+  final StreakStatBonuses streakBonuses;
+
+  /// Bugünkü seri; bonus bölümünün başlığında gösterilir.
+  final int streakDays;
+
   const CharacterPowerPanel({
     super.key,
     required this.buffs,
     required this.equippedCount,
     required this.slotCount,
+    this.streakBonuses = StreakStatBonuses.empty,
+    this.streakDays = 0,
   });
 
   @override
@@ -678,6 +687,7 @@ class CharacterPowerPanel extends StatelessWidget {
             total: '${buffs.streakStepThreshold}',
             bonusIsGain: buffs.streakStepRelief > 0,
           ),
+          _StreakBonusSection(bonuses: streakBonuses, streakDays: streakDays),
           if (buffs.combatEffects.isNotEmpty) ...[
             const SizedBox(height: 14),
             const Text(
@@ -745,8 +755,82 @@ class CharacterPowerPanel extends StatelessWidget {
   }
 }
 
+/// Karakter panelindeki "Seri Bonusu" bölümü.
+///
+/// Hangi stata ne kadar biriktiği **stat stat** gösterilir; tek bir toplam
+/// sayı, oyuncunun serisinin ona nasıl bir savaş profili verdiğini
+/// anlatmıyor. Tavana ulaşan stat ayrıca işaretlenir (Model Kuralları #4):
+/// o stat artık çekilişe girmiyor ve oyuncu nedenini bilmeli.
+class _StreakBonusSection extends StatelessWidget {
+  final StreakStatBonuses bonuses;
+  final int streakDays;
+
+  const _StreakBonusSection({required this.bonuses, required this.streakDays});
+
+  @override
+  Widget build(BuildContext context) {
+    if (bonuses.isEmpty) return const SizedBox.shrink();
+    final total = (bonuses.totalBonus * 100).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Icon(
+              Icons.local_fire_department,
+              size: 15,
+              color: AppColors.streak,
+            ),
+            const SizedBox(width: 4),
+            const Expanded(
+              child: Text(
+                'Seri Bonusu',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+            Text(
+              'toplam +%$total',
+              style: const TextStyle(fontSize: 11.5, color: AppColors.streak),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          bonuses.isFull
+              ? '$streakDays günlük serin savaş statlarını büyüttü. '
+                  'Seri bonusu tavana ulaştı.'
+              : '$streakDays günlük serin savaş statlarını büyüttü. '
+                  'Seri kırılırsa tamamı gider.',
+          style: const TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+        const SizedBox(height: 6),
+        // Bölümün kendi sütun başlıkları: üstteki tabloda "EKİPMAN" yazan
+        // sütun burada seri gününü taşıyor, aynı başlığı kullanmak yanıltıcı
+        // olurdu.
+        const _StatHeader(
+          columns: ['GÜN', 'BONUS', 'DURUM'],
+        ),
+        for (final stat in StreakStatBonuses.pool)
+          if (bonuses.daysFor(stat) > 0)
+            _StatRow(
+              label: CharacterPowerPanel._capitalize(stat.label),
+              base: '${bonuses.daysFor(stat)} gün',
+              bonus: '+%${(bonuses.bonusFor(stat) * 100).round()}',
+              total: bonuses.isAtCap(stat) ? 'tavan' : '—',
+              dimmed: true,
+            ),
+      ],
+    );
+  }
+}
+
 class _StatHeader extends StatelessWidget {
-  const _StatHeader();
+  /// Üç sayı sütununun başlığı. Seri bonusu bölümü aynı hizayı kullanır ama
+  /// sütunların anlamı farklıdır, o yüzden başlıklar dışarıdan verilebilir.
+  final List<String> columns;
+
+  const _StatHeader({this.columns = const ['TABAN', 'EKİPMAN', 'TOPLAM']});
 
   @override
   Widget build(BuildContext context) {
@@ -756,14 +840,21 @@ class _StatHeader extends StatelessWidget {
       fontWeight: FontWeight.w700,
       letterSpacing: 0.3,
     );
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 4),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Expanded(flex: 4, child: Text('', style: style)),
-          Expanded(flex: 2, child: Text('TABAN', style: style)),
-          Expanded(flex: 2, child: Text('EKİPMAN', style: style)),
-          Expanded(flex: 2, child: Text('TOPLAM', style: style)),
+          const Expanded(flex: 4, child: Text('', style: style)),
+          for (final column in columns)
+            Expanded(
+              flex: 2,
+              child: Text(
+                column,
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
         ],
       ),
     );

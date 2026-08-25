@@ -268,6 +268,8 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 12),
           CharacterPowerPanel(
             buffs: buffs,
+            streakBonuses: profile.streakStatBonuses,
+            streakDays: profile.streakDays,
             equippedCount: equippedItems.length,
             slotCount:
                 ItemCategory.values

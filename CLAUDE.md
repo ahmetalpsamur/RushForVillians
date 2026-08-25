@@ -3785,6 +3785,67 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
 ---
 ---
 
+### GD44. Seri bonusu her gün **rastgele bir** savaş statını büyütür (2026-08-25)
+- **Nerede:** `models/streak_stat_bonuses.dart`, `core/utils/streak_bonus.dart`,
+  `UserProfile.grantStreakStatBonus`
+- **Karar:** her seri günü havuzdan bir savaş statı seçilir ve o stat **+%1**
+  büyür. Stat başına tavan **+%25**, toplam tavan **+%100** (~100 günde
+  dolar). Tavana ulaşan stat havuzdan çıkar, yani gün boşa gitmez.
+- **Neden tek stat değil:** tek stata giden bonus, 30 günlük seriyi tek bir
+  sayıya indiriyordu ve "bugün ne kazandım" anı yoktu. Dağılım her oyuncuya
+  serisine özel bir savaş profili bırakıyor.
+- **Neden tavan +%100:** bonus yediye yayıldığı için tek statlık düşük bir
+  tavan pratikte hiçbir şey ifade etmezdi. Stat başına +%25 sınırı da uzun
+  serinin tek stata yığılmasını engelliyor. 7 stat × %25 = %175 > %100, yani
+  **toplam tavan bağlayıcı** — bu ilişki testle bağlı.
+- **Havuz elle yazılmadı:** `ItemStat.isCombat` üzerinden türetiliyor. Bölüm 7
+  savaş motoru yeni bir stat eklerse havuz kendiliğinden genişler.
+- **Ekonomi statları havuzda yok** (adım parası, adım XP, çark XP, düşman XP,
+  tavanlar, seri eşiği): ekonomi ölçülmüş bir dengeye bağlı
+  (`economy_pacing_test.dart`) ve seriyle büyürse günlük coin tavanı katlanır.
+  Sekiz ekonomi statının hepsi ayrı ayrı sıfır kontrol ediliyor.
+- **Seri kırılınca birikimin tamamı gider.** Bilerek: seriyi değerli kılan ve
+  600 coin'lik dondurma hakkını haklı çıkaran şey bu. Dondurma hakkı köprü
+  kurduğunda birikim **korunur** (seri artmıyor, ama kırılmıyor da).
+
+### GD45. Rastgelelik hem tohumlu hem **kalıcı** (2026-08-25)
+- **Nerede:** `UserProfile.streakBonusSeed`, `streakStatBonuses`,
+  `lastStreakBonusDay`
+- **Karar:** çekiliş tohumdan çıkıyor **ve** sonucu diske yazılıyor. Gün
+  `lastStreakBonusDay` ile işaretleniyor; aynı oyun gününde ikinci çekiliş
+  yapılmıyor.
+- **Neden tohum tek başına yetmedi:** çekiliş **yol bağımlı** — tavana ulaşan
+  stat havuzdan çıkıyor, yani N. günün havuzu önceki N−1 günün sonucuna
+  bağlı. Saf bir `f(tohum, günIndeksi)` bunu ancak bütün geçmişi yeniden
+  oynatarak üretebilirdi; üstelik havuz Bölüm 7'de genişleyecek ve eski
+  günlerin sonucu geriye dönük değişirdi.
+- **Zar atma kapatıldı:** kapat-aç yeni bir çekiliş yaptırmaz (gün işareti),
+  çark çevirmek de sırayı değiştirmez — tohum çarkınkinden **ayrı** bir akış
+  (`nextStreakSeed`), aynı LCG ama farklı sayaç. Aynı sayacı paylaşsalardı
+  oyuncu "önce çarkı çevir, sonra yürü" ile stat seçebilirdi.
+- **`String.hashCode` kullanılmadı** (GD8): başlangıç tohumu `stableSpread`
+  ile oyuncunun adı ve sınıfından türüyor, sürümler arası sabit.
+- **Tohum kırılmada sıfırlanmaz:** sıfırlansaydı her kırılıştan sonra aynı
+  stat dizisi tekrarlanırdı.
+
+### GD46. Seviye kutlaması seri bildirimini yutuyordu (2026-08-25)
+- **Nerede:** `root_shell.dart:_onStepsReported`
+- **Sorun:** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor (seviye
+  kutlaması manşet olmalı). Seri stat bildirimi senkron gösterildiği için
+  kuyruğa **önce** giriyor, seviye kutlaması frame sonunda gelip onu hemen
+  kapatıyordu. Aynı partide seviye atlayan oyuncu günün bonusunu hiç
+  görmüyordu.
+- **Karar:** seri bildirimi de `addPostFrameCallback` ile kuyruğa alınıyor.
+  Frame sonu callback'leri kayıt sırasıyla çalıştığı için seviye kutlaması
+  (setState içinde kaydediliyor) önce, seri bildirimi arkasından geliyor;
+  ikisi de görülüyor. Testle bağlandı.
+- **Kilometre taşı bildirimi (`_showStreakMilestone`) hâlâ senkron** ve aynı
+  riski taşıyor. Bu birimin kapsamı dışında bırakıldı; Bölüm 6'da ele
+  alınacak.
+
+---
+---
+
 # Bölüm 3 — Buff çeşitliliği ✅ (2026-08-25)
 
 Kartın sözü: *"aynı sınıftaki üç eşyanın en düşük seviyeli hallerinin buff'ı
@@ -4600,6 +4661,92 @@ test/golden/goldens/adventure_320.png
 test/golden/goldens/adventure_390.png
 ```
 
+
+---
+---
+---
+
+# Bölüm 5C — Seri savaş stat bonusu ✅ (2026-08-25)
+
+Seri artık yalnızca bir sayaç değil: her gün savaş statlarından **birini**
+kalıcı olarak büyütüyor. Kararlar **GD44–GD46**. Şema **v12 → v13**.
+
+> **Not — Bölüm 5a ve 5b yapılmadı.** Seri tetikleyicisi hâlâ 2000 adım
+> (`GameConstants.streakStepThreshold`), çark kilidi hâlâ 3000 adım
+> (`dailyWheelUnlockSteps`). "Macera tamamlamak" şartına geçiş **Bölüm 8.5**'in
+> zincirleme sonucu olarak orada ele alınacak: iki fazlı macerada
+> "tamamlamak"ın ne demek olduğu orada cevaplanıyor, ikisini ayrı yapmak aynı
+> yeri iki kez yazmak olurdu.
+
+## Tasarım
+
+| Kural | Değer |
+|---|---|
+| Gün başına | seçilen stata **+%1** (`streakStatBonusPerDay`) |
+| Stat başına tavan | **+%25** (`maxStreakStatBonus`) → 25 gün |
+| Toplam tavan | **+%100** (`maxStreakTotalBonus`) → ~100 gün |
+| Havuz | `ItemStat.isCombat` olan **7 stat**: saldırı, savunma, savaş canı, kritik şansı, kritik hasarı, can çalma, sıyrılma |
+| Tavandaki stat | havuzdan çıkar, gün boşa gitmez |
+| Seri kırılınca | birikimin **tamamı** gider |
+| Dondurma hakkı | birikimi **korur** (seri artmaz ama kırılmaz) |
+
+7 × %25 = %175 > %100, yani toplam tavan bağlayıcı. Bu ilişki testle bağlı:
+sabitlerden biri değişirse alarm verir.
+
+## Kalıcılık ve zar atma koruması
+
+Çekiliş **yol bağımlı** (tavana ulaşan stat havuzdan çıkıyor), bu yüzden tek
+başına tohum yetmiyor — birikimin kendisi diske yazılıyor. Gerekçe **GD45**.
+
+| Alan | İş |
+|---|---|
+| `streakStatBonuses` | Stat → kazandırılmış **gün sayısı**. Oran türetiliyor. |
+| `streakBonusSeed` | Çekilişin tohumu; çarkınkinden ayrı akış. `0` = kurulmadı. |
+| `lastStreakBonusDay` | Bonusun verildiği son oyun günü; aynı gün ikinci çekiliş yok. |
+
+**Gün sayısı tutuluyor, oran değil:** `0.01` yirmi beş kez toplanınca `0.25`
+etmiyor (`0.2499…`) ve stat tavana hiç oturmuyordu. Tam sayı hem kayıt turunda
+kaymıyor hem tavan karşılaştırmasını kesin yapıyor.
+
+## Arayüz
+
+- **Profil → Karakter Gücü**: "Seri Bonusu" bölümü; hangi stata kaç gün ve ne
+  kadar oran biriktiği **stat stat**. Bölümün kendi sütun başlıkları var
+  (`GÜN / BONUS / DURUM`) — üstteki tablonun "EKİPMAN" başlığını paylaşmak
+  yanıltıcı olurdu. Tavandaki stat "tavan" etiketiyle işaretli.
+- **Yeni gün bildirimi**: "3. gün: +%1 kritik şansı (seriden toplam +%3)".
+  Stat tavana oturduysa ya da toplam tavan dolduysa bunu da söylüyor
+  (Model Kuralları #4).
+- **Ana ekran seri kartı**: tek satırlık özet; kırılma uyarısı artık birikimi
+  de hatırlatıyor ("Biriken +%15 savaş bonusun gider.").
+- **Kırılma anı**: seri kırıldığında ne kaybedildiği söyleniyor.
+
+## Bugün uygulanmıyor — ve bu bilinçli
+
+Savaş statlarının hiçbiri bugün bir yere uygulanmıyor (item savaş statları da
+öyle, bkz. GD24/GD38). Bonus üretiliyor, saklanıyor ve gösteriliyor; savaş
+motoru **Bölüm 7**'de yazılınca item + eşya seviyesi + birleştirme + seri
+bonusu dördü birden canlanacak. Toplama noktası tek olmalı.
+
+## Test
+
+- `test/streak_stat_bonus_test.dart` — **25 test**: havuzun canlı stat
+  listesinden türemesi ve ekonomi statlarını içermemesi, determinizm (aynı
+  tohum → aynı stat, aynı gün ikinci çağrı `null`, kapat-aç turu aynı diziyi
+  sürdürüyor, farklı oyuncular farklı dizi), tohumun her günde ilerlemesi,
+  stat başına ve toplam tavan, tavandaki statın havuzdan çıkması, tavan
+  dolunca serinin yine ilerlemesi, dağılımın tek stata yığılmaması, seri
+  kırılınca sıfırlanma, dondurma hakkının koruması, tohumun kırılmada
+  sıfırlanmaması, sekiz ekonomi statının hiç etkilenmemesi, bozuk ve tavan
+  üstü kayıtların kırpılması, v12 kaydının temiz varsayılana düşmesi.
+- `test/streak_bonus_shell_test.dart` — **6 test** (gerçek `RootShell`):
+  eşik geçilince bonusun verilip duyurulması, **seviye atlansa bile
+  bildirimin yutulmaması** (GD46 regresyonu), aynı gün ikinci partinin bonus
+  vermemesi, diske yazılması, profilde ve ana ekranda gösterilmesi.
+- `test/golden/streak_bonus_golden_test.dart` — **3 test**: 320/390 dp golden
+  (PNG'ler üretildi ve gözle doğrulandı) + bonus yokken bölümün hiç çıkmaması.
+
+Toplam **588 test geçiyor**, `flutter analyze` temiz.
 
 ---
 ---

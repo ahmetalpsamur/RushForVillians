@@ -23,6 +23,7 @@ import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
 import '../../models/item.dart';
+import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
 import '../../models/reward.dart';
 import '../../models/reward_rarity.dart';
@@ -341,6 +342,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       changed = true;
     }
+    // Kırılma bonusu sıfırlıyor; kaybedileni söyleyebilmek için önce ölç.
+    final bonusBeforeRefresh = _profile.streakStatBonuses.totalBonus;
     final streakOutcome = _profile.refreshStreak(now);
     if (streakOutcome != StreakDayOutcome.unchanged) changed = true;
     if (streakOutcome == StreakDayOutcome.frozen) {
@@ -348,6 +351,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // çağrıldığı için bildirim frame sonuna bırakılır.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showStreakFrozen();
+      });
+    }
+    if (streakOutcome == StreakDayOutcome.broken && bonusBeforeRefresh > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showStreakBonusLost(bonusBeforeRefresh);
       });
     }
     return changed;
@@ -605,6 +613,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     CombatRoundResult? roundResult;
     int? milestoneReached;
     var milestoneFreezeGranted = false;
+    ItemStat? streakStatGained;
     var capJustReached = false;
     final capWasReached = _today.coinCapReached;
     setState(() {
@@ -656,6 +665,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // kontrol ediliyor, yani kuşanmayı çıkarmak geçmiş günleri bozmaz.
       if (_today.steps >= _buffs.streakStepThreshold &&
           _profile.registerStreakDay(now)) {
+        // Günün savaş stat bonusu: seri ilerledikten **sonra** çekilir.
+        // Aynı oyun gününde ikinci çağrı null döner, yani kapat-aç ile
+        // yeniden zar atılamaz (bkz. `streak_bonus.dart`).
+        streakStatGained = _profile.grantStreakStatBonus(now);
         milestoneReached = _profile.reachedStreakMilestone;
         // Her kilometre taşı bir dondurma hakkı verir (stok sınırlı).
         // Aşama 2c'de bilerek boş bırakılan kazanım yolu bu.
@@ -667,6 +680,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     });
     _persist();
     if (capJustReached) _showCoinCapNotice();
+    final statGained = streakStatGained;
+    if (statGained != null) {
+      // Frame sonuna bırakılıyor: aynı partide seviye atlandıysa
+      // [_showLevelUp] `hideCurrentSnackBar()` çağırıp bu bildirimi yutuyordu.
+      // Seviye kutlaması frame sonunda kuyruğa girdiği için burada da frame
+      // sonunu beklemek, seri bildirimini onun **arkasına** koyuyor — ikisi
+      // de görülüyor.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showStreakStatBonus(statGained);
+      });
+    }
     final milestone = milestoneReached;
     if (milestone != null) {
       _showStreakMilestone(milestone, freezeGranted: milestoneFreezeGranted);
@@ -811,6 +835,62 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             const Icon(Icons.local_fire_department, color: AppColors.streak),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Günün seri stat bonusunu duyurur: "3. gün: +%1 kritik şansı".
+  ///
+  /// Stat tavana oturduysa bunu da söyler; oyuncu neden bir daha o statın
+  /// çıkmayacağını bilmeli (Model Kuralları #4).
+  void _showStreakStatBonus(ItemStat stat) {
+    final bonuses = _profile.streakStatBonuses;
+    final percent = (GameConstants.streakStatBonusPerDay * 100).round();
+    final total = (bonuses.bonusFor(stat) * 100).round();
+    final buffer = StringBuffer(
+      '${_profile.streakDays}. gün: +%$percent ${stat.label} '
+      '(seriden toplam +%$total)',
+    );
+    if (bonuses.isAtCap(stat)) {
+      buffer.write(' · bu stat tavana ulaştı');
+    } else if (bonuses.isFull) {
+      buffer.write(' · seri bonusu tavana ulaştı');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        content: Row(
+          children: [
+            const Icon(Icons.auto_awesome, color: AppColors.streak),
+            const SizedBox(width: 8),
+            Expanded(child: Text(buffer.toString())),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Seri kırılınca kaybedilen savaş bonusunu söyler. Sessiz kalmamalı:
+  /// oyuncu neyi kaybettiğini bilmezse dondurma hakkının değerini de
+  /// anlamaz.
+  void _showStreakBonusLost(double lostBonus) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            const Icon(Icons.heart_broken, color: AppColors.streak),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Serin kırıldı. Biriktirdiğin +%${(lostBonus * 100).round()} '
+                'savaş bonusu sıfırlandı.',
+              ),
+            ),
           ],
         ),
       ),

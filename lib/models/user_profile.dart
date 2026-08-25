@@ -1,9 +1,12 @@
 import '../core/constants/game_constants.dart';
 import '../core/utils/game_clock.dart';
 import '../core/utils/game_day.dart';
+import '../core/utils/streak_bonus.dart';
 import 'avatar_profile.dart';
+import 'item_effect.dart';
 import 'owned_item.dart';
 import 'reward_rarity.dart';
+import 'streak_stat_bonuses.dart';
 
 /// Gün döngüsü kontrolünün seri açısından sonucu.
 enum StreakDayOutcome {
@@ -140,6 +143,26 @@ class UserProfile {
   /// ayrı bir gün hesabı yapılmaz.
   DateTime? xpBoostUntil;
 
+  /// Serinin biriktirdiği savaş stat bonusları (Bölüm 5C).
+  ///
+  /// Her seri günü havuzdan bir stat seçilip büyür. Birikim **kalıcı**:
+  /// çekiliş yol bağımlı olduğu için (tavana ulaşan stat havuzdan çıkar)
+  /// tohumdan yeniden üretilemez. Seri kırılınca tamamen sıfırlanır.
+  StreakStatBonuses streakStatBonuses;
+
+  /// Seri stat çekilişinin tohumu. `0` = henüz kurulmadı.
+  ///
+  /// Çark tohumundan ([wheelSeed]) **ayrı** tutuluyor: aynı sayacı
+  /// paylaşsalardı çarkı çevirmek ertesi günün stat çekilişini değiştirir,
+  /// yani oyuncuya sıra üzerinden bir zar atma yolu açardı.
+  int streakBonusSeed;
+
+  /// Seri stat bonusunun verildiği son oyun günü.
+  ///
+  /// Aynı gün ikinci kez çekiliş yapılmamasının dayanağı: uygulamayı kapatıp
+  /// açmak yeni bir zar attırmaz.
+  DateTime? lastStreakBonusDay;
+
   UserProfile({
     required this.avatar,
     int? hp,
@@ -166,6 +189,9 @@ class UserProfile {
     this.extraWheelSpins = 0,
     this.wheelSeed = 0,
     this.xpBoostUntil,
+    this.streakStatBonuses = StreakStatBonuses.empty,
+    this.streakBonusSeed = 0,
+    this.lastStreakBonusDay,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItems = ownedItems ?? <OwnedItem>[],
@@ -328,6 +354,9 @@ class UserProfile {
     if (gap < 2) return StreakDayOutcome.unchanged;
     if (_bridgeWithFreeze(gap)) return StreakDayOutcome.frozen;
     streakDays = 0;
+    // Seri kırılınca biriken savaş bonusu da gider. Bilerek: seriyi değerli
+    // kılan ve dondurma hakkının fiyatını haklı çıkaran şey bu.
+    resetStreakStatBonuses();
     return StreakDayOutcome.broken;
   }
 
@@ -410,9 +439,55 @@ class UserProfile {
   }
 
   void _startStreakDay(DateTime now, int days) {
+    // Seri 1'e dönüyorsa (yeni seri ya da kırılmanın ardından yeniden
+    // başlama) biriken savaş bonusu da sıfırlanır. Köprülenen gün buraya
+    // `streakDays + 1` ile geldiği için jeton birikimi korur.
+    if (days <= 1) resetStreakStatBonuses();
     streakDays = days;
     lastActiveDay = now;
     if (streakDays > longestStreak) longestStreak = streakDays;
+  }
+
+  // --- Seri savaş stat bonusu (Bölüm 5C) ---
+
+  /// Biriken bonusu ve gün işaretini temizler.
+  ///
+  /// Tohum **sıfırlanmaz**: oyuncuya özel kalması gerekiyor ve serinin
+  /// kırılması yeni bir kimlik anlamına gelmiyor. Tohumu da sıfırlamak,
+  /// her kırılıştan sonra aynı stat dizisini tekrarlatırdı.
+  void resetStreakStatBonuses() {
+    streakStatBonuses = StreakStatBonuses.empty;
+    lastStreakBonusDay = null;
+  }
+
+  /// Bu oyun gününün seri stat bonusunu verir; kazanan statı döner.
+  ///
+  /// `null` dönerse bonus verilmedi: ya aynı gün zaten verilmiş ya da toplam
+  /// tavan dolmuş. Aynı gün ikinci çağrı **her zaman** `null` döner —
+  /// uygulamayı kapatıp açmak yeni bir zar attırmaz.
+  ///
+  /// [registerStreakDay]'den **sonra** çağrılmalı: seri o gün ilerlemediyse
+  /// bonus da verilmemeli.
+  ItemStat? grantStreakStatBonus(DateTime now) {
+    final last = lastStreakBonusDay;
+    if (last != null && GameDay.isSameGameDay(last, now)) return null;
+
+    if (streakBonusSeed == 0) {
+      streakBonusSeed = initialStreakSeed(
+        '${avatar.name}|${avatar.characterClass}',
+      );
+    }
+    final draw = drawStreakStatBonus(
+      current: streakStatBonuses,
+      seed: streakBonusSeed,
+    );
+    // Tavan dolu olsa bile gün işaretlenir: aynı gün tekrar tekrar çekiliş
+    // denemenin bir anlamı yok.
+    lastStreakBonusDay = now;
+    if (draw == null) return null;
+    streakStatBonuses = draw.bonuses;
+    streakBonusSeed = draw.nextSeed;
+    return draw.stat;
   }
 
   /// Serinin şu anda denk geldiği kilometre taşı (yoksa null).
@@ -480,6 +555,9 @@ class UserProfile {
     'extraWheelSpins': extraWheelSpins,
     'wheelSeed': wheelSeed,
     'xpBoostUntil': xpBoostUntil?.toUtc().toIso8601String(),
+    'streakStatBonuses': streakStatBonuses.toJson(),
+    'streakBonusSeed': streakBonusSeed,
+    'lastStreakBonusDay': lastStreakBonusDay?.toIso8601String(),
   };
 
   /// Eksik alanlar varsayılana düşer; böylece eski kayıtlar okunabilir kalır.
@@ -525,6 +603,11 @@ class UserProfile {
         GameConstants.maxExtraWheelSpins + GameConstants.maxEquippedStockBonus,
       ),
       wheelSeed: json['wheelSeed'] as int? ?? 0,
+      // Bozuk/elle düzenlenmiş kayıt: bilinmeyen stat adları ve tavan üstü
+      // günler [StreakStatBonuses] içinde sessizce kırpılır.
+      streakStatBonuses: StreakStatBonuses.fromJson(json['streakStatBonuses']),
+      streakBonusSeed: json['streakBonusSeed'] as int? ?? 0,
+      lastStreakBonusDay: _parseDate(json['lastStreakBonusDay']),
       xpBoostUntil: _parseDate(json['xpBoostUntil']),
     );
   }

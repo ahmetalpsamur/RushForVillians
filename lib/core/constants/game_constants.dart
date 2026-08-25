@@ -47,6 +47,29 @@ class GameConstants {
   /// Gün bitmeye bu kadar saat kala, seri henüz tamamlanmadıysa uyarılır.
   static const int streakWarningHours = 3;
 
+  // --- Seri savaş stat bonusu (Bölüm 5C) ---
+
+  /// Her seri günü, savaş statlarından **birine** eklenen oran (0.01 = +%1).
+  ///
+  /// Bonus tek bir stata değil, gün gün seçilen statlara dağılır: 30 günlük
+  /// bir seri oyuncuya kendine özgü bir savaş profili bırakır ve her gün
+  /// "bugün ne kazandım" anı olur.
+  static const double streakStatBonusPerDay = 0.01;
+
+  /// Tek bir savaş statının seriden alabileceği en fazla oran (+%25).
+  ///
+  /// Tavana ulaşan stat havuzdan çıkarılır, yani gün boşa gitmez. Sınır,
+  /// uzun serinin tek bir stata yığılıp diğerlerini anlamsız kılmasını
+  /// engelliyor.
+  static const double maxStreakStatBonus = 0.25;
+
+  /// Seriden gelen **toplam** savaş bonusu tavanı (+%100).
+  ///
+  /// Gün başına +%1 ile ~100 günde dolar. Yedi stata yayıldığı için tek
+  /// statlık eski tavanlar çok düşük kalırdı; buna karşılık stat başına
+  /// tavan (+%25) tek bir statın uçmasını engelliyor.
+  static const double maxStreakTotalBonus = 1.0;
+
   /// Aynı anda tutulabilecek en fazla ekstra çark hakkı.
   ///
   /// [maxStreakFreezes] ile aynı gerekçe: jeton biriktirip günlerce çark

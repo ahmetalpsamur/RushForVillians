@@ -457,6 +457,13 @@ class _StreakCardState extends State<_StreakCard> {
     final endingSoon =
         !completed &&
         remaining <= const Duration(hours: GameConstants.streakWarningHours);
+    // Uyarı neyin kaybedileceğini de söylemeli: biriken savaş bonusu serinin
+    // asıl değeri, gün sayısı değil.
+    final streakBonus = profile.streakStatBonuses.totalBonus;
+    final bonusWarning =
+        streakBonus > 0
+            ? ' Biriken +%${(streakBonus * 100).round()} savaş bonusun gider.'
+            : '';
 
     return SectionCard(
       title: 'Günlük Seri',
@@ -510,6 +517,26 @@ class _StreakCardState extends State<_StreakCard> {
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
+          if (streakBonus > 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: AppColors.streak,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Seri bonusu: +%${(streakBonus * 100).round()} savaş statı '
+                    '(profilde stat stat görülür).',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ],
           // Stok 0'ken satır hiç çıkmaz: kazanım yolları Aşama 3'te gelene
           // kadar kullanıcıya boş bir sayaç göstermenin anlamı yok.
           if (profile.streakFreezes > 0) ...[
@@ -541,7 +568,7 @@ class _StreakCardState extends State<_StreakCard> {
                 Expanded(
                   child: Text(
                     'Gün bitmesine ${GameDay.formatRemaining(remaining)} kaldı, '
-                    'serini kaybetme!',
+                    'serini kaybetme!$bonusWarning',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.streak,

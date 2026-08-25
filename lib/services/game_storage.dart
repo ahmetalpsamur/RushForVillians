@@ -21,7 +21,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 12;
+  static const int schemaVersion = 13;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -151,6 +151,12 @@ class GameStorage {
       profile['nextItemInstanceId'] = nextId;
       return state;
     },
+    // 12 -> 13: seri savaş stat bonusu eklendi (Bölüm 5C).
+    //
+    // Varsayılanları (boş birikim / tohum 0 / gün null) doğru: seri bonusu
+    // yokken geçen günler geriye dönük stat kazandırmamalı. Tohum ilk
+    // kullanımda oyuncuya özel kurulacak.
+    12: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde
