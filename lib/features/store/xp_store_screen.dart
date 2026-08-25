@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/item.dart';
 import '../../models/xp_store_item.dart';
+import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
 import '../../widgets/section_card.dart';
 
@@ -506,7 +507,17 @@ class _EquipmentCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             const SizedBox(height: 4),
-            RarityBadge(rarity: item.rarity),
+            // Nadirlik "ne kadar güçlü", arketip "hangi yöne güçlü" sorusunu
+            // cevaplar. Wrap kullanılıyor: dar kartta ikisi alt alta düşsün,
+            // taşmasın.
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                RarityBadge(rarity: item.rarity),
+                ArchetypeBadge(archetype: item.archetype),
+              ],
+            ),
             // İmzalı itemlerin kural cümlesi: item'ın karakterini bu taşıyor.
             if (item.lore case final lore?) ...[
               const SizedBox(height: 4),

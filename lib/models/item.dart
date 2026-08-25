@@ -19,6 +19,35 @@ enum ItemCategory {
 /// Kategorinin oyun içindeki rolü. Buff dağılımı buradan çıkar.
 enum ItemRole { melee, magic, ranged, defense }
 
+/// Item'ın **karakteri**: aynı güç bütçesini farklı dağıtan eğilim.
+///
+/// Arketip, item'ın **kendi kimliğinden** (`Item.id`) kararlı biçimde türer
+/// ve kategori rolüne göre ağırlıklandırılır (bkz. [ItemArchetypes.wheel]).
+/// Aynı sınıfın, aynı nadirlikteki iki kılıcı bu sayede birbirinden ayrışıyor:
+/// biri vurucu, öbürü düellocu olabiliyor.
+///
+/// Model Kuralları #1: enum diske **yazılmaz** — [Item] kalıcı değil, her
+/// açılışta katalogdan yeniden çözülüyor.
+enum ItemArchetype { striker, guardian, duelist, swift }
+
+extension ItemArchetypeX on ItemArchetype {
+  /// Kullanıcıya görünen Türkçe ad.
+  String get label => switch (this) {
+    ItemArchetype.striker => 'Vurucu',
+    ItemArchetype.guardian => 'Muhafız',
+    ItemArchetype.duelist => 'Düellocu',
+    ItemArchetype.swift => 'Çevik',
+  };
+
+  /// Kartta ad(ın altında) tek satırlık açıklama.
+  String get description => switch (this) {
+    ItemArchetype.striker => 'ham vuruş gücüne yatırım yapar',
+    ItemArchetype.guardian => 'dayanıklılığa yatırım yapar',
+    ItemArchetype.duelist => 'kritik vuruşa yatırım yapar',
+    ItemArchetype.swift => 'kaçınma ve tempoya yatırım yapar',
+  };
+}
+
 extension ItemCategoryX on ItemCategory {
   /// `lib/Items/` altındaki klasör adı. Katalog taraması bunu kullanır.
   String get folder => switch (this) {
@@ -118,7 +147,9 @@ extension ItemCategoryX on ItemCategory {
       'Skeleton',
       'Soldier',
     ],
-    // Tırpan hasat aletidir; Nature'a doğal olarak düşer.
+    // Tırpan hasat aletidir; Nature'a doğal olarak düşer. Mezar Okçusu da
+    // ölümün aletini taşır — ve o sınıfın kategori havuzu onsuz 150 item
+    // alt sınırının altında kalıyordu (bkz. GD37).
     ItemCategory.scythes => const [
       'DarkMagic',
       'Thief',
@@ -126,6 +157,7 @@ extension ItemCategoryX on ItemCategory {
       'Bat',
       'Greatsword Skeleton',
       'Necromancer',
+      'Skeleton Archer',
       'Slime',
       'Werewolf',
     ],
@@ -155,6 +187,9 @@ extension ItemCategoryX on ItemCategory {
       'Skeleton',
       'Soldier',
       'Swordsman',
+      // Ayı Ruhlu ağır bir savaşçı; kalkan ona doğal düşüyor ve sınıfın
+      // havuzu onsuz 105 item'da kalıyordu (bkz. GD37).
+      'Werebear',
     ],
     // Arbalet hırsızın da işine yarar.
     ItemCategory.arch => const [
@@ -205,9 +240,16 @@ extension ItemCategoryX on ItemCategory {
 
 /// Bir item'ın verebileceği bonus türü — **kural türetmesinin** alfabesi.
 ///
-/// Sekiz tür var ve her karakter sınıfının **imzası** ayrı bir tür
-/// (`item_rules.dart:_classSignature`); aynı görsel bu sayede sınıfa göre
-/// farklı bir item oluyor.
+/// Sekiz tür var ve her karakter sınıfının bir **imzası** vardır
+/// (`item_rules.dart:_classSignature`). İmza, o sınıfın itemlerinde en olası
+/// bonus türüdür — **her itemde bulunmaz**: hangi türlerin çıkacağı item'ın
+/// kendi kimliğinden ağırlıklı bir çekilişle belirlenir
+/// (`item_rules.dart:economyTypeOrder`). Aynı görsel bu sayede hem sınıfa
+/// göre hem item'dan item'a farklılaşıyor.
+///
+/// 18 oynanabilir sınıf ve sekiz tür var; imzalar zorunlu olarak paylaşılıyor
+/// (bkz. GD36). Sınıf kimliği tek bir itemde değil, sınıfın gördüğü katalogun
+/// tamamındaki dağılımda okunuyor.
 ///
 /// Bu enum yalnızca sıradan/az bulunur/nadir itemlerin kuraldan türeyen
 /// bonuslarını tanımlar. Elle tasarlanmış itemler ([ItemEffects]) doğrudan
@@ -406,6 +448,13 @@ class Item {
 
   final ItemBuff buff;
 
+  /// Item'ın karakteri: aynı bütçeyi hangi yöne dağıttığı.
+  ///
+  /// Kuraldan türeyen itemlerde kimlikten hesaplanır
+  /// (`item_rules.dart:archetypeFor`); elle tasarlanmış itemlerde taşıdıkları
+  /// savaş statlarından okunur, yani etiketi gerçekten yaptığı işi anlatır.
+  final ItemArchetype archetype;
+
   /// Elle tasarlanmış itemlerin kısa kural cümlesi; kuraldan türeyenlerde
   /// `null`.
   ///
@@ -423,6 +472,7 @@ class Item {
     required this.requiredLevel,
     required this.cost,
     required this.buff,
+    required this.archetype,
     this.lore,
   });
 
@@ -435,17 +485,19 @@ class Item {
   /// **[id] hiçbir zaman değişmez:** kalıcı olan tek şey o
   /// ([UserProfile.ownedItemIds]). Kimliğe sınıf gömseydik, oyuncu karakterini
   /// düzenleyip sınıf değiştirdiğinde envanteri sessizce boşalırdı.
-  Item copyWith({String? name, ItemBuff? buff}) => Item(
-    id: id,
-    name: name ?? this.name,
-    assetPath: assetPath,
-    category: category,
-    rarity: rarity,
-    requiredLevel: requiredLevel,
-    cost: cost,
-    buff: buff ?? this.buff,
-    lore: lore,
-  );
+  Item copyWith({String? name, ItemBuff? buff, ItemArchetype? archetype}) =>
+      Item(
+        id: id,
+        name: name ?? this.name,
+        assetPath: assetPath,
+        category: category,
+        rarity: rarity,
+        requiredLevel: requiredLevel,
+        cost: cost,
+        buff: buff ?? this.buff,
+        archetype: archetype ?? this.archetype,
+        lore: lore,
+      );
 
   /// Bu item'ı [characterClass] sınıfı kuşanabilir mi.
   bool isUsableBy(String characterClass) =>

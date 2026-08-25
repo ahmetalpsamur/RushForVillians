@@ -145,6 +145,21 @@ class AvatarProfile {
     'Thief': 'Werewolf',
   };
 
+  /// Bugün oynanabilen sınıf kimlikleri.
+  ///
+  /// [classLabels] hem güncel All_Assets sınıflarını hem de yalnızca eski
+  /// kayıtlarda geçen kimlikleri taşıyor (emekliye ayrılanlar ve
+  /// All_Assets'e taşınmış eski sınıflar). Oynanabilir küme ikisini de
+  /// dışarıda bırakır; [CharacterCatalog.load] de aynı sonucu üretir.
+  ///
+  /// Item dağılımı ve buff testleri bu listeye bakar: elle yazılmış bir
+  /// kopya, sınıf eklendiğinde sessizce eskiyordu.
+  static List<String> get playableClassIds => [
+    for (final id in classLabels.keys)
+      if (!_retiredClasses.containsKey(id) && !_legacyClasses.containsKey(id))
+        id,
+  ];
+
   static const _retiredClasses = {
     'Bat': 'Werewolf',
     'Lancer': 'Knight',

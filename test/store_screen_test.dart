@@ -412,7 +412,16 @@ void main() {
 
         await pumpStore(tester, equipment: sample, coins: 10, level: 1);
 
-        expect(errors, isEmpty, reason: errors.join(' | '));
+        // Yalnızca ilk birkaç hata raporlanıyor: taşan bir düzen her karede
+        // yüzlerce hata üretiyor ve hepsini birleştirmek test koşucusunu
+        // dakikalarca meşgul ediyordu (10 dakikalık zaman aşımına kadar).
+        expect(
+          errors,
+          isEmpty,
+          reason:
+              '${errors.length} hata; ilk ikisi: '
+              '${errors.take(2).join(" || ")}',
+        );
       });
     }
 

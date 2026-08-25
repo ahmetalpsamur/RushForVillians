@@ -14,6 +14,7 @@ import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/avatar_view.dart';
+import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
 import '../../widgets/section_card.dart';
 
@@ -952,10 +953,13 @@ class _InventoryRow extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         RarityBadge(rarity: item.rarity),
-                        const SizedBox(width: 8),
+                        ArchetypeBadge(archetype: item.archetype),
                         Text(
                           item.category.label,
                           style: const TextStyle(
@@ -1089,10 +1093,13 @@ class _ItemSheet extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             RarityBadge(rarity: item.rarity),
-                            const SizedBox(width: 8),
+                            ArchetypeBadge(archetype: item.archetype),
                             Text(
                               '${item.category.label} · Sv. '
                               '${item.requiredLevel}',
@@ -1102,6 +1109,18 @@ class _ItemSheet extends StatelessWidget {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Arketip bir sıralama değil, bir yön: aynı
+                        // nadirlikteki iki eşya arasındaki tercihi bu cümle
+                        // anlaşılır kılıyor.
+                        Text(
+                          '${item.archetype.label} — '
+                          '${item.archetype.description}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ArchetypeBadge.colorFor(item.archetype),
+                          ),
                         ),
                       ],
                     ),

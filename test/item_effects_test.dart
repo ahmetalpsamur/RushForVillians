@@ -5,22 +5,14 @@ import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/data/item_definitions.dart';
 import 'package:rush_for_villains/data/item_effects.dart';
+import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/item_effect.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
 
-/// [AvatarProfile.classLabels] anahtarları.
-const _allClasses = [
-  'SwordMan',
-  'Paladin',
-  'Thief',
-  'Archer',
-  'Magic',
-  'DarkMagic',
-  'Faith',
-  'Nature',
-];
+/// Bugün oynanabilen sınıflar; tek kaynaktan okunuyor (bkz. GD37).
+List<String> get _allClasses => AvatarProfile.playableClassIds;
 
 /// `lib/Items/` altındaki bütün görsel yolları (repo dosya sisteminden).
 List<String> _allAssetPaths() {
@@ -233,8 +225,8 @@ void main() {
       final base = buildItemFromAsset('lib/Items/magic/staff_type_1.png')!;
       expect(base.hasSignature, isFalse);
       expect(
-        flavorForClass(base, 'Magic').buff.labels,
-        isNot(flavorForClass(base, 'DarkMagic').buff.labels),
+        flavorForClass(base, 'Wizard').buff.labels,
+        isNot(flavorForClass(base, 'Priest').buff.labels),
       );
     });
 

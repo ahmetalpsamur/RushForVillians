@@ -1,3 +1,4 @@
+import '../../data/item_archetypes.dart';
 import '../../data/item_definitions.dart';
 import '../../data/item_effects.dart';
 import '../../models/item.dart';
@@ -142,18 +143,16 @@ double _buffTotal(RewardRarity rarity) => switch (rarity) {
   RewardRarity.legendary => 0.26,
 };
 
-/// Nadirliğin taşıdığı **bonus sayısı**.
+/// Kuraldan türeyen bir item'ın taşıdığı **toplam etki sayısı**.
 ///
-/// Sıradan bir item tek şey yapar; efsanevi bir item üç şey birden. Üçte
-/// duruyoruz: mağaza kartı sabit yükseklikte (bkz. GD12) ve dört satır
-/// bonus okunmaz hâle geliyor.
-int buffCountFor(RewardRarity rarity) => switch (rarity) {
-  RewardRarity.common => 1,
-  RewardRarity.uncommon => 2,
-  RewardRarity.rare => 2,
-  RewardRarity.epic => 3,
-  RewardRarity.legendary => 3,
-};
+/// Ekonomi ([ItemArchetypes.economyCount]) + savaş
+/// ([ItemArchetypes.combatCount]). Sıradan bir item iki şey yapar (biri
+/// bugün canlı, biri savaş motorunu bekliyor), efsanevi altı şey birden.
+///
+/// Mağaza kartı artık **esnek yükseklikte** (bkz. K9); GD12'nin sabit
+/// yükseklik kısıtı kalktığı için satır sayısı üçte durmak zorunda değil.
+int buffCountFor(RewardRarity rarity) =>
+    ItemArchetypes.economyCount(rarity) + ItemArchetypes.combatCount(rarity);
 
 /// Bütçenin bonuslara dağılımı. Birincil bonus her zaman en büyük payı alır;
 /// item'ın "ne işe yaradığı" tek bakışta anlaşılsın.
@@ -163,44 +162,52 @@ List<double> _buffShares(int count) => switch (count) {
   _ => const [0.5, 0.3, 0.2],
 };
 
-/// Karakter sınıfının **imza bonusu**: o sınıfın itemlerinde her zaman
-/// birincil sırada durur.
+/// Karakter sınıfının **imza bonusu**: o sınıfın itemlerinde en olası
+/// ekonomi bonusu.
 ///
-/// Aynı görselin Büyücüde ve Kara Büyücüde farklı bir item olmasını sağlayan
-/// şey bu. Sekiz sınıfa sekiz ayrı tür düşüyor; hiçbiri tekrar etmiyor.
+/// **Her itemde bulunmaz** (bkz. GD36). İmza, ekonomi türü çekilişinde
+/// [ItemArchetypes.signatureWeight] kadar ağırlık taşır; sınıfın gördüğü
+/// katalogun kabaca yarısında birincil bonus olur, kalanında item kendi
+/// kimliğinden başka bir tür çeker. Sınıf kimliği tek bir itemde değil,
+/// dağılımda okunuyor — aksi hâlde aynı sınıfın bütün sıradan itemleri
+/// birebir aynı olurdu.
+///
+/// 18 oynanabilir sınıf, sekiz tür: imzalar zorunlu olarak paylaşılıyor.
+/// Dağılım dengeli tutuldu — her tür en az iki, en fazla üç sınıfın imzası
+/// (`item_variety_test.dart` bunu bağlıyor). Boşta kalan tür bırakılmadı:
+/// hiç kimsenin imzası olmayan bir bonus türü fiilen ölü olurdu.
 ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
-  // Savaşçı düşmandan daha çok ders çıkarır.
-  'SwordMan' => ItemBuffType.enemyXp,
-  // Paladin kararlıdır: serisini korur.
-  'Paladin' => ItemBuffType.streakFreezeCap,
-  // Hırsız günlük kazanç tavanını zorlar.
-  'Thief' => ItemBuffType.dailyCoinCap,
-  // Okçu gezgindir: yol para eder.
-  'Archer' => ItemBuffType.stepCoin,
-  // Büyücü öğrenir.
-  'Magic' => ItemBuffType.stepXp,
-  // Kara büyücü kaderi kendine çevirir.
-  'DarkMagic' => ItemBuffType.wheelXp,
+  // --- Oynanabilir sınıflar (All_Assets) ---
+  // Kılıç ustaları düşmandan ders çıkarır.
+  'Swordsman' || 'Elite Orc' || 'Armored Axeman' => ItemBuffType.enemyXp,
+  // Zırhlı olanlar kararlıdır: serilerini korurlar.
+  'Knight' || 'Armored Skeleton' => ItemBuffType.streakFreezeCap,
+  // Yağmacılar günlük kazanç tavanını zorlar.
+  'Orc' || 'Werewolf' => ItemBuffType.dailyCoinCap,
+  // Gezginler için yol para eder.
+  'Archer' || 'Soldier' => ItemBuffType.stepCoin,
+  // Öğrenenler adımdan bilgi devşirir.
+  'Wizard' || 'Skeleton' => ItemBuffType.stepXp,
+  // Kaderle oynayanlar çarktan daha çok alır.
+  'Slime' || 'Skeleton Archer' => ItemBuffType.wheelXp,
   // İnanç disiplindir: seri eşiği düşer.
-  'Faith' => ItemBuffType.streakRelief,
-  // Doğa döngüseldir: çark hakkı birikir.
-  'Nature' => ItemBuffType.wheelSpinCap,
-  // All_Assets sınıfları görsel savaş rollerine göre mevcut sekiz
-  // ekonomi imzasından birini kullanır.
-  'Armored Axeman' ||
-  'Elite Orc' ||
-  'Greatsword Skeleton' ||
-  'Orc' ||
-  'Swordsman' => ItemBuffType.enemyXp,
-  'Armored Orc' ||
-  'Armored Skeleton' ||
-  'Knight' => ItemBuffType.streakFreezeCap,
-  'Bat' || 'Skeleton Archer' || 'Werewolf' => ItemBuffType.dailyCoinCap,
-  'Lancer' || 'Orc rider' => ItemBuffType.stepCoin,
-  'Soldier' || 'Wizard' => ItemBuffType.stepXp,
-  'Necromancer' => ItemBuffType.wheelXp,
   'Knight Templar' || 'Priest' => ItemBuffType.streakRelief,
-  'Skeleton' || 'Slime' || 'Werebear' => ItemBuffType.wheelSpinCap,
+  // Döngüsel olanlarda çark hakkı birikir.
+  'Werebear' ||
+  'Armored Orc' ||
+  'Greatsword Skeleton' => ItemBuffType.wheelSpinCap,
+
+  // --- Yalnızca eski kayıtlarda geçen sınıflar ---
+  // Kimlikleri korunuyor: eski bir kaydın itemleri güncelleme sonrası
+  // sessizce başka bir bonusa kaymamalı.
+  'SwordMan' => ItemBuffType.enemyXp,
+  'Paladin' => ItemBuffType.streakFreezeCap,
+  'Thief' || 'Bat' => ItemBuffType.dailyCoinCap,
+  'Lancer' || 'Orc rider' => ItemBuffType.stepCoin,
+  'Magic' => ItemBuffType.stepXp,
+  'DarkMagic' || 'Necromancer' => ItemBuffType.wheelXp,
+  'Faith' => ItemBuffType.streakRelief,
+  'Nature' => ItemBuffType.wheelSpinCap,
   _ => ItemBuffType.stepCoin,
 };
 
@@ -237,64 +244,220 @@ List<ItemBuffType> _roleOrder(ItemRole role) => switch (role) {
   ],
 };
 
-/// Bir item'ın bonus türlerini sırayla verir: önce sınıf imzası, sonra
-/// kategori eğilimi, sonra kalanlar.
+/// Bir item'ın **ekonomi** bonus türlerini sırayla verir.
 ///
-/// Kuyruk [stableSpread] ile döndürülür; böylece aynı sınıf ve kategorideki
-/// yüzlerce item aynı ikincil bonusa yapışmaz. Döndürme kimlikten çıktığı için
-/// **kararlı**: aynı item her açılışta aynı bonusları verir (bkz. GD8).
-List<ItemBuffType> buffTypeOrder(
+/// Eskiden bu liste "önce sınıf imzası, sonra kategori eğilimi, sonra
+/// kalanlar" biçiminde sabitti ve yalnızca kuyruğu item kimliğine göre
+/// dönüyordu. Sonuç: sıradan itemde tek bonus vardı ve o **her zaman** sınıf
+/// imzasıydı — aynı sınıfın bütün sıradan kılıçları birebir aynı bonusu
+/// veriyordu. Oyuncu iki kılıç arasında gerçek bir tercih yapamıyordu.
+///
+/// Şimdi türler **ağırlıklı, tekrarsız ve kararlı** bir çekilişten geliyor:
+///
+/// - sınıf imzası [ItemArchetypes.signatureWeight] ek ağırlık,
+/// - kategori rolünün eğilim listesi [ItemArchetypes.roleWeights] ek ağırlık,
+/// - her tür [ItemArchetypes.baseWeight] taban ağırlık (hiçbiri elenmiyor).
+///
+/// Çekiliş tohumu item kimliği + sınıf: aynı item her açılışta aynı bonusları
+/// verir (GD8 — `String.hashCode` kullanılmaz), ama iki farklı item aynı
+/// olmak zorunda değildir.
+List<ItemBuffType> economyTypeOrder(
   ItemCategory category, {
   String? characterClass,
   String id = '',
+  int count = 8,
 }) {
   final signature =
       characterClass == null
           ? _roleOrder(category.role).first
           : _classSignature(characterClass);
 
-  final seen = <ItemBuffType>{signature};
-  final tail = <ItemBuffType>[];
-  for (final type in [..._roleOrder(category.role), ...ItemBuffType.values]) {
-    if (seen.add(type)) tail.add(type);
+  final weights = <ItemBuffType, int>{
+    for (final type in ItemBuffType.values) type: ItemArchetypes.baseWeight,
+  };
+  weights[signature] = weights[signature]! + ItemArchetypes.signatureWeight;
+
+  final role = _roleOrder(category.role);
+  final roleWeights = ItemArchetypes.roleWeights;
+  for (var i = 0; i < role.length && i < roleWeights.length; i++) {
+    weights[role[i]] = weights[role[i]]! + roleWeights[i];
   }
 
-  if (tail.isEmpty) return [signature];
-  final offset = stableSpread(id, tail.length);
-  return [signature, ...tail.sublist(offset), ...tail.sublist(0, offset)];
+  return _weightedDraw(weights, '$id|${characterClass ?? ''}', count);
 }
 
-/// Item'ın buff'ı. [characterClass] verilmezse sınıftan bağımsız temel buff
-/// üretilir; sınıfa uyarlama [flavorForClass] üzerinden yapılır.
+/// Ağırlıklı, tekrarsız, kararlı çekiliş.
 ///
-/// Sayı olarak verilen bonuslar (tavan, eşik) oranla ölçeklenip okunur
-/// değerlere yuvarlanır ve hiçbiri sıfıra düşmez: etiketi görünüp etkisi
-/// olmayan bir bonus olmamalı.
+/// Her turda kalan ağırlık toplamı üzerinden [stableSpread] ile bir nokta
+/// seçilir ve kümülatif ağırlıklar üzerinde yürünür. Yineleme sırası
+/// [ItemBuffType.values] olduğu için sonuç platformdan ve `Map` ekleme
+/// sırasından bağımsız.
+List<ItemBuffType> _weightedDraw(
+  Map<ItemBuffType, int> weights,
+  String salt,
+  int count,
+) {
+  final remaining = Map<ItemBuffType, int>.from(weights);
+  final drawn = <ItemBuffType>[];
+
+  while (drawn.length < count && remaining.isNotEmpty) {
+    var total = 0;
+    for (final weight in remaining.values) {
+      total += weight;
+    }
+    var point = stableSpread('$salt|${drawn.length}', total);
+
+    ItemBuffType? chosen;
+    for (final type in ItemBuffType.values) {
+      final weight = remaining[type];
+      if (weight == null) continue;
+      if (point < weight) {
+        chosen = type;
+        break;
+      }
+      point -= weight;
+    }
+    // Toplam ağırlık > 0 olduğu sürece buraya düşülmez; yine de sessiz
+    // kalmamak için son çare olarak kalanın ilki seçilir.
+    chosen ??= remaining.keys.first;
+
+    remaining.remove(chosen);
+    drawn.add(chosen);
+  }
+  return drawn;
+}
+
+/// Item'ın arketipi: kimliğinden kararlı biçimde türer, kategori rolüne göre
+/// ağırlıklandırılır.
+///
+/// Rol kısıtı bilinçli — kalkanın "vurucu" olması saçma olurdu — ama hiçbir
+/// rol tek arketipe kilitli değil: dört arketip de her rolde çıkabiliyor,
+/// sadece farklı sıklıkta (bkz. [ItemArchetypes.wheel]).
+ItemArchetype archetypeFor(ItemCategory category, String id) {
+  final wheel = ItemArchetypes.wheel[category.role]!;
+  return wheel[stableSpread('$id|archetype', wheel.length)];
+}
+
+/// Elle tasarlanmış bir item'ın arketipi: **taşıdığı savaş statlarından**
+/// okunur, uydurulmaz.
+///
+/// Etiket item'ın gerçekten yaptığı işi anlatmalı; imzalı bir itemin
+/// arketipini kimlikten hesaplasaydık "Vurucu" yazan bir kalkan çıkabilirdi.
+/// Hiç savaş statı yoksa kimliğe düşülür.
+ItemArchetype archetypeFromEffects(
+  List<ItemEffect> effects,
+  ItemCategory category,
+  String id,
+) {
+  final scores = <ItemArchetype, double>{};
+  for (final effect in effects) {
+    if (!effect.stat.isCombat) continue;
+    for (final entry in ItemArchetypes.combatStats.entries) {
+      final rank = entry.value.indexOf(effect.stat);
+      if (rank < 0) continue;
+      // Birincil stat üç, ikincil iki, üçüncül bir puan. Eksi değerli
+      // etkiler (çift etkili itemlerin bedeli) puanı düşürür.
+      final direction = effect.value < 0 ? -1 : 1;
+      scores[entry.key] = (scores[entry.key] ?? 0) + (3 - rank) * direction;
+    }
+  }
+  if (scores.isEmpty) return archetypeFor(category, id);
+
+  ItemArchetype? best;
+  var bestScore = double.negativeInfinity;
+  // Yineleme enum sırasında: eşitlikte sonuç her açılışta aynı olmalı.
+  for (final archetype in ItemArchetype.values) {
+    final score = scores[archetype];
+    if (score != null && score > bestScore) {
+      best = archetype;
+      bestScore = score;
+    }
+  }
+  return best ?? archetypeFor(category, id);
+}
+
+/// Item'ın buff'ı: **ekonomi** bonusları + **savaş** statları.
+///
+/// [characterClass] verilmezse sınıftan bağımsız temel buff üretilir; sınıfa
+/// uyarlama [flavorForClass] üzerinden yapılır.
+///
+/// Bütçe iki kaynağa bölünür ve arketip dağılımı eğer:
+/// - ekonomi bütçesi [ItemArchetypes.economyTilt] ile çarpılır — **hepsi 1.0
+///   ya da altında**, yani arketip sistemi ekonomiyi hiçbir koşulda
+///   bugünkünün üstüne çıkarmaz (`economy_pacing_test.dart` bugünkü dengeyi
+///   ölçüyor),
+/// - savaş bütçesi [ItemArchetypes.combatTilt] ile çarpılır. Savaş statları
+///   Aşama 4a'ya kadar uygulanmıyor; orada cömert olmak bedava (GD24).
 ItemBuff buffFor(
   RewardRarity rarity,
   ItemCategory category, {
   String? characterClass,
   String id = '',
+  ItemArchetype? archetype,
 }) {
-  final count = buffCountFor(rarity);
+  final resolved = archetype ?? archetypeFor(category, id);
+  return ItemBuff([
+    ..._economyEffects(rarity, category, resolved, characterClass, id),
+    ..._combatEffects(rarity, resolved),
+  ]);
+}
+
+List<ItemEffect> _economyEffects(
+  RewardRarity rarity,
+  ItemCategory category,
+  ItemArchetype archetype,
+  String? characterClass,
+  String id,
+) {
+  final count = ItemArchetypes.economyCount(rarity);
   final shares = _buffShares(count);
-  final total = _buffTotal(rarity);
-  final types = buffTypeOrder(
+  final total = _buffTotal(rarity) * ItemArchetypes.economyTilt[archetype]!;
+  final types = economyTypeOrder(
     category,
     characterClass: characterClass,
     id: id,
-  ).take(count);
+    count: count,
+  );
 
-  final effects = <ItemEffect>[];
-  var index = 0;
-  for (final type in types) {
-    final value = total * shares[index++];
-    effects.add(_ruleEffect(type, value));
-  }
-  return ItemBuff(effects);
+  return [
+    for (var i = 0; i < types.length; i++)
+      _ruleEffect(types[i], total * shares[i]),
+  ];
 }
 
-/// Kural türetmesinin tek bir bonusunu [ItemEffect]'e çevirir.
+List<ItemEffect> _combatEffects(RewardRarity rarity, ItemArchetype archetype) {
+  final count = ItemArchetypes.combatCount(rarity);
+  final shares = ItemArchetypes.combatShares(count);
+  final budget =
+      ItemArchetypes.combatBudget(rarity) *
+      ItemArchetypes.combatTilt[archetype]!;
+  final stats = ItemArchetypes.combatStats[archetype]!;
+
+  return [
+    for (var i = 0; i < count && i < stats.length; i++)
+      _combatEffect(stats[i], budget * shares[i]),
+  ];
+}
+
+/// Savaş bütçesinin bir dilimini [ItemEffect]'e çevirir.
+///
+/// Sıfıra düşen bir stat üretilmez: etiketi görünüp etkisi olmayan bonus
+/// olmamalı. Oranlar yarım yüzdeye yuvarlanır ki `+%6,5` gibi okunur kalsın.
+ItemEffect _combatEffect(ItemStat stat, double budget) {
+  final (mode, factor) = ItemArchetypes.combatSpec[stat]!;
+  final raw = budget * factor;
+  if (mode == ItemEffectMode.flat) {
+    final rounded = raw.round();
+    return ItemEffect.flat(
+      stat: stat,
+      value: (rounded < 1 ? 1 : rounded).toDouble(),
+    );
+  }
+  final rounded = (raw * 200).round() / 200;
+  return ItemEffect(stat: stat, value: rounded < 0.01 ? 0.01 : rounded);
+}
+
+/// Kural türetmesinin tek bir **ekonomi** bonusunu [ItemEffect]'e çevirir.
 ///
 /// Sayı olarak verilen bonuslar (tavan, eşik) oranla ölçeklenip okunur
 /// değerlere yuvarlanır ve hiçbiri sıfıra düşmez: etiketi görünüp etkisi
@@ -475,6 +638,9 @@ Item flavorForClass(Item item, String characterClass) {
   // Azrailin Tırpanı'dır (bkz. GD22).
   if (item.hasSignature) return item;
 
+  // Arketip sınıfa göre **değişmez**: item'ın karakteri onun kendi kimliğinden
+  // geliyor, kuşanan kişiden değil. Değişen şey, o karakterin hangi ekonomi
+  // bonusuyla eşleştiği.
   return item.copyWith(
     name: _classFlavoredName(item, characterClass),
     buff: buffFor(
@@ -482,6 +648,7 @@ Item flavorForClass(Item item, String characterClass) {
       item.category,
       characterClass: characterClass,
       id: item.id,
+      archetype: item.archetype,
     ),
   );
 }
@@ -542,6 +709,18 @@ Item? buildItemFromAsset(String assetPath) {
   // etkilerini alır. Tablo veridir; burada `switch (id)` yok.
   final signature = ItemEffects.of(identity.baseId);
 
+  // Arketip: kuraldan türeyen itemde kimlikten hesaplanır, imzalı itemde
+  // taşıdığı savaş statlarından okunur — etiket gerçekten yaptığı işi
+  // anlatsın diye (bkz. [archetypeFromEffects]).
+  final archetype =
+      signature == null
+          ? archetypeFor(identity.category, identity.id)
+          : archetypeFromEffects(
+            signature.effects,
+            identity.category,
+            identity.id,
+          );
+
   return Item(
     id: identity.id,
     name: name,
@@ -552,8 +731,14 @@ Item? buildItemFromAsset(String assetPath) {
     cost: costFor(rarity, requiredLevel),
     buff:
         signature == null
-            ? buffFor(rarity, identity.category)
+            ? buffFor(
+              rarity,
+              identity.category,
+              id: identity.id,
+              archetype: archetype,
+            )
             : ItemBuff(signature.effects),
+    archetype: archetype,
     lore: signature?.lore,
   );
 }

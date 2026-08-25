@@ -13,6 +13,7 @@ Item _item(String id, List<ItemEffect> effects) => Item(
   requiredLevel: 1,
   cost: 100,
   buff: ItemBuff(effects),
+  archetype: ItemArchetype.striker,
 );
 
 void main() {

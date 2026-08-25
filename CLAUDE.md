@@ -3594,7 +3594,205 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
 - **Not:** bu arkadaşımın kodu; "varsayılan dokunma" kuralına rağmen
   düzeltildi çünkü **gerçek bir görsel hata** (oyuncu görünmüyor).
 
+### GD36. Sınıf imzası artık her itemde değil, dağılımda okunuyor (2026-08-25)
+- **Nerede:** `item_rules.dart:economyTypeOrder` / `_classSignature`,
+  `data/item_archetypes.dart`
+- **Sorun:** buff türetmesi item'ın **kendi kimliğini hiç kullanmıyordu.**
+  `buildItemFromAsset` `buffFor(rarity, category)` çağırıyordu — `id`
+  parametresi varsayılan `''` kalıyordu. Sıradan itemde tek bonus vardı ve
+  bonus listesinin ilk elemanı **her zaman** sınıfın imzasıydı. Sonuç: bir
+  sınıfın bütün sıradan kılıçları birebir aynı bonusu veriyordu; oyuncunun
+  seçimi "hangisi daha güzel görünüyor"dan ibaretti.
+- **Karar:** ekonomi bonusu türleri artık **ağırlıklı, tekrarsız ve kararlı
+  bir çekilişten** geliyor. Sınıf imzası +8, kategori rolünün ilk üç eğilimi
+  +4/+2/+1, her tür +1 taban ağırlık taşıyor. Tohum: item kimliği + sınıf.
+- **Eski invariant düştü:** "her sınıfın imzası ayrı ve her itemde bulunur".
+  18 oynanabilir sınıf ve sekiz bonus türüyle bu **matematiksel olarak
+  imkânsız**; test sekiz **ölü** sınıfa baktığı için yanlışlıkla geçiyordu
+  (bkz. GD37). Yerine iki ölçülebilir kural geldi:
+  1. imza, sınıfın gördüğü katalogda **en sık** birincil bonus olmalı
+     (ölçülen: %25–%75 bandı; gerçek değerler %34–%50),
+  2. hiçbir bonus türü sahipsiz kalmamalı, hiçbiri üçten fazla sınıfa imza
+     olmamalı.
+- **İmzalar yeniden dağıtıldı.** Eski haritada `wheelXp` **hiçbir oynanabilir
+  sınıfın** imzası değildi (tek sahibi emekliye ayrılmış Necromancer'dı) ve
+  beş sınıf `enemyXp` paylaşıyordu. Yeni dağılım: sekiz türün her biri iki ya
+  da üç sınıfın imzası. Eski (yalnızca kayıtlarda geçen) sınıfların imzaları
+  **değiştirilmedi** — güncelleme sonrası eski bir kaydın itemleri sessizce
+  başka bir bonusa kaymamalı.
+- **Ölçülen sonuç:** aynı sınıf + aynı kategori + aynı nadirlikteki en kötü
+  grup, 14 itemde 7 farklı buff (en sık kalıp %43). Öncesinde her grup
+  **tek** kalıptı.
+
+### GD37. Item↔sınıf dağılımı canlı sınıf listesinden doğrulanıyor (2026-08-25)
+- **Nerede:** `AvatarProfile.playableClassIds`, `test/item_catalog_test.dart`,
+  `test/item_effects_test.dart`, `test/equipped_buffs_test.dart`,
+  `ItemCategoryX.characterClasses`
+- **Sorun:** üç test dosyası da elle yazılmış sekiz sınıflık bir liste
+  (`Archer, DarkMagic, Faith, Magic, Nature, Paladin, SwordMan, Thief`)
+  kullanıyordu. Karakterler `All_Assets`'e taşınınca bu sekizi **oynanamaz**
+  hâle geldi; testler ölü sınıfları doğrulayıp gerçek 18 sınıfın hiçbirini
+  denetlemiyordu.
+- **Karar:** liste `AvatarProfile.playableClassIds` üzerinden tek kaynaktan
+  okunuyor (`classLabels` eksi emekliler eksi eski kimlikler = 18).
+- **Ortaya çıkan iki gerçek ihlal düzeltildi:**
+  - *Mezar Okçusu* 143 item görüyordu (alt sınır 150) → **tırpanlar** eklendi
+    (158). Ölümün aleti, ölü bir okçuya tematik olarak düşüyor.
+  - *Ayı Ruhlu* 105 item görüyordu → **kalkanlar** eklendi (217). Ağır bir
+    savaşçının doğal ekipmanı.
+- **Sınırların dışında kalan yok:** en geniş sınıf (Sınır Muhafızı, 408 item)
+  kataloğun %52'sini görüyor; testin üst sınırı %60.
+
+### GD38. Kuraldan türeyen itemler de savaş statı taşıyor (2026-08-25)
+- **Nerede:** `data/item_archetypes.dart`, `item_rules.dart:_combatEffects`
+- **Karar:** her item bir **arketip** taşıyor (Vurucu / Muhafız / Düellocu /
+  Çevik) ve arketip ona savaş statları veriyor. Nadirlik başına toplam etki
+  sayısı 1/2/2/3/3'ten **2/3/4/5/6**'ya çıktı; ek satırların hepsi savaş
+  statı.
+- **Neden ekonomi büyümedi:** ekonomi bütçesi arketipe göre **yalnızca
+  küçülüyor** (`economyTilt` en fazla 1.0: vurucu 0.85, düellocu 0.90,
+  muhafız/çevik 1.00). Savaş bütçesi ise büyüyor (1.20 / 1.10 / 1.00 / 0.95).
+  Aynı güç bütçesi farklı dağılıyor; `economy_pacing_test.dart` ve dört
+  ekonomi tavanı olduğu gibi geçerli.
+- **Neden savaş tarafında cömert olundu:** GD24 — savaş motoru Aşama 4a'da
+  geliyor, bugün o sayıların hiçbir etkisi yok. Yine de kuraldan türeyen
+  hiçbir item elle tasarlanmış (imzalı) itemlerin savaş gücünü geçemiyor;
+  testle bağlı.
+- **Rol kısıtı korundu ama gevşetildi:** dört arketip de her rolde çıkabiliyor,
+  yalnızca sıklıkları farklı (kalkanların %40'ından fazlası muhafız). İlk
+  tasarımda menzil çarkında muhafız yoktu ve sıradan menzilli itemler yalnızca
+  üç farklı savaş statı üretebiliyordu — çeşitlilik ölçümü bunu yakaladı.
+- **İmzalı itemlerin arketipi uydurulmuyor:** taşıdıkları savaş statlarından
+  okunuyor (`archetypeFromEffects`), yoksa "Vurucu" yazan bir kalkan
+  çıkabilirdi.
+- **Mağaza kartında satır sayısı kısıtı kalktı:** GD12'nin sabit yüksekliği K9
+  ile esnek satıra dönmüştü; altı ekran genişliğindeki taşma testleri hâlâ
+  geçiyor.
+
 ---
+---
+---
+
+# Bölüm 3 — Buff çeşitliliği ✅ (2026-08-25)
+
+Kartın sözü: *"aynı sınıftaki üç eşyanın en düşük seviyeli hallerinin buff'ı
+aynı."* Doğrulandı, kökü bulundu ve kapatıldı. Kararlar **GD36–GD38**.
+
+## Kök neden — iki ayrı hata üst üste binmişti
+
+1. **`buildItemFromAsset` item kimliğini hiç geçmiyordu.**
+   `buffFor(rarity, identity.category)` çağrılıyordu; `id` parametresi
+   varsayılan `''` kalıyordu. Yani kuraldan türeyen **bütün** itemler, aynı
+   kategori ve nadirlikteyse birebir aynı buff'ı alıyordu.
+2. **Sıradan itemde tek bonus vardı ve o her zaman sınıf imzasıydı.**
+   `buffTypeOrder` listesinin ilk elemanı `_classSignature(sınıf)` idi;
+   kimliğe göre dönen yalnızca **kuyruk**tu. Sıradan item kuyruğa hiç
+   ulaşmıyordu.
+
+Sonuç: bir sınıfın gördüğü bütün sıradan kılıçlar aynı, bütün sıradan
+kalkanlar aynı. Oyuncunun seçimi kozmetikti.
+
+## Çözüm — arketip + ağırlıklı çekiliş
+
+| Katman | Ne yapar |
+|---|---|
+| `lib/data/item_archetypes.dart` | **Veri**: arketip çarkları, savaş stat sıraları, bütçeler, eğilim çarpanları, çekiliş ağırlıkları |
+| `models/item.dart:ItemArchetype` | Vurucu / Muhafız / Düellocu / Çevik + Türkçe ad ve açıklama |
+| `item_rules.dart:archetypeFor` | Kimlikten kararlı arketip; kategori rolüne göre ağırlıklı |
+| `item_rules.dart:economyTypeOrder` | Ağırlıklı, tekrarsız, kararlı ekonomi bonusu çekilişi |
+| `item_rules.dart:_combatEffects` | Arketipin savaş statları |
+| `widgets/archetype_badge.dart` | Mağaza ve envanterde arketip rozeti |
+
+Hiçbir yerde `switch (id)` yok; tablo veridir (Model Kuralı #1: enum ve
+`String`, Flutter tipi yok — `Item` zaten diske yazılmıyor).
+
+### Etki sayısı ve bütçe
+
+| Nadirlik | Ekonomi | Savaş | Toplam | Ekonomi bütçesi | Savaş bütçesi |
+|---|---|---|---|---|---|
+| Sıradan | 1 | 1 | 2 | %2 | 9 |
+| Az Bulunur | 2 | 1 | 3 | %5 | 18 |
+| Nadir | 2 | 2 | 4 | %9 | 32 |
+| Epik | 3 | 2 | 5 | %15 | 55 |
+| Efsanevi | 3 | 3 | 6 | %26 | 90 |
+
+Arketip eğilimi bütçeyi kaydırıyor: **ekonomi ×0.85–1.00, savaş ×0.95–1.20.**
+Ekonomi çarpanı hiçbir arketipte 1.0'ı geçmiyor — `economy_pacing_test.dart`
+bugünkü dengeyi ölçüyor ve arketip sistemi onu büyütmemeli (GD38).
+
+### Ölçülen çeşitlilik
+
+Aynı sınıf + aynı kategori + aynı nadirlikteki gruplar (yalnızca kuraldan
+türeyen itemler, ≥6 item):
+
+| | Önce | Sonra |
+|---|---|---|
+| En kötü grupta farklı buff sayısı | **1** | **7** (14 itemde) |
+| En sık kalıbın payı | **%100** | **%43** |
+
+Sınıf kimliği kaybolmadı: imza hâlâ **en sık** birincil bonus (Kılıç Ustası
+%50 düşman XP, Şahin Okçu %50 adım parası, Işık Rahibi %36 seri eşiği, Ayı
+Ruhlu %34 çark hakkı).
+
+## Beraberinde kapanan iki gerçek hata (Faz 0 A listesi)
+
+- **A3 — testler ölü sınıfları doğruluyordu.** Üç test dosyasındaki elle
+  yazılmış sekiz sınıflık liste `AvatarProfile.playableClassIds` ile
+  değiştirildi; ortaya çıkan iki dağılım ihlali (Mezar Okçusu 143 item, Ayı
+  Ruhlu 105 item) düzeltildi. Ayrıntı: **GD37**.
+- **A4 — sınıf imzaları çakışıyordu.** Beş sınıf `enemyXp` paylaşıyor,
+  `wheelXp` ise hiçbir oynanabilir sınıfın imzası değildi. İmzalar sekiz türe
+  dengeli dağıtıldı. Ayrıntı: **GD36**.
+
+## Yol boyunca bulunan iki başka hata
+
+1. **`ArchetypeBadge` dar kartta `RenderFlex` taşması üretiyordu** (320 ve
+   360 dp'de 10 px). Etiket `Flexible` + `TextOverflow.fade` ile esnetildi.
+   Test ortamında gerçek font olmadığı için yazılar dolu kutu çiziliyor ve bu
+   **en kötü durum**; gerçek cihazda etiket rahat sığıyor.
+2. **`store_screen_test.dart` taşma testi 10 dakikada zaman aşımına
+   uğruyordu.** `expect(errors, isEmpty, reason: errors.join(' | '))` — taşan
+   bir düzen her karede yüzlerce hata üretiyor ve hepsini birleştirmek test
+   koşucusunu kilitliyordu. Artık yalnızca ilk iki hata raporlanıyor; hata
+   varken **10 dakika beklemek yerine saniyeler içinde** kırmızıya dönüyor.
+
+## Arayüz
+
+Arketip rozeti nadirlik rozetinin yanında, `Wrap` içinde: dar kartta alt
+satıra düşüyor, taşmıyor. Envanterin item kartında ayrıca tek satırlık
+açıklama var ("Düellocu — kritik vuruşa yatırım yapar"), çünkü rozet tek
+başına "hangi yöne güçlü" sorusunu cevaplamıyor.
+
+Nadirlik "ne kadar güçlü", arketip "hangi yöne güçlü" sorusunu cevaplıyor;
+görsel dil bilerek nadirlikten soluk — arketip bir sıralama değil.
+
+## Test
+
+- `test/item_variety_test.dart` — **14 test** (yeni): aynı sınıf/kategori/
+  nadirlik gruplarının tek kalıba sıkışmaması, varyantların ayrışması, sınıf
+  kimliğinin dağılımda korunması, arketipin kararlılığı ve sınıftan
+  bağımsızlığı, her rolde dört arketipin bulunması, rol eğiliminin korunması,
+  imzalı itemin arketipinin gerçekten taşıdığı stattan okunması, ekonomi
+  tavanları, kuraldan türeyenin imzalıyı geçmemesi, sıfıra düşen stat
+  olmaması.
+- `test/golden/store_card_golden_test.dart` — **3 test** (yeni): 320 ve 390 dp
+  golden + örneklemin gerçekten dört farklı arketip/buff içerdiği iddiası.
+  PNG'ler okundu ve gözle doğrulandı: dört kart dört farklı renkte rozet ve
+  dört farklı bonus satırı gösteriyor.
+- Güncellenen (silinmedi): `item_catalog_test.dart` (imza invariantı yeniden
+  tanımlandı, bonus sayısı tablosu, rol eğilimi artık istatistiksel),
+  `item_effects_test.dart`, `equipped_buffs_test.dart`,
+  `item_comparison_test.dart`, `inventory_test.dart`, `store_screen_test.dart`.
+
+Toplam **470 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+`ItemArchetype` bugün yalnızca **buff türetmesini** ve **gösterimi** etkiliyor.
+Savaş statları hâlâ uyuyor (Aşama 4a). Bölüm 4'te eşya seviyesi savaş
+statlarını büyütecek; arketip o noktada "hangi stat büyüyor" sorusunun da
+cevabı olacak.
+
 ---
 ---
 
@@ -3682,7 +3880,7 @@ sabit kare dizisi kullan.
 
 Bölüm 1 ve 2 kendi kapsamlarındaki hataları kapattı. Kalanlar:
 
-### A3. Item↔sınıf dağılım testi ölü sınıfları doğruluyor · **ORTA**
+### A3. ✅ ÇÖZÜLDÜ (Bölüm 3) — dağılım testi ölü sınıfları doğruluyordu
 - **Nerede:** `test/item_catalog_test.dart:_allClasses` (dosyanın en üstü)
 - **Ne:** Liste hâlâ **eski 8 sınıf** (`Archer, DarkMagic, Faith, Magic,
   Nature, Paladin, SwordMan, Thief`). Arkadaşım karakterleri `All_Assets`
@@ -3700,18 +3898,21 @@ Bölüm 1 ve 2 kendi kapsamlarındaki hataları kapattı. Kalanlar:
   | Soldier | swords + spears + shields + rangedOther | **408** | üst sınır 392 (%50) |
 
   Diğer 15 sınıf sınırların içinde.
-- **Yapılacak:** `_allClasses`'ı canlı listeden türet (retired olanlar hariç —
+- **Çözüm (2026-08-25):** `AvatarProfile.playableClassIds` eklendi ve üç
+  test dosyası da ondan okuyor; iki dağılım ihlali kapatıldı (bkz. GD37).
+- *(Yapılacaklar, tarihsel):* `_allClasses`'ı canlı listeden türet (retired olanlar hariç —
   `CharacterCatalog.retiredClassIds` = `{Bat, Lancer, Necromancer, Orc rider}`),
   testi kırmızıya düşür, sonra `ItemCategoryX.characterClasses` haritasını
   dengele. **Bölüm 3 ile aynı dosyalara dokunuyor, birlikte yapılmalı.**
 
-### A4. Sınıf imzaları çakışıyor · **ORTA (Bölüm 3'ün konusu)**
+### A4. ✅ ÇÖZÜLDÜ (Bölüm 3) — sınıf imzaları çakışıyordu
 - **Nerede:** `lib/core/utils/item_rules.dart:_classSignature`
 - **Ne:** GD17'nin "her sınıfın imza bonusu ayrı" garantisi 18 sınıf × 8 buff
   türüyle **matematiksel olarak imkânsız**. Beş sınıf `enemyXp` paylaşıyor
   (`Armored Axeman, Elite Orc, Greatsword Skeleton, Orc, Swordsman`).
-- Bölüm 3 zaten buff türetmesini değiştirecek; invariant orada yeniden
-  tanımlanmalı.
+- **Çözüm (2026-08-25):** imzalar sekiz türe dengeli dağıtıldı, invariant
+  yeniden tanımlandı (bkz. GD36). `wheelXp` eskiden **hiçbir oynanabilir
+  sınıfın** imzası değildi; artık iki sınıfın.
 
 ### A6. Çark GIF karesi yüklerken hata yönetimi yok · **DÜŞÜK**
 - **Nerede:** `lib/features/wheel/daily_wheel_screen.dart:_StillGifFrameState._load`
@@ -4000,8 +4201,8 @@ Firebase gerektirenler **hariç**. Kaynak: bu dosyadaki "OTURUM KAPANIŞI —
 
 ## 6. Önerilen sıra
 
-1. **Bölüm 3** (buff çeşitliliği) + **A3** + **A4** — hepsi `item_rules.dart`,
-   `item.dart`, `item_catalog_test.dart` üçgeninde; birlikte yapılmalı.
+1. ~~**Bölüm 3** (buff çeşitliliği) + **A3** + **A4**~~ ✅ **BİTTİ**
+   (2026-08-25) — bkz. "Bölüm 3 — Buff çeşitliliği" bölümü, GD36–GD38.
 2. **Bölüm 4.1–4.2** (veri yapısı + eşya seviyesi). Şema v12. Mağazanın tekrar
    satın almaya açılması burada; kırılan testler burada güncellenir.
 3. **Bölüm 4.3–4.6** (birleştirme + demirci arayüzü + mağaza duyurusu).

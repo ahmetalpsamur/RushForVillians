@@ -4,21 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/equipped_buffs.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
+import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/item_effect.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
 
-const _allClasses = [
-  'SwordMan',
-  'Paladin',
-  'Thief',
-  'Archer',
-  'Magic',
-  'DarkMagic',
-  'Faith',
-  'Nature',
-];
+/// Bugün oynanabilen sınıflar; tek kaynaktan okunuyor (bkz. GD37).
+List<String> get _allClasses => AvatarProfile.playableClassIds;
 
 Item _item(String id, List<ItemEffect> effects) => Item(
   id: id,
@@ -29,6 +22,7 @@ Item _item(String id, List<ItemEffect> effects) => Item(
   requiredLevel: 1,
   cost: 100,
   buff: ItemBuff(effects),
+  archetype: ItemArchetype.striker,
 );
 
 List<Item> _catalog() {

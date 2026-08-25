@@ -2,27 +2,47 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
+import 'package:rush_for_villains/data/item_archetypes.dart';
+import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/data/item_definitions.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
 
-/// Karakter kataloğundaki sınıflar (`lib/Characters/` klasör adları).
-const _allClasses = [
-  'Archer',
-  'DarkMagic',
-  'Faith',
-  'Magic',
-  'Nature',
-  'Paladin',
-  'SwordMan',
-  'Thief',
-];
+/// Bugün oynanabilen sınıflar.
+///
+/// Elle yazılmış bir kopya değil: sınıflar `All_Assets`'e taşındığında liste
+/// eskimişti ve testler **ölü** sekiz sınıfı doğrulayıp gerçek 18 sınıfın
+/// hiçbirini denetlemiyordu. Artık tek kaynaktan okunuyor.
+List<String> get _allClasses => AvatarProfile.playableClassIds;
 
 /// Item kataloğu sanat klasöründen üretiliyor; kod yalnızca dosya adına anlam
 /// veriyor. Bu testler iki şeyi koruyor: türetme kurallarının kararlılığı
 /// (seviye kilidi kayarsa oyuncunun sahip olduğu item kilitlenir) ve sanatın
 /// tamamının tanımlı olması.
+/// Bir sınıfın imza bonusu.
+///
+/// `_classSignature` private; imza, ağırlıklı çekilişte türün ezici üstünlük
+/// kurduğu tek nokta olduğu için **çok sayıda tohumun modu** olarak okunuyor.
+ItemBuffType _signatureOf(String characterClass) {
+  final counts = <ItemBuffType, int>{};
+  for (var seed = 0; seed < 200; seed++) {
+    final first =
+        economyTypeOrder(
+          ItemCategory.magic,
+          characterClass: characterClass,
+          id: 'probe_$seed',
+          count: 1,
+        ).first;
+    counts[first] = (counts[first] ?? 0) + 1;
+  }
+  var best = counts.entries.first;
+  for (final entry in counts.entries) {
+    if (entry.value > best.value) best = entry;
+  }
+  return best.key;
+}
+
 void main() {
   group('asset yolu çözümleme', () {
     test('varyantsız dosya çözümlenir', () {
@@ -180,11 +200,12 @@ void main() {
 
   group('buff dağılımı', () {
     test('nadirlik yükseldikçe bonus sayısı artar', () {
-      expect(buffCountFor(RewardRarity.common), 1);
-      expect(buffCountFor(RewardRarity.uncommon), 2);
-      expect(buffCountFor(RewardRarity.rare), 2);
-      expect(buffCountFor(RewardRarity.epic), 3);
-      expect(buffCountFor(RewardRarity.legendary), 3);
+      // Toplam = ekonomi (bugün canlı) + savaş (Aşama 4a'da canlanacak).
+      expect(buffCountFor(RewardRarity.common), 2);
+      expect(buffCountFor(RewardRarity.uncommon), 3);
+      expect(buffCountFor(RewardRarity.rare), 4);
+      expect(buffCountFor(RewardRarity.epic), 5);
+      expect(buffCountFor(RewardRarity.legendary), 6);
 
       for (final rarity in RewardRarity.values) {
         final buff = buffFor(rarity, ItemCategory.swords);
@@ -192,6 +213,16 @@ void main() {
           buff.count,
           buffCountFor(rarity),
           reason: '$rarity için üretilen bonus sayısı tabloyla uyuşmuyor',
+        );
+        expect(
+          buff.liveEffects,
+          hasLength(ItemArchetypes.economyCount(rarity)),
+          reason: '$rarity için ekonomi bonusu sayısı tabloyla uyuşmuyor',
+        );
+        expect(
+          buff.combatEffects,
+          hasLength(ItemArchetypes.combatCount(rarity)),
+          reason: '$rarity için savaş statı sayısı tabloyla uyuşmuyor',
         );
       }
     });
@@ -206,55 +237,94 @@ void main() {
       expect(total(RewardRarity.rare), lessThan(total(RewardRarity.legendary)));
     });
 
-    test('sınıfsız temel buff kategori rolünden çıkar', () {
-      // Yakın dövüş → adım XP, menzil → adım parası.
-      expect(
-        buffFor(RewardRarity.common, ItemCategory.swords).stepXpBonus,
-        greaterThan(0),
-      );
-      expect(
-        buffFor(RewardRarity.common, ItemCategory.arch).stepCoinBonus,
-        greaterThan(0),
-      );
-    });
-
-    test('her sınıfın imza bonusu ayrı ve her itemde bulunur', () {
-      final signatures = <String, ItemBuffType>{};
-      for (final characterClass in _allClasses) {
-        final order = buffTypeOrder(
-          ItemCategory.magic,
-          characterClass: characterClass,
-        );
-        signatures[characterClass] = order.first;
+    test('sınıfsız temel buff kategori rolüne eğilimli', () {
+      // Ağırlıklı çekilişte rolün eğilimi **garanti** değil, ama açık ara en
+      // olası sonuç olmalı: yakın dövüş → adım XP, menzil → adım parası.
+      int share(ItemCategory category, ItemBuffType expected) {
+        var hits = 0;
+        for (var seed = 0; seed < 200; seed++) {
+          final first =
+              economyTypeOrder(category, id: 'seed_$seed', count: 1).first;
+          if (first == expected) hits++;
+        }
+        return hits;
       }
 
       expect(
-        signatures.values.toSet(),
-        hasLength(_allClasses.length),
-        reason: 'iki sınıf aynı imza bonusunu paylaşmamalı',
+        share(ItemCategory.swords, ItemBuffType.stepXp),
+        greaterThan(60),
+        reason: 'yakın dövüş kategorisinde adım XP baskın olmalı',
+      );
+      expect(
+        share(ItemCategory.arch, ItemBuffType.stepCoin),
+        greaterThan(60),
+        reason: 'menzil kategorisinde adım parası baskın olmalı',
+      );
+    });
+
+    test('imza dağılımı dengeli ve hiçbir bonus türü boşta kalmıyor', () {
+      // Eski invariant "her sınıfın imzası ayrı" idi. 18 oynanabilir sınıf ve
+      // sekiz bonus türüyle bu **matematiksel olarak imkânsız**; test sekiz
+      // ölü sınıfa baktığı için yanlışlıkla geçiyordu (bkz. GD36).
+      //
+      // Yerine geçen kural: dağılım dengeli olmalı ve hiçbir tür sahipsiz
+      // kalmamalı — kimsenin imzası olmayan bir bonus türü fiilen ölüdür.
+      final counts = <ItemBuffType, int>{
+        for (final type in ItemBuffType.values) type: 0,
+      };
+      for (final characterClass in _allClasses) {
+        final signature =
+            economyTypeOrder(
+              ItemCategory.magic,
+              characterClass: characterClass,
+              // Ağırlıklı çekilişte imza her zaman ilk sırada çıkmaz; imzayı
+              // doğrudan ölçmek için tek elemanlık bir tohum kullanılıyor.
+              id: '__signature_probe__',
+              count: 8,
+            ).first;
+        counts[_signatureOf(characterClass)] =
+            counts[_signatureOf(characterClass)]! + 1;
+        expect(signature, isA<ItemBuffType>());
+      }
+
+      for (final entry in counts.entries) {
+        expect(
+          entry.value,
+          greaterThanOrEqualTo(1),
+          reason: '${entry.key.name} hiçbir sınıfın imzası değil',
+        );
+        expect(
+          entry.value,
+          lessThanOrEqualTo(3),
+          reason: '${entry.key.name} çok fazla sınıfa imza oluyor',
+        );
+      }
+      expect(
+        counts.values.fold<int>(0, (a, b) => a + b),
+        _allClasses.length,
       );
     });
 
     test('aynı görsel sınıfa göre farklı item olur', () {
       final base = buildItemFromAsset('lib/Items/magic/holy_staff.png')!;
-      final mage = flavorForClass(base, 'Magic');
-      final darkMage = flavorForClass(base, 'DarkMagic');
+      final wizard = flavorForClass(base, 'Wizard');
+      final priest = flavorForClass(base, 'Priest');
 
-      expect(mage.id, base.id, reason: 'kimlik sınıfa göre değişmemeli');
-      expect(darkMage.id, base.id);
-      expect(mage.name, isNot(darkMage.name));
-      expect(mage.buff.labels, isNot(darkMage.buff.labels));
-      // Sınıf imzaları: Büyücü adım XP, Kara Büyücü çark XP.
-      expect(mage.buff.stepXpBonus, greaterThan(0));
-      expect(darkMage.buff.wheelXpBonus, greaterThan(0));
+      expect(wizard.id, base.id, reason: 'kimlik sınıfa göre değişmemeli');
+      expect(priest.id, base.id);
+      expect(wizard.name, isNot(priest.name));
+      expect(wizard.buff.labels, isNot(priest.buff.labels));
+      // Arketip item'ın kendi karakteri: kuşanana göre değişmez.
+      expect(wizard.archetype, base.archetype);
+      expect(priest.archetype, base.archetype);
     });
 
-    test('tek sınıfa özel kategoride ad değişmez', () {
+    test('paylaşılan kategoride ada sınıf lakabı eklenir', () {
       final base =
           ItemCatalog.fromAssetPaths(['lib/Items/swords/sword.png']).single;
       // Kılıçlar paylaşılan bir kategori: lakap eklenir.
-      expect(flavorForClass(base, 'SwordMan').name, startsWith('Çelik '));
-      expect(flavorForClass(base, 'Thief').name, startsWith('Gölge '));
+      expect(flavorForClass(base, 'Swordsman').name, startsWith('Çelik '));
+      expect(flavorForClass(base, 'Werewolf').name, startsWith('Ay '));
     });
 
     test('sayısal bonuslar hiçbir zaman sıfır olmaz', () {

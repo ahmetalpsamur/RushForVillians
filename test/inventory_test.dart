@@ -64,6 +64,7 @@ void main() {
     cost: 1000,
     lore: 'Test için dövüldü.',
     buff: const ItemBuff([ItemEffect(stat: ItemStat.stepCoin, value: 0.5)]),
+    archetype: ItemArchetype.swift,
   );
 
   final catalog = [sword, betterSword, lockedSword, shield, bow, boostItem];
