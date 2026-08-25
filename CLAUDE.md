@@ -9,13 +9,15 @@ Bu dosyadaki kurallar tüm oturumlarda geçerlidir.
 >
 > 1. Bu baştaki **Çalışma Kuralları** + **Model Kuralları** bölümünü oku
 >    (zorunlu, kısa).
-> 2. Sona git: **"⭐ OTURUM KAPANIŞI — 2026-08-25 · SONRAKİ OTURUM BURADAN
->    BAŞLASIN"**. Ne bitti, ne açık, hangi işin şartnamesi ne, hangi sırayla —
->    hepsi orada ve tek başına yeterli.
+> 2. **Dosyanın en sonuna git:** "⭐ OTURUM KAPANIŞI — 2026-08-25 (AKŞAM) ·
+>    SONRAKİ OTURUM BURADAN BAŞLASIN". Ne bitti, ne açık, sıradaki işin
+>    şartnamesi nerede — hepsi orada. Ondan bir önceki kapanış (aynı tarih,
+>    başlığı "SABAH") **Bölüm 5/6/7'nin tam şartnamesini** taşıyor ve hâlâ
+>    geçerli; akşam kapanışı oraya yönlendiriyor.
 > 3. Test çalıştırmadan önce **"Test ortamı — testler neden `--no-test-assets`
 >    ile çalışıyor"** bölümünü oku. Bu bayrak olmadan hiçbir test çalışmaz.
 > 4. Verilmiş kararları değiştirmeden önce **"GERİ DÖNÜLECEK KARARLAR"**
->    (GD1–GD35) içinde gerekçesini ara.
+>    (GD1–GD43) içinde gerekçesini ara.
 >
 > Aradaki "Aşama 0…3g", "Bug Triajı", "Trello Kartları" ve eski oturum
 > kapanışları **tarihsel bağlam**. Bir çelişki görürsen **en yeni tarih
@@ -4156,7 +4158,12 @@ gelince kendiliğinden canlanacaklar.
 ---
 ---
 
-# ⭐ OTURUM KAPANIŞI — 2026-08-25 · SONRAKİ OTURUM BURADAN BAŞLASIN
+# OTURUM KAPANIŞI — 2026-08-25 (SABAH) · ŞARTNAME ARŞİVİ
+
+> ⚠️ **Devam noktası artık dosyanın en sonundaki akşam kapanışı.**
+> Bu bölüm **hâlâ gerekli**: aşağıdaki §5, **Bölüm 5 / 6 / 7+**'nın tam
+> şartnamesini taşıyor ve o işler henüz yapılmadı. Bölüm 1–4 ile ilgili
+> kısımlar tarihsel kayıt.
 
 > Bu bölüm **tek başına yeterlidir.** Kullanıcıya hiçbir şey sormadan devam
 > edebilmek için gereken her şey burada: ne bitti, ne açık, hangi işin şartnamesi
@@ -4592,3 +4599,137 @@ test/golden/goldens/class_reveal_800.png
 test/golden/goldens/adventure_320.png
 test/golden/goldens/adventure_390.png
 ```
+
+
+---
+---
+---
+
+# ⭐ OTURUM KAPANIŞI — 2026-08-25 (AKŞAM) · SONRAKİ OTURUM BURADAN BAŞLASIN
+
+> Bu bölüm devam noktasıdır. Sıradaki işin **tam şartnamesi** bir önceki
+> kapanışın ("OTURUM KAPANIŞI — 2026-08-25 (SABAH) · ŞARTNAME ARŞİVİ") §5
+> bölümünde; oraya yönlendiriliyor, kopyalanmıyor.
+
+## 0. Bu oturumda ne bitti
+
+| Bölüm | Ne | Test | Kararlar |
+|---|---|---|---|
+| **Bölüm 3** | Buff çeşitliliği: arketip sistemi + ağırlıklı ekonomi çekilişi | 453 → 470 | GD36–GD38 |
+| **Bölüm 4.1–4.2** | Envanter örnek listesine geçti (şema **v12**), mağaza çoklu satın alma, eşya seviyesi | 470 → 511 | GD39–GD41 |
+| **Bölüm 4.3–4.6** | Birleştirme, ayrı demirci ekranı, mağaza yatırım duyurusu | 511 → **554** | GD42–GD43 |
+
+Üçü de kullanıcı tarafından **commit edildi**. Ayrıntılar dosyadaki
+"Bölüm 3", "Bölüm 4.1–4.2" ve "Bölüm 4.3–4.6" bölümlerinde.
+
+Kapanan Faz 0 hataları: **A3** (testler ölü sınıfları doğruluyordu),
+**A4** (sınıf imzaları çakışıyordu). İkisi de Bölüm 3 ile kapandı.
+
+**Durum:** `flutter analyze` temiz · **554/554 test geçiyor** · paket
+eklenmedi · şema **v12** · çalışma ağacında yalnızca bu CLAUDE.md
+değişikliği kalmış olmalı.
+
+## 1. ⚠️ İLK İŞ: test ortamı
+
+```powershell
+flutter test --no-test-assets
+```
+
+Bu bayrak **olmadan hiçbir test çalışmaz** (araç çöker). Gerekçe ve
+`ink_sparkle.frag` kopyalama adımı için dosyadaki **"Test ortamı — testler
+neden `--no-test-assets` ile çalışıyor"** bölümünü oku.
+
+Golden üretmek: `flutter test --no-test-assets --update-goldens test/golden/`.
+`pumpAndSettle` yerine sabit kare dizisi kullan (sonsuz animasyonlar var).
+
+**Yararlı alışkanlık:** test çıktısı çok uzun; log'u dosyaya yazıp `[E]`
+satırlarını süzmek bu oturumda çok işe yaradı.
+
+## 2. SIRADAKİ İŞ — BÖLÜM 5
+
+**Tam şartname:** SABAH kapanışının §5 → "BÖLÜM 5 — Günlük döngüyü maceraya
+bağla". Özet:
+
+- **(a) Streak tetikleyicisi:** 2000 adım **değil**, günde **bir macera
+  tamamlamak**. `GameConstants.streakStepThreshold` kullanımdan çıkacak.
+  ⚠️ `EquippedBuffs.streakStepThreshold` ve `streakRelief` buff türü ona
+  bağlı — **o buff türü yeniden anlamlandırılmalı** (yoksa ölü bir bonus
+  kalır ve GD36'nın "boşta tür kalmasın" invariantı kırılır).
+- **(b) Çark kilidi:** `dailyWheelUnlockSteps` (3000 adım) yerine 1 macera
+  tamamlama. Tekrarlama mantığına **dokunma**.
+- **(c) Streak savaş stat bonusu:** gün başına +%0,5, tavan +%30. **Yalnızca
+  savaş statları** — ekonomiye uygulanmayacak.
+
+**Dikkat edilecekler (bu oturumdan çıkan bilgi):**
+- Savaş stat bonusunun toplandığı yer `lib/core/utils/equipped_buffs.dart`;
+  eşya seviyesi çarpanı `item_leveling.dart:scaleForLevel`. Streak bonusu
+  ikisinin **üstüne** binen üçüncü bir katman — nereye ekleneceği bilinçli
+  seçilmeli (öneri: `EquippedBuffs`'a bir `streakMultiplier` alanı, çünkü
+  savaş statlarının tek toplama noktası orası).
+- Arayüzdeki "2000 adım" metinleri: `home_screen.dart` (`_StreakCard`),
+  `inventory_screen.dart` (karakter paneli), `root_shell.dart`
+  (`_onStepsReported` tetikleyici dalı).
+- `test/streak_test.dart` (20) ve `test/streak_freeze_test.dart` (21) adım
+  eşiğine dayanıyor. **Silme, birlikte güncelle.**
+- Şema değişirse sürümü artır (v12 → v13) ve migration yaz.
+
+## 3. Sonra ne var
+
+- **BÖLÜM 6** — kalan Faz 0 hataları: **A6** (çark GIF karesi yüklenirken
+  try/catch yok), **A7** (`CharacterCatalog._cache` hiç geçersizleşmiyor,
+  `reset()` yok) ve 320 dp'de savaş sahnesindeki görev metni katmanının
+  karakterlerin üstüne binmesi. Üçünün de tarifi SABAH kapanışının §4'ünde.
+- **BÖLÜM 7+** — **Aşama 4a savaş motoru (#4).** ⚠️ Determinizm şartı:
+  `Random()` savaş kodunda yasak, tohum enjekte edilip durumla saklanacak
+  (izlenecek örnek: `wheel_rewards.dart` + `UserProfile.wheelSeed`, GD18).
+  Sonra Aşama 4b (#14 canavara göre ödül), Aşama 5 (#3/#6/#18).
+  **Firebase (Aşama 6) arkadaşımın işi — dokunma.**
+
+## 4. Bu oturumda eklenen dosyalar
+
+```
+lib/data/item_archetypes.dart              # arketip tabloları (veri)
+lib/widgets/archetype_badge.dart           # arketip rozeti
+lib/models/owned_item.dart                 # envanter örneği
+lib/core/utils/item_leveling.dart          # eşya seviyesi (saf)
+lib/core/utils/item_merging.dart           # birleştirme (saf)
+lib/features/inventory/blacksmith_screen.dart
+
+test/item_variety_test.dart                # buff çeşitliliği (14)
+test/item_leveling_test.dart               # seviye kuralları (28)
+test/item_merging_test.dart                # birleştirme kuralları (22)
+test/blacksmith_test.dart                  # demirci, RootShell üzerinden (16)
+test/golden/store_card_golden_test.dart    # mağaza kartı (3)
+test/golden/blacksmith_golden_test.dart    # demirci paneli (3)
+test/golden/forge_golden_test.dart         # demirci ekranı (2)
+test/golden/goldens/store_card_{320,390}.png
+test/golden/goldens/blacksmith_{320,390}.png
+test/golden/goldens/blacksmith_blocked_320.png
+test/golden/goldens/forge_{320,390}.png
+```
+
+## 5. Bu oturumda **savaş motorunu bekleyen** birikim
+
+Üç bölüm de savaş statlarını üretiyor ama **hiçbiri uygulanmıyor**:
+
+| Kaynak | Ne üretiyor |
+|---|---|
+| Arketip (Bölüm 3) | Her itemde 1–3 savaş statı |
+| Eşya seviyesi (4.2) | Seviye başına +%10 savaş statı |
+| Birleştirme (4.3) | Nadirlik yükselince daha büyük savaş statı |
+| Bölüm 5c (yapılacak) | Streak başına +%0,5 savaş statı |
+
+Aşama 4a savaş motoru yazılınca dördü birden canlanacak. Toplama noktası
+`EquippedBuffs.combatEffects` / `flatBonusFor` / `rateBonusFor` — motor oradan
+okumalı, beşinci bir hesap yazmamalı.
+
+## 6. Değişmeyen kurallar (hatırlatma)
+
+- ⛔ **Firebase'e dokunma.**
+- ⚠️ **`flutter run` çalışmıyor** (Smart App Control). Görsel iş = **golden**;
+  PNG'yi üret, **oku ve gerçekten bak**, birden çok genişlik için üret.
+- **Commit atma.** Bölüm bitince değişen dosyaları listele, özetle, tek satır
+  conventional-commit mesajı öner.
+- **Arkadaşımın kodu — varsayılan: dokunma.** Yalnızca gerçek hataları düzelt.
+- Her adımdan sonra `flutter analyze` temiz + testler yeşil.
+
