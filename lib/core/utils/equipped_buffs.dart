@@ -82,7 +82,10 @@ class EquippedBuffs {
   /// ([ItemCatalog.byId] `characterClass` ile ya da
   /// [ItemCatalog.forCharacterClass]); yoksa temel buff toplanır ve sınıfa
   /// özel buff'lar (GD16) anlamını yitirir.
-  factory EquippedBuffs.from(Iterable<Item> equipped) {
+  factory EquippedBuffs.from(
+    Iterable<Item> equipped, {
+    Iterable<ItemEffect> titleEffects = const [],
+  }) {
     var stepCoin = 0.0;
     var stepXp = 0.0;
     var wheelXp = 0.0;
@@ -93,8 +96,19 @@ class EquippedBuffs {
     final conditional = <ItemEffect>[];
     final combat = <ItemEffect>[];
 
-    for (final item in equipped) {
-      for (final effect in item.buff.effects) {
+    // Takılı ünvanın etkileri (Bölüm C) **aynı** toplama noktasından geçer.
+    //
+    // Neden ayrı bir hesap yok: ekonomi tavanı (`_cap`) ve stok tavanları
+    // burada uygulanıyor. Ünvan ayrı toplansaydı, ünvan + eşya birlikte
+    // tavanı aşabilirdi — GD25'in "tavan toplama noktasında, item başına
+    // değil" kararının doğrudan sonucu.
+    final effectSources = <Iterable<ItemEffect>>[
+      for (final item in equipped) item.buff.effects,
+      titleEffects,
+    ];
+
+    for (final effects in effectSources) {
+      for (final effect in effects) {
         if (effect.stat.isCombat) {
           combat.add(effect);
           continue;

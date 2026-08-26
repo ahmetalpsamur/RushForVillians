@@ -35,13 +35,6 @@ class MockData {
       cost: 2000,
       icon: Icons.science,
     ),
-    XpStoreItem(
-      id: 'skin_dragon_cape',
-      name: 'Ejderha Pelerini',
-      description: 'Karakterin için kozmetik pelerin.',
-      cost: 500,
-      icon: Icons.checkroom,
-    ),
     // Tüketilen iki yükseltme: `repeatable`, çünkü etkileri bir kerelik.
     // Kalıcı sahiplik yerine profildeki sayaçlara/süreye yazılırlar.
     XpStoreItem(
@@ -73,13 +66,6 @@ class MockData {
       cost: 600,
       icon: Icons.ac_unit,
       repeatable: true,
-    ),
-    XpStoreItem(
-      id: 'title_villain_hunter',
-      name: '"Kötü Ruh Avcısı" Unvanı',
-      description: 'Profilinde görünen özel unvan.',
-      cost: 1200,
-      icon: Icons.military_tech,
     ),
   ];
 

@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../models/item.dart';
+import '../../models/game_title.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/wheel_reward.dart';
 import '../../services/reward_sound.dart';
 import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/title_badge.dart';
 import '../tutorial/tutorial_guide.dart';
 
 /// Günlük çark: adım hedefinin bir kısmı tamamlanınca açılır, günde bir
@@ -39,6 +41,13 @@ class DailyWheelScreen extends StatefulWidget {
   /// Zaten sahip olunan kimlikler; çarktan çıkmazlar.
   final List<String> ownedItemIds;
 
+  /// Çarktan çıkabilecek ünvan adayları (Bölüm C.4). Havuz süzmeyi
+  /// `buildWheelSlices` yapıyor: yalnızca çark kaynaklı ve sahip olunmayanlar.
+  final List<GameTitle> titles;
+
+  /// Sahip olunan ünvan kimlikleri.
+  final List<String> ownedTitleIds;
+
   /// Çarkın tohumu ([UserProfile.wheelSeed]).
   final int seed;
 
@@ -54,6 +63,8 @@ class DailyWheelScreen extends StatefulWidget {
     this.level = 1,
     this.equipment = const [],
     this.ownedItemIds = const [],
+    this.titles = const [],
+    this.ownedTitleIds = const [],
     this.tutorialMode = false,
   });
 
@@ -91,10 +102,15 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
     candidates: widget.equipment,
     ownedItemIds: [...widget.ownedItemIds, ..._wonIds],
     seed: _seed,
+    titleCandidates: widget.titles,
+    ownedTitleIds: [...widget.ownedTitleIds, ..._wonTitleIds],
   );
 
   /// Bu ekranda kazanılan itemler; ikinci çevirmede tekrar çıkmasınlar.
   final List<String> _wonIds = [];
+
+  /// Aynı kural ünvanlar için (Bölüm C.4).
+  final List<String> _wonTitleIds = [];
 
   int get _remainingExtras => widget.extraSpins - _spentExtras;
 
@@ -124,6 +140,7 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
       _result = reward;
       _showReward = true;
       if (reward.isItem) _wonIds.add(reward.item!.id);
+      if (reward.isTitle) _wonTitleIds.add(reward.title!.id);
       if (usesExtra) {
         _spentExtras++;
       } else {
@@ -238,6 +255,34 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = reward.title;
+    if (title != null) {
+      return SectionCard(
+        child: Column(
+          children: [
+            const Text('Ünvan kazandın! 🎉', textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            TitleBadge(title: title),
+            const SizedBox(height: 6),
+            Text(
+              title.lore,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontStyle: FontStyle.italic,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Profildeki Ünvanlar ekranından takabilirsin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 11.5),
+            ),
+          ],
+        ),
+      );
+    }
     final item = reward.item;
     if (item == null) {
       return Text(
@@ -292,7 +337,7 @@ class _RewardReveal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final item = reward.item;
-    final glowColor = item?.rarity.color ?? AppColors.xp;
+    final glowColor = reward.rarity?.color ?? AppColors.xp;
 
     return ColoredBox(
       key: const ValueKey('wheel-reward-reveal'),

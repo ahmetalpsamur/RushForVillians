@@ -7,10 +7,12 @@ import '../../models/daily_progress.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/item.dart';
+import '../../models/game_title.dart';
 import '../../models/user_profile.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/daily_step_ring.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
 import '../inventory/inventory_screen.dart';
 import 'step_history_screen.dart';
@@ -35,6 +37,13 @@ class ProfileScreen extends StatelessWidget {
 
   final VoidCallback onOpenInventory;
   final VoidCallback onOpenBlacksmith;
+  final VoidCallback onOpenTitles;
+
+  /// Takılı ünvan (Bölüm C.2). Oyuncu adının hemen altında gösterilir.
+  final GameTitle? equippedTitle;
+
+  /// Kazanılmış ünvan sayısı; "Ünvanlar" kartındaki özet satırı.
+  final int ownedTitleCount;
 
   const ProfileScreen({
     super.key,
@@ -45,6 +54,9 @@ class ProfileScreen extends StatelessWidget {
     required this.canEditCharacter,
     required this.onOpenInventory,
     required this.onOpenBlacksmith,
+    required this.onOpenTitles,
+    this.equippedTitle,
+    this.ownedTitleCount = 0,
     this.equippedItems = const [],
     this.buffs = EquippedBuffs.none,
     this.adventure,
@@ -116,6 +128,14 @@ class ProfileScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
+                  // Takılı ünvan adın hemen altında: görünmeyen bir ünvan
+                  // yalnızca gizli bir buff olur ve "hangisini takayım"
+                  // sorusu anlamını yitirir (Bölüm C.2).
+                  if (equippedTitle != null) ...[
+                    const SizedBox(height: 4),
+                    TitleBadge(title: equippedTitle),
+                  ],
+                  const SizedBox(height: 2),
                   Text('Seviye ${profile.level}'),
                   const SizedBox(height: 8),
                   Chip(
@@ -172,6 +192,59 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('profile-titles-entry'),
+                onTap: onOpenTitles,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Colors.white10,
+                        child: Icon(
+                          Icons.military_tech,
+                          color: AppColors.streak,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ünvanlar',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              equippedTitle == null
+                                  ? '$ownedTitleCount ünvan kazandın. Birini '
+                                      'tak, adının yanında görünsün.'
+                                  : 'Takılı: ${equippedTitle!.name} · '
+                                      '$ownedTitleCount ünvan kazandın.',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Colors.white54),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),

@@ -16,15 +16,18 @@ import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
 import '../../core/utils/streak_bonus.dart';
+import '../../core/utils/title_rules.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
+import '../../data/title_catalog.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/combat_stats.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
+import '../../models/game_title.dart';
 import '../../models/item.dart';
 import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
@@ -51,6 +54,7 @@ import '../inventory/inventory_screen.dart';
 import '../profile/profile_screen.dart';
 import '../rewards/rewards_screen.dart';
 import '../store/xp_store_screen.dart';
+import '../titles/titles_screen.dart';
 import '../team/team_screen.dart';
 import '../tutorial/tutorial_guide.dart';
 import '../wheel/daily_wheel_screen.dart';
@@ -287,9 +291,138 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
       resolved.add(item);
     }
-    _buffs = EquippedBuffs.from(resolved);
+    // Takılı ünvan katalogdan düştüyse ya da artık sahip değilsek slot
+    // boşalır; sahiplik listesine dokunulmaz (GD28 deseni).
+    _profile.normalizeEquippedTitle((id) => TitleCatalog.byId(id) != null);
+    _buffs = EquippedBuffs.from(
+      resolved,
+      titleEffects: _equippedTitle?.effects ?? const [],
+    );
     // Kuşanma can tavanını değiştirmiş olabilir.
     _syncAdventureStats();
+  }
+
+  /// Takılı ünvan (yoksa null).
+  GameTitle? get _equippedTitle =>
+      TitleCatalog.byId(_profile.equippedTitleId);
+
+  /// Sahip olunan ünvanlar, katalog sırasında.
+  List<GameTitle> get _ownedTitles => [
+    for (final title in TitleCatalog.all)
+      if (_profile.ownsTitle(title.id)) title,
+  ];
+
+  /// Başarım sayaçlarının anlık görüntüsü (Bölüm C.4).
+  TitleProgress get _titleProgress => TitleProgress.fromCounters(
+    level: _profile.level,
+    totalSteps: _profile.totalSteps,
+    longestStreak: _profile.longestStreak,
+    enemiesDefeated: _profile.enemiesDefeated,
+    adventuresCompleted: _profile.adventuresCompleted,
+    wheelSpins: _profile.wheelSpins,
+    itemsMerged: _profile.itemsMerged,
+    lifetimeCoins: _profile.lifetimeCoins,
+    ownedItems: _profile.ownedItems,
+  );
+
+  /// Başarım koşulu sağlanan ünvanları verir; **yeni** kazanılanları döner.
+  ///
+  /// `setState` içinden çağrılır ve bildirim frame sonuna bırakılır
+  /// (GD46/GD47: senkron bildirim seviye kutlamasına yem oluyor).
+  List<GameTitle> _grantEarnedTitles() {
+    final earned = newlyEarnedTitles(
+      progress: _titleProgress,
+      ownedTitleIds: _profile.ownedTitleIds.toSet(),
+    );
+    for (final title in earned) {
+      _profile.grantTitle(title.id);
+    }
+    return earned;
+  }
+
+  /// Ünvanlar ekranını açar.
+  ///
+  /// Envanter/demirci ile aynı desen (GD27): ekran veri tutmuyor, her
+  /// çizimde `readState` ile buradan okuyor ve `_revision` değişince
+  /// tazeleniyor.
+  void _openTitles() {
+    _push(
+      TitlesScreen(
+        revision: _revision,
+        readState:
+            () => TitlesScreenState(
+              ownedIds: _profile.ownedTitleIds.toSet(),
+              equippedId: _profile.equippedTitleId,
+              progress: _titleProgress,
+              coins: _profile.coins,
+            ),
+        onEquip: _equipTitle,
+      ),
+    );
+  }
+
+  /// Ünvanı takar/çıkarır ve buff'ları tazeler.
+  void _equipTitle(String? id) {
+    if (!_profile.equipTitle(id)) return;
+    setState(_refreshEquipment);
+    _persist();
+    final title = TitleCatalog.byId(id);
+    _showStoreNotice(
+      title == null
+          ? 'Ünvanın çıkarıldı.'
+          : '"${title.name}" ünvanını taktın.',
+    );
+  }
+
+  /// Mağazadan ünvan satın alır.
+  ///
+  /// Kilit **iki yerde** kontrol edilir (ekranda görünürlük, burada karar);
+  /// son söz state'in — mağaza deseninin aynısı.
+  void _purchaseTitle(GameTitle title) {
+    if (title.source != TitleSource.purchase) return;
+    if (_profile.ownsTitle(title.id)) {
+      _showStoreNotice('"${title.name}" ünvanı zaten sende.');
+      return;
+    }
+    if (_profile.coins < title.cost) {
+      _showStoreNotice(
+        '${title.cost - _profile.coins} altın daha gerekiyor.',
+      );
+      return;
+    }
+    setState(() {
+      _profile.coins -= title.cost;
+      _profile.grantTitle(title.id);
+    });
+    _persist();
+    _showStoreNotice(
+      '"${title.name}" ünvanı alındı. Profilden takabilirsin.',
+    );
+  }
+
+  /// Kazanılan ünvanları kullanıcıya duyurur.
+  void _showTitlesEarned(List<GameTitle> titles) {
+    if (titles.isEmpty) return;
+    final names = titles.map((title) => '"${title.name}"').join(', ');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            const Icon(Icons.military_tech, color: AppColors.streak),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                titles.length == 1
+                    ? 'Yeni ünvan: $names — profilden takabilirsin.'
+                    : 'Yeni ünvanlar: $names',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Bir envanter örneğini katalogdan çözer: sınıfa uyarlanmış item +
@@ -713,6 +846,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     adventure.victoryXpReward = xp;
     adventure.victoryCoinReward = coins;
     _profile.coins += coins;
+    // Ömür boyu kazanç: harcama bunu düşürmez, başarım ünvanları buna bakar.
+    _profile.lifetimeCoins += coins;
+    _profile.enemiesDefeated += 1;
     return xp;
   }
 
@@ -803,6 +939,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     CombatRoundResult? roundResult;
     int? milestoneReached;
     var milestoneFreezeGranted = false;
+    final earnedTitles = <GameTitle>[];
     StreakBonusDraw? streakStatGained;
     final revivalAdventure = _adventure;
     final revivalStepsWithoutXp =
@@ -859,7 +996,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       coinsGained += coinReward.coins;
       _profile.lastRewardedStepCount += coinReward.consumedSteps;
       _profile.coins += coinsGained;
+      _profile.lifetimeCoins += coinsGained;
       _today.coinsEarned += coinsGained;
+
+      // Yürüyüş fazı bu partide bittiyse macera gerçekten tamamlandı
+      // (Bölüm A.1). Sayaç yalnızca **geçiş anında** artar: her partide
+      // `isAdventureCompleted` doğru olduğu için koşulsuz artırmak aynı
+      // macerayı defalarca sayardı.
+      if (walkAccepted > 0 && _adventure?.isAdventureCompleted == true) {
+        _profile.adventuresCompleted += 1;
+      }
 
       // XP'nin kendi işaretçisi var; iki ödül ekonomisi birbirine karışmaz.
       final xpReward = calculateStepXp(
@@ -892,6 +1038,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           // Bölüm A.6: zafer seriyi ve çarkı **o anda** açar. Yürüyüş fazı
           // bonustur, zorunluluk değil.
           _today.enemyDefeated = true;
+          // Yürüyüş fazı hiç açılmadan biten macera (düşman tam hedefte
+          // devrildi) burada sayılır; açılanlar para hesabında sayılıyor.
+          if (adventure.isAdventureCompleted) {
+            _profile.adventuresCompleted += 1;
+          }
         }
       }
       // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı. Kuşanılan
@@ -910,8 +1061,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         if (milestoneReached != null) {
           milestoneFreezeGranted =
               _profile.grantStreakFreeze(1, _buffs.streakFreezeCap) > 0;
+          // Kilometre taşı ünvanı (Bölüm C.4). Katalogda o güne bir ünvan
+          // tanımlıysa verilir; yoksa sessizce geçilir.
+          final milestoneTitle = TitleCatalog.forMilestone(milestoneReached!);
+          if (milestoneTitle != null &&
+              _profile.grantTitle(milestoneTitle.id)) {
+            earnedTitles.add(milestoneTitle);
+          }
         }
       }
+      // Başarım ünvanları en sonda: bu partinin bütün sayaçları işlendikten
+      // sonra bakılmalı, yoksa aynı partide açılan bir ünvan bir sonraki
+      // partiye kalırdı.
+      earnedTitles.addAll(_grantEarnedTitles());
+      if (earnedTitles.isNotEmpty) _refreshEquipment();
     });
     _persist();
 
@@ -926,7 +1089,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // düşüyor ve sırayla gösteriliyor.
     final statGained = streakStatGained;
     final milestone = milestoneReached;
-    if (statGained != null || milestone != null) {
+    if (statGained != null || milestone != null || earnedTitles.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (statGained != null) _showStreakStatBonus(statGained);
@@ -936,6 +1099,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             freezeGranted: milestoneFreezeGranted,
           );
         }
+        _showTitlesEarned(earnedTitles);
       });
     }
     if (enemyDefeated) {
@@ -1230,11 +1394,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// süzgeci havuz kurulurken uygulanıyor (`buildWheelSlices`); burada ikinci
   /// bir kontrol **yok** — kilidin tek kaynağı [Item.isUnlockedAt].
   void _spinWheel(WheelReward reward) {
+    final earned = <GameTitle>[];
     setState(() {
       _profile.consumeWheelSpin(GameClock.now());
       // Tohum ilerletilir: bir sonraki çevirme aynı sonucu vermesin.
       // Çark ekranı da aynı adımı kendi içinde uyguluyor.
       _profile.wheelSeed = nextWheelSeed(_profile.wheelSeed);
+
+      _profile.wheelSpins += 1;
 
       final item = reward.item;
       if (item == null) {
@@ -1245,8 +1412,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         // olarak ekleniyor, kimlik olarak değil.
         _profile.addItem(item.id);
       }
+      // Ünvan dilimi (Bölüm C.4). Havuz sahip olunanları eliyor; `grantTitle`
+      // yine de mükerrer kazanmayı sessizce yutar.
+      final wonTitle = reward.title;
+      if (wonTitle != null && _profile.grantTitle(wonTitle.id)) {
+        earned.add(wonTitle);
+      }
+      earned.addAll(_grantEarnedTitles());
+      if (earned.isNotEmpty) _refreshEquipment();
     });
     _persist();
+    if (earned.isNotEmpty) _showTitlesEarned(earned);
     if (_tutorialStep.value == TutorialGuideStep.wheelWaiting) {
       _setTutorialStep(TutorialGuideStep.wheelReward);
     }
@@ -1485,6 +1661,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (target == null) return;
 
     final unequipped = quote.consumesEquipped;
+    final earnedTitles = <GameTitle>[];
     setState(() {
       _profile.coins -= quote.cost;
       for (final instanceId in quote.consumedInstanceIds) {
@@ -1492,6 +1669,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
       // Sonuç **Sv. 1**'e döner (GD42); nadirlik yükselir.
       _profile.addItem(itemId, rarity: target);
+      _profile.itemsMerged += 1;
+      earnedTitles.addAll(_grantEarnedTitles());
       _refreshEquipment();
     });
     _persist();
@@ -1503,6 +1682,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           : '${quote.requiredCount} adet ${resolved.name} birleştirildi: '
               'artık ${target.label}, Sv. 1.',
     );
+    _showTitlesEarned(earnedTitles);
   }
 
   /// Aynı kimliğe ve aynı nadirliğe sahip örnekler.
@@ -1757,6 +1937,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           for (final instance in _profile.ownedItems) instance.itemId,
         ],
         seed: _profile.wheelSeed,
+        titles: TitleCatalog.withSource(TitleSource.wheel),
+        ownedTitleIds: _profile.ownedTitleIds,
         tutorialMode: tutorialWheel,
         onSpinResult: _spinWheel,
       ),
@@ -1824,6 +2006,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final tabs = [
       HomeScreen(
         profile: _profile,
+        equippedTitle: _equippedTitle,
         today: _today,
         adventure: _adventure,
         onOpenAdventure: _openAdventure,
@@ -1867,8 +2050,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                     _tutorialStep.value == TutorialGuideStep.shopWaiting
                 ? _tutorialStarterWeapon?.id
                 : null,
+        titles: TitleCatalog.purchasable,
+        ownedTitleIds: _profile.ownedTitleIds,
         onPurchase: _purchase,
         onPurchaseEquipment: _purchaseEquipment,
+        onPurchaseTitle: _purchaseTitle,
       ),
       TeamScreen(team: _team),
       ProfileScreen(
@@ -1878,6 +2064,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         stepHistory: _stepHistory,
         equippedItems: _equippedItems,
         buffs: _buffs,
+        equippedTitle: _equippedTitle,
+        ownedTitleCount: _ownedTitles.length,
+        onOpenTitles: _openTitles,
         canEditCharacter: _profile.ownedUpgradeIds.contains(
           _reincarnationPotionId,
         ),

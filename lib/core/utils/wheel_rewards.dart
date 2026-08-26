@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../../data/mock_data.dart';
+import '../../models/game_title.dart';
 import '../../models/item.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/wheel_reward.dart';
@@ -24,6 +25,12 @@ const int wheelSliceCount = 8;
 /// Kalanı XP. Item dilimleri azınlıkta: çark günde bir kez dönüyor ve her
 /// gün ekipman dağıtmak hem mağazayı hem seviye kilidini anlamsız kılar.
 const int maxItemSlices = 4;
+
+/// Bir çarkta en fazla kaç dilimin **ünvan** olabileceği (Bölüm C.4).
+///
+/// Bir: ünvan çarkın dört kaynağından yalnızca biri ve en nadir olanı.
+/// İkiden fazlası, başarım ve kilometre taşı yollarını anlamsızlaştırırdı.
+const int maxTitleSlices = 1;
 
 /// Item seçilirken kullanılan nadirlik ağırlığı. Her nadirlik çarktan
 /// çıkabilir; yüksek nadirlikler giderek daha düşük ağırlık alır.
@@ -66,8 +73,39 @@ List<WheelReward> buildWheelSlices({
   required List<Item> candidates,
   required List<String> ownedItemIds,
   required int seed,
+  List<GameTitle> titleCandidates = const [],
+  List<String> ownedTitleIds = const [],
 }) {
   final random = Random(seed);
+
+  // Ünvan dilimi (Bölüm C.4): yalnızca **çark kaynaklı** ve henüz sahip
+  // olunmayan ünvanlar. Başka bir yoldan gelen ünvanın çarktan da çıkması,
+  // o yolu anlamsız kılardı — bu yüzden süzme çağıran tarafta değil, burada.
+  final eligibleTitles = [
+    for (final title in titleCandidates)
+      if (title.source == TitleSource.wheel && !ownedTitleIds.contains(title.id))
+        title,
+  ];
+  final selectedTitles = <GameTitle>[];
+  if (eligibleTitles.isNotEmpty) {
+    final remainingTitles = [...eligibleTitles];
+    while (selectedTitles.length < maxTitleSlices && remainingTitles.isNotEmpty) {
+      final totalWeight = remainingTitles.fold<double>(
+        0,
+        (sum, title) => sum + wheelRarityWeight(title.rarity),
+      );
+      var cursor = random.nextDouble() * totalWeight;
+      var selectedIndex = remainingTitles.length - 1;
+      for (var index = 0; index < remainingTitles.length; index++) {
+        cursor -= wheelRarityWeight(remainingTitles[index].rarity);
+        if (cursor <= 0) {
+          selectedIndex = index;
+          break;
+        }
+      }
+      selectedTitles.add(remainingTitles.removeAt(selectedIndex));
+    }
+  }
 
   final eligible =
       candidates
@@ -77,7 +115,11 @@ List<WheelReward> buildWheelSlices({
           )
           .toList();
 
-  final itemSliceCount = min(maxItemSlices, eligible.length);
+  // Ünvan dilimi item dilimlerinden pay alır: toplam dilim sayısı sabit.
+  final itemSliceCount = min(
+    maxItemSlices,
+    min(eligible.length, wheelSliceCount - selectedTitles.length - 1),
+  );
   final selectedItems = <Item>[];
   final remaining = [...eligible];
   while (selectedItems.length < itemSliceCount && remaining.isNotEmpty) {
@@ -99,9 +141,12 @@ List<WheelReward> buildWheelSlices({
 
   final xpOptions = MockData.wheelXpOptions;
 
+  final rewardSliceCount = itemSliceCount + selectedTitles.length;
   final slices = <WheelReward>[
     for (final item in selectedItems) WheelReward.item(item),
-    for (var i = itemSliceCount; i < wheelSliceCount; i++)
+    for (final title in selectedTitles) WheelReward.title(title),
+    // Kalan dilimler XP: **boş dilim hiçbir koşulda oluşmaz.**
+    for (var i = rewardSliceCount; i < wheelSliceCount; i++)
       WheelReward.xp(xpOptions[random.nextInt(xpOptions.length)]),
   ];
 

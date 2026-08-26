@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 18;
+  static const int schemaVersion = 19;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -248,6 +248,42 @@ class GameStorage {
         for (final entry in bonuses.entries)
           if (entry.value is int) entry.key: (entry.value as int) * 10,
       };
+      return state;
+    },
+    // 18 -> 19: "Ejderha Pelerini" (`skin_dragon_cape`) kaldırıldı ve yerine
+    // ünvan sistemi geldi (Bölüm C). Pelerin hiçbir yerde gösterilmiyordu ama
+    // 500 altına satılmıştı; sahibi karşılıksız kalmamalı.
+    //
+    // **Neden ünvana çevriliyor, coin iade edilmiyor:** pelerin kozmetikti ve
+    // yerine geçen şey de kozmetik. Coin iadesi ekonomiye para basar; ünvan
+    // ise oyuncunun aldığı şeyin karşılığını aynı türden verir. Aynı mantık
+    // eski `title_villain_hunter` satın alması için de geçerli — o zaten bir
+    // ünvandı, artık gerçek kataloğa bağlanıyor.
+    18: (state) {
+      final profile = state['profile'];
+      if (profile is! Map) return state;
+
+      final upgrades = <String>[
+        for (final id in (profile['ownedUpgradeIds'] as List?) ?? const [])
+          if (id is String) id,
+      ];
+      final titles = <String>[
+        for (final id in (profile['ownedTitleIds'] as List?) ?? const [])
+          if (id is String) id,
+      ];
+
+      void convert(String upgradeId, String titleId) {
+        if (!upgrades.remove(upgradeId)) return;
+        if (!titles.contains(titleId)) titles.add(titleId);
+      }
+
+      // Pelerin sahibi "Gece Yürüyüşçüsü" alır: ikisi de mağazadan alınan,
+      // benzer fiyatlı kozmetikler.
+      convert('skin_dragon_cape', 'night_walker');
+      convert('title_villain_hunter', 'villain_hunter');
+
+      profile['ownedUpgradeIds'] = upgrades;
+      profile['ownedTitleIds'] = titles;
       return state;
     },
   };

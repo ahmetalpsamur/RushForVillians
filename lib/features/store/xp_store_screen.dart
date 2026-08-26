@@ -4,12 +4,14 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
 import '../../models/reward_rarity.dart';
+import '../../models/game_title.dart';
 import '../../models/item.dart';
 import '../../models/xp_store_item.dart';
 import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
 import '../../widgets/scroll_to_top_button.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/title_badge.dart';
 import '../tutorial/tutorial_guide.dart';
 
 /// Mağaza: yükseltmeler ve ekipman.
@@ -48,6 +50,16 @@ class XpStoreScreen extends StatefulWidget {
 
   final void Function(XpStoreItem item) onPurchase;
   final void Function(Item item) onPurchaseEquipment;
+
+  /// Mağazada satılan ünvanlar (Bölüm C.4), ucuzdan pahalıya.
+  final List<GameTitle> titles;
+
+  /// Sahip olunan ünvan kimlikleri: satın alınmışı ikinci kez satmamak için.
+  final List<String> ownedTitleIds;
+
+  /// Ünvan satın alma. `null` ise ünvan bölümü hiç çizilmez — testler ve
+  /// eski çağrı noktaları ünvansız bir mağaza kurabilsin diye.
+  final void Function(GameTitle title)? onPurchaseTitle;
   final String? tutorialItemId;
 
   const XpStoreScreen({
@@ -61,6 +73,9 @@ class XpStoreScreen extends StatefulWidget {
     this.ownedEquipmentCounts = const {},
     required this.onPurchase,
     required this.onPurchaseEquipment,
+    this.onPurchaseTitle,
+    this.titles = const [],
+    this.ownedTitleIds = const [],
     this.extraWheelSpins = 0,
     this.xpBoostActive = false,
     this.tutorialItemId,
@@ -378,6 +393,38 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   ),
                 ),
             ],
+            if (widget.titles.isNotEmpty && widget.onPurchaseTitle != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: SectionCard(
+                    title: 'Ünvanlar',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Ünvan bir kimlik: adının yanında görünür ve kendine '
+                          'has bir etki taşır. Aynı anda yalnızca birini '
+                          'takarsın; hepsi sende kalır.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        for (final title in widget.titles)
+                          _TitleRow(
+                            title: title,
+                            coins: widget.coins,
+                            owned: widget.ownedTitleIds.contains(title.id),
+                            onPurchase: () => widget.onPurchaseTitle!(title),
+                            onBlocked: _explain,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ],
       ),
@@ -410,6 +457,83 @@ class _FilterChip extends StatelessWidget {
 }
 
 /// Yükseltme satırı (kozmetik, unvan, dondurma hakkı).
+/// Mağazadaki tek bir ünvan satırı (Bölüm C.4).
+///
+/// Satın alınamıyorsa **neden** alınamadığını söyler: devre dışı düğme
+/// dokunulabilir kalır ve nedeni açıklar (Model Kuralları #4).
+class _TitleRow extends StatelessWidget {
+  final GameTitle title;
+  final int coins;
+  final bool owned;
+  final VoidCallback onPurchase;
+  final ValueChanged<String> onBlocked;
+
+  const _TitleRow({
+    required this.title,
+    required this.coins,
+    required this.owned,
+    required this.onPurchase,
+    required this.onBlocked,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final affordable = coins >= title.cost;
+    final buyable = !owned && affordable;
+    final reason =
+        owned
+            ? '"${title.name}" ünvanı zaten sende. Profilden takabilirsin.'
+            : '${title.cost - coins} altın daha gerekiyor.';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TitleBadge(title: title, compact: true),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title.lore,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontStyle: FontStyle.italic,
+              fontSize: 11.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final effect in title.effects)
+            Text(
+              '• ${effect.label}',
+              style: const TextStyle(fontSize: 11.5),
+            ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: GestureDetector(
+              // Devre dışı düğme dokunmayı yutar; sarmalayıcı nedeni
+              // söyleyebilmek için dokunmayı yakalar.
+              onTap: buyable ? null : () => onBlocked(reason),
+              child: FilledButton.icon(
+                key: ValueKey('buy-title-${title.id}'),
+                onPressed: buyable ? onPurchase : null,
+                icon: Icon(owned ? Icons.check : Icons.monetization_on),
+                label: Text(
+                  owned ? 'SENDE' : '${title.cost} ALTIN',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _UpgradeRow extends StatelessWidget {
   final XpStoreItem item;
   final int coins;

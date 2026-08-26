@@ -99,6 +99,13 @@ void main() {
         ),
       ),
     );
+    // GIF çözümlemesi **gerçek** asenkron iş; sahte saat onu ilerletmiyor.
+    // Isınma olmadan sprite'lar kimi koşuda henüz çözülmemiş oluyor ve
+    // golden'lar tam suite altında rastgele kırmızıya dönüyordu (ölçülen fark
+    // %1,4-%2,5). `runAsync` sırasında animasyon denetleyicileri ilerlemez.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 320)),
+    );
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -283,8 +290,10 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      // 250 ms kimi koşuda ölüm karesini çözmeye yetmiyordu; ısınma payı
+      // artırıldı. Aynı gerekçe `pumpAdventure` içinde yazılı.
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 250)),
+        () => Future<void>.delayed(const Duration(milliseconds: 420)),
       );
       await tester.pump();
 

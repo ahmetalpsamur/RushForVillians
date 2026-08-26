@@ -8,11 +8,13 @@ import '../../core/utils/game_clock.dart';
 import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
+import '../../models/game_title.dart';
 import '../../models/streak_stat_bonuses.dart';
 import '../../models/user_profile.dart';
 import '../../services/step_permission_service.dart';
 import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
 import '../../widgets/hero_progress_rings.dart';
 
@@ -20,6 +22,9 @@ import '../../widgets/hero_progress_rings.dart';
 /// bölümlere hızlı erişim.
 class HomeScreen extends StatelessWidget {
   final UserProfile profile;
+
+  /// Takılı ünvan (Bölüm C.2). `null` ise rozet hiç çizilmez.
+  final GameTitle? equippedTitle;
   final DailyProgress today;
   final AdventureQuest? adventure;
   final VoidCallback onOpenAdventure;
@@ -47,6 +52,7 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.profile,
+    this.equippedTitle,
     required this.today,
     required this.adventure,
     required this.onOpenAdventure,
@@ -96,6 +102,15 @@ class HomeScreen extends StatelessWidget {
             title: 'Merhaba, ${profile.name}',
             child: Column(
               children: [
+                // Takılı ünvan oyuncu adının geçtiği her yerde görünür
+                // (Bölüm C.2).
+                if (equippedTitle != null) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TitleBadge(title: equippedTitle, compact: true),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 HeroProgressRings(
                   profile: profile,
                   today: today,

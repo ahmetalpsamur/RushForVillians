@@ -4147,6 +4147,128 @@ macera yürüyüş bonusu alabilir" sorusudur. Bugün sınır yok.
   Üç ekran da onu kullanıyor; tam sayıya yuvarlamak gün başına kazancı sıfır
   ya da 1 gösteriyordu.
 
+### GD67. Pelerin silinmedi, **ünvana dönüştürüldü** (2026-08-26)
+- **Nerede:** `data/mock_data.dart`, `services/game_storage.dart` şema **v19**
+- **Karar (C.1):** `skin_dragon_cape` mağazadan kalktı. Sahibi eli boş
+  kalmıyor: taşıma onu **"Gece Yürüyüşçüsü"** ünvanına çeviriyor. Aynı
+  taşıma eski `title_villain_hunter` yükseltmesini de gerçek bir ünvana
+  (`villain_hunter`) bağlıyor.
+- **Neden dönüştürme, iade değil:** coin iadesi, oyuncunun aldığı şeyi
+  "yanlış alışveriş" ilan etmek olurdu. Pelerin zaten hiçbir yerde
+  gösterilmiyordu (GD13'ün kalan maddesi); ünvan onun **verilmiş sözünü**
+  ilk kez tutuyor — adının yanında görünen bir kimlik.
+- **Neden bu iki ünvan:** ikisi de mağazadan alınan, benzer fiyatlı
+  kozmetikler. Eşleştirme keyfî değil, aynı raftan aynı rafa.
+- **Silme yok:** kimlikler kayıttan **çıkarılıyor** ama hiçbir dosya
+  silinmedi ve hiçbir test devre dışı bırakılmadı (Kural 8).
+- **Geri dönülecek nokta:** pelerin görseli üretilirse ünvan sistemi
+  kozmetik bir "görünüm" alanına genişletilebilir; bugün öyle bir alan yok.
+
+### GD68. Aynı anda **tek** ünvan; garanti alanın kendisinde (2026-08-26)
+- **Nerede:** `UserProfile.equippedTitleId` (`String?`), `ownedTitleIds`
+- **Karar (C.2):** oyuncu sınırsız ünvan biriktirir ama yalnızca **birini**
+  takar. Kural bir kontrolle değil **veri tipiyle** zorlanıyor: tek bir
+  `String?` alan ikinci bir değeri tutamaz.
+- **Neden liste değil:** kuşanma slotlarında aynı gerekçeyle `Map`
+  seçilmişti (GD26) — "slot başına tek item" kuralı her yazma noktasında elle
+  kontrol edilmesin diye. Ünvanda slot bile yok, dolayısıyla tek alan yeter.
+- **Ünvanlar tüketilmiyor:** takılıyı değiştirmek eskisini envanterden
+  düşürmez. Ünvan bir kimlik, bir sarf malzemesi değil.
+- **Temizlik sahipliğe dokunmaz** (GD28 ile aynı sözleşme):
+  `normalizeEquippedTitle` katalogdan kalkmış ya da sahip olunmayan bir
+  seçimi **yalnızca çıkarır**; `ownedTitleIds` hiç değişmez.
+- **Model Kuralları #1 temiz:** diske giden tek şey `String` kimlik; etki,
+  ad, nadirlik her açılışta `TitleCatalog` üzerinden çözülüyor.
+
+### GD69. Ünvanlar düz stat artışı **vermiyor**; kural testle zorlanıyor (2026-08-26)
+- **Nerede:** `data/title_catalog.dart`, `test/title_catalog_test.dart`
+- **Karar (C.3):** 65 ünvanın her biri şu dördünden **en az birini** taşımak
+  zorunda: bir tetikleyici (`lowHealth`, `onKill`, `nightWalk`, …), bir
+  bedel (eksi değerli ikinci etki), birden çok etki, ya da kendine ait bir
+  metin (`customLabel`). "+%10 saldırı" yazan çıplak bir ünvan **teste
+  takılır**.
+- **Neden testle:** kural bir üslup tercihi olarak bırakılsaydı, 65 satırlık
+  bir tabloya zamanla düz bonuslar sızardı. Aynı disiplin item tarafında da
+  var (`item_effects_test.dart`).
+- **Nadirlik etki sayısını büyütüyor:** sıradan ort. 1,7 · az bulunur 2,1 ·
+  nadir 2,8 · epik 3,2 · efsanevi 3,8. Ölçüm testle bağlı (efsanevi
+  ortalaması sıradanı geçmeli).
+- **Yedi tetikleyicinin hepsi katalogda gerçekten kullanılıyor**; kullanılmayan
+  bir tetikleyici kalırsa test kırmızıya döner.
+- **En az beş ünvan çift etkili** (bir artı bir eksi): "Cam Top" +%70 saldırı
+  / −%30 can gibi. Bunlar ünvan seçimini bir **tercih** yapıyor, bir
+  sıralama değil.
+
+### GD70. Ünvan ekonomi tavanı +%25; seyrek olay statlarında +%50 (2026-08-26)
+- **Nerede:** `GameConstants.maxTitleEconomyBonus` / `maxTitleRareEventBonus`
+- **Karar (C.3):** tek bir ünvanın koşulsuz ekonomi oranı +%25'i aşamaz.
+  İstisna `wheelXp` ve `enemyXp`: onlarda tavan **+%50**.
+- **Neden item tavanından (+%15) yüksek:** oyuncu aynı anda 3–5 item kuşanıyor
+  ama **tek** ünvan takıyor (GD68). Aynı tavan verilseydi ünvan, kuşanmanın
+  yanında hissedilmezdi.
+- **Neden seyrek olaylarda iki katı:** `wheelXp` günde bir kez (çark),
+  `enemyXp` macera başına bir kez uygulanıyor; adım parası her adımda.
+  GD17 item bütçesinde aynı gerekçeyle bu iki statı iki katı ölçekliyor.
+  Ekonomiye risk yok: ikisi de **XP** veriyor ve ölçülmüş coin dengesine
+  (`economy_pacing_test.dart`) hiç dokunmuyorlar.
+- **Tavan bir disiplin, garanti değil:** garantiyi toplama noktasındaki
+  `EquippedBuffs.from` kırpması veriyor (GD25). Ünvan etkileri **aynı
+  fonksiyondan** geçiyor (`titleEffects` parametresi), yani ünvan + eşya
+  birlikte de +%50 toplam tavanını aşamıyor. İkisi de testle bağlı.
+- **Koşullu etki çarpana hiç girmiyor:** "gece yürüyüşlerinde +%25" kuşanıldığı
+  anda pasif bir bonusa dönüşmüyor; `conditionalEffects` içinde taşınıp
+  yalnızca koşul sağlanınca `effectiveCombatStats` üzerinden açılıyor.
+
+### GD71. Dört kazanma yolu; çarkta en fazla **bir** ünvan dilimi (2026-08-26)
+- **Nerede:** `TitleSource`, `wheel_rewards.dart:maxTitleSlices`
+- **Karar (C.4):** 65 ünvan dört yola dağıldı — **başarım 38**, **mağaza 14**,
+  **çark 7**, **kilometre taşı 6**.
+- **Neden başarım çoğunlukta:** ünvanın anlamı "bunu yaptım" demek. Parayla
+  alınan bir ünvan da olmalı ama çoğunluk parayla alınabilseydi ünvan bir
+  mağaza rafına dönerdi.
+- **Çark dilimi tavanı 1:** GD19 ile aynı gerekçe — günde dönen bir çarktan
+  bol ünvan düşerse başarım ve kilometre taşı yolları anlamsızlaşır.
+  Süzme **havuzun içinde**: yalnızca `TitleSource.wheel` ünvanları ve yalnızca
+  sahip olunmayanlar. Başka bir yoldan gelen ünvanın çarktan da çıkması o
+  yolu geçersiz kılardı.
+- **Kilometre taşı ünvanları mevcut seri eşiklerine bağlı**
+  (`GameConstants.streakMilestones`); test her eşiğin bir ünvanı olduğunu
+  bağlıyor, yani yeni bir eşik eklenip ünvanı unutulursa alarm veriyor.
+- **Mağaza fiyat bandı 700 – 48.000 coin**, nadirlikle artıyor; en pahalı iki
+  ünvan (efsanevi) aylara yayılan bir hedef.
+
+### GD72. Başarım sayaçları saklanıyor, envanterden okunabilenler **saklanmıyor** (2026-08-26)
+- **Nerede:** `UserProfile.enemiesDefeated` / `adventuresCompleted` /
+  `wheelSpins` / `itemsMerged` / `lifetimeCoins`,
+  `TitleProgress.fromCounters`
+- **Karar:** yalnızca **geçmişe ait** ve başka hiçbir yerden geri
+  hesaplanamayan beş sayaç kalıcı. `ownedItemCount` ve `maxItemLevel`
+  envanterin kendisinden türetiliyor; `level`, `totalSteps`, `longestStreak`
+  zaten profilde vardı.
+- **Neden türetme:** iki doğruluk kaynağı er ya da geç çelişir. Bir eşya
+  satıldığında sayacı düşürmeyi unutan tek bir satır, "Koleksiyoner"
+  ünvanını haksız yere açık tutardı.
+- **Sayaçlar geriye gitmiyor:** `fromJson` eksi ya da sayı olmayan değeri
+  sıfıra düşürüyor — eksi bir sayaç ünvanı **kalıcı olarak kilitleyebilirdi**.
+- **Ünvan geri alınmıyor:** koşul sonradan bozulsa bile (eşya satıldı,
+  seri kırıldı) kazanılmış ünvan sende kalır. Başarım "o anı yaşadım"
+  demek; sonradan geri alınırsa anlamı kalmaz.
+
+### GD73. Ünvan bölümü mağazanın **en sonunda** (2026-08-26)
+- **Nerede:** `features/store/xp_store_screen.dart`
+- **Sorun:** bölüm ekipman listesinin üstüne konduğunda mevcut 12 mağaza
+  testi "Bad state: No element" ile düştü. Sebep kod değil **düzen**: ekipman
+  listesi tembel bir `SliverList` ve ünvan bölümü onu görünür alanın dışına
+  itince kartlar hiç kurulmuyor.
+- **Karar:** bölüm slivers'ın sonuna alındı ve `onPurchaseTitle` **nullable**
+  yapıldı — çağıran taraf vermezse bölüm hiç çizilmiyor.
+- **Neden testler değiştirilmedi:** mağazanın ana içeriği ekipman; ünvan
+  bölümünün onun önüne geçmesi zaten yanlış bir bilgi mimarisiydi. Test
+  gerçek bir kullanılabilirlik sorununu yakaladı.
+- **Ekran itilen rota değil, sekme** (GD11): ünvan satın alınca para ve
+  "Sahipsin" rozeti anında tazeleniyor. Ünvan **ekranı** ise itilen rotada
+  ama veri tutmuyor — `revision` + `readState` ile canlı okuyor (GD27).
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -5947,3 +6069,135 @@ Toplam **727 test geçiyor**, `flutter analyze` temiz.
   serilerde düşman dengesi ölçülmedi. `combat_balance_test.dart` ölçüt
   oyuncuyu bonussuz ölçüyor.
 - Döngü kutlaması yalnızca bildirimde; ayrı bir kutlama ekranı yok.
+
+---
+---
+---
+
+# Bölüm C — Ünvanlar ✅ (2026-08-26)
+
+Pelerin kaldırıldı ve yerine **65 ünvanlık** bir kimlik sistemi geldi.
+Kararlar **GD67–GD73**. Şema **v18 → v19**.
+
+## C.1 — Pelerin
+
+`skin_dragon_cape` mağazadan kalktı. **Hiçbir şey silinmedi:** taşıma pelerin
+sahibini "Gece Yürüyüşçüsü" ünvanına, eski `title_villain_hunter`
+yükseltmesini de gerçek bir ünvana (`villain_hunter`) bağlıyor. Gerekçe
+**GD67**; taşıma `game_storage_test` ve `titles_test` ile uçtan uca bağlı
+(para, diğer yükseltmeler ve seviye korunuyor).
+
+## C.2 — Sahiplik ve takma
+
+| Kavram | Nerede |
+|---|---|
+| Sahip olunanlar | `UserProfile.ownedTitleIds` (`List<String>`) |
+| Takılı olan | `UserProfile.equippedTitleId` (`String?`) |
+| Temizlik | `normalizeEquippedTitle` — seçim düşer, **sahiplik durur** |
+
+Aynı anda **tek** ünvan takılı kalır ve kural veri tipiyle zorlanıyor
+(GD68). Ünvanlar tüketilmiyor: takılıyı değiştirmek eskisini düşürmez.
+
+**Takılı ünvan adın geçtiği her yerde görünüyor:** ana ekranın karşılama
+kartı, profil başlığı, profildeki "Ünvanlar" kartı ve ünvan ekranının
+tepesi. Rozet `widgets/title_badge.dart` — nadirlik renginde, `Flexible` +
+ellipsis ile dar ekranda kırpılıyor.
+
+**Kilitli ünvanlar da listeleniyor** ve nasıl kazanılacağını söylüyor
+(Model Kuralları #4): her ünvanın bir `unlockHint`'i var, başarım
+ünvanlarında ayrıca ilerleme çubuğu — "100 düşman devir" yazan bir kart,
+62'de olduğunu da söylüyor.
+
+## C.3 — Etkiler ve ekonomi hesabı
+
+**Düz stat artışı yasak** (GD69): her ünvan bir tetikleyici, bir bedel,
+birden çok etki ya da kendine ait bir metin taşımak zorunda — kural
+`title_catalog_test.dart` ile zorlanıyor.
+
+| Nadirlik | Adet | Ort. etki |
+|---|---|---|
+| Sıradan | 13 | 1,7 |
+| Az Bulunur | 14 | 2,1 |
+| Nadir | 14 | 2,8 |
+| Epik | 13 | 3,2 |
+| Efsanevi | 11 | 3,8 |
+
+Örnekler:
+
+- **Demir Yürek** — can %20 altına düşünce savunma +%60 (koşullu).
+- **Cam Top** — saldırı +%70, ama can −%30 (çift etkili).
+- **Son Nefes** — can %15 altına düşünce saldırı iki katı.
+- **Gece Yürüyüşçüsü** — yalnızca gece yürüyüşlerinde adım parası +%25.
+- **Bozukluk Koklayan** — adım parası +%8, ama adım XP −%5.
+
+### Ekonomi tavanı — sayılar
+
+| Sınır | Değer | Nerede |
+|---|---|---|
+| Tek ünvan, günlük ekonomi statı | **+%25** | `maxTitleEconomyBonus` |
+| Tek ünvan, seyrek olay statı (çark/düşman XP) | **+%50** | `maxTitleRareEventBonus` |
+| Ünvan + kuşanma **toplamı** | **+%50** | `maxEquippedEconomyBonus` (sert kırpma) |
+
+İlk ikisi tasarım disiplini ve testle taranıyor; üçüncüsü **kodla
+zorlanıyor** — ünvan etkileri `EquippedBuffs.from`'un `titleEffects`
+parametresinden geçtiği için GD25'in kırpması onları da kapsıyor.
+
+Referans oyuncu (6.000 adım/gün = 120 coin/gün) için en kötü durum:
+kuşanmanın ölçülen en yüksek tek oranı **+%29** (Aşama 3f) ve ünvanın
+tavanı +%25; toplam yine +%50'ye kırpılıyor, yani günlük 120 coin en fazla
+**180 coin**e çıkabiliyor. `economy_pacing_test.dart`'ın ölçtüğü denge
+"taban" olarak geçerli kalıyor.
+
+**Koşullu etki çarpana hiç girmiyor:** "gece yürüyüşlerinde +%25"
+kuşanıldığı anda pasif bir bonusa dönüşmüyor, `conditionalEffects` içinde
+taşınıyor ve yalnızca koşul sağlanınca `effectiveCombatStats` üzerinden
+açılıyor. Savaş etkileri ekonomi çarpanına hiçbir koşulda girmiyor.
+
+## C.4 — Kazanma yolları
+
+| Yol | Adet | Nasıl |
+|---|---|---|
+| Başarım | 38 | On koşul türü: seviye, toplam adım, en uzun seri, devrilen düşman, tamamlanan macera, eşya adedi, en yüksek eşya seviyesi, çark çevirme, birleştirme, ömür boyu altın |
+| Mağaza | 14 | 700 – 48.000 coin |
+| Çark | 7 | En fazla **bir** dilim (`maxTitleSlices`) |
+| Kilometre taşı | 6 | Seri eşiklerine bağlı |
+
+Başarım sayaçlarının beşi profilde saklanıyor; envanterden okunabilenler
+(eşya adedi, en yüksek eşya seviyesi) **türetiliyor** (GD72). Kazanılmış bir
+ünvan koşul sonradan bozulsa da geri alınmıyor.
+
+## C.5 — Test
+
+- `test/title_catalog_test.dart` — **29 test**: katalog bütünlüğü (≥50 ünvan,
+  benzersiz kimlik ve ad, beş nadirlik ve dört kaynağın hepsi, her kaynağın
+  kendi alanını doldurması, dolu kilit ipuçları, sıralı mağaza listesi, her
+  seri eşiğinin ünvanı); C.3 tasarım kuralı (düz stat artışı yok, yedi
+  tetikleyicinin hepsi kullanılıyor, en az beş çift etkili ünvan, nadirlikle
+  artan etki sayısı); C.3 ekonomi sınırı (tek ünvan tavanı, dar tavanın
+  günlük statlarda geçerliliği, koşullu etkinin çarpana girmemesi, ünvan +
+  eşya toplamı, stok bonusları, savaş etkilerinin dışarıda kalması);
+  C.4 başarım koşulları (tam eşikte açılma, ilerleme oranı, her koşul
+  türünün kullanımı, envanterden türeme).
+- `test/titles_test.dart` — **20 test** (gerçek `RootShell` üzerinden):
+  takma, tek ünvan kuralı, çıkarma, sahip olunmayanın takılamaması,
+  katalogdan kalkmış ünvanın sessizce çıkarılması; **buffın gerçekten paraya
+  yansıması** (+%8 → 100 coin yerine 108) ve çıkarınca geri düşmesi; koşullu
+  savaş etkisinin yalnızca koşul sağlanınca açılması; başarımın kendiliğinden
+  gelmesi ve ikinci kez verilmemesi; mağazadan satın alma; diske yazma;
+  **v18 pelerin taşıması** ve bozuk kaydın temiz varsayılana düşmesi;
+  ünvan + eşya toplam tavanı.
+- `test/golden/titles_golden_test.dart` — **3 test**: 320/390 dp golden
+  (PNG'ler üretildi ve gözle doğrulandı — takılı ünvan kartı, süzgeç
+  çipleri, kilitli kartların ipucu ve ilerleme çubukları taşmadan sığıyor) +
+  hiç ünvan takılı değilken boş durumun anlatılması.
+
+Toplam **779 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- Ünvanların savaş etkileri motora giriyor ama **kutlama ekranı yok**:
+  kazanım tek bir SnackBar ile duyuruluyor ve aynı partide seri bonusu gibi
+  başka duyurular varsa kuyruğa giriyor (GD47).
+- Ünvan **eğitimde anlatılmıyor** — Bölüm F'nin işi.
+- Kozmetik bir "görünüm" alanı yok; pelerin görseli üretilirse ünvan sistemi
+  oraya genişletilebilir (GD67).

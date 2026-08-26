@@ -200,6 +200,29 @@ class GameConstants {
   /// (`equipped_buffs.dart`), yani item tasarımı ne olursa olsun garanti.
   static const double maxEquippedEconomyBonus = 0.50;
 
+  /// Tek bir **ünvanın** verebileceği en yüksek koşulsuz ekonomi oranı (+%25).
+  ///
+  /// Item tavanından ([maxSingleItemEconomyBonus], +%15) yüksek: oyuncu aynı
+  /// anda 3-5 item kuşanabiliyor ama **tek** ünvan takıyor (Bölüm C.2), yani
+  /// ünvanın tek başına hissedilmesi gerekiyor.
+  ///
+  /// Bu bir **tasarım disiplini**, garanti değil: garantiyi toplama
+  /// noktasındaki [maxEquippedEconomyBonus] kırpması veriyor (GD25). İkisi
+  /// birlikte tutuluyor — ilki testle taranıyor, ikincisi kodla zorlanıyor.
+  static const double maxTitleEconomyBonus = 0.25;
+
+  /// Aynı tavanın **seyrek olay** statları için karşılığı (+%50).
+  ///
+  /// `wheelXp` ve `enemyXp` günde bir kez (çark) ya da macera başına bir kez
+  /// (düşman) uygulanıyor; adım parası ve adım XP'si gibi her adımda değil.
+  /// GD17 aynı gerekçeyle item bütçesinde bu iki statı iki katı ölçekliyor —
+  /// ünvan tarafında da aynı ölçek geçerli olmalı, yoksa seyrek statlı bir
+  /// ünvan etiketi kadar bile hissedilmez.
+  ///
+  /// Ekonomiye risk yok: ikisi de **XP** veriyor, XP'nin harcanacağı bir yer
+  /// yok ve ölçülmüş coin dengesine ([stepsPerCoin]) hiç dokunmuyorlar.
+  static const double maxTitleRareEventBonus = 0.50;
+
   /// Kaldırılan `dailyCoinCap` buff API'sinin eski toplama sınırı.
   /// Aktif katalog artık bu buff'ı üretmez.
   static const int maxEquippedCoinCapBonus = 200;

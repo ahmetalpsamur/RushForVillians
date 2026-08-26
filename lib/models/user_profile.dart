@@ -173,6 +173,44 @@ class UserProfile {
   /// Eğitimin satın aldıracağı, sınıfa uygun ilk silahın kimliği.
   String? tutorialStarterItemId;
 
+  // --- Ünvanlar (Bölüm C) ---
+
+  /// Kazanılmış ünvanların kimlikleri.
+  ///
+  /// Model Kuralları #1: yalnızca `String` tutulur; ünvanın adı, nadirliği ve
+  /// etkileri her açılışta [TitleCatalog] üzerinden çözülür.
+  List<String> ownedTitleIds;
+
+  /// Şu an takılı ünvanın kimliği. `null` = hiçbiri takılı değil.
+  ///
+  /// **Tek ünvan kuralı veri düzeyinde:** tek bir alan olduğu için iki ünvan
+  /// aynı anda takılamaz. Liste tutup "sadece biri aktif" demek, kuralı her
+  /// yazma noktasında elle korumak olurdu (aynı gerekçe GD26'da slotlar için
+  /// verilmişti).
+  String? equippedTitleId;
+
+  // --- Başarım sayaçları (Bölüm C.4) ---
+  //
+  // Hepsi ömür boyu, hiç sıfırlanmıyor. Envanterden türetilebilenler
+  // (eşya sayısı, en yüksek eşya seviyesi) bilerek **sayaç değil**: envanter
+  // zaten kalıcı ve ikinci bir sayaç, satış anında düşürülmeyi unutunca
+  // ünvanı haksız yere açardı.
+
+  /// Devrilen düşman sayısı.
+  int enemiesDefeated;
+
+  /// Adım taahhüdü de dolarak **tamamlanan** macera sayısı.
+  int adventuresCompleted;
+
+  /// Çevrilen çark sayısı.
+  int wheelSpins;
+
+  /// Demircide birleştirilen eşya sayısı.
+  int itemsMerged;
+
+  /// Ömür boyu kazanılan altın. Harcama bunu **düşürmez**.
+  int lifetimeCoins;
+
   UserProfile({
     required this.avatar,
     int? hp,
@@ -206,10 +244,18 @@ class UserProfile {
     this.tutorialStep = 0,
     this.tutorialGuideId = 'mavili',
     this.tutorialStarterItemId,
+    List<String>? ownedTitleIds,
+    this.equippedTitleId,
+    this.enemiesDefeated = 0,
+    this.adventuresCompleted = 0,
+    this.wheelSpins = 0,
+    this.itemsMerged = 0,
+    this.lifetimeCoins = 0,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItems = ownedItems ?? <OwnedItem>[],
-       ownedUpgradeIds = ownedUpgradeIds ?? <String>[];
+       ownedUpgradeIds = ownedUpgradeIds ?? <String>[],
+       ownedTitleIds = ownedTitleIds ?? <String>[];
 
   String get name => avatar.name;
 
@@ -462,6 +508,44 @@ class UserProfile {
     if (streakDays > longestStreak) longestStreak = streakDays;
   }
 
+  // --- Ünvanlar (Bölüm C) ---
+
+  /// Bu ünvana sahip mi.
+  bool ownsTitle(String id) => ownedTitleIds.contains(id);
+
+  /// Ünvanı envantere ekler; **yeni** kazanıldıysa `true` döner.
+  ///
+  /// İkinci kez kazanmak sessizce yutulur: aynı ünvan hem çarktan hem
+  /// başarımdan gelebilirdi ve mükerrer bildirim gürültü olurdu.
+  bool grantTitle(String id) {
+    if (ownedTitleIds.contains(id)) return false;
+    ownedTitleIds.add(id);
+    return true;
+  }
+
+  /// Ünvanı takar. Sahip olunmayan ünvan takılamaz.
+  ///
+  /// [id] `null` ise takılı ünvan çıkarılır. Tek ünvan kuralı burada değil,
+  /// **alanın kendisinde**: [equippedTitleId] tek bir değer tutuyor.
+  bool equipTitle(String? id) {
+    if (id != null && !ownedTitleIds.contains(id)) return false;
+    if (equippedTitleId == id) return false;
+    equippedTitleId = id;
+    return true;
+  }
+
+  /// Sahip olunmayan ya da katalogda karşılığı kalmamış takılı ünvanı düşürür.
+  ///
+  /// Sahipliğe **dokunmaz** — GD28'in kuşanma temizliğiyle aynı kural:
+  /// çözülemeyen bir takı yalnızca slotu boşaltır, envanteri değil.
+  bool normalizeEquippedTitle(bool Function(String id) exists) {
+    final current = equippedTitleId;
+    if (current == null) return false;
+    if (ownedTitleIds.contains(current) && exists(current)) return false;
+    equippedTitleId = null;
+    return true;
+  }
+
   // --- Seri savaş stat bonusu (Bölüm 5C) ---
 
   /// Biriken bonusu ve gün işaretini temizler.
@@ -581,6 +665,13 @@ class UserProfile {
     'tutorialStep': tutorialStep,
     'tutorialGuideId': tutorialGuideId,
     'tutorialStarterItemId': tutorialStarterItemId,
+    'ownedTitleIds': ownedTitleIds,
+    'equippedTitleId': equippedTitleId,
+    'enemiesDefeated': enemiesDefeated,
+    'adventuresCompleted': adventuresCompleted,
+    'wheelSpins': wheelSpins,
+    'itemsMerged': itemsMerged,
+    'lifetimeCoins': lifetimeCoins,
   };
 
   /// Eksik alanlar varsayılana düşer; böylece eski kayıtlar okunabilir kalır.
@@ -641,6 +732,16 @@ class UserProfile {
       },
       tutorialGuideId: json['tutorialGuideId'] as String? ?? 'mavili',
       tutorialStarterItemId: json['tutorialStarterItemId'] as String?,
+      ownedTitleIds: _stringList(json['ownedTitleIds']),
+      // Katalogda karşılığı olmayan ya da sahip olunmayan bir kimlik takılı
+      // gelirse sessizce düşer: elle düzenlenmiş kayıt bilinmeyen bir ünvanın
+      // buff'ını uygulayamaz.
+      equippedTitleId: json['equippedTitleId'] as String?,
+      enemiesDefeated: _nonNegative(json['enemiesDefeated']),
+      adventuresCompleted: _nonNegative(json['adventuresCompleted']),
+      wheelSpins: _nonNegative(json['wheelSpins']),
+      itemsMerged: _nonNegative(json['itemsMerged']),
+      lifetimeCoins: _nonNegative(json['lifetimeCoins']),
     );
   }
 
@@ -683,5 +784,17 @@ class UserProfile {
   static DateTime? _parseDate(Object? value) {
     if (value is! String) return null;
     return DateTime.tryParse(value);
+  }
+
+  /// Bozuk ya da eksik listeyi boş listeye düşürür; `String` olmayan
+  /// elemanları atar (elle düzenlenmiş kayda karşı savunma).
+  static List<String> _stringList(Object? value) =>
+      (value as List?)?.whereType<String>().toList() ?? <String>[];
+
+  /// Eksi ya da sayı olmayan sayacı sıfıra düşürür. Başarım sayaçları geriye
+  /// gitmemeli: eksi bir sayaç ünvanı kalıcı olarak kilitleyebilirdi.
+  static int _nonNegative(Object? value) {
+    if (value is! int || value < 0) return 0;
+    return value;
   }
 }

@@ -82,6 +82,13 @@ void main() {
         ),
       ),
     );
+    // GIF çözümlemesi **gerçek** asenkron iş: sahte saat onu ilerletmiyor.
+    // Isınma olmadan karakter kimi koşuda henüz çözülmemiş oluyor ve golden
+    // rastgele kırmızıya dönüyordu (ölçülen fark %12). `runAsync` sırasında
+    // animasyon denetleyicisi ilerlemez, yani konum determinizmi bozulmaz.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 320)),
+    );
     // Sabit kare dizisi: sonsuz yürüyüş animasyonu `pumpAndSettle`'ı
     // takıyor, ama kare sayısı sabit olduğu için golden tekrarlanabilir.
     for (var i = 0; i < 4; i++) {
