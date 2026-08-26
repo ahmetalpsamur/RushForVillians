@@ -130,9 +130,20 @@ void main() {
 
   Future<void> equipFromScreen(WidgetTester tester, GameTitle title) async {
     final button = find.byKey(ValueKey('equip-title-${title.id}'));
-    // Ünvan listesi uzun; düğme kurulmuş ama görünür alanın dışında olabilir.
-    // `scrollUntilVisible` burada işe yaramıyor: finder zaten eşleşiyor,
-    // dolayısıyla hiç kaydırmadan dönüyor.
+    // Liste tembel: kart hiç kurulmamış olabilir (o zaman kaydırmak gerek)
+    // ya da kurulmuş ama görünür alanın dışında olabilir (o zaman
+    // `ensureVisible`). İkisi de gerekiyor.
+    if (button.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        button,
+        260,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('titles-scroll-view')),
+          matching: find.byType(Scrollable),
+        ).first,
+      );
+      await tester.pumpAndSettle();
+    }
     await tester.ensureVisible(button);
     await tester.pumpAndSettle();
     await tester.tap(button);
@@ -189,6 +200,16 @@ void main() {
       await pumpShell(tester, profile: profile);
       await openTitles(tester);
 
+      // Sahip olunmayan ünvanın kartı listede var ama takma düğmesi yok.
+      // Liste tembel olduğu için kartı önce görünür alana getiriyoruz.
+      await tester.scrollUntilVisible(
+        find.text(lowHealthTitle.name),
+        260,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('titles-scroll-view')),
+          matching: find.byType(Scrollable),
+        ).first,
+      );
       expect(
         find.byKey(ValueKey('equip-title-${lowHealthTitle.id}')),
         findsNothing,
@@ -328,6 +349,15 @@ void main() {
       // duyurular da sıraya giriyor ve hangisinin önce görüneceği bu testin
       // konusu değil (GD47).
       await openTitles(tester);
+      // Liste tembel; kart görünür alana kaydırılınca kuruluyor.
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey('equip-title-${firstStep.id}')),
+        260,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('titles-scroll-view')),
+          matching: find.byType(Scrollable),
+        ).first,
+      );
       expect(
         find.byKey(ValueKey('equip-title-${firstStep.id}')),
         findsOneWidget,

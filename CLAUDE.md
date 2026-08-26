@@ -4342,6 +4342,87 @@ macera yürüyüş bonusu alabilir" sorusudur. Bugün sınır yok.
   kayıp olurdu. Kapatan profilden kapatıyor ve oyunun hiçbir kuralı
   değişmiyor — bu, ayarın altında yazılı.
 
+### GD78. Ünvan rafı mağazanın **en tepesine** alındı; GD73 geçersiz (2026-08-26)
+- **Nerede:** `features/store/xp_store_screen.dart`
+- **Sorun:** kullanıcı bildirimi — "mağazada ünvanları göremiyorum". GD73
+  bölümü listenin **sonuna** koymuştu; 14 ünvan, uzun ekipman ızgarasının
+  altında pratikte görünmüyordu.
+- **Karar:** bölüm "Ünvan Mağazası" adıyla Yükseltmeler'in de üstünde, ilk
+  sırada. GD73'ün "sona al" kararı **geçersiz**.
+- **GD73'ün gerekçesi neden artık geçerli değil:** o karar, bölümü yukarı
+  koymanın 12 mağaza testini düşürmesine dayanıyordu. Sebep koddaki bir hata
+  değil, testlerin kaydırmıyor olmasıydı: ekipman listesi tembel bir
+  `SliverList` ve kartlar görünür alana girmeden kurulmuyor. Testlere
+  `scrollStoreTo` yardımcısı eklendi (silinmedi, güncellendi) ve düzen
+  kullanıcının istediği gibi kaldı.
+- **Bölümün kendi süzgeçleri var:** nadirlik çipleri, "Alabileceklerim",
+  "Sendekileri gizle" ve sahiplik özeti. 14 satırlık süzgeçsiz bir liste,
+  mağazanın en tepesinde okunmaz bir duvar olurdu.
+
+### GD79. Ünvan listesi arama, kaynak süzgeci ve sıralama aldı (2026-08-26)
+- **Nerede:** `features/titles/titles_screen.dart`
+- **Karar:** ekrana dört şey eklendi — **arama** (ad, hikâye **ve etki**
+  metninde), **kazanma yolu süzgeci** (başarım/mağaza/çark/kilometre taşı),
+  **sıralama** (varsayılan · nadirlik · "az kaldı" · A→Z) ve aktifken çıkan
+  **TEMİZLE** düğmesi.
+- **Neden etki metninde de aranıyor:** oyuncu ünvanı adıyla değil işiyle
+  arıyor ("kritik", "gece", "seri"). Yalnızca ada bakan bir arama, 65
+  ünvanlık katalogda işe yaramazdı.
+- **Neden "az kaldı" sıralaması:** başarım listesinin en değerli bilgisi
+  hangisine yaklaştığın. Sahip olunanlar ve ilerlemesi olmayanlar (mağaza,
+  çark) sona düşüyor.
+- **Liste tembelleşti** (`SliverList.separated`): 65 kartın hepsi açılışta
+  kuruluyordu, her birinde rozet ve ilerleme çubuğu var. Testler de buna
+  göre kaydırıyor.
+
+### GD80. Çarkın bütün oranları tek tabloda (2026-08-26)
+- **Nerede:** `lib/data/wheel_odds.dart` (yeni)
+- **Karar (kullanıcı isteği):** çarkta hiçbir şey "öylesine" seçilmiyor.
+  Dilim türü, ekipman nadirliği, XP ve altın miktarı — hepsi tek dosyadaki
+  ağırlık tablolarından çıkıyor. `wheel_rewards.dart` artık karar vermiyor,
+  yalnızca tabloyu uyguluyor.
+- **Kompozisyon sırası ve oranları:**
+
+  | Adım | Oran |
+  |---|---|
+  | Ünvan dilimi | uygun ünvan varken **%25** ihtimalle 1 dilim |
+  | Ekipman dilimi | uygun ekipman varken **en az 1**; adet ağırlıkları 55 / 28 / 12 / 5 |
+  | Altın dilimi | adet ağırlıkları 30 / 45 / 25, en fazla 3 |
+  | XP dilimi | kalan bütün dilimler, **en az 1** |
+
+- **Neden ağırlık, sabit adet değil:** eski kod "en fazla 4 item, kalanı XP"
+  diyordu; yani çark her gün aynı şekle sahipti. Ağırlıklı çekiliş çarkı
+  çevirmeden önce de merak edilir kılıyor.
+- **Neden en az bir XP ve bir ekipman dilimi garanti:** çarkın iki vaadi bu.
+  Tamamen altına dönen bir çark, ekipman vaadini sessizce iptal ederdi.
+- **Testle bağlı:** ağırlık listelerinin uzunluğu tavanlarla, azalan sıra
+  "büyük ödül daha nadir" kuralıyla, beklenen değerler ölçülmüş ekonomiyle.
+
+### GD81. Çark artık altın veriyor; epik ve efsanevi ekipman çarktan kalktı (2026-08-26)
+- **Nerede:** `WheelOdds.coinOptions` / `maxItemRarity`, `WheelReward.coins`
+- **Üç değişiklik, üçü de kullanıcı kararı:**
+  1. **Altın dilimi eklendi.** Değerler 25–500, ağırlıkları azalan; beklenen
+     değer **77 altın**. İki altın dilimiyle bir çevirmenin beklenen getirisi
+     ≈ **19 altın/gün**, referans oyuncunun günlük 120 altınının ~**%16**'sı.
+     Adım ekonomisinden ayrı bir kaynak: `lastRewardedStepCount` işaretçisine
+     hiç dokunmuyor, `economy_pacing_test.dart` etkilenmiyor.
+  2. **Epik ve efsanevi ekipman çarktan kalktı** (`maxItemRarity` = nadir).
+     Bu, GD19'un kararının **geri gelmesi**: epik ~üç haftalık, efsanevi ~iki
+     aylık birikim; günde bir dönen bir çarktan düşmeleri hem mağazayı hem
+     seviye kilidini anlamsız kılıyordu. Arkadaşım bu kuralı bir ara
+     kaldırmıştı; kullanıcı kararıyla geri kondu.
+  3. **XP havuzu genişledi:** 50–500 arası altı değer yerine **50'den 1000'e
+     50'şer, 20 değer**. Ağırlıklar azalan, beklenen değer **367 XP** —
+     referans oyuncunun günlük 3.000 adım XP'sinin ~%12'si.
+- **Ünvan nadirliğinde istisna:** ünvanlarda efsanevi kapatılmadı, çok düşük
+  ağırlıkla (2) bırakıldı. Gerekçe: ünvan ekonomiye girmiyor, kalıcı bir
+  kimlik; çark kaynaklı yedi ünvandan biri efsanevi ve onu tamamen kapatmak
+  o ünvanı erişilemez yapardı.
+- **Sıfır XP dilimi yok:** havuz 50'den başlıyor. "Boş dilim hiçbir koşulda
+  oluşmaz" kuralı çarkın en eski garantisi.
+- **Çarktan gelen altın ömür sayacına da yazılıyor** (`lifetimeCoins`), yani
+  altın başarımlı ünvanları besliyor.
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -6358,3 +6439,91 @@ Toplam **801 test geçiyor**, `flutter analyze` temiz.
   F eğitim metinlerini güncellerken ton tutarlılığı ayrıca gözden
   geçirilmeli.
 - Taverna'nın gerçek işlevi (takım kurma, çevrimiçi eşleşme) Aşama 6'ya ait.
+
+---
+---
+---
+
+# Bölüm C/D sonrası düzeltmeler — kullanıcı bildirimleri ✅ (2026-08-26)
+
+Dört madde: üçü kullanıcının bildirdiği sorun, biri kullanıcının verdiği
+denge kararı. Kararlar **GD78–GD81**.
+
+## 1. Mağazada ünvanlar görünmüyordu
+
+Ünvan rafı listenin sonundaydı (GD73) ve 14 ünvan uzun ekipman ızgarasının
+altında pratikte hiç görünmüyordu. Artık **en tepede**, "Ünvan Mağazası"
+adıyla ve kendi süzgeçleriyle: nadirlik çipleri, "Alabileceklerim",
+"Sendekileri gizle", sahiplik özeti (`3 / 14 ünvan sende · 9 tanesi
+listede`). Süzgeç boş sonuç verirse nedeni yazılı.
+
+GD73 **geçersiz** — gerekçesi testlerin kaydırmaması olduğu için testler
+düzeltildi, tasarım kullanıcının istediği gibi bırakıldı. Ayrıntı: GD78.
+
+## 2. Ünvan listesi ve süzgeci geliştirildi
+
+Arama (ad, hikâye **ve etki** metninde), kazanma yolu süzgeci, dört ölçütlü
+sıralama, ilerleme çubuğu ve TEMİZLE düğmesi. Liste tembelleşti — 65 kart
+artık açılışta hepsi birden kurulmuyor. Ayrıntı: GD79.
+
+## 3. Çarktan ünvan gelince "+0 XP" yazıyordu
+
+Işıklı ödül sahnesi ünvanı hiç tanımıyordu: `item == null` dalına düşüp
+"XP KAZANDIN" ve "+0 XP" gösteriyordu. Artık nadirlik başlığı
+("EPİK ÜNVAN"), madalya ikonu, ünvanın adı, hikâyesi, etkileri ve nereden
+takılacağı yazılı. Hem sahne hem sonuç kartı testle bağlandı.
+
+## 4. Çark ödül havuzu yeniden kuruldu
+
+**Bütün oranlar tek dosyada:** `lib/data/wheel_odds.dart` (GD80).
+
+| Dilim | Oran |
+|---|---|
+| Ünvan | uygun ünvan varken %25 ihtimalle 1 dilim |
+| Ekipman | en az 1, en fazla 4 — adet ağırlıkları 55 / 28 / 12 / 5 |
+| Altın | en fazla 3 — adet ağırlıkları 30 / 45 / 25 |
+| XP | kalan dilimler, en az 1 |
+
+**Değer tabloları:**
+
+| Tür | Değerler | Ağırlık | Beklenen |
+|---|---|---|---|
+| XP | 50 → 1000, 50'şer (20 değer) | 20 → 1, azalan | **367 XP** |
+| Altın | 25 · 50 · 75 · 100 · 150 · 200 · 300 · 500 | 30 → 1, azalan | **77 altın** |
+| Ekipman nadirliği | sıradan 60 · az bulunur 27 · nadir 10 | epik/efsanevi **0** | — |
+| Ünvan nadirliği | 50 · 28 · 14 · 6 · 2 | — | — |
+
+### Ekonomi etkisi
+
+Referans oyuncu (6.000 adım/gün): **120 altın + 3.000 XP**.
+
+| Kaynak | Beklenen günlük katkı | Pay |
+|---|---|---|
+| Çark altını | ~19 altın (2 altın dilimi × %25 isabet × 77) | **+%16** |
+| Çark XP'si | ~137 XP (benzer hesap) | **+%5** |
+
+Adım ekonomisinden **ayrı** bir kaynak: çark altını
+`lastRewardedStepCount` işaretçisine hiç dokunmuyor, dolayısıyla
+`economy_pacing_test.dart`'ın ölçtüğü denge taban olarak aynen geçerli.
+Altın ayrıca `lifetimeCoins` sayacına yazılıyor, yani altın başarımlı
+ünvanları besliyor.
+
+**Epik ve efsanevi ekipman çarktan kaldırıldı** — GD19'un kararı geri geldi
+(GD81).
+
+## Test
+
+- `test/wheel_rewards_test.dart` (19 → **26**): oran tablolarının
+  bütünlüğü (XP havuzunun 50'şer artışı, her değerin ağırlığı, azalan sıra,
+  beklenen değerlerin ekonomiyle uyumu, adet ağırlıklarının tavanlarla
+  tutarlılığı); altın dilimi (çıkması, tavanı, değerlerin tablodan gelmesi,
+  başka ödül taşımaması); her çarkta en az bir XP dilimi kalması; epik ve
+  efsanevinin **hiç** girmemesi.
+- `test/daily_wheel_test.dart` (17 → **19**): ünvan ve altın sonuçlarının
+  "+0 XP" yerine kendi metinleriyle gösterilmesi.
+- `test/store_screen_test.dart` (31 → **39**): ünvan rafının tepede olması,
+  özet satırı, üç süzgeç, boş durum, satın alma geri çağrısı.
+- `test/store_purchase_test.dart` (+1): çarktan gelen altının keseye ve
+  ömür sayacına yazılması.
+
+Toplam **822 test geçiyor**, `flutter analyze` temiz.

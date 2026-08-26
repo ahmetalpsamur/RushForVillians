@@ -236,6 +236,26 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
               ),
             ),
           ] else ...[
+            // Ünvan mağazası en tepede: mağazanın en yeni ve en görünür
+            // olması istenen rafı bu. (Bölüm C'de listenin sonundaydı ve
+            // kullanıcı ünvanları hiç göremediğini bildirdi.)
+            if (widget.titles.isNotEmpty && widget.onPurchaseTitle != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: SectionCard(
+                    key: const ValueKey('store-titles-section'),
+                    title: 'Ünvan Mağazası',
+                    child: _TitleShop(
+                      titles: widget.titles,
+                      coins: widget.coins,
+                      ownedTitleIds: widget.ownedTitleIds,
+                      onPurchase: widget.onPurchaseTitle!,
+                      onBlocked: _explain,
+                    ),
+                  ),
+                ),
+              ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               sliver: SliverToBoxAdapter(
@@ -393,38 +413,6 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   ),
                 ),
             ],
-            if (widget.titles.isNotEmpty && widget.onPurchaseTitle != null)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: SectionCard(
-                    title: 'Ünvanlar',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Ünvan bir kimlik: adının yanında görünür ve kendine '
-                          'has bir etki taşır. Aynı anda yalnızca birini '
-                          'takarsın; hepsi sende kalır.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        for (final title in widget.titles)
-                          _TitleRow(
-                            title: title,
-                            coins: widget.coins,
-                            owned: widget.ownedTitleIds.contains(title.id),
-                            onPurchase: () => widget.onPurchaseTitle!(title),
-                            onBlocked: _explain,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
           ],
         ],
       ),
@@ -461,6 +449,133 @@ class _FilterChip extends StatelessWidget {
 ///
 /// Satın alınamıyorsa **neden** alınamadığını söyler: devre dışı düğme
 /// dokunulabilir kalır ve nedeni açıklar (Model Kuralları #4).
+/// Mağazadaki ünvan rafı (Bölüm C.4 / D sonrası düzeltme).
+///
+/// Ekipman ızgarasının kendi süzgeçleri var; ünvanların da olmalı. 14 satır
+/// filtresiz bir liste, mağazanın en tepesinde okunmaz bir duvar olurdu.
+class _TitleShop extends StatefulWidget {
+  final List<GameTitle> titles;
+  final int coins;
+  final List<String> ownedTitleIds;
+  final void Function(GameTitle title) onPurchase;
+  final ValueChanged<String> onBlocked;
+
+  const _TitleShop({
+    required this.titles,
+    required this.coins,
+    required this.ownedTitleIds,
+    required this.onPurchase,
+    required this.onBlocked,
+  });
+
+  @override
+  State<_TitleShop> createState() => _TitleShopState();
+}
+
+class _TitleShopState extends State<_TitleShop> {
+  RewardRarity? _rarity;
+  bool _affordableOnly = false;
+  bool _hideOwned = false;
+
+  List<GameTitle> get _visible => [
+    for (final title in widget.titles)
+      if ((_rarity == null || title.rarity == _rarity) &&
+          (!_affordableOnly || widget.coins >= title.cost) &&
+          (!_hideOwned || !widget.ownedTitleIds.contains(title.id)))
+        title,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _visible;
+    final owned =
+        widget.ownedTitleIds
+            .where((id) => widget.titles.any((title) => title.id == id))
+            .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Ünvan bir kimlik: adının yanında görünür ve kendine has bir etki '
+          'taşır. Aynı anda yalnızca birini takarsın; hepsi sende kalır.',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '$owned / ${widget.titles.length} ünvan sende · '
+          '${visible.length} tanesi listede',
+          key: const ValueKey('store-titles-summary'),
+          style: const TextStyle(color: Colors.white38, fontSize: 11.5),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            FilterChip(
+              key: const ValueKey('store-title-rarity-all'),
+              label: const Text('Tümü'),
+              selected: _rarity == null,
+              onSelected: (_) => setState(() => _rarity = null),
+            ),
+            for (final rarity in RewardRarity.values)
+              FilterChip(
+                key: ValueKey('store-title-rarity-${rarity.name}'),
+                label: Text(rarity.label),
+                selected: _rarity == rarity,
+                selectedColor: rarity.color.withValues(alpha: 0.30),
+                onSelected:
+                    (selected) =>
+                        setState(() => _rarity = selected ? rarity : null),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            FilterChip(
+              key: const ValueKey('store-title-affordable'),
+              label: const Text('Alabileceklerim'),
+              selected: _affordableOnly,
+              onSelected:
+                  (selected) => setState(() => _affordableOnly = selected),
+            ),
+            FilterChip(
+              key: const ValueKey('store-title-hide-owned'),
+              label: const Text('Sendekileri gizle'),
+              selected: _hideOwned,
+              onSelected: (selected) => setState(() => _hideOwned = selected),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (visible.isEmpty)
+          const Padding(
+            key: ValueKey('store-titles-empty'),
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Bu süzgeçle gösterilecek ünvan yok. Süzgeci gevşet ya da biraz '
+              'daha altın biriktir.',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          )
+        else
+          for (final title in visible)
+            _TitleRow(
+              title: title,
+              coins: widget.coins,
+              owned: widget.ownedTitleIds.contains(title.id),
+              onPurchase: () => widget.onPurchase(title),
+              onBlocked: widget.onBlocked,
+            ),
+      ],
+    );
+  }
+}
+
 class _TitleRow extends StatelessWidget {
   final GameTitle title;
   final int coins;
@@ -505,10 +620,7 @@ class _TitleRow extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           for (final effect in title.effects)
-            Text(
-              '• ${effect.label}',
-              style: const TextStyle(fontSize: 11.5),
-            ),
+            Text('• ${effect.label}', style: const TextStyle(fontSize: 11.5)),
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,

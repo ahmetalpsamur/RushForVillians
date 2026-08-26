@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import '../../data/mock_data.dart';
+import '../../data/wheel_odds.dart';
 import '../../models/game_title.dart';
 import '../../models/item.dart';
 import '../../models/reward_rarity.dart';
@@ -14,33 +14,31 @@ import 'item_rules.dart';
 /// kalıcı oyun sonucunu etkileyen rastgelelik tohumlu olmalı ve tohum durumla
 /// birlikte saklanmalı ([UserProfile.wheelSeed]).
 ///
+/// **Oranların tamamı `data/wheel_odds.dart` içinde.** Burada karar yok,
+/// yalnızca o tablonun uygulanması var: dilim türü, ekipman nadirliği, XP ve
+/// altın miktarı hepsi oradan çekiliyor.
+///
 /// Seviye kilidi burada **yeniden yazılmaz**: tek kaynak
 /// [Item.isUnlockedAt] (#10).
 
 /// Çarkın dilim sayısı. Görselde eşit açılara bölünür.
-const int wheelSliceCount = 8;
+const int wheelSliceCount = WheelOdds.sliceCount;
 
 /// Bir çarkta en fazla kaç dilimin item olabileceği.
-///
-/// Kalanı XP. Item dilimleri azınlıkta: çark günde bir kez dönüyor ve her
-/// gün ekipman dağıtmak hem mağazayı hem seviye kilidini anlamsız kılar.
-const int maxItemSlices = 4;
+const int maxItemSlices = WheelOdds.maxItemSlices;
 
 /// Bir çarkta en fazla kaç dilimin **ünvan** olabileceği (Bölüm C.4).
-///
-/// Bir: ünvan çarkın dört kaynağından yalnızca biri ve en nadir olanı.
-/// İkiden fazlası, başarım ve kilometre taşı yollarını anlamsızlaştırırdı.
-const int maxTitleSlices = 1;
+const int maxTitleSlices = WheelOdds.maxTitleSlices;
 
-/// Item seçilirken kullanılan nadirlik ağırlığı. Her nadirlik çarktan
-/// çıkabilir; yüksek nadirlikler giderek daha düşük ağırlık alır.
-double wheelRarityWeight(RewardRarity rarity) => switch (rarity) {
-  RewardRarity.common => 60,
-  RewardRarity.uncommon => 27,
-  RewardRarity.rare => 10,
-  RewardRarity.epic => 2.5,
-  RewardRarity.legendary => 0.5,
-};
+/// Bir çarkta en fazla kaç dilimin **altın** olabileceği.
+const int maxCoinSlices = WheelOdds.maxCoinSlices;
+
+/// Ekipman seçilirken kullanılan nadirlik ağırlığı.
+///
+/// [WheelOdds.maxItemRarity] üstündeki nadirlikler sıfır ağırlık taşır ve
+/// havuza hiç girmez.
+double wheelRarityWeight(RewardRarity rarity) =>
+    WheelOdds.itemRarityWeight(rarity);
 
 /// Tohumu bir sonraki çevirmeye ilerletir.
 ///
@@ -51,23 +49,53 @@ int nextWheelSeed(int seed) => (seed * 1103515245 + 12345) & 0x7FFFFFFF;
 
 /// Oyuncuya özel başlangıç tohumu.
 ///
-/// `String.hashCode` **kullanılmaz** (bkz. GD8): sürümler arası sabit değil.
-/// Aynı isim + sınıf her zaman aynı başlangıcı verir, farklı oyuncular farklı
-/// çark görür. Sıfır dönmez; sıfır "henüz kurulmadı" anlamında.
-int initialWheelSeed(String salt) => stableSpread(salt, 0x7FFFFFF0) + 1;
+/// `String.hashCode` **kullanılmaz** (GD8): sürümler arası sabit değil, bir
+/// güncelleme sonrası çark sıralaması değişirdi.
+int initialWheelSeed(String identity) =>
+    stableSpread('wheel-$identity', 0x7FFFFFF) + 1;
 
-/// Çarkın dilimlerini kurar.
+/// Ağırlıklı çekiliş: [weights] içindeki indekslerden birini döndürür.
 ///
-/// Item dilimleri [candidates] içinden seçilir; liste **oyuncunun sınıfına
-/// göre süzülmüş** gelmeli ([ItemCatalog.forCharacterClass]). Buradaki tek
-/// süzme seviye kilidi ve sahiplik:
-/// - [Item.isUnlockedAt] — kilidin tek kaynağı, ikinci bir kontrol yok (#10),
-/// - zaten sahip olunanlar elenir; çarktan sahip olduğun şeyin çıkması ödül
-///   değil, hayal kırıklığı,
-/// - nadirlik seçim ihtimalini [wheelRarityWeight] üzerinden etkiler.
+/// Toplam ağırlık sıfırsa 0 döner (çağıran taraf zaten boş havuzu ayrıca
+/// kontrol ediyor).
+int _weightedIndex(List<num> weights, Random random) {
+  var total = 0.0;
+  for (final weight in weights) {
+    if (weight > 0) total += weight;
+  }
+  if (total <= 0) return 0;
+  var cursor = random.nextDouble() * total;
+  for (var index = 0; index < weights.length; index++) {
+    final weight = weights[index];
+    if (weight <= 0) continue;
+    cursor -= weight;
+    if (cursor <= 0) return index;
+  }
+  // Kayan nokta artığı: son geçerli indekse düş.
+  for (var index = weights.length - 1; index >= 0; index--) {
+    if (weights[index] > 0) return index;
+  }
+  return 0;
+}
+
+/// Verilen tohumla çarkın dilimlerini kurar.
 ///
-/// Uygun item yoksa (seviye düşük, hepsi alınmış, katalog boş) dilimlerin
-/// tamamı XP olur — **boş dilim hiçbir koşulda oluşmaz.**
+/// Kompozisyon sırası (hepsi [WheelOdds] tablosundan):
+///
+/// 1. **Ünvan** — uygun ünvan varsa [WheelOdds.titleSliceChance] ihtimalle
+///    bir dilim.
+/// 2. **Ekipman** — uygun ekipman varsa **en az bir**, en fazla
+///    [maxItemSlices]; adet [WheelOdds.itemSliceCountWeights] ile çekilir.
+/// 3. **Altın** — adet [WheelOdds.coinSliceCountWeights] ile çekilir; en az
+///    bir dilim XP'ye kalacak şekilde kırpılır.
+/// 4. **XP** — kalan bütün dilimler.
+///
+/// Ekipman adayları için seviye kilidi, sahiplik ve
+/// [WheelOdds.maxItemRarity] uygulanır. Sınıf süzgeci **çağıran tarafta**
+/// (`ItemCatalog.forCharacterClass`).
+///
+/// Uygun ödül bulunamazsa dilimler XP ve altına düşer — **boş dilim hiçbir
+/// koşulda oluşmaz.**
 List<WheelReward> buildWheelSlices({
   required int level,
   required List<Item> candidates,
@@ -78,79 +106,84 @@ List<WheelReward> buildWheelSlices({
 }) {
   final random = Random(seed);
 
-  // Ünvan dilimi (Bölüm C.4): yalnızca **çark kaynaklı** ve henüz sahip
+  // 1) Ünvan dilimi (Bölüm C.4): yalnızca **çark kaynaklı** ve henüz sahip
   // olunmayan ünvanlar. Başka bir yoldan gelen ünvanın çarktan da çıkması,
   // o yolu anlamsız kılardı — bu yüzden süzme çağıran tarafta değil, burada.
   final eligibleTitles = [
     for (final title in titleCandidates)
-      if (title.source == TitleSource.wheel && !ownedTitleIds.contains(title.id))
+      if (title.source == TitleSource.wheel &&
+          !ownedTitleIds.contains(title.id))
         title,
   ];
   final selectedTitles = <GameTitle>[];
-  if (eligibleTitles.isNotEmpty) {
-    final remainingTitles = [...eligibleTitles];
-    while (selectedTitles.length < maxTitleSlices && remainingTitles.isNotEmpty) {
-      final totalWeight = remainingTitles.fold<double>(
-        0,
-        (sum, title) => sum + wheelRarityWeight(title.rarity),
-      );
-      var cursor = random.nextDouble() * totalWeight;
-      var selectedIndex = remainingTitles.length - 1;
-      for (var index = 0; index < remainingTitles.length; index++) {
-        cursor -= wheelRarityWeight(remainingTitles[index].rarity);
-        if (cursor <= 0) {
-          selectedIndex = index;
-          break;
-        }
-      }
-      selectedTitles.add(remainingTitles.removeAt(selectedIndex));
+  if (eligibleTitles.isNotEmpty &&
+      random.nextDouble() < WheelOdds.titleSliceChance) {
+    final remaining = [...eligibleTitles];
+    while (selectedTitles.length < maxTitleSlices && remaining.isNotEmpty) {
+      final index = _weightedIndex([
+        for (final t in remaining) WheelOdds.titleRarityWeight(t.rarity),
+      ], random);
+      selectedTitles.add(remaining.removeAt(index));
     }
   }
 
-  final eligible =
-      candidates
-          .where(
-            (item) =>
-                item.isUnlockedAt(level) && !ownedItemIds.contains(item.id),
-          )
-          .toList();
+  // 2) Ekipman dilimleri.
+  final eligible = [
+    for (final item in candidates)
+      if (item.isUnlockedAt(level) &&
+          !ownedItemIds.contains(item.id) &&
+          item.rarity.index <= WheelOdds.maxItemRarity.index)
+        item,
+  ];
 
-  // Ünvan dilimi item dilimlerinden pay alır: toplam dilim sayısı sabit.
-  final itemSliceCount = min(
-    maxItemSlices,
-    min(eligible.length, wheelSliceCount - selectedTitles.length - 1),
-  );
+  var freeSlices = wheelSliceCount - selectedTitles.length;
+  var itemSliceCount = 0;
+  if (eligible.isNotEmpty) {
+    // En az bir ekipman dilimi: çark ekipman vaadini her çevirmede tutmalı.
+    itemSliceCount =
+        _weightedIndex(WheelOdds.itemSliceCountWeights, random) + 1;
+    itemSliceCount = min(itemSliceCount, min(maxItemSlices, eligible.length));
+    // Altına ve XP'ye en az birer dilim kalsın.
+    itemSliceCount = min(itemSliceCount, freeSlices - 2);
+    if (itemSliceCount < 1) itemSliceCount = min(1, freeSlices - 1);
+  }
+
   final selectedItems = <Item>[];
-  final remaining = [...eligible];
-  while (selectedItems.length < itemSliceCount && remaining.isNotEmpty) {
-    final totalWeight = remaining.fold<double>(
-      0,
-      (sum, item) => sum + wheelRarityWeight(item.rarity),
-    );
-    var cursor = random.nextDouble() * totalWeight;
-    var selectedIndex = remaining.length - 1;
-    for (var index = 0; index < remaining.length; index++) {
-      cursor -= wheelRarityWeight(remaining[index].rarity);
-      if (cursor <= 0) {
-        selectedIndex = index;
-        break;
-      }
-    }
-    selectedItems.add(remaining.removeAt(selectedIndex));
+  final remainingItems = [...eligible];
+  while (selectedItems.length < itemSliceCount && remainingItems.isNotEmpty) {
+    final index = _weightedIndex([
+      for (final item in remainingItems) wheelRarityWeight(item.rarity),
+    ], random);
+    selectedItems.add(remainingItems.removeAt(index));
   }
+  freeSlices -= selectedItems.length;
 
-  final xpOptions = MockData.wheelXpOptions;
+  // 3) Altın dilimleri; en az bir dilim XP'ye kalır.
+  var coinSliceCount =
+      _weightedIndex(WheelOdds.coinSliceCountWeights, random) + 1;
+  coinSliceCount = min(coinSliceCount, min(maxCoinSlices, freeSlices - 1));
+  if (coinSliceCount < 0) coinSliceCount = 0;
 
-  final rewardSliceCount = itemSliceCount + selectedTitles.length;
+  final coinRewards = [
+    for (var i = 0; i < coinSliceCount; i++)
+      WheelReward.coins(
+        WheelOdds.coinOptions[_weightedIndex(WheelOdds.coinWeights, random)],
+      ),
+  ];
+  freeSlices -= coinRewards.length;
+
+  // 4) Kalan dilimler XP.
   final slices = <WheelReward>[
     for (final item in selectedItems) WheelReward.item(item),
     for (final title in selectedTitles) WheelReward.title(title),
-    // Kalan dilimler XP: **boş dilim hiçbir koşulda oluşmaz.**
-    for (var i = rewardSliceCount; i < wheelSliceCount; i++)
-      WheelReward.xp(xpOptions[random.nextInt(xpOptions.length)]),
+    ...coinRewards,
+    for (var i = 0; i < freeSlices; i++)
+      WheelReward.xp(
+        WheelOdds.xpOptions[_weightedIndex(WheelOdds.xpWeights, random)],
+      ),
   ];
 
-  // Item dilimleri baştan sona dağılsın; hepsi yan yana durmasın.
+  // Ödül dilimleri baştan sona dağılsın; hepsi yan yana durmasın.
   slices.shuffle(random);
   return slices;
 }

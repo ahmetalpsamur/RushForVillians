@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
+import 'package:rush_for_villains/core/utils/wheel_rewards.dart';
+import 'package:rush_for_villains/data/title_catalog.dart';
+import 'package:rush_for_villains/models/game_title.dart';
 import 'package:rush_for_villains/features/wheel/daily_wheel_screen.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
@@ -25,6 +28,8 @@ void main() {
     int level = 1,
     List<Item> equipment = const [],
     List<String> owned = const [],
+    List<GameTitle> titles = const [],
+    List<String> ownedTitles = const [],
   }) async {
     final results = <WheelReward>[];
     await tester.pumpWidget(
@@ -41,6 +46,8 @@ void main() {
           level: level,
           equipment: equipment,
           ownedItemIds: owned,
+          titles: titles,
+          ownedTitleIds: ownedTitles,
           onSpinResult: results.add,
         ),
       ),
@@ -59,6 +66,141 @@ void main() {
   }
 
   Finder spinButton() => find.widgetWithText(FilledButton, 'Çarkı Çevir');
+
+  group('ünvan ödülü', () {
+    /// Çark kaynaklı ünvanların hepsi; havuz süzmesini `buildWheelSlices`
+    /// yapıyor.
+    final wheelTitles = TitleCatalog.withSource(TitleSource.wheel);
+
+    /// Sekiz dilimin **hepsi** ünvan olamıyor (`maxTitleSlices` = 1), bu
+    /// yüzden ünvanın kazandığı bir tohum aranıyor.
+    ({int seed, GameTitle title})? findTitleSeed() {
+      for (var seed = 1; seed < 400; seed++) {
+        final slices = buildWheelSlices(
+          level: 60,
+          candidates: const [],
+          ownedItemIds: const [],
+          seed: seed,
+          titleCandidates: wheelTitles,
+          ownedTitleIds: const [],
+        );
+        final winner = slices[pickWinningSlice(slices.length, seed)];
+        if (winner.isTitle) return (seed: seed, title: winner.title!);
+      }
+      return null;
+    }
+
+    testWidgets('kazanılan ünvan "+0 XP" değil, adıyla gösterilir', (
+      tester,
+    ) async {
+      // Kullanıcı bildirimi: ünvan çıktığında sonuç kartı "XP KAZANDIN" ve
+      // "+0 XP" yazıyordu.
+      final found = findTitleSeed();
+      expect(found, isNotNull, reason: 'ünvan kazandıran bir tohum bulunmalı');
+
+      final results = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: found!.seed,
+        level: 60,
+        titles: wheelTitles,
+      );
+      await spin(tester);
+
+      expect(results.single.isTitle, isTrue);
+      // Sonuç kartı: ünvan olduğu belli, adı ve hikâyesi yazılı.
+      expect(find.text('+0 XP'), findsNothing);
+      expect(find.textContaining('XP KAZANDIN'), findsNothing);
+      expect(find.text('Ünvan kazandın! 🎉'), findsOneWidget);
+      expect(find.text(found.title.name), findsWidgets);
+      // Nereden takılacağı da yazıyor (Model Kuralları #4).
+      expect(find.textContaining('Ünvanlar ekranından'), findsWidgets);
+    });
+
+    testWidgets('ışıklı ödül sahnesi de ünvanı doğru anlatır', (tester) async {
+      // Sahne yalnızca `_revealDuration` boyunca duruyor; `spin()` onu
+      // geçiyor, bu yüzden burada elle daha kısa ilerletiliyor.
+      final found = findTitleSeed();
+      expect(found, isNotNull);
+
+      await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: found!.seed,
+        level: 60,
+        titles: wheelTitles,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2700));
+      await tester.pump(const Duration(milliseconds: 700));
+
+      expect(find.byKey(const ValueKey('wheel-reward-reveal')), findsOneWidget);
+      expect(find.text('+0 XP'), findsNothing);
+      expect(find.text('XP KAZANDIN'), findsNothing);
+      expect(
+        find.text('${found.title.rarity.label.toUpperCase()} ÜNVAN'),
+        findsOneWidget,
+      );
+      expect(find.text(found.title.name), findsWidgets);
+
+      // Sahne kapanınca sonuç kartı devralıyor.
+      await tester.pump(const Duration(milliseconds: 2500));
+      expect(find.byKey(const ValueKey('wheel-reward-reveal')), findsNothing);
+    });
+
+    testWidgets('altın kazanınca miktar yazılı, "0 XP" yazmıyor', (
+      tester,
+    ) async {
+      // Altın dilimi olan bir tohum ara.
+      int? coinSeed;
+      for (var seed = 1; seed < 200 && coinSeed == null; seed++) {
+        final slices = buildWheelSlices(
+          level: 1,
+          candidates: const [],
+          ownedItemIds: const [],
+          seed: seed,
+        );
+        if (slices[pickWinningSlice(slices.length, seed)].isCoins) {
+          coinSeed = seed;
+        }
+      }
+      expect(coinSeed, isNotNull);
+
+      final results = await pumpWheel(
+        tester,
+        alreadySpunToday: false,
+        seed: coinSeed!,
+      );
+      await spin(tester);
+
+      final reward = results.single;
+      expect(reward.isCoins, isTrue);
+      expect(find.text('+0 XP'), findsNothing);
+      expect(
+        find.text('Kazandın: ${reward.coins} altın 🎉'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sahip olunan ünvan çarktan bir daha çıkmaz', (tester) async {
+      final slices = buildWheelSlices(
+        level: 60,
+        candidates: const [],
+        ownedItemIds: const [],
+        seed: 7,
+        titleCandidates: wheelTitles,
+        ownedTitleIds: [for (final title in wheelTitles) title.id],
+      );
+
+      expect(slices.any((slice) => slice.isTitle), isFalse);
+      // Boş dilim yok: kalanlar XP ve altına düşüyor.
+      expect(
+        slices.every((slice) => slice.xp > 0 || slice.coins > 0),
+        isTrue,
+      );
+    });
+  });
 
   testWidgets('eski segmentli arka çark olmadan yedi dişli gösterilir', (
     tester,

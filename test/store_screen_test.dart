@@ -7,6 +7,8 @@ import 'package:rush_for_villains/core/utils/item_leveling.dart';
 import 'package:rush_for_villains/core/utils/item_merging.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/features/store/xp_store_screen.dart';
+import 'package:rush_for_villains/data/title_catalog.dart';
+import 'package:rush_for_villains/models/game_title.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/models/xp_store_item.dart';
@@ -58,8 +60,11 @@ void main() {
     int extraWheelSpins = 0,
     bool xpBoostActive = false,
     Map<String, int> ownedEquipment = const {},
+    List<GameTitle> titles = const [],
+    List<String> ownedTitles = const [],
     void Function(Item)? onPurchaseEquipment,
     void Function(XpStoreItem)? onPurchase,
+    void Function(GameTitle)? onPurchaseTitle,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -76,8 +81,13 @@ void main() {
           streakFreezes: streakFreezes,
           extraWheelSpins: extraWheelSpins,
           xpBoostActive: xpBoostActive,
+          titles: titles,
+          ownedTitleIds: ownedTitles,
           onPurchase: onPurchase ?? (_) {},
           onPurchaseEquipment: onPurchaseEquipment ?? (_) {},
+          onPurchaseTitle: titles.isEmpty && onPurchaseTitle == null
+              ? null
+              : onPurchaseTitle ?? (_) {},
         ),
       ),
     );
@@ -521,4 +531,115 @@ void main() {
       expect(controller.offset, closeTo(0, 0.1));
     });
   });
+
+  group('ünvan rafı (kullanıcı bildirimi: mağazada ünvan görünmüyordu)', () {
+    final storeTitles = TitleCatalog.purchasable;
+
+    testWidgets('ünvan bölümü mağazanın en tepesinde', (tester) async {
+      await pumpStore(tester, equipment: [cheapItem], titles: storeTitles);
+
+      final section = find.byKey(const ValueKey('store-titles-section'));
+      expect(section, findsOneWidget);
+
+      // Kaydırmadan görünüyor: kullanıcı ünvanları bulmak için aramak
+      // zorunda kalmamalı.
+      final box = tester.getRect(section);
+      expect(box.top, lessThan(400));
+    });
+
+    testWidgets('ünvan yoksa bölüm hiç çizilmez', (tester) async {
+      await pumpStore(tester, equipment: [cheapItem]);
+      expect(find.byKey(const ValueKey('store-titles-section')), findsNothing);
+    });
+
+    testWidgets('özet satırı sahiplik ve liste sayısını söyler', (
+      tester,
+    ) async {
+      await pumpStore(
+        tester,
+        titles: storeTitles,
+        ownedTitles: [storeTitles.first.id],
+      );
+
+      expect(
+        find.text('1 / ${storeTitles.length} ünvan sende · '
+            '${storeTitles.length} tanesi listede'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('nadirlik süzgeci listeyi daraltır', (tester) async {
+      await pumpStore(tester, titles: storeTitles);
+
+      final rarity = storeTitles.first.rarity;
+      await tester.tap(find.byKey(ValueKey('store-title-rarity-${rarity.name}')));
+      await tester.pumpAndSettle();
+
+      final expected = storeTitles.where((t) => t.rarity == rarity).length;
+      expect(
+        find.textContaining('$expected tanesi listede'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('"Alabileceklerim" parası yetmeyenleri eler', (tester) async {
+      final cheapest = storeTitles.first;
+      await pumpStore(tester, coins: cheapest.cost, titles: storeTitles);
+
+      await tester.tap(find.byKey(const ValueKey('store-title-affordable')));
+      await tester.pumpAndSettle();
+
+      final expected = storeTitles.where((t) => t.cost <= cheapest.cost).length;
+      expect(
+        find.textContaining('$expected tanesi listede'),
+        findsOneWidget,
+      );
+      expect(find.byKey(ValueKey('buy-title-${cheapest.id}')), findsOneWidget);
+    });
+
+    testWidgets('"Sendekileri gizle" sahip olunanları eler', (tester) async {
+      final owned = storeTitles.first;
+      await pumpStore(
+        tester,
+        titles: storeTitles,
+        ownedTitles: [owned.id],
+      );
+
+      await tester.tap(find.byKey(const ValueKey('store-title-hide-owned')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(ValueKey('buy-title-${owned.id}')), findsNothing);
+      expect(
+        find.textContaining('${storeTitles.length - 1} tanesi listede'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('süzgeç hiçbir şey bırakmazsa nedeni yazılı', (tester) async {
+      // Hiçbir ünvanın alınamayacağı bir bakiye.
+      await pumpStore(tester, coins: 0, titles: storeTitles);
+
+      await tester.tap(find.byKey(const ValueKey('store-title-affordable')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('store-titles-empty')), findsOneWidget);
+    });
+
+    testWidgets('satın alma düğmesi ünvanı geri veriyor', (tester) async {
+      GameTitle? bought;
+      final cheapest = storeTitles.first;
+      await pumpStore(
+        tester,
+        coins: cheapest.cost,
+        titles: storeTitles,
+        onPurchaseTitle: (title) => bought = title,
+      );
+
+      await tester.tap(find.byKey(ValueKey('buy-title-${cheapest.id}')));
+      await tester.pumpAndSettle();
+
+      expect(bought?.id, cheapest.id);
+    });
+  });
+
 }

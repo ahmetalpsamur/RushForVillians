@@ -7,6 +7,7 @@ import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/core/utils/game_day.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
+import 'package:rush_for_villains/core/utils/wheel_rewards.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/features/store/xp_store_screen.dart';
@@ -135,8 +136,25 @@ void main() {
   ///
   /// Mağaza itemleri **sınıfa uyarlanmış** hâlde gösterir (ad sınıf lakabını
   /// alır), bu yüzden aranan ad da uyarlanmış addır.
+  /// Mağaza listesi tembel: ünvan rafı en tepede olduğu için (kullanıcı
+  /// isteği) ekipman ve yükseltme kartları görünür alanın altında kalabilir
+  /// ve hiç kurulmaz. Dokunmadan önce listeyi oraya kaydırmak gerekiyor.
+  Future<void> scrollStoreTo(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isNotEmpty) return;
+    await tester.scrollUntilVisible(
+      finder,
+      280,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('store-scroll-view')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   Future<void> tapEquipment(WidgetTester tester, Item item) async {
     final shown = flavorForClass(item, _avatar.characterClass);
+    await scrollStoreTo(tester, find.text(shown.name));
     final card = find.ancestor(
       of: find.text(shown.name),
       matching: find.byType(SectionCard),
@@ -145,17 +163,22 @@ void main() {
       of: card.first,
       matching: find.byType(FilledButton),
     );
+    await tester.ensureVisible(button.first);
+    await tester.pumpAndSettle();
     await tester.tap(button.first, warnIfMissed: false);
     await tester.pumpAndSettle();
   }
 
   /// Yükseltme satırındaki düğmeye ada göre dokunur.
   Future<void> tapUpgrade(WidgetTester tester, String name) async {
+    await scrollStoreTo(tester, find.text(name));
     final row = find.ancestor(of: find.text(name), matching: find.byType(Row));
     final button = find.descendant(
       of: row.first,
       matching: find.byType(FilledButton),
     );
+    await tester.ensureVisible(button.first);
+    await tester.pumpAndSettle();
     await tester.tap(button.first, warnIfMissed: false);
     await tester.pumpAndSettle();
   }
@@ -289,10 +312,17 @@ void main() {
         catalog: [cheapItem],
       );
 
+      // Ünvan rafı en tepede; ekipman kartı görünür alanın altında kalıyor.
+      await scrollStoreTo(
+        tester,
+        find.text(flavorForClass(cheapItem, _avatar.characterClass).name),
+      );
       final button = find.descendant(
         of: find.byType(XpStoreScreen),
         matching: find.widgetWithText(FilledButton, '${cheapItem.cost}'),
       );
+      await tester.ensureVisible(button.first);
+      await tester.pumpAndSettle();
       await tester.tap(button.first, warnIfMissed: false);
       await tester.tap(button.first, warnIfMissed: false);
       await tester.pumpAndSettle();
@@ -494,6 +524,7 @@ void main() {
       // Çark 3.000 adımda açılıyor.
       await simulateSteps(tester, 5000);
       final xpBeforeSpin = profile.xp;
+      final coinsBeforeSpin = profile.coins;
 
       await tester.tap(
         find.descendant(
@@ -508,15 +539,69 @@ void main() {
       await tester.pump(const Duration(milliseconds: 2700));
       await tester.pump(const Duration(milliseconds: 2500));
 
-      // Ödül ya item ya XP; ikisi de profile işlemeli.
+      // Ödül item, ünvan, XP ya da altın olabilir; hangisi çıkarsa çıksın
+      // profile işlemeli.
       final gotItem = profile.ownedItems.isNotEmpty;
       final gotXp = profile.xp > xpBeforeSpin;
+      final gotCoins = profile.coins > coinsBeforeSpin;
+      final gotTitle = profile.ownedTitleIds.isNotEmpty;
       expect(
-        gotItem || gotXp,
+        gotItem || gotXp || gotCoins || gotTitle,
         isTrue,
         reason: 'çark ödülü profile hiç işlemedi',
       );
       expect(profile.wheelSpunToday, isTrue);
+    });
+
+    testWidgets('çarktan gelen altın keseye ve ömür sayacına yazılır', (
+      tester,
+    ) async {
+      // Altın diliminin kazandığı bir tohum arayıp profili onunla kuruyoruz;
+      // ekran tohumu profilden okuyor.
+      int? coinSeed;
+      for (var seed = 1; seed < 400 && coinSeed == null; seed++) {
+        final slices = buildWheelSlices(
+          level: 50,
+          candidates: const [],
+          ownedItemIds: const [],
+          seed: seed,
+        );
+        if (slices[pickWinningSlice(slices.length, seed)].isCoins) {
+          coinSeed = seed;
+        }
+      }
+      expect(coinSeed, isNotNull);
+
+      final profile = makeProfile(level: 50, coins: 0);
+      profile.wheelSeed = coinSeed!;
+      await pumpShell(
+        tester,
+        profile: profile,
+        catalog: const [],
+        openStoreTab: false,
+      );
+
+      await simulateSteps(tester, 5000);
+      final coinsFromSteps = profile.coins;
+      final lifetimeFromSteps = profile.lifetimeCoins;
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.text('Günlük Çark'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Çarkı Çevir'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 2700));
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pumpAndSettle();
+
+      expect(profile.coins, greaterThan(coinsFromSteps));
+      // Başarım sayacı da ilerliyor (ünvan koşulları buna bakıyor).
+      expect(profile.lifetimeCoins, greaterThan(lifetimeFromSteps));
     });
 
     testWidgets('tohum çevirdikten sonra ilerler', (tester) async {

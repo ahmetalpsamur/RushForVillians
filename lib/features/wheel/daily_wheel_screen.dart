@@ -283,6 +283,14 @@ class _ResultCard extends StatelessWidget {
         ),
       );
     }
+    if (reward.isCoins) {
+      return Text(
+        'Kazandın: ${reward.coins} altın 🎉',
+        key: const ValueKey('wheel-coin-result'),
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      );
+    }
     final item = reward.item;
     if (item == null) {
       return Text(
@@ -387,9 +395,13 @@ class _RewardReveal extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  item == null
-                      ? 'XP KAZANDIN'
-                      : '${item.rarity.label.toUpperCase()} ÖDÜL',
+                  switch ((item, reward.title)) {
+                    (final Item item, _) =>
+                      '${item.rarity.label.toUpperCase()} ÖDÜL',
+                    (_, final GameTitle title) =>
+                      '${title.rarity.label.toUpperCase()} ÜNVAN',
+                    _ => reward.isCoins ? 'ALTIN KAZANDIN' : 'XP KAZANDIN',
+                  },
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: glowColor,
@@ -402,7 +414,13 @@ class _RewardReveal extends StatelessWidget {
                 const SizedBox(height: 18),
                 if (item == null)
                   Icon(
-                    Icons.bolt_rounded,
+                    // Ünvan bir eşya değil; şimşek yerine madalya.
+                    // Altın diliminde de kendi ikonu olmalı.
+                    reward.isTitle
+                        ? Icons.military_tech
+                        : reward.isCoins
+                        ? Icons.monetization_on
+                        : Icons.bolt_rounded,
                     size: 92,
                     color: glowColor,
                     shadows: [Shadow(color: glowColor, blurRadius: 26)],
@@ -423,7 +441,9 @@ class _RewardReveal extends StatelessWidget {
                   ),
                 const SizedBox(height: 16),
                 Text(
-                  item?.name ?? '+${reward.xp} XP',
+                  // Ünvan dilimi XP vermiyor; eski hâlinde burada "+0 XP"
+                  // yazıyordu (kullanıcı bildirimi).
+                  item?.name ?? reward.title?.name ?? reward.label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
@@ -431,6 +451,36 @@ class _RewardReveal extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (reward.title case final title?) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    title.lore,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: glowColor.withValues(alpha: 0.95),
+                      fontSize: 12.5,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    [
+                      for (final effect in title.effects) effect.label,
+                    ].join(' · '),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Profildeki Ünvanlar ekranından takabilirsin.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, fontSize: 11.5),
+                  ),
+                ],
                 if (item?.buff.label case final effect?) ...[
                   const SizedBox(height: 8),
                   Text(

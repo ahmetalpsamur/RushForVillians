@@ -1417,6 +1417,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // Ünvan dilimi (Bölüm C.4). Havuz sahip olunanları eliyor; `grantTitle`
       // yine de mükerrer kazanmayı sessizce yutar.
       final wonTitle = reward.title;
+      // Altın dilimi (çark oran tablosu): doğrudan keseye gider ve
+      // başarım sayacına yazılır. Adım ekonomisinden ayrı bir kaynak, bu
+      // yüzden `lastRewardedStepCount` işaretçisine hiç dokunmuyor.
+      if (reward.coins > 0) {
+        _profile.coins += reward.coins;
+        _profile.lifetimeCoins += reward.coins;
+      }
       if (wonTitle != null && _profile.grantTitle(wonTitle.id)) {
         earned.add(wonTitle);
       }
