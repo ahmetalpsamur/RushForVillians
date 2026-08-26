@@ -18,22 +18,17 @@ import 'package:rush_for_villains/models/streak_stat_bonuses.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  /// Uzun bir serinin tipik birikimi: dört stat, biri tavanda.
+  /// Uzun bir serinin tipik birikimi: dört stat, farklı büyüklüklerde.
+  ///
+  /// Değerler **binde** cinsinden (Bölüm B): 125 = +%12,5. Tavan kalktığı
+  /// için "biri tavanda" örneklemi yerine "biri açık ara önde" örneklemi
+  /// kullanılıyor — panelin pay sütununu da bu ayrım sınıyor.
   StreakStatBonuses buildBonuses() {
-    var bonuses = StreakStatBonuses.empty;
-    for (var i = 0; i < StreakStatBonuses.maxDaysPerStat; i++) {
-      bonuses = bonuses.withGrant(ItemStat.critDamage);
-    }
-    for (var i = 0; i < 11; i++) {
-      bonuses = bonuses.withGrant(ItemStat.attack);
-    }
-    for (var i = 0; i < 7; i++) {
-      bonuses = bonuses.withGrant(ItemStat.defense);
-    }
-    for (var i = 0; i < 3; i++) {
-      bonuses = bonuses.withGrant(ItemStat.dodge);
-    }
-    return bonuses;
+    return StreakStatBonuses.empty
+        .withGrant(ItemStat.critDamage, 125)
+        .withGrant(ItemStat.attack, 55)
+        .withGrant(ItemStat.defense, 35)
+        .withGrant(ItemStat.dodge, 15);
   }
 
   Future<void> pumpPanel(WidgetTester tester, double width) async {
@@ -70,10 +65,18 @@ void main() {
       await pumpPanel(tester, width);
 
       expect(find.text('Seri Bonusu'), findsOneWidget);
-      // 25 + 11 + 7 + 3 = 46 gün → +%46
-      expect(find.text('toplam +%46'), findsOneWidget);
-      // Tavana ulaşan stat işaretli olmalı.
-      expect(find.text('tavan'), findsOneWidget);
+      // 125 + 55 + 35 + 15 = 230 binde → +%23
+      expect(find.text('toplam +%23'), findsOneWidget);
+      // Bölüm B: tavan yerine **güncel basamak** gösteriliyor.
+      expect(find.text('tavan'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('streak-bonus-current-rate')),
+        findsOneWidget,
+      );
+      // 46. gün ilk basamakta: yarın da +%0,5.
+      expect(find.textContaining('Şu an: gün başına +%0,5'), findsOneWidget);
+      // Pay sütunu: 125 / 230 = %54.
+      expect(find.text('%54'), findsOneWidget);
 
       await expectLater(
         find.byType(CharacterPowerPanel),

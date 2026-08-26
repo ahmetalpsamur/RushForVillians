@@ -8,6 +8,7 @@ import '../../core/utils/game_clock.dart';
 import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
+import '../../models/streak_stat_bonuses.dart';
 import '../../models/user_profile.dart';
 import '../../services/step_permission_service.dart';
 import '../../widgets/day_reset_countdown.dart';
@@ -462,7 +463,8 @@ class _StreakCardState extends State<_StreakCard> {
     final streakBonus = profile.streakStatBonuses.totalBonus;
     final bonusWarning =
         streakBonus > 0
-            ? ' Biriken +%${(streakBonus * 100).round()} savaş bonusun gider.'
+            ? ' Biriken +%${StreakStatBonuses.formatRate(streakBonus)} savaş '
+                'bonusun gider.'
             : '';
 
     return SectionCard(
@@ -530,7 +532,8 @@ class _StreakCardState extends State<_StreakCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Seri bonusu: +%${(streakBonus * 100).round()} savaş statı '
+                    'Seri bonusu: +%${StreakStatBonuses.formatRate(streakBonus)} '
+                    'savaş statı '
                     '(profilde stat stat görülür).',
                     style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),

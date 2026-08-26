@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 17;
+  static const int schemaVersion = 18;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -234,6 +234,22 @@ class GameStorage {
     // macera yürüyüş fazına geriye dönük sokulmuyor** ve ×1 ödülüyle kalıyor.
     // Veri silen bir dönüşüm gerekmiyor.
     16: (state) => state,
+    // 17 -> 18: seri stat bonusu artık **binde** biriktiriyor, gün sayısı
+    // değil (Bölüm B). Gün başına kazanç sabit olmaktan çıktığı için gün
+    // sayısı oranı belirleyemiyor. Eski kayıtta bir gün +%1 = 10 binde
+    // ediyordu; birikim birebir korunsun diye her değer 10 ile çarpılır.
+    // Tavanlar kalktığı için kırpma yok.
+    17: (state) {
+      final profile = state['profile'];
+      if (profile is! Map) return state;
+      final bonuses = profile['streakStatBonuses'];
+      if (bonuses is! Map) return state;
+      profile['streakStatBonuses'] = {
+        for (final entry in bonuses.entries)
+          if (entry.value is int) entry.key: (entry.value as int) * 10,
+      };
+      return state;
+    },
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

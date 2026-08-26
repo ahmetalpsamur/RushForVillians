@@ -3,30 +3,36 @@ import 'item_effect.dart';
 
 /// Günlük serinin biriktirdiği **savaş** stat bonusları.
 ///
-/// Her seri günü havuzdan bir stat seçilir ve o stata
-/// [GameConstants.streakStatBonusPerDay] kadar oran eklenir. Bu sınıf o
-/// birikimi taşır: stat başına kaç gün kazanıldığını tutar, oranı türetir.
+/// Her seri günü havuzdan bir stat seçilir ve o stata o günün basamak
+/// kazancı eklenir. Kazanç sabit değil: her [GameConstants.streakBonusTierLength]
+/// günde bir azalır, tablonun sonunda başa döner (Bölüm B).
 ///
-/// **Gün sayısı tutuluyor, oran değil.** Kayıt turunda kayan nokta birikmesin
-/// ve tavan karşılaştırmaları tam olsun diye: `0.01` yirmi beş kez toplanınca
-/// `0.25` etmiyor, `0.2499999…` ediyor ve stat tavana hiç oturmuyordu.
+/// **Birikim binde cinsinden tam sayı tutulur, oran değil.** 0.005'i yüz kez
+/// toplamak 0.5 etmiyor; tur attıkça sapma büyüyordu ve tavan/eşik
+/// karşılaştırmaları kayıyordu. Aynı gerekçeyle Bölüm 5C'de gün sayısı
+/// tutuluyordu — gün başına kazanç artık sabit olmadığı için gün sayısı
+/// yetmiyor.
+///
+/// **Tavan yok** (Bölüm B): ne stat başına ne toplamda. Tek bir statın uçup
+/// gitmesini engelleyen şey, çekilişin geride kalan statı kayırması
+/// ([drawWeights]). Sert bir stat tavanı, toplam tavan kalkınca uzun seride
+/// bütün statları tavana oturtur ve her günü boşa çıkarırdı.
 ///
 /// Model Kuralları #1 temiz: yalnızca `String` anahtar ve `int` tutulur,
 /// [ItemStat] bir düz Dart enum'u ve diske adıyla yazılır.
 class StreakStatBonuses {
-  /// Stat -> o stata kazandırılmış seri günü sayısı. Yalnızca artı değerler.
-  final Map<ItemStat, int> days;
+  /// Stat -> o stata birikmiş bonus, **binde** cinsinden (5 = +%0,5).
+  final Map<ItemStat, int> tenths;
 
-  const StreakStatBonuses._(this.days);
+  const StreakStatBonuses._(this.tenths);
 
   static const StreakStatBonuses empty = StreakStatBonuses._({});
 
-  factory StreakStatBonuses(Map<ItemStat, int> days) {
+  factory StreakStatBonuses(Map<ItemStat, int> tenths) {
     final cleaned = <ItemStat, int>{};
-    for (final entry in days.entries) {
+    for (final entry in tenths.entries) {
       if (!entry.key.isCombat) continue;
-      final capped = entry.value.clamp(0, maxDaysPerStat);
-      if (capped > 0) cleaned[entry.key] = capped;
+      if (entry.value > 0) cleaned[entry.key] = entry.value;
     }
     return StreakStatBonuses._(Map.unmodifiable(cleaned));
   }
@@ -34,62 +40,98 @@ class StreakStatBonuses {
   /// Seri bonusunun dağıtıldığı havuz: **savaş** statlarının tamamı.
   ///
   /// Ekonomi statları (adım parası, adım XP, çark XP...) bilerek dışarıda:
-  /// ekonomi ölçülmüş bir dengeye bağlı ve seriyle büyürse günlük tavan
-  /// katlanır. Havuz `isCombat`'tan türetiliyor, elle yazılmıyor — savaş
-  /// motoru yeni bir stat eklerse havuz kendiliğinden genişler.
+  /// ekonomi ölçülmüş bir dengeye bağlı ve tavansız büyüyen bir para çarpanı
+  /// onu tamamen çökertir. Havuz `isCombat`'tan türetiliyor, elle yazılmıyor
+  /// — savaş motoru yeni bir stat eklerse havuz kendiliğinden genişler.
   static final List<ItemStat> pool = List.unmodifiable([
     for (final stat in ItemStat.values)
       if (stat.isCombat) stat,
   ]);
 
-  /// Tek bir statın alabileceği en fazla gün.
-  static int get maxDaysPerStat =>
-      (GameConstants.maxStreakStatBonus / GameConstants.streakStatBonusPerDay)
-          .round();
-
-  /// Bütün statlara dağıtılabilecek en fazla gün.
-  static int get maxTotalDays =>
-      (GameConstants.maxStreakTotalBonus / GameConstants.streakStatBonusPerDay)
-          .round();
-
-  /// [stat]'a kazandırılmış gün sayısı.
-  int daysFor(ItemStat stat) => days[stat] ?? 0;
-
-  /// [stat]'ın seriden gelen oran bonusu (0.03 = +%3).
-  double bonusFor(ItemStat stat) =>
-      daysFor(stat) * GameConstants.streakStatBonusPerDay;
-
-  /// Dağıtılmış toplam gün.
-  int get totalDays => days.values.fold(0, (sum, value) => sum + value);
-
-  /// Seriden gelen toplam oran.
-  double get totalBonus => totalDays * GameConstants.streakStatBonusPerDay;
-
-  bool get isEmpty => days.isEmpty;
-
-  /// [stat] kendi tavanına ulaştı mı.
-  bool isAtCap(ItemStat stat) => daysFor(stat) >= maxDaysPerStat;
-
-  /// Toplam tavan doldu mu. Dolduysa yeni gün bonus üretmez.
-  bool get isFull => totalDays >= maxTotalDays;
-
-  /// Bugün çekilişe girebilecek statlar: tavana ulaşanlar havuzdan çıkar,
-  /// böylece kazanılan gün boşa gitmez.
-  List<ItemStat> get eligibleStats => [
-    for (final stat in pool)
-      if (!isAtCap(stat)) stat,
-  ];
-
-  /// [stat]'a bir gün ekleyip yeni birikimi döner. Tavandaysa kendini döner.
-  StreakStatBonuses withGrant(ItemStat stat) {
-    if (!stat.isCombat || isAtCap(stat) || isFull) return this;
-    return StreakStatBonuses({...days, stat: daysFor(stat) + 1});
+  /// Bir seri gününün kazancı, binde cinsinden.
+  ///
+  /// [streakDay] 1'den başlar. Basamak tablosu tur attığı için 501. gün
+  /// yeniden ilk basamağa döner — 500 günü geçmek bir ödül.
+  static int tenthsForDay(int streakDay) {
+    final tiers = GameConstants.streakBonusTierTenths;
+    if (streakDay < 1 || tiers.isEmpty) return 0;
+    final length = GameConstants.streakBonusTierLength;
+    if (length < 1) return tiers.first;
+    return tiers[((streakDay - 1) ~/ length) % tiers.length];
   }
 
-  /// Kayıt biçimi: `{statAdı: gün}`. Bilinmeyen ya da savaş dışı anahtarlar
+  /// [streakDay] hangi basamakta (0 tabanlı).
+  static int tierIndexForDay(int streakDay) {
+    final tiers = GameConstants.streakBonusTierTenths;
+    if (streakDay < 1 || tiers.isEmpty) return 0;
+    final length = GameConstants.streakBonusTierLength;
+    if (length < 1) return 0;
+    return ((streakDay - 1) ~/ length) % tiers.length;
+  }
+
+  /// [streakDay] döngünün başa döndüğü gün mü ("501. günde %0,5'e döndü").
+  ///
+  /// İlk turun 1. günü kutlanmaz: kutlanacak şey **geri dönmek**.
+  static bool isCycleRestartDay(int streakDay) {
+    final tiers = GameConstants.streakBonusTierTenths;
+    final length = GameConstants.streakBonusTierLength;
+    if (streakDay < 1 || tiers.isEmpty || length < 1) return false;
+    final cycle = length * tiers.length;
+    return streakDay > cycle && (streakDay - 1) % cycle == 0;
+  }
+
+  /// Oranı kullanıcıya görünen biçimde yazar: 0.005 -> "0,5", 0.03 -> "3".
+  ///
+  /// Tam sayıya yuvarlamak gün başına kazancı (+%0,5) sıfır ya da 1
+  /// gösterirdi; basamak tablosunun tamamı binde mertebesinde.
+  static String formatRate(double rate) {
+    final percent = rate * 100;
+    final rounded = (percent * 10).round() / 10;
+    if (rounded == rounded.roundToDouble()) return rounded.toStringAsFixed(0);
+    return rounded.toStringAsFixed(1).replaceAll('.', ',');
+  }
+
+  /// [stat]'a birikmiş binde.
+  int tenthsFor(ItemStat stat) => tenths[stat] ?? 0;
+
+  /// [stat]'ın seriden gelen oran bonusu (0.03 = +%3).
+  double bonusFor(ItemStat stat) => tenthsFor(stat) / 1000;
+
+  /// Dağıtılmış toplam binde.
+  int get totalTenths => tenths.values.fold(0, (sum, value) => sum + value);
+
+  /// Seriden gelen toplam oran.
+  double get totalBonus => totalTenths / 1000;
+
+  bool get isEmpty => tenths.isEmpty;
+
+  /// Çekiliş ağırlıkları: [pool] ile aynı sırada, hepsi >= 1.
+  ///
+  /// Geride kalan stat kayrılır ama lider hiçbir zaman çekilişten düşmez;
+  /// üstünlük [GameConstants.streakBonusBalanceWeight] ile sınırlı.
+  List<int> get drawWeights {
+    var highest = 0;
+    for (final stat in pool) {
+      final value = tenthsFor(stat);
+      if (value > highest) highest = value;
+    }
+    final boostCap = GameConstants.streakBonusBalanceWeight;
+    return [
+      for (final stat in pool)
+        1 + (highest - tenthsFor(stat)).clamp(0, boostCap < 0 ? 0 : boostCap),
+    ];
+  }
+
+  /// [stat]'a [amount] binde ekleyip yeni birikimi döner.
+  StreakStatBonuses withGrant(ItemStat stat, int amount) {
+    if (!stat.isCombat || amount <= 0) return this;
+    return StreakStatBonuses({...tenths, stat: tenthsFor(stat) + amount});
+  }
+
+  /// Kayıt biçimi: `{statAdı: binde}`. Bilinmeyen ya da savaş dışı anahtarlar
   /// okuma sırasında sessizce atılır (elle düzenlenmiş kayda karşı savunma).
   Map<String, Object?> toJson() => {
-    for (final entry in days.entries) entry.key.name: entry.value,
+    for (final entry in tenths.entries) entry.key.name: entry.value,
   };
 
   factory StreakStatBonuses.fromJson(Object? json) {

@@ -93,11 +93,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 750));
 
     expect(profile.streakDays, 1);
-    expect(profile.streakStatBonuses.totalDays, 1);
+    // Bölüm B: 1. gün ilk basamakta, +%0,5 = 5 binde.
+    expect(profile.streakStatBonuses.totalTenths, 5);
     expect(profile.streakBonusSeed, isNot(0));
 
     // Kazanılan stat kullanıcıya söylenir.
-    final stat = profile.streakStatBonuses.days.keys.single;
+    final stat = profile.streakStatBonuses.tenths.keys.single;
     expect(find.textContaining('1. gün:'), findsOneWidget);
     expect(find.textContaining(stat.label), findsOneWidget);
   });
@@ -178,7 +179,7 @@ void main() {
     await tester.pump();
 
     expect(profile.streakStatBonuses.toJson(), afterFirst);
-    expect(profile.streakStatBonuses.totalDays, 1);
+    expect(profile.streakStatBonuses.totalTenths, 5);
   });
 
   testWidgets('bonus diske yazılır', (tester) async {
@@ -204,10 +205,11 @@ void main() {
   });
 
   testWidgets('kayıttan dönen birikim profilde gösterilir', (tester) async {
-    var bonuses = StreakStatBonuses.empty;
-    for (var i = 0; i < 9; i++) {
-      bonuses = bonuses.withGrant(StreakStatBonuses.pool.first);
-    }
+    // 9 gün x +%0,5 = +%4,5 (45 binde).
+    final bonuses = StreakStatBonuses.empty.withGrant(
+      StreakStatBonuses.pool.first,
+      45,
+    );
     final profile = UserProfile(
       avatar: _avatar,
       streakDays: 9,
@@ -219,14 +221,91 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Seri Bonusu'), findsOneWidget);
-    expect(find.text('toplam +%9'), findsOneWidget);
+    expect(find.text('toplam +%4,5'), findsOneWidget);
+    // Bölüm B: tavan yerine **güncel basamak** gösteriliyor.
+    expect(
+      find.byKey(const ValueKey('streak-bonus-current-rate')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Şu an: gün başına +%0,5'), findsOneWidget);
+  });
+
+  testWidgets('basamak düşünce panel güncel oranı gösterir', (tester) async {
+    // 150. gün: ikinci basamak, gün başına +%0,4.
+    final profile = UserProfile(
+      avatar: _avatar,
+      streakDays: 150,
+      streakStatBonuses: StreakStatBonuses.empty.withGrant(
+        StreakStatBonuses.pool.first,
+        700,
+      ),
+    );
+    await pumpShell(tester, profile: profile);
+
+    await tester.tap(find.text('Profil'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Şu an: gün başına +%0,4'), findsOneWidget);
+    expect(find.text('toplam +%70'), findsOneWidget);
+  });
+
+  testWidgets('döngü başa dönünce kutlanır', (tester) async {
+    // 500 günlük seri: bir sonraki gün 501, yani kazanç +%0,1'den +%0,5'e
+    // geri döner ve bu kullanıcıya söylenmeli (Bölüm B).
+    final profile = await pumpShell(
+      tester,
+      profile: UserProfile(
+        avatar: _avatar,
+        level: 10,
+        streakDays: 500,
+        lastActiveDay: GameClock.now().subtract(const Duration(days: 1)),
+        streakStatBonuses: StreakStatBonuses.empty.withGrant(
+          StreakStatBonuses.pool.first,
+          1500,
+        ),
+      ),
+    );
+
+    await addSteps(tester, 5000);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 750));
+
+    expect(profile.streakDays, 501);
+    expect(find.textContaining('501. gün: +%0,5'), findsOneWidget);
+    expect(find.textContaining('Döngü başa döndü!'), findsOneWidget);
+  });
+
+  testWidgets('döngü dışındaki gün kutlanmaz', (tester) async {
+    final profile = await pumpShell(
+      tester,
+      profile: UserProfile(
+        avatar: _avatar,
+        level: 10,
+        streakDays: 150,
+        lastActiveDay: GameClock.now().subtract(const Duration(days: 1)),
+        streakStatBonuses: StreakStatBonuses.empty.withGrant(
+          StreakStatBonuses.pool.first,
+          700,
+        ),
+      ),
+    );
+
+    await addSteps(tester, 5000);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 750));
+
+    expect(profile.streakDays, 151);
+    // İkinci basamak: gün başına +%0,4.
+    expect(find.textContaining('151. gün: +%0,4'), findsOneWidget);
+    expect(find.textContaining('Döngü başa döndü!'), findsNothing);
   });
 
   testWidgets('ana ekrandaki seri kartı birikimi özetler', (tester) async {
-    var bonuses = StreakStatBonuses.empty;
-    for (var i = 0; i < 4; i++) {
-      bonuses = bonuses.withGrant(StreakStatBonuses.pool.first);
-    }
+    // 4 gün x +%0,5 = +%2 (20 binde).
+    final bonuses = StreakStatBonuses.empty.withGrant(
+      StreakStatBonuses.pool.first,
+      20,
+    );
     await pumpShell(
       tester,
       profile: UserProfile(
@@ -236,6 +315,6 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('Seri bonusu: +%4'), findsOneWidget);
+    expect(find.textContaining('Seri bonusu: +%2'), findsOneWidget);
   });
 }

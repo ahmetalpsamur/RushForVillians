@@ -914,8 +914,11 @@ class CharacterPowerPanel extends StatelessWidget {
 ///
 /// Hangi stata ne kadar biriktiği **stat stat** gösterilir; tek bir toplam
 /// sayı, oyuncunun serisinin ona nasıl bir savaş profili verdiğini
-/// anlatmıyor. Tavana ulaşan stat ayrıca işaretlenir (Model Kuralları #4):
-/// o stat artık çekilişe girmiyor ve oyuncu nedenini bilmeli.
+/// anlatmıyor.
+///
+/// Tavan kalktı (Bölüm B). Yerine gösterilmesi gereken şey **gün başına
+/// güncel kazanç**: oyuncu 200. günde kazancının neden küçüldüğünü ve 501.
+/// günde neden büyüdüğünü panelde görmeli (Model Kuralları #4).
 class _StreakBonusSection extends StatelessWidget {
   final StreakStatBonuses bonuses;
   final int streakDays;
@@ -925,7 +928,11 @@ class _StreakBonusSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bonuses.isEmpty) return const SizedBox.shrink();
-    final total = (bonuses.totalBonus * 100).round();
+    final total = StreakStatBonuses.formatRate(bonuses.totalBonus);
+    // Bir sonraki günün kazancı: oyuncunun bugün baktığında görmesi gereken
+    // sayı "yarın ne kazanacağım".
+    final nextGain =
+        StreakStatBonuses.tenthsForDay(streakDays + 1) / 1000;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -952,25 +959,34 @@ class _StreakBonusSection extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          bonuses.isFull
-              ? '$streakDays günlük serin savaş statlarını büyüttü. '
-                  'Seri bonusu tavana ulaştı.'
-              : '$streakDays günlük serin savaş statlarını büyüttü. '
-                  'Seri kırılırsa tamamı gider.',
+          '$streakDays günlük serin savaş statlarını büyüttü. '
+          'Seri kırılırsa tamamı gider.',
           style: const TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Şu an: gün başına +%${StreakStatBonuses.formatRate(nextGain)}. '
+          'Kazanç her ${GameConstants.streakBonusTierLength} günde bir azalır, '
+          '${GameConstants.streakBonusTierLength * GameConstants.streakBonusTierTenths.length}. '
+          'günden sonra başa döner.',
+          key: const ValueKey('streak-bonus-current-rate'),
+          style: const TextStyle(color: AppColors.streak, fontSize: 11),
         ),
         const SizedBox(height: 6),
         // Bölümün kendi sütun başlıkları: üstteki tabloda "EKİPMAN" yazan
         // sütun burada seri gününü taşıyor, aynı başlığı kullanmak yanıltıcı
         // olurdu.
-        const _StatHeader(columns: ['GÜN', 'BONUS', 'DURUM']),
+        const _StatHeader(columns: ['BONUS', 'PAY', 'DURUM']),
         for (final stat in StreakStatBonuses.pool)
-          if (bonuses.daysFor(stat) > 0)
+          if (bonuses.tenthsFor(stat) > 0)
             _StatRow(
               label: CharacterPowerPanel._capitalize(stat.label),
-              base: '${bonuses.daysFor(stat)} gün',
-              bonus: '+%${(bonuses.bonusFor(stat) * 100).round()}',
-              total: bonuses.isAtCap(stat) ? 'tavan' : '—',
+              base: '+%${StreakStatBonuses.formatRate(bonuses.bonusFor(stat))}',
+              bonus:
+                  bonuses.totalTenths == 0
+                      ? '—'
+                      : '%${(bonuses.tenthsFor(stat) * 100 / bonuses.totalTenths).round()}',
+              total: '—',
               dimmed: true,
             ),
       ],

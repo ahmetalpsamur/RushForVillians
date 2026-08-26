@@ -15,6 +15,7 @@ import '../../core/utils/item_merging.dart';
 import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
+import '../../core/utils/streak_bonus.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
@@ -27,6 +28,7 @@ import '../../models/game_state.dart';
 import '../../models/item.dart';
 import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
+import '../../models/streak_stat_bonuses.dart';
 import '../../models/reward.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/tutorial_guide_variant.dart';
@@ -801,7 +803,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     CombatRoundResult? roundResult;
     int? milestoneReached;
     var milestoneFreezeGranted = false;
-    ItemStat? streakStatGained;
+    StreakBonusDraw? streakStatGained;
     final revivalAdventure = _adventure;
     final revivalStepsWithoutXp =
         revivalAdventure?.isRevivalActive == true
@@ -1121,22 +1123,23 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
-  /// Günün seri stat bonusunu duyurur: "3. gün: +%1 kritik şansı".
+  /// Günün seri stat bonusunu duyurur: "3. gün: +%0,5 kritik şansı".
   ///
-  /// Stat tavana oturduysa bunu da söyler; oyuncu neden bir daha o statın
-  /// çıkmayacağını bilmeli (Model Kuralları #4).
-  void _showStreakStatBonus(ItemStat stat) {
-    final bonuses = _profile.streakStatBonuses;
-    final percent = (GameConstants.streakStatBonusPerDay * 100).round();
-    final total = (bonuses.bonusFor(stat) * 100).round();
+  /// Tavan kalktı (Bölüm B); bunun yerine söylenmesi gereken şey **günün
+  /// kazancının basamağı**: oyuncu 200. günde kazancının neden küçüldüğünü,
+  /// 501. günde neden büyüdüğünü görmeli (Model Kuralları #4).
+  void _showStreakStatBonus(StreakBonusDraw draw) {
+    final total = _profile.streakStatBonuses.bonusFor(draw.stat);
     final buffer = StringBuffer(
-      '${_profile.streakDays}. gün: +%$percent ${stat.label} '
-      '(seriden toplam +%$total)',
+      '${_profile.streakDays}. gün: +%${StreakStatBonuses.formatRate(draw.grantedBonus)} '
+      '${draw.stat.label} '
+      '(seriden toplam +%${StreakStatBonuses.formatRate(total)})',
     );
-    if (bonuses.isAtCap(stat)) {
-      buffer.write(' · bu stat tavana ulaştı');
-    } else if (bonuses.isFull) {
-      buffer.write(' · seri bonusu tavana ulaştı');
+    if (draw.cycleRestarted) {
+      buffer.write(
+        ' · Döngü başa döndü! Gün başına kazanç yeniden '
+        '+%${StreakStatBonuses.formatRate(draw.grantedBonus)}.',
+      );
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1167,8 +1170,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Serin kırıldı. Biriktirdiğin +%${(lostBonus * 100).round()} '
-                'savaş bonusu sıfırlandı.',
+                'Serin kırıldı. Biriktirdiğin '
+                '+%${StreakStatBonuses.formatRate(lostBonus)} savaş bonusu '
+                'sıfırlandı.',
               ),
             ),
           ],

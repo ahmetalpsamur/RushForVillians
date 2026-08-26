@@ -4061,6 +4061,92 @@ macera yürüyüş bonusu alabilir" sorusudur. Bugün sınır yok.
   gözle kaçabilir). Test ağaç sırasını doğrudan ölçüyor: ceset anahtarı ilk,
   altın anahtarları sonra. Golden ayrıca gözle doğrulandı.
 
+### GD62. Seri bonusunun tavanı kalktı; kazanç azalıp sıfırlanan bir döngüye girdi (2026-08-26)
+- **Nerede:** `GameConstants.streakBonusTierLength` / `streakBonusTierTenths`,
+  `StreakStatBonuses.tenthsForDay`
+- **Karar (Bölüm B):** gün başına kazanç sabit +%1 olmaktan çıktı; her 100
+  günde bir azalıyor ve tablonun sonunda başa dönüyor:
+
+  | Gün | Kazanç |
+  |---|---|
+  | 1–100 | +%0,5 |
+  | 101–200 | +%0,4 |
+  | 201–300 | +%0,3 |
+  | 301–400 | +%0,2 |
+  | 401–500 | +%0,1 |
+  | 501+ | +%0,5 — döngü baştan |
+
+  Basamak uzunluğu ve kazanç tablosu **iki config sabitinde**; koda gömülü
+  sayı yok ve test bunu bağlıyor.
+- **Neden tavan kalktı:** sabit tavan (+%100) uzun seride her günü boşa
+  çıkarıyordu. Serinin amacı alışkanlık; 120. günde hiçbir şey kazanmayan
+  oyuncu için seri bir sayaçtan ibaret kalıyordu.
+- **Neden azalıp sıfırlanıyor, sadece azalmıyor:** monoton azalan bir eğri
+  sonsuza kadar sıfıra yaklaşır ve aynı anlamsızlığa varır. Sıfırlanma, 500.
+  günü geçmeyi **ödül** yapıyor ve uzun seriye somut bir hedef veriyor.
+- **Kutlama şart:** görünmeyen bir ödül ödül değildir. 501. (ve 1001., …)
+  günde bildirimde "Döngü başa döndü! Gün başına kazanç yeniden +%0,5."
+  yazıyor; ilk turun 1. günü kutlanmıyor — kutlanacak şey **geri dönmek**.
+
+### GD63. Birikim **binde** cinsinden tam sayı tutuluyor (2026-08-26)
+- **Nerede:** `StreakStatBonuses.tenths`, şema **v17 → v18**
+- **Karar:** stat başına birikim `int` olarak binde tutuluyor (5 = +%0,5);
+  oran okurken türetiliyor.
+- **Neden gün sayısı yetmedi:** Bölüm 5C gün sayısı tutuyordu ve oranı
+  `gün × %1` ile türetiyordu — gün başına kazanç sabit olduğu için doğruydu.
+  Kazanç basamağa bağlanınca gün sayısı oranı belirleyemez oldu.
+- **Neden `double` değil:** 0.005'i yüz kez toplamak 0.5 etmiyor. Bölüm
+  5C'nin kendi notu bu tuzağı zaten yazmıştı; aynı hata daha büyük ölçekte
+  geri gelirdi.
+- **Taşıma veri kaybetmiyor:** v17 kaydındaki her gün değeri **10 ile
+  çarpılıyor** (1 gün = +%1 = 10 binde). Uzun serili bir oyuncunun bonusu
+  güncelleme sonrası onda birine düşmüyor; testle bağlı.
+
+### GD64. Stat başına tavan da kalktı; yerine **ağırlıklı çekiliş** geldi (2026-08-26)
+- **Nerede:** `StreakStatBonuses.drawWeights`,
+  `GameConstants.streakBonusBalanceWeight`
+- **Sorun:** şartname "toplam tavan kalksın ama tavana yakın statın seçilme
+  ihtimali azalsın" diyordu. Sert bir **stat** tavanını korumak, toplam tavan
+  kalkınca uzun seride bütün statları tavana oturtur ve her günü boşa
+  çıkarırdı — yani kaldırılan tavanın geri gelmesi.
+- **Karar:** hiçbir tavan yok. Her statın çekiliş ağırlığı
+  `1 + min(streakBonusBalanceWeight, enYüksekStat − kendisi)`. Lider **her
+  zaman** 1 ağırlıkla çekilişte kalır (rastgelelik gerçek), geride kalan en
+  fazla 9 kat şanslı olur.
+- **Ölçülen sonuç:** 90 günlük seride dokuz savaş statının **hepsi** bonus
+  alıyor ve lider, en geriden gelenin iki katını geçmiyor. Testle bağlı.
+- **Determinizm korundu:** çekiliş tek bir `Random(seed).nextInt(toplamAğırlık)`
+  çağrısı ve kümülatif ağırlıkta yürüyüş. Ağırlıklar kalıcı birikimden
+  türediği için `f(tohum, birikim)` deterministik; kapat-aç zar attırmıyor
+  (gün işareti `lastStreakBonusDay` yerinde).
+
+### GD65. Ekonomi statları havuzda **hâlâ** yok (2026-08-26)
+- **Nerede:** `StreakStatBonuses.pool` (`ItemStat.isCombat` türevi)
+- **Karar:** tavan kalktığı hâlde havuz genişletilmedi. Sekiz ekonomi statı
+  (adım parası, adım XP, çark XP, düşman XP, stoklar, seri eşiği) dışarıda.
+- **Neden:** tavansız büyüyen bir para çarpanı ekonomiyi tamamen çökertir —
+  501. gündeki bir oyuncunun adım parası çarpanı sınırsız olurdu. Savaş
+  statlarında aynı risk yok: onları düşman statları dengeliyor ve savaş
+  motorunun kendi tavanları var (kritik %60, sıyrılma %40).
+- Sekiz ekonomi statının hepsi ayrı ayrı sıfır kontrol ediliyor (test Bölüm
+  5C'den korundu).
+
+### GD66. Panel tavanı değil **güncel basamağı** gösteriyor (2026-08-26)
+- **Nerede:** `inventory_screen.dart:_StreakBonusSection`,
+  `root_shell.dart:_showStreakStatBonus`
+- **Karar:** "tavan" etiketi ve "seri bonusu tavana ulaştı" metni kalktı.
+  Yerine karakter panelinde tek satır: "Şu an: gün başına +%0,4. Kazanç her
+  100 günde bir azalır, 500. günden sonra başa döner."
+- **Neden:** oyuncunun 200. günde kazancının **neden** küçüldüğünü ve 501.
+  günde neden büyüdüğünü görmesi gerekiyor (Model Kuralları #4). Tavan
+  kalktığı için eski etiketin söyleyeceği bir şey kalmamıştı.
+- **Sütun anlamı da değişti:** "GÜN / BONUS / DURUM" → "BONUS / PAY / DURUM".
+  Gün sayısı artık bonusu belirlemediği için onu göstermek yanıltıcıydı; pay
+  sütunu serinin oyuncuya nasıl bir profil verdiğini tek bakışta anlatıyor.
+- **Ortak biçimlendirici:** `StreakStatBonuses.formatRate` (0.005 → "0,5").
+  Üç ekran da onu kullanıyor; tam sayıya yuvarlamak gün başına kazancı sıfır
+  ya da 1 gösteriyordu.
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -5757,3 +5843,107 @@ köşe anti-aliasing farkını gösterdi. Hepsi incelenip yeniden üretildi.
 - Faz **eğitimde anlatılmıyor** — Bölüm F'nin işi. Eğitim savaşı bilerek tam
   hedefte damgalanıyor: yeni oyuncu ×2 ödül almıyor ve eğitimin ortasında
   binlerce adımlık yürüyüşe kilitlenmiyor.
+
+---
+---
+---
+
+# Bölüm B — Seri bonusunun tavanı kalktı ✅ (2026-08-26)
+
+Kararlar **GD62–GD66**. Şema **v17 → v18**.
+
+## Ne değişti
+
+| | Önce | Sonra |
+|---|---|---|
+| Gün başına kazanç | Sabit +%1 | Basamaklı: +%0,5 → +%0,1, sonra **başa döner** |
+| Stat başına tavan | +%25 | **Yok** |
+| Toplam tavan | +%100 | **Yok** |
+| Tavana ulaşan stat | Havuzdan çıkardı | Havuzda kalır, **ağırlığı düşer** |
+| Birikim biçimi | Gün sayısı (`int`) | Binde (`int`) — 5 = +%0,5 |
+| Panel | "tavan" etiketi | "Şu an: gün başına +%0,4" |
+
+## Basamak tablosu
+
+```
+   1–100. gün : +%0,5
+ 101–200. gün : +%0,4
+ 201–300. gün : +%0,3
+ 301–400. gün : +%0,2
+ 401–500. gün : +%0,1
+ 501+     gün : +%0,5 — döngü baştan başlar
+```
+
+İki config sabitinden: `GameConstants.streakBonusTierLength` (100) ve
+`streakBonusTierTenths` ([5, 4, 3, 2, 1]). Koda gömülü sayı yok; test tablo
+değişirse hesabın da değiştiğini bağlıyor.
+
+Bir tam tur (500 gün) toplam **+%150** savaş bonusu biriktiriyor
+(100×0,5 + 100×0,4 + 100×0,3 + 100×0,2 + 100×0,1). Eski sistemin toplam
+tavanı +%100'dü ve 100 günde doluyordu.
+
+## Tavan yerine ağırlıklı çekiliş
+
+Tek bir statın uçmasını engelleyen mekanizma artık tavan değil, çekilişin
+geride kalanı kayırması: `ağırlık = 1 + min(8, enYüksek − kendisi)`.
+
+- Lider **her zaman** çekilişte kalır (ağırlık 1) — rastgelelik gerçek.
+- Geride kalan en fazla 9 kat şanslı olur.
+- **Hiçbir gün boşa gitmez**: kaldırılan tavanın asıl derdi buydu.
+- Ölçülen: 90 günlük seride dokuz savaş statının hepsi bonus alıyor ve lider,
+  en geriden gelenin iki katını geçmiyor.
+
+Gerekçe: **GD64**.
+
+## Determinizm korundu
+
+Çekiliş hâlâ tohumlu ve gün işaretli:
+- Ağırlıklar kalıcı birikimden türüyor → `f(tohum, birikim)` deterministik.
+- Tek bir `Random(seed).nextInt(toplamAğırlık)` çağrısı, kümülatif ağırlıkta
+  yürüyüş.
+- `lastStreakBonusDay` aynı oyun gününde ikinci çekilişi engelliyor →
+  **kapat-aç zar attırmıyor**.
+- Tohum akışı çarkınkinden ayrı (`nextStreakSeed`) → çark çevirerek sıra
+  kaydırılamıyor.
+
+## Ekonomi güvende
+
+Havuz **hâlâ** yalnızca savaş statları (`ItemStat.isCombat`). Sekiz ekonomi
+statının hepsi ayrı ayrı sıfır kontrol ediliyor. Tavansız büyüyen bir para
+çarpanı ekonomiyi çökertirdi; savaş statlarında aynı risk yok çünkü onları
+düşman statları dengeliyor ve motorun kendi tavanları var (kritik %60,
+sıyrılma %40). Gerekçe: **GD65**.
+
+## Şema v18 — veri kaybı yok
+
+v17 kaydındaki her gün değeri **10 ile çarpılıyor** (1 gün = +%1 = 10 binde).
+Uzun serili bir oyuncunun bonusu güncelleme sonrası onda birine düşmüyor;
+`game_storage_test.dart` içinde uçtan uca testli.
+
+## Test
+
+- `test/streak_stat_bonus_test.dart` — **+14 test** (grup değişti, silinmedi):
+  basamak tablosunun tamamı, şartnamedeki sınır günleri (1/100/101/200/201/
+  300/301/400/401/500/**501**/600/601/1000/**1001**), yalnızca döngü
+  başlangıcının kutlanması, tablonun tek config kaynağından okunması,
+  geçersiz gün savunması, çekilişin gün kazancını taşıması; tavan yokluğu
+  (tek statın sınırsız birikmesi, 160 günlük serinin tam toplamı = 740 binde,
+  çekilişin hiçbir birikimde durmaması), ağırlık kuralları.
+- `test/streak_bonus_shell_test.dart` — **+3 test**: 501. günün kutlanması,
+  151. günün kutlanmaması ve doğru basamağı (+%0,4) göstermesi, panelde
+  güncel oranın görünmesi.
+- `test/game_storage_test.dart` — **+2 test**: v17 → v18 taşıması birikimi
+  birebir koruyor; bonusu olmayan kayıt bozulmuyor.
+- Güncellenen (silinmedi): `combat_balance_test.dart`,
+  `golden/streak_bonus_golden_test.dart` (golden yeniden üretildi ve gözle
+  doğrulandı), `streak_bonus_shell_test.dart`, `streak_stat_bonus_test.dart`.
+
+Toplam **727 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- 500 günlük tur **+%150** biriktiriyor; ikinci tur +%300'e çıkarıyor. Savaş
+  motoru bunu bugün taşıyor (statların kendi tavanları var) ama çok uzun
+  serilerde düşman dengesi ölçülmedi. `combat_balance_test.dart` ölçüt
+  oyuncuyu bonussuz ölçüyor.
+- Döngü kutlaması yalnızca bildirimde; ayrı bir kutlama ekranı yok.

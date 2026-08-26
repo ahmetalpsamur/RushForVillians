@@ -49,25 +49,53 @@ class GameConstants {
 
   // --- Seri savaş stat bonusu (Bölüm 5C) ---
 
-  /// Her seri günü, savaş statlarından **birine** eklenen oran (0.01 = +%1).
+  /// Bir seri basamağının uzunluğu (gün).
   ///
-  /// Bonus tek bir stata değil, gün gün seçilen statlara dağılır: 30 günlük
-  /// bir seri oyuncuya kendine özgü bir savaş profili bırakır ve her gün
-  /// "bugün ne kazandım" anı olur.
+  /// Gün başına kazanç her [streakBonusTierLength] günde bir azalır, tablonun
+  /// sonunda başa döner (Bölüm B). Basamak sayısı ve azalma miktarı
+  /// [streakBonusTierTenths] içinde; koda gömülü sayı yok.
+  static const int streakBonusTierLength = 100;
+
+  /// Basamak başına gün kazancı, **binde** cinsinden (5 = +%0,5).
+  ///
+  /// ```
+  ///    1–100. gün : +%0,5
+  ///  101–200. gün : +%0,4
+  ///  201–300. gün : +%0,3
+  ///  301–400. gün : +%0,2
+  ///  401–500. gün : +%0,1
+  ///  501+     gün : +%0,5 — döngü baştan başlar
+  /// ```
+  ///
+  /// **Neden binde:** oran kayan noktada biriktirilirse tur atarken kayıyor
+  /// (0.005 × 100 ≠ 0.5). Birikim tam sayı olarak tutulur, oran okurken
+  /// türetilir. Aynı gerekçe Bölüm 5C'de "gün sayısı tutuluyor, oran değil"
+  /// diye yazılmıştı; tek fark, gün başına kazanç artık sabit olmadığı için
+  /// gün sayısı yetmiyor.
+  ///
+  /// **Neden azalıp sıfırlanıyor:** sabit kazanç uzun seride ya ekonomiyi
+  /// uçurur ya da tavanla anlamsızlaşır. Azalan basamak ilerlemeyi
+  /// yavaşlatır, sıfırlanma ise 500. günü geçmeyi bir **ödül** yapar.
+  static const List<int> streakBonusTierTenths = [5, 4, 3, 2, 1];
+
+  /// Geride kalan statın çekilişteki ağırlık üstünlüğü tavanı.
+  ///
+  /// Toplam tavan kalktığı için tek bir statın uçup gitmesini engelleyen tek
+  /// mekanizma bu: her statın ağırlığı `1 + min(bu, ötedeki en yüksek stat −
+  /// kendisi)`. Lider her zaman 1 ağırlıkla çekilişte kalır, yani
+  /// rastgelelik gerçek; ama geride kalan en fazla 9 kat şanslı olur.
+  ///
+  /// **Neden sert bir stat tavanı yerine ağırlık:** toplam tavan kalkınca
+  /// sert bir stat tavanı, uzun seride bütün statların tavana oturup her
+  /// günün boşa gitmesi demekti — kaldırılan tavanın geri gelmesi.
+  static const int streakBonusBalanceWeight = 8;
+
+  /// Kaldırılan seri bonusu tavanlarının eski değerleri.
+  ///
+  /// Yalnızca eski kayıt/test okumaları ve tarihsel gerekçe için korunur;
+  /// hesaplayıcı bunları uygulamaz (Bölüm B).
   static const double streakStatBonusPerDay = 0.01;
-
-  /// Tek bir savaş statının seriden alabileceği en fazla oran (+%25).
-  ///
-  /// Tavana ulaşan stat havuzdan çıkarılır, yani gün boşa gitmez. Sınır,
-  /// uzun serinin tek bir stata yığılıp diğerlerini anlamsız kılmasını
-  /// engelliyor.
   static const double maxStreakStatBonus = 0.25;
-
-  /// Seriden gelen **toplam** savaş bonusu tavanı (+%100).
-  ///
-  /// Gün başına +%1 ile ~100 günde dolar. Yedi stata yayıldığı için tek
-  /// statlık eski tavanlar çok düşük kalırdı; buna karşılık stat başına
-  /// tavan (+%25) tek bir statın uçmasını engelliyor.
   static const double maxStreakTotalBonus = 1.0;
 
   /// Aynı anda tutulabilecek en fazla ekstra çark hakkı.

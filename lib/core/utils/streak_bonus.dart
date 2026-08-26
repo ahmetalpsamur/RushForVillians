@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../constants/game_constants.dart';
 import '../../models/item_effect.dart';
 import '../../models/streak_stat_bonuses.dart';
 import 'item_rules.dart';
@@ -39,34 +40,74 @@ class StreakBonusDraw {
   /// Bu gün büyüyen stat.
   final ItemStat stat;
 
+  /// Bu gün eklenen bonus, **binde** cinsinden (5 = +%0,5).
+  final int grantedTenths;
+
   /// Bonus eklendikten sonraki birikim.
   final StreakStatBonuses bonuses;
 
   /// Bir sonraki gün için ilerletilmiş tohum.
   final int nextSeed;
 
+  /// Bu gün döngü başa döndü mü ("501. günde kazanç %0,5'e döndü").
+  final bool cycleRestarted;
+
   const StreakBonusDraw({
     required this.stat,
+    required this.grantedTenths,
     required this.bonuses,
     required this.nextSeed,
+    required this.cycleRestarted,
   });
+
+  /// Bu günün kazancı oran olarak (0.005 = +%0,5).
+  double get grantedBonus => grantedTenths / 1000;
 }
 
 /// Bir seri günü için stat çeker.
 ///
-/// Tavanı dolmuş statlar havuza girmez; toplam tavan dolduysa `null` döner
-/// (gün bonus üretmez, ama seri yine ilerler).
+/// [streakDay] 1'den başlar ve **kazancın büyüklüğünü** belirler: basamak
+/// tablosu her [GameConstants.streakBonusTierLength] günde bir azalır, sonra
+/// başa döner (Bölüm B).
+///
+/// **Tavan yok.** Tek bir statın uçmasını engelleyen şey ağırlıklı çekiliş:
+/// geride kalan stat daha şanslı, ama lider de çekilişte kalıyor. Bu yüzden
+/// hiçbir gün boşa gitmez ve fonksiyon asla `null` dönmez — kazanç sıfır
+/// olacak tek durum bozuk bir yapılandırma (boş basamak tablosu).
 StreakBonusDraw? drawStreakStatBonus({
   required StreakStatBonuses current,
   required int seed,
+  required int streakDay,
 }) {
-  if (current.isFull) return null;
-  final candidates = current.eligibleStats;
-  if (candidates.isEmpty) return null;
-  final stat = candidates[Random(seed).nextInt(candidates.length)];
+  final granted = StreakStatBonuses.tenthsForDay(streakDay);
+  if (granted <= 0) return null;
+
+  final pool = StreakStatBonuses.pool;
+  if (pool.isEmpty) return null;
+
+  final weights = current.drawWeights;
+  final total = weights.fold(0, (sum, weight) => sum + weight);
+  if (total <= 0) return null;
+
+  // Ağırlıklı çekiliş, tek bir tohumdan: `nextInt` bir kez çağrılıyor ve
+  // kümülatif ağırlıkta yürünüyor. Aynı tohum + aynı birikim her zaman aynı
+  // statı verir; kapat-aç zar attırmaz.
+  var ticket = Random(seed).nextInt(total);
+  var index = 0;
+  for (var i = 0; i < weights.length; i++) {
+    if (ticket < weights[i]) {
+      index = i;
+      break;
+    }
+    ticket -= weights[i];
+  }
+  final stat = pool[index];
+
   return StreakBonusDraw(
     stat: stat,
-    bonuses: current.withGrant(stat),
+    grantedTenths: granted,
+    bonuses: current.withGrant(stat, granted),
     nextSeed: nextStreakSeed(seed),
+    cycleRestarted: StreakStatBonuses.isCycleRestartDay(streakDay),
   );
 }

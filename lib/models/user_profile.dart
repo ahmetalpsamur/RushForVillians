@@ -3,7 +3,6 @@ import '../core/utils/game_clock.dart';
 import '../core/utils/game_day.dart';
 import '../core/utils/streak_bonus.dart';
 import 'avatar_profile.dart';
-import 'item_effect.dart';
 import 'owned_item.dart';
 import 'reward_rarity.dart';
 import 'streak_stat_bonuses.dart';
@@ -475,15 +474,19 @@ class UserProfile {
     lastStreakBonusDay = null;
   }
 
-  /// Bu oyun gününün seri stat bonusunu verir; kazanan statı döner.
+  /// Bu oyun gününün seri stat bonusunu verir; çekilişin sonucunu döner.
   ///
-  /// `null` dönerse bonus verilmedi: ya aynı gün zaten verilmiş ya da toplam
-  /// tavan dolmuş. Aynı gün ikinci çağrı **her zaman** `null` döner —
-  /// uygulamayı kapatıp açmak yeni bir zar attırmaz.
+  /// `null` dönerse bonus verilmedi: aynı gün zaten verilmiş. Aynı gün ikinci
+  /// çağrı **her zaman** `null` döner — uygulamayı kapatıp açmak yeni bir zar
+  /// attırmaz.
   ///
-  /// [registerStreakDay]'den **sonra** çağrılmalı: seri o gün ilerlemediyse
-  /// bonus da verilmemeli.
-  ItemStat? grantStreakStatBonus(DateTime now) {
+  /// Kazancın büyüklüğü [streakDays]'e bağlı: basamak tablosu her 100 günde
+  /// bir azalır, 500'ün ardından başa döner (Bölüm B). Tavan yok.
+  ///
+  /// [registerStreakDay]'den **sonra** çağrılmalı: hem seri o gün
+  /// ilerlemediyse bonus verilmemeli, hem de basamak güncel gün sayısından
+  /// okunuyor.
+  StreakBonusDraw? grantStreakStatBonus(DateTime now) {
     final last = lastStreakBonusDay;
     if (last != null && GameDay.isSameGameDay(last, now)) return null;
 
@@ -495,14 +498,15 @@ class UserProfile {
     final draw = drawStreakStatBonus(
       current: streakStatBonuses,
       seed: streakBonusSeed,
+      streakDay: streakDays,
     );
-    // Tavan dolu olsa bile gün işaretlenir: aynı gün tekrar tekrar çekiliş
+    // Çekiliş sonuçsuz kalsa bile gün işaretlenir: aynı gün tekrar tekrar
     // denemenin bir anlamı yok.
     lastStreakBonusDay = now;
     if (draw == null) return null;
     streakStatBonuses = draw.bonuses;
     streakBonusSeed = draw.nextSeed;
-    return draw.stat;
+    return draw;
   }
 
   /// Serinin şu anda denk geldiği kilometre taşı (yoksa null).

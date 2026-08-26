@@ -280,10 +280,10 @@ void main() {
     });
 
     test('seri bonusu savaş statını büyütür', () {
-      var streak = StreakStatBonuses.empty;
-      for (var i = 0; i < 10; i++) {
-        streak = streak.withGrant(ItemStat.attack);
-      }
+      // 10 gün x +%1 (eski oran) yerine doğrudan +%10 birikim: bu test
+      // seri bonusunun statlara **işlediğini** ölçüyor, basamak tablosunu
+      // değil (o `streak_stat_bonus_test.dart` içinde).
+      final streak = StreakStatBonuses.empty.withGrant(ItemStat.attack, 100);
       final plain = effectiveCombatStats(level: 5, buffs: EquippedBuffs.none);
       final streaked = effectiveCombatStats(
         level: 5,
@@ -294,10 +294,7 @@ void main() {
     });
 
     test('seri bonusu ekonomi statlarına dokunmaz', () {
-      var streak = StreakStatBonuses.empty;
-      for (var i = 0; i < 20; i++) {
-        streak = streak.withGrant(ItemStat.attack);
-      }
+      final streak = StreakStatBonuses.empty.withGrant(ItemStat.attack, 200);
       final buffs = EquippedBuffs.from([
         swordWith(const [ItemEffect(stat: ItemStat.stepCoin, value: 0.1)]),
       ]);
@@ -314,10 +311,8 @@ void main() {
 
     test('seri bonusu gerçekten savaşı kısaltır', () {
       final enemy = EnemyCatalog.byId('ember_heir')!;
-      var streak = StreakStatBonuses.empty;
-      for (var i = 0; i < StreakStatBonuses.maxDaysPerStat; i++) {
-        streak = streak.withGrant(ItemStat.attack);
-      }
+      // Tavan kalktı (Bölüm B); "uzun seri" artık bir sayı, bir sınır değil.
+      final streak = StreakStatBonuses.empty.withGrant(ItemStat.attack, 250);
       final plain = effectiveCombatStats(
         level: enemy.tier,
         buffs: EquippedBuffs.none,

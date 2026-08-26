@@ -8,6 +8,7 @@ import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/daily_step_record.dart';
 import 'package:rush_for_villains/models/game_state.dart';
+import 'package:rush_for_villains/models/item_effect.dart';
 import 'package:rush_for_villains/models/user_profile.dart';
 import 'package:rush_for_villains/services/game_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -247,6 +248,53 @@ void main() {
       expect(restored, isNotNull);
       expect(restored!.stepHistory, isEmpty);
       expect(restored.today.steps, 900);
+    });
+
+    test('v17 kaydındaki seri bonusu gün sayıları bindeye taşınır', () async {
+      // Bölüm B öncesi kayıt gün sayısı tutuyordu ve bir gün +%1 ediyordu.
+      // Yeni biçim binde tutuyor: 1 gün = 10 binde. Birikim birebir korunmalı,
+      // yoksa uzun serili oyuncunun savaş bonusu güncelleme sonrası onda
+      // birine düşerdi.
+      SharedPreferences.setMockInitialValues({
+        _storageKey: jsonEncode({
+          'schemaVersion': 17,
+          'state': {
+            'profile': {
+              'level': 3,
+              'streakDays': 6,
+              'streakStatBonuses': {'attack': 4, 'defense': 2},
+            },
+            'today': {'steps': 900, 'stepGoal': 5000},
+          },
+        }),
+      });
+
+      final restored = await GameStorage.load(avatar: _avatar);
+
+      expect(restored, isNotNull);
+      final bonuses = restored!.profile.streakStatBonuses;
+      expect(bonuses.tenthsFor(ItemStat.attack), 40);
+      expect(bonuses.tenthsFor(ItemStat.defense), 20);
+      // 4 gün x %1 + 2 gün x %1 = +%6.
+      expect(bonuses.totalBonus, closeTo(0.06, 1e-9));
+    });
+
+    test('v17 taşıması seri bonusu olmayan kaydı bozmaz', () async {
+      SharedPreferences.setMockInitialValues({
+        _storageKey: jsonEncode({
+          'schemaVersion': 17,
+          'state': {
+            'profile': {'level': 3},
+            'today': {'steps': 120, 'stepGoal': 5000},
+          },
+        }),
+      });
+
+      final restored = await GameStorage.load(avatar: _avatar);
+
+      expect(restored, isNotNull);
+      expect(restored!.profile.level, 3);
+      expect(restored.profile.streakStatBonuses.isEmpty, isTrue);
     });
 
     test('uygulamadan yeni sürümdeki kayıt yok sayılır', () async {
