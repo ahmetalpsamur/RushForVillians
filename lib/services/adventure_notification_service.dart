@@ -82,9 +82,7 @@ class AdventureNotificationService {
   ) async {
     if (!_initialized) return;
     await cancelAdventureReminders();
-    if (adventure.isEnemyDefeated || adventure.playerHealth <= 0) {
-      return;
-    }
+    if (adventure.isBattleCompleted) return;
 
     final gifPath = await _copyAttackGif(adventure);
     final remainingSteps = adventure.roundStepsRemaining(currentSteps);

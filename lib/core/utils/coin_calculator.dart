@@ -9,7 +9,8 @@ class StepCoinReward {
   /// ilerletilir; bir coin'e yetmeyen artık adımlar bir sonraki hesaba kalır.
   final int consumedSteps;
 
-  /// Bu hesapla günlük kazanç tavanı doldu mu.
+  /// Eski çağrı noktaları için korunur; günlük kazanç tavanı
+  /// kaldırıldığından hesaplayıcı her zaman `false` döndürür.
   final bool capReached;
 
   const StepCoinReward({
@@ -27,51 +28,37 @@ class StepCoinReward {
 
 /// Henüz paraya çevrilmemiş [pendingSteps] adımı paraya çevirir.
 ///
-/// [coinsEarnedToday] günün o ana kadarki **adım** kazancıdır; günlük tavan
-/// buna göre uygulanır. Tavan dolduğunda kalan adımlar bilerek **taşınmaz**:
-/// aksi halde adım biriktirip ertesi gün bozdurmak tavanı anlamsız kılardı.
+/// Günlük kazanç tavanı yoktur. Bir coin'e yetmeyen adımlar tüketilmez;
+/// sonraki sensör partisinde değerlendirilmeye devam eder.
 ///
-/// Adım → para oranı ve tavan [GameConstants] içinde; burada sabit yok.
+/// [coinsEarnedToday] ve [dailyCap] eski çağrı noktalarını bir anda
+/// kırmamak için geçici olarak imzada tutulur, fakat ödemeyi kırpmaz.
+/// Adım → para oranı [GameConstants] içinde; burada sabit yok.
 ///
 /// [multiplier] kuşanılan itemlerin adım-para bonusudur
 /// ([EquippedBuffs.stepCoinMultiplier]). Yalnızca **ödemeyi** büyütür,
 /// tüketilen adımı değiştirmez — buff, adımı daha değerli yapar, daha çok
 /// adım harcatmaz.
 ///
-/// [dailyCap] o oyuncunun günlük tavanıdır ([EquippedBuffs.dailyCoinCap]);
-/// verilmezse [GameConstants.maxDailyStepCoins] taban değeri kullanılır.
-/// Çarpan **tavanı aşamaz**: buff'lı kazanç da bu sınıra kırpılır.
 StepCoinReward calculateStepCoins({
   required int pendingSteps,
-  required int coinsEarnedToday,
+  int coinsEarnedToday = 0,
   double multiplier = 1.0,
   int? dailyCap,
 }) {
   if (pendingSteps <= 0) return StepCoinReward.none;
 
-  final cap = dailyCap ?? GameConstants.maxDailyStepCoins;
-  final remainingToday = (cap - coinsEarnedToday).clamp(0, cap);
-
-  if (remainingToday == 0) {
-    // Tavan zaten dolu: adımlar tüketilir ama para kazandırmaz.
-    return StepCoinReward(
-      coins: 0,
-      consumedSteps: pendingSteps,
-      capReached: true,
-    );
-  }
-
   final rawCoins = pendingSteps ~/ GameConstants.stepsPerCoin;
   if (rawCoins == 0) return StepCoinReward.none;
 
-  final grantedCoins = (rawCoins * multiplier).floor().clamp(0, remainingToday);
-  final capReached = grantedCoins >= remainingToday;
+  // Negatif/NaN bir çarpan ekonomiden para silemez. Normal oyun akışında
+  // çarpan >= 1'dir; bu koruma saf fonksiyonun sınır girdileri içindir.
+  final safeMultiplier = multiplier.isFinite && multiplier > 0 ? multiplier : 0;
+  final grantedCoins = (rawCoins * safeMultiplier).floor();
 
   return StepCoinReward(
     coins: grantedCoins,
-    // Tavana dayanıldıysa artık adımlar da tüketilir, yarına taşınmaz.
-    consumedSteps:
-        capReached ? pendingSteps : rawCoins * GameConstants.stepsPerCoin,
-    capReached: capReached,
+    consumedSteps: rawCoins * GameConstants.stepsPerCoin,
+    capReached: false,
   );
 }

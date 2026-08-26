@@ -19,13 +19,12 @@ class StepXpReward {
 /// [calculateStepCoins] ile aynı desende saf bir domain fonksiyonu, ama iki
 /// bilinçli farkı var:
 ///
-/// 1. **Günlük tavan yok.** Para tavanı bir ekonomi koruması; XP'nin
-///    harcanacağı bir yer olmadığı için aynı gerekçe geçmiyor. Sahte adıma
-///    karşı koruma `limitStepBatch` içinde, akışın daha yukarısında yapılıyor.
+/// 1. **Günlük tavan yok.** Adım parası gibi XP de fiziksel hız denetimini
+///    geçen tüm yürüyüş boyunca kazanılmaya devam eder. Sahte adıma karşı
+///    koruma `limitStepBatch` içinde, akışın daha yukarısında yapılıyor.
 /// 2. **Ayrı işaretçi kullanır.** Para ve XP aynı `lastRewardedStepCount`
-///    üzerinden yürüseydi, günlük para tavanı dolduğunda o işaretçi bekleyen
-///    tüm adımları tüketeceği için **XP de dururdu**. İki ekonomi birbirine
-///    bağlanmamalı.
+///    üzerinden yürüseydi, farklı dönüşüm oranları bir işaretçinin diğer
+///    ödüle ait artık adımları tüketmesine ve XP'nin kaybolmasına yol açardı.
 ///
 /// [multiplier] kuşanılan itemlerin adım-XP bonusudur
 /// ([EquippedBuffs.stepXpMultiplier]). Yalnızca ödemeyi büyütür, tüketilen

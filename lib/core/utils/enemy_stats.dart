@@ -153,3 +153,30 @@ CombatStats enemyCombatStats({
     luck: tier.toDouble(),
   ).sanitized();
 }
+
+/// Bir saldırı hedefinin güç çarpanını düşmanın **katalog tabanına** uygular.
+///
+/// Sağlık ve ham saldırı doğrusal ölçeklenir. Savunma, hız ve olasılık statları
+/// sabit kalır; onları da çarpmak efektif dayanıklılığı doğrusal değerin üstüne
+/// taşır ve kritik/sıyrılma oranlarını anlamsız biçimde tavana vurur.
+///
+/// Çağıran taraf her zaman [baseStats] olarak katalog statını vermelidir. Böylece
+/// round ilerledikçe daha önce ölçeklenmiş bir değer tekrar çarpılmaz.
+CombatStats scaleEnemyCombatStats(
+  CombatStats baseStats,
+  double enemyPowerMultiplier,
+) {
+  if (enemyPowerMultiplier <= 0 || !enemyPowerMultiplier.isFinite) {
+    throw ArgumentError.value(
+      enemyPowerMultiplier,
+      'enemyPowerMultiplier',
+      'Must be a finite value greater than zero.',
+    );
+  }
+  return baseStats
+      .copyWith(
+        attack: baseStats.attack * enemyPowerMultiplier,
+        maxHealth: baseStats.maxHealth * enemyPowerMultiplier,
+      )
+      .sanitized();
+}

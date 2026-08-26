@@ -25,7 +25,7 @@ const _avatar = AvatarProfile(
 
 final _xpRate = GameConstants.stepsPerXp;
 final _coinRate = GameConstants.stepsPerCoin;
-final _coinCap = GameConstants.maxDailyStepCoins;
+final _legacyCoinCap = GameConstants.maxDailyStepCoins;
 
 /// `RootShell._awardXp`'in test kopyası: XP verir, seviye atlandıysa yayınlar.
 void awardXp(UserProfile profile, int amount) {
@@ -91,7 +91,6 @@ void main() {
     });
 
     test('günlük XP tavanı yok', () {
-      // Para 400'de dururken XP durmaz.
       final reward = calculateStepXp(pendingSteps: 100000);
       expect(reward.xp, 100000 ~/ _xpRate);
     });
@@ -186,20 +185,25 @@ void main() {
   });
 
   group('para ve XP işaretçileri bağımsız', () {
-    test('günlük para tavanı dolunca XP durmaz', () {
+    test('yüksek günlük kazançta para da XP de akmaya devam eder', () {
       final profile = UserProfile(avatar: _avatar);
       final today = DailyProgress(date: DateTime(2026, 8, 18));
 
-      // Tavanı doldurmaya yetecek kadar adım.
-      walk(profile, today, _coinRate * _coinCap);
-      expect(today.coinCapReached, isTrue);
-      final xpAtCap = profile.xp;
+      // Eski 400 coin eşiğine ulaşacak kadar adım.
+      walk(profile, today, _coinRate * _legacyCoinCap);
+      expect(today.coinsEarned, _legacyCoinCap);
+      expect(today.coinCapReached, isFalse);
+      final xpAtLegacyCap = profile.xp;
 
-      // Tavan dolduktan sonra 4.000 adım daha.
+      // Aynı gün 4.000 adım daha: iki ekonomi de ilerlemeli.
       walk(profile, today, 4000);
 
-      expect(today.coinsEarned, _coinCap, reason: 'para tavanda kalmalı');
-      expect(profile.xp - xpAtCap, 4000 ~/ _xpRate, reason: 'XP akmaya devam');
+      expect(today.coinsEarned, _legacyCoinCap + 4000 ~/ _coinRate);
+      expect(
+        profile.xp - xpAtLegacyCap,
+        4000 ~/ _xpRate,
+        reason: 'XP de akmaya devam etmeli',
+      );
     });
 
     test('iki işaretçi farklı hızda ilerler', () {

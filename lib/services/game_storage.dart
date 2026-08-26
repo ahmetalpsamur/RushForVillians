@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 14;
+  static const int schemaVersion = 16;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -217,6 +217,16 @@ class GameStorage {
       adventure['lastPlayerDamage'] = 0;
       return state;
     },
+    // 14 -> 15: saldırı hedefi artık tek AttackConfig kaynağından gelen beş
+    // süre tabanlı round kullanıyor; yenilgi sonrası 500 adımlık hayat
+    // yürüyüşü de macera kaydında tutuluyor. AdventureQuest.fromJson eski
+    // hedefleri desteklenen en yakın hedefe taşıyor ve eksik alanlara güvenli
+    // varsayılanları verdiği için burada veri silen bir dönüşüm gerekmiyor.
+    14: (state) => state,
+    // 15 -> 16: kesinleşen zaferde verilen gerçek XP ve kademe bazlı rastgele
+    // altın macera kaydında tutuluyor. Eski kayıtlarda alanlar model tarafından
+    // sıfır varsayılanıyla okunur; tamamlanmış ödül ikinci kez verilmez.
+    15: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

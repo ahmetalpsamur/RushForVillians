@@ -42,7 +42,7 @@ void main() {
 
   var shellSerial = 0;
 
-  /// [RootShell]'i kurup envanter → demirci yolunu açar.
+  /// [RootShell]'i kurup profil → demirci yolunu açar.
   Future<void> pumpForge(
     WidgetTester tester, {
     required UserProfile profile,
@@ -72,9 +72,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.text('Envanter'));
+    await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Demirci'));
+    final entry = find.byKey(const ValueKey('profile-blacksmith-entry'));
+    await tester.ensureVisible(entry);
+    await tester.tap(entry);
     await tester.pumpAndSettle();
   }
 
@@ -118,7 +120,7 @@ void main() {
   }
 
   group('demirci ekranı', () {
-    testWidgets('envanterdeki örs düğmesi demirciyi açar', (tester) async {
+    testWidgets('profildeki demirci bölümü demirciyi açar', (tester) async {
       await pumpForge(tester, profile: profileWith(items: swords(1)));
 
       expect(find.text('Demirci'), findsWidgets);

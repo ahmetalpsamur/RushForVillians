@@ -63,7 +63,7 @@ void main() {
       expect(buffs.stepCoinMultiplier, closeTo(1.12, 1e-9));
     });
 
-    test('sabit bonuslar toplanıp tavanlara eklenir', () {
+    test('eski coin tavanı bonusu adım parasına dönüşür', () {
       final buffs = EquippedBuffs.from([
         _item('a', const [
           ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 40),
@@ -76,7 +76,8 @@ void main() {
         ]),
       ]);
 
-      expect(buffs.dailyCoinCap, GameConstants.maxDailyStepCoins + 100);
+      expect(buffs.stepCoinBonus, closeTo(0.25, 1e-9));
+      expect(buffs.dailyCoinCapBonus, 0);
       expect(
         buffs.streakStepThreshold,
         GameConstants.streakStepThreshold - 300,
@@ -143,14 +144,15 @@ void main() {
       expect(buffs.stepCoinMultiplier, closeTo(1.5, 1e-9));
     });
 
-    test('coin tavanı bonusu sınırlı', () {
+    test('eski coin tavanı bonusu toplam ekonomi tavanını aşmaz', () {
       final buffs = EquippedBuffs.from([
         for (var i = 0; i < 5; i++)
           _item('item$i', const [
             ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 120),
           ]),
       ]);
-      expect(buffs.dailyCoinCapBonus, GameConstants.maxEquippedCoinCapBonus);
+      expect(buffs.dailyCoinCapBonus, 0);
+      expect(buffs.stepCoinBonus, GameConstants.maxEquippedEconomyBonus);
     });
 
     test('stok bonusları sınırlı', () {
@@ -183,6 +185,24 @@ void main() {
   });
 
   group('gerçek katalogla en kötü durum', () {
+    test('aktif katalog kaldırılmış günlük tavan etkisini üretmez', () {
+      for (final item in _catalog()) {
+        for (final characterClass in [null, ..._allClasses]) {
+          final resolved =
+              characterClass == null
+                  ? item
+                  : flavorForClass(item, characterClass);
+          expect(
+            resolved.buff.effects.any(
+              (effect) => effect.stat == ItemStat.dailyCoinCap,
+            ),
+            isFalse,
+            reason: '${item.id} / $characterClass',
+          );
+        }
+      }
+    });
+
     test('her sınıfın en güçlü kuşanması tavanı aşmıyor', () {
       final catalog = _catalog();
 

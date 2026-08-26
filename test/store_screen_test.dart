@@ -496,4 +496,29 @@ void main() {
       expect(find.byIcon(Icons.lock), findsOneWidget);
     });
   });
+
+  group('sayfa başına dön', () {
+    testWidgets('mağaza aşağı kaydırılınca kısayol görünür ve başa döner', (
+      tester,
+    ) async {
+      await pumpStore(tester, equipment: allItems.take(24).toList());
+
+      final scrollFinder = find.byKey(const ValueKey('store-scroll-view'));
+      final scrollView = tester.widget<CustomScrollView>(scrollFinder);
+      final controller = scrollView.controller!;
+
+      expect(find.byTooltip('Başa dön'), findsNothing);
+
+      await tester.drag(scrollFinder, const Offset(0, -900));
+      await tester.pump();
+
+      expect(controller.offset, greaterThan(200));
+      expect(find.byTooltip('Başa dön'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Başa dön'));
+      await tester.pumpAndSettle();
+
+      expect(controller.offset, closeTo(0, 0.1));
+    });
+  });
 }

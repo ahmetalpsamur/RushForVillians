@@ -346,8 +346,8 @@ class _StepSourceCard extends StatelessWidget {
   }
 }
 
-/// Bugün adımlardan kazanılan para ve XP. Para tavanına ulaşıldığında bunu da
-/// söyler — kazanç sessizce durmaz. XP'nin günlük tavanı yok.
+/// Bugün adımlardan kazanılan para ve XP. Her iki adım kazancı da gün boyunca
+/// sınırsız devam eder; sayaçlar yalnızca günlük özeti gösterir.
 class _DailyEarnings extends StatelessWidget {
   final DailyProgress today;
 
@@ -355,17 +355,12 @@ class _DailyEarnings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final capped = today.coinCapReached;
     return Column(
       children: [
         _EarningRow(
           icon: Icons.monetization_on,
           color: AppColors.streak,
-          text:
-              capped
-                  ? 'Bugün adımlarından ${today.coinsEarned} coin kazandın — '
-                      'günlük sınır doldu.'
-                  : 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
+          text: 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
           rate: '${GameConstants.stepsPerCoin} adım = 1',
         ),
         const SizedBox(height: 6),

@@ -35,14 +35,10 @@ void main() {
       expect(effect.isPassive, isTrue);
     });
 
-    test('sabit artış birimiyle yazılır', () {
+    test('sabit savaş artışı birimiyle yazılır', () {
       expect(
         const ItemEffect.flat(stat: ItemStat.attack, value: 12).label,
         'saldırı +12',
-      );
-      expect(
-        const ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 30).label,
-        'günlük coin sınırı +30',
       );
     });
 
@@ -165,10 +161,10 @@ void main() {
       expect(buff.stepCoinBonus, closeTo(0.07, 1e-9));
     });
 
-    test('sayısal kısayol eski davranışı korur', () {
-      final buff = ItemBuff.stats(dailyCoinCapBonus: 30, streakStepRelief: 200);
-      expect(buff.labels, ['günlük coin sınırı +30', 'seri eşiği -200 adım']);
-      expect(buff.dailyCoinCapBonus, 30);
+    test('sayısal kısayol canlı ekonomi etkilerini korur', () {
+      final buff = ItemBuff.stats(stepCoinBonus: 0.075, streakStepRelief: 200);
+      expect(buff.labels, ['adım parası +%7,5', 'seri eşiği -200 adım']);
+      expect(buff.stepCoinBonus, closeTo(0.075, 1e-9));
       expect(buff.streakStepRelief, 200);
     });
   });

@@ -81,12 +81,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    final openInventory = find.text('Envanter');
-    await tester.ensureVisible(openInventory);
+    await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    await tester.tap(openInventory);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Demirci'));
+    final entry = find.byKey(const ValueKey('profile-blacksmith-entry'));
+    await tester.ensureVisible(entry);
+    await tester.tap(entry);
     await tester.pumpAndSettle();
   }
 

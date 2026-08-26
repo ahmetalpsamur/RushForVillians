@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/app.dart';
-import 'package:rush_for_villains/features/character/character_creation_screen.dart';
 import 'package:rush_for_villains/features/start/start_screen.dart';
+import 'package:rush_for_villains/features/tutorial/guide_selection_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Açılış akışı hiçbir koşulda ekranı kilitlememeli.
@@ -41,7 +41,7 @@ void main() {
       await bootApp(tester);
 
       expect(find.byType(StartScreen), findsNothing);
-      expect(find.byType(CharacterCreationScreen), findsOneWidget);
+      expect(find.byType(GuideSelectionScreen), findsOneWidget);
     });
 
     testWidgets('kayıt okunamazsa kullanıcı sessizce geçiştirilmez', (
@@ -62,7 +62,7 @@ void main() {
       await bootApp(tester);
       await tester.pump();
 
-      expect(find.byType(CharacterCreationScreen), findsOneWidget);
+      expect(find.byType(GuideSelectionScreen), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
     });
 

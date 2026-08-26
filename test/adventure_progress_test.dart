@@ -71,7 +71,7 @@ void main() {
       // geliyor ve yalnızca round kapanınca hesaplanıyor.
       quest.resolveExpiredRound(
         steps,
-        startedAt.add(const Duration(seconds: 30)),
+        startedAt.add(quest.currentRoundDuration),
       );
       // Round sonucu animasyonu oynatılmış kabul ediliyor; hasar mesajı o
       // animasyondan **sonraki** karede çıkıyor.
@@ -92,6 +92,7 @@ void main() {
               stepGoal: stepGoal,
             ),
             onAdventureSelected: (_) {},
+            onStartRevival: () {},
             onChooseNewAdventure: () {},
             onAdventureUpdated: () {},
           ),
@@ -179,7 +180,7 @@ void main() {
     });
 
     testWidgets('round çubuğu round içi ilerlemeyi gösterir', (tester) async {
-      // 2. round: ilk 1000 adım geride, 200 adım atılmış, hedef 1000 → %20.
+      // İkinci roundda 200 / 1000 adım → %20.
       await pumpAdventure(
         tester,
         stepGoal: 2000,
@@ -244,6 +245,131 @@ void main() {
     }
   });
 
+  testWidgets(
+    'zafer savaş sahnesinde ceset, coin ve gerçek ödülleri gösterir',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var choseNewAdventure = false;
+      final quest = AdventureQuest(
+        enemy: enemy,
+        stepGoal: 2000,
+        battleOutcome: AdventureBattleOutcome.victory,
+        enemyHealth: 0,
+        deathAnimationPlayed: true,
+        xpAwarded: true,
+        victoryCoinReward: 47,
+        victoryXpReward: 180,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: AdventureScreen(
+            adventure: quest,
+            roundSerial: 0,
+            avatar: _avatar,
+            today: DailyProgress(
+              date: GameClock.now(),
+              steps: 2000,
+              stepGoal: 2000,
+            ),
+            onAdventureSelected: (_) {},
+            onStartRevival: () {},
+            onChooseNewAdventure: () => choseNewAdventure = true,
+            onAdventureUpdated: () {},
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 250)),
+      );
+      await tester.pump();
+
+      expect(find.text('+47 ALTIN'), findsOneWidget);
+      expect(find.text('+180 XP'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('victory-scattered-coin')),
+        findsNWidgets(5),
+      );
+      expect(
+        find.byKey(const ValueKey('victory-enemy-corpse')),
+        findsOneWidget,
+      );
+      expect(find.text('Yeni bir macera seni bekliyor.'), findsNothing);
+      await expectLater(
+        find.byType(AdventureScreen),
+        matchesGoldenFile('golden/goldens/victory_scene_390.png'),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('victory-choose-adventure')));
+      expect(choseNewAdventure, isTrue);
+    },
+  );
+
+  testWidgets('yeni maceraya geçince eski zafer overlayi tamamen temizlenir', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final victory = AdventureQuest(
+      enemy: enemy,
+      stepGoal: 2000,
+      battleOutcome: AdventureBattleOutcome.victory,
+      enemyHealth: 0,
+      deathAnimationPlayed: true,
+      xpAwarded: true,
+      victoryCoinReward: 47,
+      victoryXpReward: 180,
+    );
+    final current = ValueNotifier<AdventureQuest?>(victory);
+    addTearDown(current.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: ValueListenableBuilder<AdventureQuest?>(
+          valueListenable: current,
+          builder:
+              (context, adventure, _) => AdventureScreen(
+                adventure: adventure,
+                roundSerial: adventure?.roundOutcomeSerial ?? 0,
+                avatar: _avatar,
+                today: DailyProgress(
+                  date: GameClock.now(),
+                  steps: 2000,
+                  stepGoal: 2000,
+                ),
+                onAdventureSelected: (next) => current.value = next,
+                onStartRevival: () {},
+                onChooseNewAdventure: () => current.value = null,
+                onAdventureUpdated: () {},
+              ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('ZAFER!'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('victory-choose-adventure')));
+    await tester.pump();
+    expect(find.text('Bugünkü maceranı seç'), findsOneWidget);
+    expect(find.text('ZAFER!'), findsNothing);
+
+    current.value = AdventureQuest(
+      enemy: EnemyCatalog.enemies.first,
+      stepGoal: 500,
+      startedAt: GameClock.now(),
+    );
+    await tester.pump();
+    expect(find.text('ZAFER!'), findsNothing);
+    expect(find.byKey(const ValueKey('victory-coin-reward')), findsNothing);
+    expect(find.byKey(const ValueKey('victory-enemy-corpse')), findsNothing);
+  });
+
   group('golden', () {
     for (final width in const [320.0, 390.0]) {
       testWidgets('golden: macera ilerlemesi (${width.toInt()} dp)', (
@@ -267,9 +393,8 @@ void main() {
   group('macera seçimi günlük kazanç sayaçlarını yakmaz', () {
     // Eski hata: `_selectAdventure` ve `_chooseNewAdventure` yeni bir
     // `DailyProgress` kurup `coinsEarned` / `xpEarned` alanlarını taşımıyordu.
-    // `coinsEarned` günlük para tavanının sayacı olduğu için macera seçmek
-    // tavanı sıfırlıyordu: oyuncu macera değiştirerek günde sınırsız coin
-    // kazanabiliyordu.
+    // Bu alanlar artık yalnızca günlük özettir; macera değişimi geçmiş kazancı
+    // silmemeli ve sonraki sınırsız kazancı da durdurmamalıdır.
     const storageKey = 'game_state_v1';
 
     Future<void> pumpShell(WidgetTester tester) async {
@@ -330,6 +455,12 @@ void main() {
       return (state['profile'] as Map<String, dynamic>)['coins'] as int;
     }
 
+    Future<int> savedVictoryCoins(WidgetTester tester) async {
+      final state = await savedState(tester);
+      final adventure = state['adventure'] as Map<String, dynamic>?;
+      return adventure?['victoryCoinReward'] as int? ?? 0;
+    }
+
     /// Macera sekmesindeki ekranın seçim geri çağrısını doğrudan tetikler.
     Future<void> selectAdventure(WidgetTester tester) async {
       await tester.tap(find.text('Macera').last);
@@ -353,7 +484,7 @@ void main() {
       await simulateSteps(tester, 20000);
 
       final before = await savedToday(tester);
-      expect(before.coinsEarned, GameConstants.maxDailyStepCoins);
+      expect(before.coinsEarned, 20000 ~/ GameConstants.stepsPerCoin);
 
       await selectAdventure(tester);
 
@@ -367,27 +498,30 @@ void main() {
       expect(after.steps, before.steps, reason: 'adımlar da korunmalı');
     });
 
-    testWidgets('macera seçerek günlük para tavanı aşılamaz', (tester) async {
+    testWidgets('macera seçimi aynı gün yeni coin kazancını durdurmaz', (
+      tester,
+    ) async {
       await pumpShell(tester);
       await simulateSteps(tester, 20000);
       await selectAdventure(tester);
 
-      final atCap = await savedToday(tester);
-      final coinsAtCap = await savedCoins(tester);
+      final before = await savedToday(tester);
+      final coinsBefore = await savedCoins(tester);
 
-      // Tavan dolu; macera seçildikten sonra atılan adımlar para vermemeli.
       await tester.tap(find.text('Ana Sayfa').last);
       await tester.pumpAndSettle();
       await simulateSteps(tester, 20000);
 
       final after = await savedToday(tester);
       final coinsAfter = await savedCoins(tester);
+      final victoryCoins = await savedVictoryCoins(tester);
 
-      expect(after.coinsEarned, atCap.coinsEarned);
+      final secondWalkReward = 20000 ~/ GameConstants.stepsPerCoin;
+      expect(after.coinsEarned, before.coinsEarned + secondWalkReward);
       expect(
         coinsAfter,
-        coinsAtCap,
-        reason: 'tavan dolduktan sonra macera seçmek yeni para açmamalı',
+        coinsBefore + secondWalkReward + victoryCoins,
+        reason: 'macera seçimi sınırsız adım kazancını kesmemeli',
       );
     });
 
@@ -403,7 +537,7 @@ void main() {
       await tester.pump();
 
       final after = await savedToday(tester);
-      expect(after.coinsEarned, GameConstants.maxDailyStepCoins);
+      expect(after.coinsEarned, 20000 ~/ GameConstants.stepsPerCoin);
     });
   });
 }

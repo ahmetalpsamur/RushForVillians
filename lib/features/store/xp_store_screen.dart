@@ -8,7 +8,9 @@ import '../../models/item.dart';
 import '../../models/xp_store_item.dart';
 import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
+import '../../widgets/scroll_to_top_button.dart';
 import '../../widgets/section_card.dart';
+import '../tutorial/tutorial_guide.dart';
 
 /// Mağaza: yükseltmeler ve ekipman.
 ///
@@ -46,6 +48,7 @@ class XpStoreScreen extends StatefulWidget {
 
   final void Function(XpStoreItem item) onPurchase;
   final void Function(Item item) onPurchaseEquipment;
+  final String? tutorialItemId;
 
   const XpStoreScreen({
     super.key,
@@ -60,6 +63,7 @@ class XpStoreScreen extends StatefulWidget {
     required this.onPurchaseEquipment,
     this.extraWheelSpins = 0,
     this.xpBoostActive = false,
+    this.tutorialItemId,
   });
 
   @override
@@ -67,11 +71,19 @@ class XpStoreScreen extends StatefulWidget {
 }
 
 class _XpStoreScreenState extends State<XpStoreScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   /// `null` = bütün kategoriler.
   ItemCategory? _categoryFilter;
 
   /// Kilitli itemler de listelenir; oyuncu neyin peşinde olduğunu görsün.
   bool _onlyAffordable = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   List<ItemCategory> get _availableCategories {
     final seen = <ItemCategory>{};
@@ -128,6 +140,13 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
   Widget build(BuildContext context) {
     final equipment = _visibleEquipment;
     final categories = _availableCategories;
+    Item? tutorialItem;
+    for (final item in equipment) {
+      if (item.id == widget.tutorialItemId) {
+        tutorialItem = item;
+        break;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -150,164 +169,215 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
           ),
         ],
       ),
+      floatingActionButton:
+          tutorialItem == null
+              ? ScrollToTopButton(controller: _scrollController)
+              : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: CustomScrollView(
+        key: const ValueKey('store-scroll-view'),
+        controller: _scrollController,
+        physics:
+            tutorialItem != null ? const NeverScrollableScrollPhysics() : null,
         slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: SectionCard(
-                title: 'Yükseltmeler',
+          if (tutorialItem != null) ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+              sliver: SliverToBoxAdapter(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final item in widget.items)
-                      _UpgradeRow(
-                        item: item,
+                    const Text(
+                      'İLK SİLAHIN',
+                      style: TextStyle(
+                        color: AppColors.streak,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Yol arkadaşın bu silahı senin için seçti.',
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                    const SizedBox(height: 14),
+                    KeyedSubtree(
+                      key: ValueKey('tutorial-store-item-${tutorialItem.id}'),
+                      child: _EquipmentCard(
+                        key: TutorialGuideTargetKeys.shopItem,
+                        item: tutorialItem,
                         coins: widget.coins,
-                        owned: widget.ownedUpgradeIds.contains(item.id),
-                        stockLabel: _stockLabel(item),
-                        onPurchase: () => widget.onPurchase(item),
+                        level: widget.level,
+                        ownedCount:
+                            widget.ownedEquipmentCounts[tutorialItem.id] ?? 0,
+                        onPurchase:
+                            () => widget.onPurchaseEquipment(tutorialItem!),
                         onBlocked: _explain,
                       ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Ekipman',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+          ] else ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: SectionCard(
+                  title: 'Yükseltmeler',
+                  child: Column(
+                    children: [
+                      for (final item in widget.items)
+                        _UpgradeRow(
+                          item: item,
+                          coins: widget.coins,
+                          owned: widget.ownedUpgradeIds.contains(item.id),
+                          stockLabel: _stockLabel(item),
+                          onPurchase: () => widget.onPurchase(item),
+                          onBlocked: _explain,
+                        ),
+                    ],
                   ),
-                  Text(
-                    'Seviye ${widget.level}',
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (widget.equipment.isEmpty)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
-                child: Text(
-                  'Sınıfın için ekipman bulunamadı.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ),
-            )
-          else ...[
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _FilterChip(
-                      label: 'Tümü',
-                      selected: _categoryFilter == null,
-                      onSelected: () => setState(() => _categoryFilter = null),
-                    ),
-                    for (final category in categories)
-                      _FilterChip(
-                        label: category.label,
-                        selected: _categoryFilter == category,
-                        onSelected:
-                            () => setState(() => _categoryFilter = category),
-                      ),
-                  ],
                 ),
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
               sliver: SliverToBoxAdapter(
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        '${equipment.length} ekipman',
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
+                        'Ekipman',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    FilterChip(
-                      label: const Text('Alabileceklerim'),
-                      selected: _onlyAffordable,
-                      onSelected:
-                          (value) => setState(() => _onlyAffordable = value),
+                    Text(
+                      'Seviye ${widget.level}',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            if (equipment.isEmpty)
+            if (widget.equipment.isEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
                   child: Text(
-                    'Bu süzgeçle gösterilecek ekipman yok. '
-                    'Yürümeye devam et; seviyen yükseldikçe yenileri açılır.',
+                    'Sınıfın için ekipman bulunamadı.',
                     style: TextStyle(color: Colors.white70),
                   ),
                 ),
               )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                sliver: SliverList.builder(
-                  // Satır yüksekliğini kart içeriği belirler. Böylece az bonuslu
-                  // itemler, en uzun item için ayrılan boşluğu taşımaz.
-                  itemCount: (equipment.length + 1) ~/ 2,
-                  itemBuilder: (context, rowIndex) {
-                    final firstIndex = rowIndex * 2;
-                    final hasSecond = firstIndex + 1 < equipment.length;
-
-                    Widget buildCard(Item item) => _EquipmentCard(
-                      item: item,
-                      coins: widget.coins,
-                      level: widget.level,
-                      ownedCount: widget.ownedEquipmentCounts[item.id] ?? 0,
-                      onPurchase: () => widget.onPurchaseEquipment(item),
-                      onBlocked: _explain,
-                    );
-
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom:
-                            rowIndex == (equipment.length - 1) ~/ 2 ? 0 : 12,
+            else ...[
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 44,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      _FilterChip(
+                        label: 'Tümü',
+                        selected: _categoryFilter == null,
+                        onSelected:
+                            () => setState(() => _categoryFilter = null),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: buildCard(equipment[firstIndex])),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child:
-                                hasSecond
-                                    ? buildCard(equipment[firstIndex + 1])
-                                    : const SizedBox.shrink(),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                      for (final category in categories)
+                        _FilterChip(
+                          label: category.label,
+                          selected: _categoryFilter == category,
+                          onSelected:
+                              () => setState(() => _categoryFilter = category),
+                        ),
+                    ],
+                  ),
                 ),
               ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                sliver: SliverToBoxAdapter(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${equipment.length} ekipman',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      FilterChip(
+                        label: const Text('Alabileceklerim'),
+                        selected: _onlyAffordable,
+                        onSelected:
+                            (value) => setState(() => _onlyAffordable = value),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (equipment.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                    child: Text(
+                      'Bu süzgeçle gösterilecek ekipman yok. '
+                      'Yürümeye devam et; seviyen yükseldikçe yenileri açılır.',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                  sliver: SliverList.builder(
+                    // Satır yüksekliğini kart içeriği belirler. Böylece az bonuslu
+                    // itemler, en uzun item için ayrılan boşluğu taşımaz.
+                    itemCount: (equipment.length + 1) ~/ 2,
+                    itemBuilder: (context, rowIndex) {
+                      final firstIndex = rowIndex * 2;
+                      final hasSecond = firstIndex + 1 < equipment.length;
+
+                      Widget buildCard(Item item) => _EquipmentCard(
+                        item: item,
+                        coins: widget.coins,
+                        level: widget.level,
+                        ownedCount: widget.ownedEquipmentCounts[item.id] ?? 0,
+                        onPurchase: () => widget.onPurchaseEquipment(item),
+                        onBlocked: _explain,
+                      );
+
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              rowIndex == (equipment.length - 1) ~/ 2 ? 0 : 12,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: buildCard(equipment[firstIndex])),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child:
+                                  hasSecond
+                                      ? buildCard(equipment[firstIndex + 1])
+                                      : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
           ],
         ],
       ),
@@ -435,6 +505,7 @@ class _EquipmentCard extends StatelessWidget {
   final ValueChanged<String> onBlocked;
 
   const _EquipmentCard({
+    super.key,
     required this.item,
     required this.coins,
     required this.level,

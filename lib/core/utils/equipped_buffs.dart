@@ -42,7 +42,7 @@ class EquippedBuffs {
   /// Düşman XP oran bonusu. Tavana kırpılmış.
   final double enemyXpBonus;
 
-  /// Günlük coin tavanına eklenen coin. Tavana kırpılmış.
+  /// Kaldırılan günlük coin tavanı API'si için korunur; her zaman sıfırdır.
   final int dailyCoinCapBonus;
 
   /// Dondurma stok tavanına eklenen hak. Tavana kırpılmış.
@@ -87,7 +87,6 @@ class EquippedBuffs {
     var stepXp = 0.0;
     var wheelXp = 0.0;
     var enemyXp = 0.0;
-    var coinCap = 0;
     var freezeCap = 0;
     var spinCap = 0;
     var relief = 0;
@@ -114,7 +113,14 @@ class EquippedBuffs {
           case ItemStat.enemyXp:
             enemyXp += effect.value;
           case ItemStat.dailyCoinCap:
-            coinCap += effect.value.round();
+            // Eski/kullanıcı yapımı itemlerde kalmış tavan bonusu boşa
+            // gitmez. Eski taban tavana oranı kadar adım-parası bonusuna
+            // çevrilir; tek item ekonomi tavanı yine uygulanır.
+            final converted = effect.value / GameConstants.maxDailyStepCoins;
+            stepCoin += converted.clamp(
+              0,
+              GameConstants.maxSingleItemEconomyBonus,
+            );
           case ItemStat.streakFreezeCap:
             freezeCap += effect.value.round();
           case ItemStat.wheelSpinCap:
@@ -133,10 +139,7 @@ class EquippedBuffs {
       stepXpBonus: _cap(stepXp),
       wheelXpBonus: _cap(wheelXp),
       enemyXpBonus: _cap(enemyXp),
-      dailyCoinCapBonus: coinCap.clamp(
-        0,
-        GameConstants.maxEquippedCoinCapBonus,
-      ),
+      dailyCoinCapBonus: 0,
       streakFreezeCapBonus: freezeCap.clamp(
         0,
         GameConstants.maxEquippedStockBonus,
@@ -177,7 +180,8 @@ class EquippedBuffs {
 
   double get enemyXpMultiplier => 1 + enemyXpBonus;
 
-  /// Bu oyuncunun günlük adım-para tavanı.
+  /// Kaldırılan günlük tavan API'sinin eski taban değeri.
+  /// Coin hesaplayıcı bu değeri uygulamaz.
   int get dailyCoinCap => GameConstants.maxDailyStepCoins + dailyCoinCapBonus;
 
   /// Bu oyuncunun dondurma stok tavanı.

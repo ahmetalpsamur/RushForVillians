@@ -11,7 +11,7 @@ import 'package:rush_for_villains/models/reward_rarity.dart';
 ///
 /// En kritik iddia: **yükseltme ekonomi bonuslarını büyütmez.** Ekonomi
 /// dikkatle dengelendi (`economy_pacing_test.dart`); adım→para ve adım→XP
-/// çarpanları eşya seviyesiyle büyüseydi günlük coin tavanı katlanır ve denge
+/// çarpanları eşya seviyesiyle büyüseydi adım kazancı katlanır ve denge
 /// çökerdi.
 Item _item({
   RewardRarity rarity = RewardRarity.common,
@@ -224,7 +224,7 @@ void main() {
       }
     });
 
-    test('bütün ekonomi statları sabit kalır', () {
+    test('bütün canlı ekonomi statları sabit kalır', () {
       final base = _item(
         rarity: RewardRarity.legendary,
         effects: const [
@@ -232,7 +232,6 @@ void main() {
           ItemEffect(stat: ItemStat.stepXp, value: 0.10),
           ItemEffect(stat: ItemStat.wheelXp, value: 0.10),
           ItemEffect(stat: ItemStat.enemyXp, value: 0.10),
-          ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 50),
           ItemEffect.flat(stat: ItemStat.streakFreezeCap, value: 1),
           ItemEffect.flat(stat: ItemStat.wheelSpinCap, value: 1),
           ItemEffect.flat(stat: ItemStat.streakRelief, value: 200),
@@ -244,7 +243,6 @@ void main() {
       expect(scaled.stepXpBonus, base.buff.stepXpBonus);
       expect(scaled.wheelXpBonus, base.buff.wheelXpBonus);
       expect(scaled.enemyXpBonus, base.buff.enemyXpBonus);
-      expect(scaled.dailyCoinCapBonus, base.buff.dailyCoinCapBonus);
       expect(scaled.streakFreezeCapBonus, base.buff.streakFreezeCapBonus);
       expect(scaled.wheelSpinCapBonus, base.buff.wheelSpinCapBonus);
       expect(scaled.streakStepRelief, base.buff.streakStepRelief);

@@ -5,7 +5,7 @@
 /// - **Savaş statları** (saldırı, savunma, kritik...) savaş motoruna girer
 ///   (`core/utils/combat_engine.dart`). Her birinin savaşta ne yaptığı
 ///   [CombatStats] üzerinde yazılı; süs stat yok.
-/// - **Oyun dışı statlar** (adım parası, adım XP, tavanlar...) **bugün canlı**
+/// - **Oyun dışı statlar** (adım parası, adım XP, stoklar...) **bugün canlı**
 ///   ve dikkatle dengelenmiş bir ekonomiye bağlı. Bu yüzden tek bir item'ın
 ///   koşulsuz oyun dışı yüzdesi [GameConstants.maxSingleItemEconomyBonus] ile,
 ///   kuşanılan toplam ise [GameConstants.maxEquippedEconomyBonus] ile
@@ -33,6 +33,8 @@ enum ItemStat {
   stepXp,
   wheelXp,
   enemyXp,
+  // Eski kayıt ve özel item uyumluluğu. Aktif katalog artık üretmez;
+  // EquippedBuffs bunu adım-parası oranına dönüştürür.
   dailyCoinCap,
   streakFreezeCap,
   wheelSpinCap,

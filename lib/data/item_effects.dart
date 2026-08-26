@@ -76,7 +76,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.onHit,
           chance: 0.25,
         ),
-        ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 60),
+        ItemEffect(stat: ItemStat.stepCoin, value: 0.15),
       ],
     ),
     'arch/voice_of_nature_bow': ItemSignature(
@@ -254,7 +254,7 @@ class ItemEffects {
           'Aşağıda tutulan tek kayıt: kimin ne kadar yürüdüğü. Sicili temiz '
           'olan daha çok kazanır.',
       effects: [
-        ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 120),
+        ItemEffect(stat: ItemStat.stepXp, value: 0.15),
         ItemEffect(
           stat: ItemStat.stepCoin,
           value: 0.15,
@@ -361,7 +361,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.untouchedRounds,
           threshold: 2,
         ),
-        ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 55),
+        ItemEffect(stat: ItemStat.stepCoin, value: 0.14),
       ],
     ),
     'arch/energy_bow': ItemSignature(
@@ -390,7 +390,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.untouchedRounds,
           threshold: 2,
         ),
-        ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 45),
+        ItemEffect(stat: ItemStat.stepCoin, value: 0.11),
       ],
     ),
     'arch/turkish_bow': ItemSignature(
@@ -516,7 +516,7 @@ class ItemEffects {
       effects: [
         ItemEffect.flat(stat: ItemStat.attack, value: 21),
         ItemEffect(stat: ItemStat.dodge, value: 0.18),
-        ItemEffect.flat(stat: ItemStat.dailyCoinCap, value: 50),
+        ItemEffect(stat: ItemStat.stepCoin, value: 0.125),
       ],
     ),
     'shields/dragon_head_shield': ItemSignature(

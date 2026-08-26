@@ -12,6 +12,7 @@ import '../../models/wheel_reward.dart';
 import '../../services/reward_sound.dart';
 import '../../widgets/day_reset_countdown.dart';
 import '../../widgets/section_card.dart';
+import '../tutorial/tutorial_guide.dart';
 
 /// Günlük çark: adım hedefinin bir kısmı tamamlanınca açılır, günde bir
 /// kez çevrilip XP ya da ekipman kazandırır (#16).
@@ -42,6 +43,7 @@ class DailyWheelScreen extends StatefulWidget {
   final int seed;
 
   final ValueChanged<WheelReward> onSpinResult;
+  final bool tutorialMode;
 
   const DailyWheelScreen({
     super.key,
@@ -52,6 +54,7 @@ class DailyWheelScreen extends StatefulWidget {
     this.level = 1,
     this.equipment = const [],
     this.ownedItemIds = const [],
+    this.tutorialMode = false,
   });
 
   @override
@@ -150,15 +153,15 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
         children: [
           Positioned.fill(
             child: SingleChildScrollView(
+              physics:
+                  widget.tutorialMode
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _WheelFace(
-                    slices: _slices,
-                    seed: _seed,
-                    running: _gearsRunning,
-                  ),
+                  _WheelFace(seed: _seed, running: _gearsRunning),
                   const SizedBox(height: 24),
                   if (result != null) ...[
                     _ResultCard(reward: result),
@@ -187,6 +190,10 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
                     )
                   else ...[
                     FilledButton.icon(
+                      key:
+                          widget.tutorialMode
+                              ? TutorialGuideTargetKeys.wheel
+                              : null,
                       onPressed: _spinning ? null : _spin,
                       icon: const Icon(Icons.play_arrow),
                       label: Text(
@@ -211,7 +218,12 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
             ),
           ),
           if (_showReward && result != null)
-            Positioned.fill(child: _RewardReveal(reward: result)),
+            Positioned.fill(
+              child: _RewardReveal(
+                reward: result,
+                tutorialMode: widget.tutorialMode,
+              ),
+            ),
         ],
       ),
     );
@@ -273,8 +285,9 @@ class _ResultCard extends StatelessWidget {
 
 class _RewardReveal extends StatelessWidget {
   final WheelReward reward;
+  final bool tutorialMode;
 
-  const _RewardReveal({required this.reward});
+  const _RewardReveal({required this.reward, required this.tutorialMode});
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +308,7 @@ class _RewardReveal extends StatelessWidget {
                 child: Opacity(opacity: scale.clamp(0, 1), child: child),
               ),
           child: Container(
+            key: tutorialMode ? TutorialGuideTargetKeys.wheelReward : null,
             width: 274,
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
             decoration: BoxDecoration(
@@ -406,15 +420,10 @@ class _RewardReveal extends StatelessWidget {
 /// Birbirine geçmiş ChanceWheel dişlileri. İlk çevirmede GIF'ler yüklenir ve
 /// ekran açık kaldığı sürece kendi sonsuz döngülerinde çalışmaya devam eder.
 class _WheelFace extends StatelessWidget {
-  final List<WheelReward> slices;
   final int seed;
   final bool running;
 
-  const _WheelFace({
-    required this.slices,
-    required this.seed,
-    required this.running,
-  });
+  const _WheelFace({required this.seed, required this.running});
 
   @override
   Widget build(BuildContext context) {
@@ -431,6 +440,7 @@ class _WheelFace extends StatelessWidget {
     ];
 
     return SizedBox(
+      key: const ValueKey('chance-wheel-face'),
       width: 320,
       height: 330,
       child: Stack(
@@ -445,20 +455,6 @@ class _WheelFace extends StatelessWidget {
                     AppColors.primary.withValues(alpha: 0.14),
                     Colors.transparent,
                   ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            top: 5,
-            child: Opacity(
-              opacity: 0.14,
-              child: SizedBox(
-                width: 300,
-                height: 300,
-                child: CustomPaint(
-                  painter: _WheelPainter(slices, paintLabels: false),
                 ),
               ),
             ),
@@ -608,94 +604,4 @@ class _StillGifFrameState extends State<StillGifFrame> {
       filterQuality: FilterQuality.none,
     );
   }
-}
-
-class _WheelPainter extends CustomPainter {
-  final List<WheelReward> slices;
-  final bool paintLabels;
-
-  _WheelPainter(this.slices, {this.paintLabels = true});
-
-  /// XP dilimleri tek renk; item dilimleri nadirlik rengini alır — oyuncu
-  /// çark dönmeden neyin peşinde olduğunu görsün.
-  Color _sliceColor(WheelReward reward, int index) {
-    final item = reward.item;
-    if (item != null) return item.rarity.color;
-    return index.isEven ? AppColors.primary : AppColors.surface;
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (slices.isEmpty) return;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(size.width, size.height) / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final sweep = 2 * pi / slices.length;
-    // Saat 12'den başla: dilim 0'ın ortası ibrenin altında.
-    final start = -pi / 2 - sweep / 2;
-
-    for (var i = 0; i < slices.length; i++) {
-      final paint =
-          Paint()
-            ..style = PaintingStyle.fill
-            ..color = _sliceColor(slices[i], i);
-      canvas.drawArc(rect, start + i * sweep, sweep, true, paint);
-
-      final border =
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5
-            ..color = Colors.black.withValues(alpha: 0.35);
-      canvas.drawArc(rect, start + i * sweep, sweep, true, border);
-
-      if (paintLabels) {
-        _paintLabel(canvas, center, radius, start + i * sweep + sweep / 2, i);
-      }
-    }
-
-    final ring =
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4
-          ..color = AppColors.primary;
-    canvas.drawCircle(center, radius - 2, ring);
-  }
-
-  void _paintLabel(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double angle,
-    int index,
-  ) {
-    final reward = slices[index];
-    final text =
-        reward.isItem
-            ? reward.item!.rarity.label
-            : '${reward.xp} XP'.replaceAll(' ', ' ');
-
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: radius * 0.8);
-
-    final position =
-        center +
-        Offset(cos(angle), sin(angle)) * (radius * 0.62) -
-        Offset(painter.width / 2, painter.height / 2);
-    painter.paint(canvas, position);
-  }
-
-  @override
-  bool shouldRepaint(_WheelPainter oldDelegate) =>
-      oldDelegate.slices != slices || oldDelegate.paintLabels != paintLabels;
 }

@@ -49,6 +49,7 @@ GameState _sampleState() {
   adventure.lastEnemyDamage = 9;
   adventure.acknowledgedDamage = 1000;
   adventure.currentRound = 3;
+  adventure.roundTargetSteps = 1000;
   adventure.lastResolvedRound = 2;
   adventure.roundOutcomeSerial = 2;
   adventure.presentedRoundOutcomeSerial = 1;

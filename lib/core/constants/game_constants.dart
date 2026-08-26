@@ -95,18 +95,14 @@ class GameConstants {
   /// çark XP'si bunu ~12 güne indirir. Erken seviyeler günler değil saatler
   /// sürer, bu da ilk oturumda ilerleme hissi verir.
   ///
-  /// **Günlük XP tavanı bilerek yok.** Para tavanı ([maxDailyStepCoins]) bir
-  /// ekonomi koruması; XP'nin harcanacağı bir yer olmadığı için aynı gerekçe
-  /// geçerli değil. Sahte adıma karşı koruma zaten yukarıda,
-  /// [maxStepsPerMinute] ile yapılıyor — gerçekten 20.000 adım atan kullanıcı
-  /// ilerlemesinin kesilmesini hak etmiyor.
+  /// XP'nin günlük tavanı yoktur. Sahte adıma karşı koruma
+  /// [maxStepsPerMinute] ile yapılır.
   static const int stepsPerXp = 2;
 
-  /// Adımlardan bir günde kazanılabilecek en fazla para.
+  /// Kaldırılan günlük coin tavanının eski değeri.
   ///
-  /// 400 coin = 20.000 adım, yani [dragonStepGoal] ile aynı: gerçekten o kadar
-  /// yürüyen kullanıcı cezalanmaz, telefon sallayan da günde bundan fazlasını
-  /// alamaz. Adım hızı kontrolü ayrıca [maxStepsPerMinute] ile yapılır.
+  /// Yalnızca eski UI/API ve eski `dailyCoinCap` item etkilerini adım-parası
+  /// oranına dönüştürmek için korunur. Coin hesaplayıcı bunu uygulamaz.
   static const int maxDailyStepCoins = 400;
 
   /// Bir dakikada kabul edilen en fazla adım.
@@ -116,8 +112,8 @@ class GameConstants {
   /// bırakır; telefonu sallamak ise kolayca 400+ üretir. Bu hızın üstündeki
   /// adımlar sensör arızası ya da hile sayılır ve **yakılır**.
   ///
-  /// Günlük coin tavanının ([maxDailyStepCoins]) yerine geçmez, üstünde
-  /// çalışır: burada "kaç adım", orada "kaç para" sorusu cevaplanır.
+  /// Günlük coin tavanı kaldırılmıştır; ekonomi koruması artık bu
+  /// fiziksel hız denetimine dayanır.
   static const int maxStepsPerMinute = 250;
 
   /// Geçen süreye bakılmaksızın tek bir raporda kabul edilen taban adım.
@@ -133,8 +129,8 @@ class GameConstants {
   /// adım.
   ///
   /// Cihaz kapalıyken yeniden başlatılıp yürünen adımlar geri kazanılsın diye
-  /// var; bozuk bir sensörün tek okumada günlük tavanı patlatmasını da
-  /// engeller. 10.000 adım = 200 coin, yani günlük tavanın yarısı.
+  /// var; bozuk bir sensörün tek okumada ekonomiyi patlatmasını da engeller.
+  /// 10.000 adım = 200 coin; günlük coin tavanı yoktur.
   static const int maxResetRecoverySteps = 10000;
 
   /// Tek bir item'ın verebileceği en yüksek **koşulsuz** oyun dışı oran
@@ -156,10 +152,8 @@ class GameConstants {
   /// (`equipped_buffs.dart`), yani item tasarımı ne olursa olsun garanti.
   static const double maxEquippedEconomyBonus = 0.50;
 
-  /// Kuşanılan itemlerin günlük coin tavanına ekleyebileceği en fazla coin.
-  ///
-  /// [maxDailyStepCoins] üstüne gelir; yarısıyla sınırlı tutuldu ki tavan
-  /// hâlâ bir tavan olsun.
+  /// Kaldırılan `dailyCoinCap` buff API'sinin eski toplama sınırı.
+  /// Aktif katalog artık bu buff'ı üretmez.
   static const int maxEquippedCoinCapBonus = 200;
 
   /// Kuşanılan itemlerin stok tavanlarına ekleyebileceği en fazla hak

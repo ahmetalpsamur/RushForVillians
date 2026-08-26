@@ -29,6 +29,7 @@ import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
 import '../../models/reward.dart';
 import '../../models/reward_rarity.dart';
+import '../../models/tutorial_guide_variant.dart';
 import '../../models/user_profile.dart';
 import '../../models/wheel_reward.dart';
 import '../../models/xp_store_item.dart';
@@ -43,11 +44,13 @@ import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
 import '../character/character_creation_screen.dart';
 import '../home/home_screen.dart';
+import '../inventory/blacksmith_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../profile/profile_screen.dart';
 import '../rewards/rewards_screen.dart';
 import '../store/xp_store_screen.dart';
 import '../team/team_screen.dart';
+import '../tutorial/tutorial_guide.dart';
 import '../wheel/daily_wheel_screen.dart';
 
 /// Uygulamanın kök iskeleti: alt gezinme çubuğu ve tüm oyun durumunun
@@ -64,11 +67,22 @@ class RootShell extends StatefulWidget {
 
   final ValueChanged<AvatarProfile> onAvatarChanged;
 
+  /// Uygulama girişinde tutorial sistemini etkinleştirir. Widget testleri ve
+  /// bağımsız ekran kullanımları varsayılan olarak mevcut davranışı korur.
+  final bool startTutorial;
+
+  /// Store review entegrasyonu eklendiğinde bağlanacak isteğe bağlı çıkış.
+  final VoidCallback? onRequestReview;
+  final TutorialGuideVariant? initialTutorialGuide;
+
   const RootShell({
     super.key,
     required this.avatar,
     required this.onAvatarChanged,
     this.initialState,
+    this.startTutorial = false,
+    this.onRequestReview,
+    this.initialTutorialGuide,
   });
 
   @override
@@ -121,6 +135,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   Timer? _adventureClock;
   bool _isForeground = true;
   final Random _random = Random();
+  final ValueNotifier<TutorialGuideStep> _tutorialStep = ValueNotifier(
+    TutorialGuideStep.welcome,
+  );
+  bool _tutorialBattleRunning = false;
+
+  bool get _tutorialActive =>
+      widget.startTutorial && !_profile.hasCompletedTutorial;
 
   /// Dondurma hakkı yükseltmesinin kimliği ([MockData.storeItems]).
   /// Satın alma stoğu [UserProfile.grantStreakFreeze] üzerinden büyütür.
@@ -170,6 +191,26 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // değil, yalnızca bonussuz. Sessiz bir hata değil.
       _refreshEquipment();
     });
+    if (_tutorialStep.value == TutorialGuideStep.combatDemo) {
+      unawaited(_completeFirstTutorialAdventure());
+    }
+  }
+
+  Item? get _tutorialStarterWeapon {
+    final storedId = _profile.tutorialStarterItemId;
+    if (storedId != null) {
+      for (final item in _equipment) {
+        if (item.id == storedId) return item;
+      }
+    }
+    for (final item in _equipment) {
+      if (item.isUnlockedAt(_profile.level) &&
+          item.category.role != ItemRole.defense) {
+        _profile.tutorialStarterItemId = item.id;
+        return item;
+      }
+    }
+    return null;
   }
 
   /// Savaş motoruna verilecek anlık koşullar.
@@ -382,9 +423,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (!_today.isSameDayAs(now)) {
       _archiveDailySteps(_today);
       _today = DailyProgress(date: now);
-      // Macera günlük adım hedefine bağlı olduğu için gün değişiminde düşer.
-      // (Bilinen sorun; bkz. CLAUDE.md — Aşama 5a.)
-      _adventure = null;
+      // Aktif/zaferle bitmiş günlük macera yenilenir. Otoriter yenilgi ise
+      // Hayat Yürüyüşü tamamlanana ve oyuncu yeniden doğuşu görene kadar
+      // korunur; gün değişimi bu gereksinimi atlatamaz.
+      if (_adventure?.isPlayerDefeated != true) {
+        _adventure = null;
+      }
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       changed = true;
     }
@@ -421,7 +465,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// streak gibi kalıcı ilerleme her durumda korunur.
   void _restoreState() {
     final restored = widget.initialState;
-    _profile = restored?.profile ?? UserProfile(avatar: widget.avatar);
+    _profile =
+        restored?.profile ??
+        UserProfile(
+          avatar: widget.avatar,
+          tutorialGuideId:
+              (widget.initialTutorialGuide ?? TutorialGuideVariant.mavili).id,
+        );
+    _tutorialStep.value = TutorialGuideStep.fromStoredIndex(
+      _profile.tutorialStep,
+    );
     // Kapat-aç sonrası da geriye alınan saati yakalayabilmek için en son
     // güvenilen zaman diskten yüklenir.
     GameClock.restore(_profile.lastSeenAt);
@@ -460,6 +513,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _adventureClock?.cancel();
     _persist();
     _revision.dispose();
+    _tutorialStep.dispose();
     unawaited(GameStorage.flush());
     super.dispose();
   }
@@ -470,7 +524,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _isForeground = true;
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       final adventure = _adventure;
-      if (adventure != null) {
+      if (adventure != null && !adventure.isBattleCompleted) {
         adventure.nextReminderAt = GameClock.now().add(
           AdventureQuest.reminderInterval,
         );
@@ -488,7 +542,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _persist();
       unawaited(GameStorage.flush());
       final adventure = _adventure;
-      if (adventure != null) {
+      if (adventure != null && !adventure.isBattleCompleted) {
         unawaited(
           AdventureNotificationService.scheduleAdventureReminders(
             adventure,
@@ -541,6 +595,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             : amount;
     final previousLevel = _profile.level;
     _profile.addXp(granted);
+    // Seviye savaş canı tavanını büyütebilir. Adım/zafer/çark kaynağı fark
+    // etmeden aynı XP kapısından geçtiği için senkronizasyon da burada yapılır.
+    _syncAdventureStats();
     if (_profile.level == previousLevel) return granted;
 
     final event = LevelUpEvent(
@@ -615,6 +672,70 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (source is ManualStepSource) source.add(amount);
   }
 
+  /// Kesinleşmiş zaferin XP ve kademe bazlı rastgele altınını en fazla bir kez verir.
+  ///
+  /// Geçici düşman görünürlüğü, ara round animasyonu veya ileride eklenecek
+  /// Walking Phase bu kapıyı açamaz; tek ölçüt otoriter battle sonucudur.
+  int? _grantAdventureVictoryXpIfNeeded(
+    AdventureQuest adventure, {
+    int? forcedCoins,
+  }) {
+    if (!adventure.isEnemyDefeated || adventure.xpAwarded) return null;
+    adventure.xpAwarded = true;
+    final xp = _awardXp(
+      (adventure.enemy.xpReward * _buffs.enemyXpMultiplier).floor(),
+    );
+    final tier = adventure.enemy.tier;
+    final minimumCoins = 4 + (tier * 3);
+    final maximumCoins = 10 + (tier * 6);
+    final coins =
+        forcedCoins ??
+        minimumCoins + Random().nextInt(maximumCoins - minimumCoins + 1);
+    adventure.victoryXpReward = xp;
+    adventure.victoryCoinReward = coins;
+    _profile.coins += coins;
+    return xp;
+  }
+
+  Future<void> _completeFirstTutorialAdventure() async {
+    if (_tutorialBattleRunning ||
+        _tutorialStep.value != TutorialGuideStep.combatDemo) {
+      return;
+    }
+    _tutorialBattleRunning = true;
+    try {
+      if (_equipment.isEmpty) await _loadItemCatalog();
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (!mounted ||
+          _tutorialStep.value != TutorialGuideStep.combatDemo ||
+          _adventure == null) {
+        return;
+      }
+      final adventure = _adventure!;
+      final starter = _tutorialStarterWeapon;
+      final educationCoins =
+          starter == null ? 0 : max(0, starter.cost - _profile.coins);
+      setState(() {
+        adventure.completeTutorialVictory(GameClock.now());
+        _grantAdventureVictoryXpIfNeeded(
+          adventure,
+          forcedCoins: educationCoins,
+        );
+      });
+      _persist();
+      unawaited(AdventureNotificationService.cancelAdventureReminders());
+      await Future<void>.delayed(
+        Duration(milliseconds: adventure.enemy.deathAnimationDurationMs + 350),
+      );
+      if (!mounted || _tutorialStep.value != TutorialGuideStep.combatDemo) {
+        return;
+      }
+      _setTutorialStep(TutorialGuideStep.victoryCelebration);
+    } finally {
+      _tutorialBattleRunning = false;
+    }
+  }
+
   /// Adım kaynağından gelen **kümülatif** sayacı işler.
   ///
   /// Kaynak kim olursa olsun (demo butonları ya da pedometer) akış buradan
@@ -655,33 +776,44 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
 
     var enemyDefeated = false;
-    var enemyXpGranted = 0;
+    var playerDefeated = false;
+    var revivalCompleted = false;
     CombatRoundResult? roundResult;
     int? milestoneReached;
     var milestoneFreezeGranted = false;
     ItemStat? streakStatGained;
-    var capJustReached = false;
-    final capWasReached = _today.coinCapReached;
+    final revivalAdventure = _adventure;
+    final revivalStepsWithoutXp =
+        revivalAdventure?.isRevivalActive == true
+            ? min(amount, revivalAdventure!.revivalRemainingSteps)
+            : 0;
     setState(() {
       _today.addSteps(amount);
       _profile.totalSteps += amount;
+
+      // Hayat Yürüyüşünün kendi 500 adımı XP üretmez. İşaretçiyi yalnızca
+      // gerçekten kabul edilen recovery adımı kadar ilerletmek, partide 500'ü
+      // aşan normal adımların ve önceki küsuratın XP kazanmasını korur.
+      if (revivalStepsWithoutXp > 0) {
+        final accepted = revivalAdventure!.addRevivalSteps(
+          revivalStepsWithoutXp,
+        );
+        _profile.lastXpRewardedStepCount += accepted;
+        revivalCompleted = revivalAdventure.revivalCompleted;
+      }
 
       // Para adım deltasından kazanılır: işaretçi yalnızca paraya çevrilen
       // adım kadar ilerler, artan adımlar bir sonraki hesaba kalır.
       final coinReward = calculateStepCoins(
         pendingSteps: _profile.totalSteps - _profile.lastRewardedStepCount,
-        coinsEarnedToday: _today.coinsEarned,
-        // Kuşanılan ekipmanın adım-para bonusu ve büyütülmüş günlük tavanı.
-        // Çarpan tavanı aşamaz; kırpma [calculateStepCoins] içinde.
+        // Günlük tavan yoktur; ekipman yalnızca adım başına kazancı büyütür.
         multiplier: _buffs.stepCoinMultiplier,
-        dailyCap: _buffs.dailyCoinCap,
       );
       _profile.coins += coinReward.coins;
       _profile.lastRewardedStepCount += coinReward.consumedSteps;
       _today.coinsEarned += coinReward.coins;
-      capJustReached = coinReward.capReached && !capWasReached;
 
-      // XP'nin kendi işaretçisi var: para tavanı dolduğunda XP durmamalı.
+      // XP'nin kendi işaretçisi var; iki ödül ekonomisi birbirine karışmaz.
       final xpReward = calculateStepXp(
         pendingSteps: _profile.totalSteps - _profile.lastXpRewardedStepCount,
         multiplier: _buffs.stepXpMultiplier,
@@ -692,8 +824,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _today.xpEarned += _awardXp(xpReward.xp);
 
       final adventure = _adventure;
-      if (adventure != null) {
-        // 1.000 adım süre dolmadan tamamlandıysa round anında kazanılır.
+      if (adventure != null && !adventure.isBattleCompleted) {
+        final wasActive = !adventure.isBattleCompleted;
+        // Adımlar savaş yoğunluğunu belirler; round geçişini yalnız deadline
+        // yapar. Süre dolmadıysa bu çağrı state değiştirmeden null döner.
         roundResult = adventure.resolveRound(
           _today.steps,
           now,
@@ -701,16 +835,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
           onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
         );
+        playerDefeated = wasActive && adventure.isPlayerDefeated;
       }
-      if (adventure != null &&
-          adventure.isEnemyDefeated &&
-          !adventure.xpAwarded) {
-        adventure.xpAwarded = true;
-        // Düşman XP bonusu: kuşanılan ekipmandan gelir.
-        enemyXpGranted = _awardXp(
-          (adventure.enemy.xpReward * _buffs.enemyXpMultiplier).floor(),
-        );
-        enemyDefeated = true;
+      if (adventure != null) {
+        final granted = _grantAdventureVictoryXpIfNeeded(adventure);
+        if (granted != null) {
+          enemyDefeated = true;
+        }
       }
       // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı. Kuşanılan
       // ekipman bu eşiği düşürebilir (`streakRelief`); eşik yalnızca **o an**
@@ -743,10 +874,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // düşüyor ve sırayla gösteriliyor.
     final statGained = streakStatGained;
     final milestone = milestoneReached;
-    if (capJustReached || statGained != null || milestone != null) {
+    if (statGained != null || milestone != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (capJustReached) _showCoinCapNotice();
         if (statGained != null) _showStreakStatBonus(statGained);
         if (milestone != null) {
           _showStreakMilestone(
@@ -758,10 +888,23 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
     if (enemyDefeated) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
+      if (_tutorialStep.value == TutorialGuideStep.combatWaiting ||
+          _tutorialStep.value == TutorialGuideStep.enemyReaction) {
+        _setTutorialStep(TutorialGuideStep.victoryCelebration);
+      }
+    } else if (playerDefeated) {
+      unawaited(AdventureNotificationService.cancelAdventureReminders());
+    } else if (roundResult?.playerDamage case final damage? when damage > 0) {
+      if (_tutorialStep.value == TutorialGuideStep.combatWaiting) {
+        _setTutorialStep(TutorialGuideStep.enemyReaction);
+      }
+    }
+    if (revivalCompleted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            '${_adventure!.enemy.name} yenildi! $enemyXpGranted XP kazandın.',
+            'Hayat Yürüyüşü tamamlandı. Yeniden doğdun! Bu 500 adım XP '
+            'kazandırmadı.',
           ),
         ),
       );
@@ -770,6 +913,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   void _selectAdventure(AdventureQuest adventure) {
+    final current = _adventure;
+    if (current?.isPlayerDefeated == true && !current!.revivalCompleted) {
+      _showStoreNotice(
+        'Yeni bir macera için önce 500 adımlık Hayat Yürüyüşünü tamamla.',
+      );
+      return;
+    }
     setState(() {
       _adventure = adventure;
       // Savaş canı ve tohum macera başlarken damgalanır: ekran statları
@@ -786,9 +936,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // Günün adımları korunur; macera kendi başlangıç adımını taşır
       // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
       //
-      // `coinsEarned` / `xpEarned` de taşınmalı: bunlar günlük para tavanının
-      // sayacı. Taşınmazsa macera seçmek tavanı sıfırlıyor ve oyuncu macera
-      // değiştirerek günde sınırsız coin kazanabiliyordu.
+      // `coinsEarned` / `xpEarned` de taşınır: ikisi de günün yürüyüş
+      // kazancını gösteren sayaçlardır; macera seçmek geçmişi silmemeli.
       _today = DailyProgress(
         date: _today.date,
         steps: _today.steps,
@@ -798,10 +947,29 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       );
     });
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.enemyChoice) {
+      _setTutorialStep(TutorialGuideStep.enemySelected);
+    }
     unawaited(AdventureNotificationService.requestPermission());
   }
 
+  void _startRevival() {
+    final adventure = _adventure;
+    if (adventure == null || !adventure.startRevival()) return;
+    setState(() {});
+    _persist();
+    unawaited(AdventureNotificationService.cancelAdventureReminders());
+  }
+
   void _chooseNewAdventure() {
+    final adventure = _adventure;
+    if (adventure?.isPlayerDefeated == true && !adventure!.revivalCompleted) {
+      _showStoreNotice(
+        'Maceralara dönmek için Hayat Yürüyüşünde '
+        '${adventure.revivalRemainingSteps} adım daha atmalısın.',
+      );
+      return;
+    }
     setState(() {
       _adventure = null;
       // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
@@ -820,56 +988,36 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _updateAdventureClock() {
     if (!mounted) return;
     final adventure = _adventure;
-    if (adventure == null ||
-        adventure.isEnemyDefeated ||
-        adventure.playerHealth <= 0) {
-      return;
-    }
+    if (adventure == null || adventure.isBattleCompleted) return;
 
     final now = GameClock.now();
     // Biriken turların hepsi çözülür; arka planda geçen süre affedilmez.
-    final result = adventure.resolveExpiredRounds(
-      _today.steps,
-      now,
-      playerStats: _playerCombatStats(adventure),
-      onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
-      onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
-    );
-    final reminderDue = _isForeground && adventure.takeDueReminder(now);
-    setState(() {});
+    CombatRoundResult? result;
+    setState(() {
+      result = adventure.resolveExpiredRounds(
+        _today.steps,
+        now,
+        playerStats: _playerCombatStats(adventure),
+        onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
+        onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
+      );
+      _grantAdventureVictoryXpIfNeeded(adventure);
+    });
+    final reminderDue =
+        _isForeground &&
+        !adventure.isBattleCompleted &&
+        adventure.takeDueReminder(now);
 
-    if (result != null) _persist();
+    final resolvedResult = result;
+    if (resolvedResult != null) _persist();
 
-    if (result != null && result.playerDamage > 0) {
-      _showEnemyAttackNotice(adventure, result.playerDamage);
-      if (adventure.playerHealth <= 0) {
-        unawaited(AdventureNotificationService.cancelAdventureReminders());
-      }
+    if (resolvedResult != null && resolvedResult.playerDamage > 0) {
+      _showEnemyAttackNotice(adventure, resolvedResult.playerDamage);
+    }
+    if (adventure.isBattleCompleted) {
+      unawaited(AdventureNotificationService.cancelAdventureReminders());
     }
     if (reminderDue) _showAdventureReminder(adventure);
-  }
-
-  /// Günlük adım-para tavanına ulaşıldığında bir kez gösterilir; kazanç
-  /// sessizce durmaz.
-  void _showCoinCapNotice() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Row(
-          children: [
-            const Icon(Icons.monetization_on, color: AppColors.streak),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Günlük kazanç sınırına ulaştın '
-                '(${_buffs.dailyCoinCap} coin). Bugünkü adımlar '
-                'artık para kazandırmıyor.',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   /// Seri, otomatik harcanan bir dondurma hakkıyla kurtarıldığında gösterilir.
@@ -1041,6 +1189,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
     });
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.wheelWaiting) {
+      _setTutorialStep(TutorialGuideStep.wheelReward);
+    }
   }
 
   /// Yükseltme satın alır (kozmetik, unvan, dondurma hakkı).
@@ -1085,6 +1236,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       if (!alreadyOwned) _profile.ownedUpgradeIds.add(item.id);
     });
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.shopWaiting) {
+      _setTutorialStep(TutorialGuideStep.itemBought);
+    }
     _showStoreNotice('${item.name} satın alındı!');
   }
 
@@ -1095,6 +1249,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// eşyadan birkaç adet istiyor. Her satın alma envantere **yeni bir örnek**
   /// ekliyor; eskiden ikinci satın alma sessizce reddediliyordu.
   void _purchaseEquipment(Item item) {
+    if (_tutorialActive &&
+        _tutorialStep.value == TutorialGuideStep.shopWaiting &&
+        item.id != _tutorialStarterWeapon?.id) {
+      return;
+    }
     if (!item.isUnlockedAt(_profile.level)) return;
     if (_profile.coins < item.cost) return;
 
@@ -1104,6 +1263,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _profile.addItem(item.id);
     });
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.shopWaiting) {
+      _setTutorialStep(TutorialGuideStep.itemBought);
+    }
     _showStoreNotice(
       count == 1
           ? '${item.name} satın alındı!'
@@ -1156,6 +1318,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _profile.updateInstance(instanceId, equipped: true);
     setState(_refreshEquipment);
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.equipWaiting) {
+      _setTutorialStep(TutorialGuideStep.itemEquipped);
+    }
 
     _showStoreNotice(
       replacedName == null
@@ -1220,6 +1385,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _refreshEquipment();
     });
     _persist();
+    if (_tutorialStep.value == TutorialGuideStep.upgradeWaiting) {
+      _setTutorialStep(TutorialGuideStep.upgradeCompleted);
+    }
     _showStoreNotice(
       '${resolved.name} Sv. ${quote.nextLevel} oldu. -${quote.cost} coin.',
     );
@@ -1330,9 +1498,25 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     InventoryScreen(
       revision: _revision,
       readState: _readInventoryState,
+      tutorialItemId:
+          _tutorialActive &&
+                  _tutorialStep.value == TutorialGuideStep.equipWaiting
+              ? _profile.tutorialStarterItemId
+              : null,
       onEquip: _equipItem,
       onUnequip: _unequipSlot,
       onSell: _sellItem,
+      onUpgrade: _upgradeItem,
+      onMerge: _mergeItems,
+    ),
+  );
+
+  /// Demirciyi profildeki kendi girişinden açar. Envanterle aynı canlı state
+  /// kaynağını kullanır; yükseltme ve birleştirme sonuçları anında saklanır.
+  void _openBlacksmith() => _push(
+    BlacksmithScreen(
+      revision: _revision,
+      readState: _readInventoryState,
       onUpgrade: _upgradeItem,
       onMerge: _mergeItems,
     ),
@@ -1369,7 +1553,128 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       );
   }
 
-  void _openAdventure() => setState(() => _tabIndex = 1);
+  void _setTutorialStep(TutorialGuideStep step) {
+    if (!_tutorialActive || _tutorialStep.value == step) return;
+    _profile.tutorialStep = step.index;
+    _tutorialStep.value = step;
+    _persist();
+  }
+
+  void _completeTutorial() {
+    if (_profile.hasCompletedTutorial) return;
+    _returnToTutorialRoot();
+    _profile.hasCompletedTutorial = true;
+    _profile.tutorialStep = TutorialGuideStep.completed.index;
+    _tutorialStep.value = TutorialGuideStep.completed;
+    _persist();
+    if (mounted) setState(() {});
+  }
+
+  void _returnToTutorialRoot() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  void _onTutorialPrimary(TutorialGuideStep step) {
+    switch (step) {
+      case TutorialGuideStep.welcome:
+        _setTutorialStep(TutorialGuideStep.adventurePrompt);
+      case TutorialGuideStep.enemySelected:
+        _setTutorialStep(TutorialGuideStep.combatDemo);
+        unawaited(_completeFirstTutorialAdventure());
+      case TutorialGuideStep.combatDemo:
+        _setTutorialStep(TutorialGuideStep.combatWaiting);
+      case TutorialGuideStep.enemyReaction:
+        _setTutorialStep(TutorialGuideStep.combatWaiting);
+      case TutorialGuideStep.victoryCelebration:
+        _setTutorialStep(TutorialGuideStep.rewardCoins);
+      case TutorialGuideStep.rewardCoins:
+        _setTutorialStep(TutorialGuideStep.rewardXp);
+      case TutorialGuideStep.rewardXp:
+        _setTutorialStep(TutorialGuideStep.shopPrompt);
+      case TutorialGuideStep.itemBought:
+        _setTutorialStep(TutorialGuideStep.equipWaiting);
+        _openInventory();
+      case TutorialGuideStep.itemEquipped:
+        _setTutorialStep(TutorialGuideStep.wheelPrompt);
+        _returnToTutorialRoot();
+      case TutorialGuideStep.blacksmithPrompt:
+        _setTutorialStep(TutorialGuideStep.upgradeWaiting);
+        _openBlacksmith();
+      case TutorialGuideStep.upgradeCompleted:
+        _setTutorialStep(TutorialGuideStep.wheelPrompt);
+      case TutorialGuideStep.wheelPrompt:
+        _setTutorialStep(TutorialGuideStep.wheelWaiting);
+        _openWheel();
+      case TutorialGuideStep.wheelReward:
+        _setTutorialStep(TutorialGuideStep.finalReady);
+        _returnToTutorialRoot();
+      case TutorialGuideStep.finalReady:
+        _setTutorialStep(TutorialGuideStep.finalMotto);
+      case TutorialGuideStep.finalMotto:
+        _setTutorialStep(TutorialGuideStep.onlineTeaser);
+      case TutorialGuideStep.onlineTeaser:
+        _setTutorialStep(TutorialGuideStep.ratingRequest);
+      case TutorialGuideStep.ratingRequest:
+        _setTutorialStep(TutorialGuideStep.farewellWorkDone);
+      case TutorialGuideStep.farewellWorkDone:
+        _setTutorialStep(TutorialGuideStep.farewellYourTurn);
+      case TutorialGuideStep.farewellYourTurn:
+        _setTutorialStep(TutorialGuideStep.farewell);
+      case TutorialGuideStep.farewell:
+        _setTutorialStep(TutorialGuideStep.leaving);
+      case TutorialGuideStep.adventurePrompt:
+      case TutorialGuideStep.enemyChoice:
+      case TutorialGuideStep.combatWaiting:
+      case TutorialGuideStep.shopPrompt:
+      case TutorialGuideStep.shopWaiting:
+      case TutorialGuideStep.equipWaiting:
+      case TutorialGuideStep.upgradeWaiting:
+      case TutorialGuideStep.wheelWaiting:
+      case TutorialGuideStep.leaving:
+      case TutorialGuideStep.completed:
+        break;
+    }
+  }
+
+  void _onTutorialSecondary(TutorialGuideStep step) {
+    switch (step) {
+      case TutorialGuideStep.combatWaiting:
+        _setTutorialStep(TutorialGuideStep.shopPrompt);
+      case TutorialGuideStep.shopWaiting:
+        _setTutorialStep(TutorialGuideStep.itemBought);
+      case TutorialGuideStep.equipWaiting:
+        _setTutorialStep(TutorialGuideStep.itemEquipped);
+      case TutorialGuideStep.upgradeWaiting:
+        _setTutorialStep(TutorialGuideStep.upgradeCompleted);
+      case TutorialGuideStep.wheelWaiting:
+        _setTutorialStep(TutorialGuideStep.wheelReward);
+      case TutorialGuideStep.ratingRequest:
+        widget.onRequestReview?.call();
+        _setTutorialStep(TutorialGuideStep.farewellWorkDone);
+      default:
+        break;
+    }
+  }
+
+  Widget _tutorialOverlay() => TutorialGuideOverlay(
+    step: _tutorialStep,
+    guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+    onPrimary: _onTutorialPrimary,
+    onSecondary: _onTutorialSecondary,
+    onLeavingCompleted: _completeTutorial,
+  );
+
+  void _selectTab(int index) {
+    setState(() => _tabIndex = index);
+    final step = _tutorialStep.value;
+    if (index == 1 && step == TutorialGuideStep.adventurePrompt) {
+      _setTutorialStep(TutorialGuideStep.enemyChoice);
+    } else if (index == 2 && step == TutorialGuideStep.shopPrompt) {
+      _setTutorialStep(TutorialGuideStep.shopWaiting);
+    }
+  }
+
+  void _openAdventure() => _selectTab(1);
 
   void _openWheel() {
     // Tohum ilk kullanımda oyuncuya özel kurulur; `0` "henüz kurulmadı"
@@ -1381,9 +1686,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       );
       _persist();
     }
+    final tutorialWheel =
+        _tutorialActive &&
+        _tutorialStep.value == TutorialGuideStep.wheelWaiting;
     _push(
       DailyWheelScreen(
-        alreadySpunToday: _profile.wheelSpunToday,
+        alreadySpunToday: tutorialWheel ? false : _profile.wheelSpunToday,
         extraSpins: _profile.extraWheelSpins,
         level: _profile.level,
         equipment: _equipment,
@@ -1391,6 +1699,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           for (final instance in _profile.ownedItems) instance.itemId,
         ],
         seed: _profile.wheelSeed,
+        tutorialMode: tutorialWheel,
         onSpinResult: _spinWheel,
       ),
     );
@@ -1433,15 +1742,23 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// bakiye kalıyor, kart "Sahipsin" demiyor ve ikinci dokunuş sessizce
   /// düşüyordu. Sekme gövdesi her `setState`'te yeniden kurulduğu için bu
   /// sorun orada hiç yoktu — [_openAdventure] de aynı deseni kullanıyor.
-  void _openStore() => setState(() => _tabIndex = 2);
+  void _openStore() => _selectTab(2);
 
   void _push(Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).then((
-      _,
-    ) {
-      // Alt ekranlardan dönünce güncel state'i yansıtmak için yeniden çiz.
-      setState(() {});
-    });
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder:
+                (_) => Stack(
+                  fit: StackFit.expand,
+                  children: [screen, if (_tutorialActive) _tutorialOverlay()],
+                ),
+          ),
+        )
+        .then((_) {
+          // Alt ekranlardan dönünce güncel state'i yansıtmak için yeniden çiz.
+          setState(() {});
+        });
   }
 
   @override
@@ -1470,8 +1787,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         avatar: _profile.avatar,
         today: _today,
         onAdventureSelected: _selectAdventure,
+        onStartRevival: _startRevival,
         onChooseNewAdventure: _chooseNewAdventure,
         onAdventureUpdated: _persist,
+        tutorialMode:
+            _tutorialActive &&
+            _tutorialStep.value == TutorialGuideStep.enemyChoice,
       ),
       XpStoreScreen(
         items: _storeItems,
@@ -1483,6 +1804,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         streakFreezes: _profile.streakFreezes,
         extraWheelSpins: _profile.extraWheelSpins,
         xpBoostActive: _profile.isXpBoostActive,
+        tutorialItemId:
+            _tutorialActive &&
+                    _tutorialStep.value == TutorialGuideStep.shopWaiting
+                ? _tutorialStarterWeapon?.id
+                : null,
         onPurchase: _purchase,
         onPurchaseEquipment: _purchaseEquipment,
       ),
@@ -1499,22 +1825,32 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         ),
         onEditCharacter: _editCharacter,
         onOpenInventory: _openInventory,
+        onOpenBlacksmith: _openBlacksmith,
       ),
     ];
 
-    return Scaffold(
-      body: tabs[_tabIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: (i) => setState(() => _tabIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-          NavigationDestination(icon: Icon(Icons.explore), label: 'Macera'),
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'Mağaza'),
-          NavigationDestination(icon: Icon(Icons.groups), label: 'Takım'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Profil'),
-        ],
-      ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
+          body: tabs[_tabIndex],
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _tabIndex,
+            onDestinationSelected: _selectTab,
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.home), label: 'Ana Sayfa'),
+              NavigationDestination(icon: Icon(Icons.explore), label: 'Macera'),
+              NavigationDestination(
+                icon: Icon(Icons.storefront),
+                label: 'Mağaza',
+              ),
+              NavigationDestination(icon: Icon(Icons.groups), label: 'Takım'),
+              NavigationDestination(icon: Icon(Icons.person), label: 'Profil'),
+            ],
+          ),
+        ),
+        if (_tutorialActive) _tutorialOverlay(),
+      ],
     );
   }
 }

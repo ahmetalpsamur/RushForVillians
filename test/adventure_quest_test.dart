@@ -3,10 +3,25 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
+import 'package:rush_for_villains/models/combat_stats.dart';
+
+const _durablePlayer = CombatStats(
+  attack: 1,
+  defense: 10000,
+  maxHealth: 10000,
+  speed: 10000,
+);
+
+const _victoriousPlayer = CombatStats(
+  attack: 10000,
+  defense: 10000,
+  maxHealth: 10000,
+  speed: 10000,
+);
 
 void main() {
-  group('macera dengesi', () {
-    test('20 farklı düşman hedefi 500 adımlık aralıklarla açılır', () {
+  group('macera kataloğu', () {
+    test('20 farklı düşman 500 adımlık eşiklerle açılır', () {
       expect(EnemyCatalog.enemies.map((enemy) => enemy.minimumDailySteps), [
         500,
         1000,
@@ -31,7 +46,7 @@ void main() {
       ]);
     });
 
-    test('her düşman farklı ve bütün All_Assets animasyonları mevcut', () {
+    test('düşman kimlikleri ve All_Assets animasyonları benzersizdir', () {
       expect(EnemyCatalog.enemies, hasLength(20));
       expect(
         EnemyCatalog.enemies.map((enemy) => enemy.id).toSet(),
@@ -50,31 +65,20 @@ void main() {
           ...enemy.attackAssets,
           enemy.deathAsset,
         ];
-        expect(
-          enemy.attackAssets.length,
-          greaterThanOrEqualTo(2),
-          reason: '${enemy.name} için saldırı çeşitliliği yetersiz',
-        );
+        expect(enemy.attackAssets.length, greaterThanOrEqualTo(2));
         expect(
           assets.every((asset) => asset.startsWith('lib/All_Assets/Enemies/')),
           isTrue,
-          reason: '${enemy.name} eski Enemies klasörünü kullanıyor',
         );
         for (final asset in assets) {
           expect(File(asset).existsSync(), isTrue, reason: 'Eksik: $asset');
         }
       }
     });
+  });
 
-    test('test dengesi her round için 30 saniye verir', () {
-      expect(
-        AdventureQuest.roundDurationForSteps(1000),
-        const Duration(seconds: 30),
-      );
-      expect(AdventureQuest.reminderInterval, const Duration(minutes: 5));
-    });
-
-    test('1000 adım süre dolmadan tamamlanırsa round anında kazanılır', () {
+  group('eski 1000 adımlık round düzeni', () {
+    test('adım hedefi dolunca deadline beklenmeden round geçer', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
@@ -82,46 +86,22 @@ void main() {
         startedAt: startedAt,
       );
 
-      final result = quest.resolveRound(
-        1000,
-        startedAt.add(const Duration(seconds: 10)),
+      final early = quest.resolveRound(
+        quest.roundTargetSteps,
+        startedAt.add(const Duration(seconds: 107)),
+        playerStats: _durablePlayer,
       );
 
-      expect(result?.targetReached, isTrue);
-      expect(result?.roundNumber, 1);
-      expect(quest.lastRoundWon, isTrue);
+      expect(early?.roundNumber, 1);
+      expect(early?.targetReached, isTrue);
       expect(quest.currentRound, 2);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 40)),
+        startedAt.add(const Duration(seconds: 107, minutes: 15)),
       );
     });
 
-    test('eksik adım oranı kadar oyuncu hasarı uygular', () {
-      final startedAt = DateTime(2026, 8, 17, 12);
-      final quest = AdventureQuest(
-        enemy: EnemyCatalog.byId('tense_soldier')!,
-        stepGoal: 2000,
-        startedAt: startedAt,
-      );
-
-      final result = quest.resolveExpiredRound(
-        500,
-        startedAt.add(const Duration(seconds: 30)),
-      );
-
-      // Savaş motoruyla hasar artık adımdan değil statlardan geliyor; sabit
-      // sayı yerine ilişki bağlanıyor: yarısı yürünen round hem hasar aldırır
-      // hem hasar verdirir.
-      expect(result?.walkedSteps, 500);
-      expect(result!.playerDamage, greaterThan(0));
-      expect(result.enemyDamage, greaterThan(0));
-      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
-      expect(quest.enemyHealth, lessThan(quest.enemy.maxHealth));
-      expect(quest.enemyAttackSerial, 1);
-    });
-
-    test('hiç yürünmeyen round yalnızca oyuncuya hasar verir', () {
+    test('hiç yürünmeyen süresi dolmuş round oyuncuya hasar verir', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
@@ -131,211 +111,185 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         0,
-        startedAt.add(const Duration(seconds: 30)),
+        startedAt.add(const Duration(minutes: 15)),
       );
 
+      expect(result, isNotNull);
       expect(result!.enemyDamage, 0, reason: 'yürümeyen vuramaz');
       expect(result.playerDamage, greaterThan(0));
-      expect(quest.enemyHealth, quest.enemy.maxHealth);
+      expect(quest.enemyHealth, quest.scaledEnemyMaxHealth);
     });
 
-    test('tur hedefi tamamlanırsa oyuncu hasar almaz', () {
+    test('düşman ölünce zafer hemen kesinleşir', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
-        enemy: EnemyCatalog.byId('sinister_monster')!,
-        stepGoal: 5000,
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 500,
         startedAt: startedAt,
       );
 
-      final result = quest.resolveExpiredRound(
-        1000,
-        startedAt.add(const Duration(seconds: 10)),
+      quest.resolveExpiredRound(
+        quest.roundTargetSteps,
+        startedAt.add(const Duration(seconds: 45)),
+        playerStats: _victoriousPlayer,
       );
 
-      expect(result?.targetReached, isTrue);
-      expect(result?.playerDamage, 0);
-      expect(result!.enemyDamage, greaterThan(0), reason: 'tam round tam vurur');
-      expect(quest.playerHealth, quest.playerMaxHealth);
-      expect(quest.roundStartingSteps, 1000);
-      expect(quest.untouchedRounds, 1);
+      expect(quest.enemyDefeatPending, isFalse);
+      expect(quest.isEnemyDefeated, isTrue);
+      expect(quest.battleOutcome, AdventureBattleOutcome.victory);
+      expect(quest.enemyHealth, 0);
+    });
+
+    test('round süresi sabit 15 dakikadır', () {
+      final startedAt = DateTime(2026, 8, 17, 12);
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 2500,
+        startedAt: startedAt,
+      );
+
+      expect(AdventureQuest.roundDuration, const Duration(minutes: 15));
+      expect(quest.currentRoundDuration, const Duration(minutes: 15));
+      expect(
+        quest.nextEnemyAttackAt,
+        startedAt.add(const Duration(minutes: 15)),
+      );
+      expect(quest.totalRounds, 3);
     });
   });
 
-  // Uygulama arka planda kaldığında birden fazla tur birikir. Tek tur çözüp
-  // kalanları affetmek oyuncunun kalıcı savaş canını yanlış bırakıyordu
-  // (triaj A1).
-  group('biriken tur çözümü', () {
-    // sinister_monster: attackDamage 12, round hedefi 1000 adım → 30 saniye.
+  group('arka plan catch-up', () {
     AdventureQuest questAt(DateTime startedAt) => AdventureQuest(
       enemy: EnemyCatalog.byId('sinister_monster')!,
       stepGoal: 5000,
       startedAt: startedAt,
     );
 
-    test('arka planda biriken turların hepsi çözülür', () {
+    test('biriken 15 dakikalık roundların hepsi sırayla çözülür', () {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
-      // 90 saniye arka plan, hiç adım atılmadı: 30, 60 ve 90.
-      // saniyelerdeki üç round dolmuş olmalı.
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(seconds: 90)),
+        startedAt.add(const Duration(minutes: 46)),
+        playerStats: _durablePlayer,
       );
 
-      // Hasar artık stattan geliyor; bağlanan şey sabit sayı değil, üç
-      // roundun da çözüldüğü.
-      expect(quest.enemyAttackSerial, 3);
+      expect(result?.roundNumber, 3);
+      expect(quest.roundOutcomeSerial, 3);
       expect(quest.currentRound, 4);
-      expect(result!.playerDamage, greaterThan(0));
-      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
-    });
-
-    test('bir sonraki geri sayım geleceğe taşınır', () {
-      final startedAt = DateTime(2026, 8, 18, 12);
-      final quest = questAt(startedAt);
-      final now = startedAt.add(const Duration(seconds: 90));
-
-      quest.resolveExpiredRounds(0, now);
-
-      expect(quest.nextEnemyAttackAt.isAfter(now), isTrue);
-      // Sıra `now`'dan değil, dolan sıradan ileri taşınır: 90 + 30 = 120.
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 120)),
+        startedAt.add(const Duration(minutes: 60)),
       );
     });
 
-    test('arka planda atılan adımlar turlara sırayla sayılır', () {
+    test('arka plandaki adımlar round hedeflerine sırayla dağıtılır', () {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
-      // 90 saniyede 2.500 adım: ilk iki round tam, üçüncüsü yarım.
       final result = quest.resolveExpiredRounds(
         2500,
-        startedAt.add(const Duration(seconds: 90)),
+        startedAt.add(const Duration(minutes: 46)),
+        playerStats: _durablePlayer,
       );
 
       expect(result?.walkedSteps, 2500);
-      // İlk iki round tam (hasar yok), üçüncüsü yarım (hasar var).
-      expect(result!.playerDamage, greaterThan(0));
-      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
-      expect(quest.enemyAttackSerial, 1);
+      expect(result?.targetSteps, 3000);
+      expect(quest.roundStartingSteps, 2500);
     });
 
-    test('süresi dolmamış turda hiçbir şey olmaz', () {
+    test('süresi dolmamış ilk round state değiştirmez', () {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(seconds: 15)),
+        startedAt.add(const Duration(minutes: 14, seconds: 59)),
       );
 
       expect(result, isNull);
-      expect(quest.playerHealth, quest.playerMaxHealth);
-    });
-
-    test('can bitince döngü durur, can eksiye düşmez', () {
-      final startedAt = DateTime(2026, 8, 18, 12);
-      final quest = questAt(startedAt);
-
-      // 3 gün arka plan: canı bitirmeye fazlasıyla yeter.
-      quest.resolveExpiredRounds(0, startedAt.add(const Duration(days: 3)));
-
-      expect(quest.playerHealth, 0);
+      expect(quest.currentRound, 1);
     });
   });
 
-  // Macera başlatmak günün adımlarını sıfırlamaz; ilerleme
-  // [AdventureQuest.startingSteps] farkı üzerinden hesaplanır.
-  group('macera başlangıç adımı', () {
-    AdventureQuest questAt(int startingSteps, {DateTime? startedAt}) =>
-        AdventureQuest(
-          enemy: EnemyCatalog.byId('tense_soldier')!,
-          stepGoal: 2000,
-          startingSteps: startingSteps,
-          startedAt: startedAt,
-        );
-
-    test('ilerleme günlük sayaçtan değil başlangıç adımından sayılır', () {
-      final quest = questAt(4000);
+  group('ilerleme, ölçek ve yeniden doğuş', () {
+    test('başlangıç adımı düşülür ve round hedefi 1000 adımdır', () {
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 2000,
+        startingSteps: 4000,
+      );
 
       expect(quest.questSteps(4000), 0);
       expect(quest.questSteps(5000), 1000);
-    });
-
-    test('düşman canı artık adımdan bağımsız', () {
-      // Savaş motorundan önce düşman canı = kalan adım hedefiydi (A2/A3).
-      // Artık ayrı bir stat: adım atmak tek başına düşmanı öldürmez, round
-      // çözülmesi gerekir.
-      final quest = questAt(4000);
-
-      expect(quest.enemyHealth, quest.enemy.maxHealth);
-      expect(quest.isEnemyDefeated, isFalse);
-      expect(quest.enemyHealthProgress, 1);
-
-      // Hedefin tamamı kadar adım atmak, round çözülmeden canı düşürmez.
-      expect(quest.questSteps(6000), 2000);
-      expect(quest.isEnemyDefeated, isFalse);
-    });
-
-    test('düşman canı bitince yenilmiş sayılır', () {
-      final quest = questAt(4000);
-      quest.enemyHealth = 0;
-
-      expect(quest.isEnemyDefeated, isTrue);
-      expect(quest.enemyHealthProgress, 0);
-    });
-
-    test('ilk tur da başlangıç adımından başlar', () {
-      final quest = questAt(4000);
-
       expect(quest.roundStartingSteps, 4000);
-      expect(quest.stepsThisRound(4500), 500);
-      expect(quest.roundStepsRemaining(4500), 500);
+      expect(quest.roundTargetSteps, 1000);
+      expect(quest.stepsThisRound(4150), 150);
+      expect(quest.roundStepsRemaining(4150), 850);
     });
 
-    test('bekleyen hasar round çıktısından gelir ve bir kez gösterilir', () {
-      // Eskiden bu sayı doğrudan atılan adımdı; artık düşmana **gerçekten**
-      // verilen hasar ve yalnızca round çözümünde oluşuyor.
-      final startedAt = DateTime(2026, 8, 18, 12);
-      final quest = questAt(4000, startedAt: startedAt);
-
-      expect(quest.takePendingDamage(), 0, reason: 'henüz round çözülmedi');
-
-      quest.resolveExpiredRound(5000, startedAt.add(const Duration(seconds: 5)));
-
-      final shown = quest.takePendingDamage();
-      expect(shown, quest.lastPlayerDamage);
-      expect(shown, greaterThan(0));
-      expect(quest.takePendingDamage(), 0, reason: 'ikinci kez gösterilmez');
-    });
-
-    test('tur çözümü başlangıç adımlı macerada da doğru hasar verir', () {
-      final startedAt = DateTime(2026, 8, 18, 12);
-      final quest = questAt(4000, startedAt: startedAt);
-
-      final result = quest.resolveExpiredRound(
-        4500,
-        startedAt.add(const Duration(seconds: 30)),
-      );
-
-      expect(result?.walkedSteps, 500);
-      expect(result!.playerDamage, greaterThan(0));
-      expect(result.enemyDamage, greaterThan(0));
-      expect(quest.playerHealth, lessThan(quest.playerMaxHealth));
-    });
-
-    test('başlangıç adımı verilmezse eski davranış korunur', () {
+    test('düşman canı hedefe göre ölçeklenmez', () {
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
         stepGoal: 2000,
       );
 
-      expect(quest.startingSteps, 0);
-      expect(quest.roundStartingSteps, 0);
-      expect(quest.questSteps(500), 500);
+      expect(quest.enemyPowerMultiplier, 1);
+      expect(quest.enemyHealth, quest.scaledEnemyMaxHealth);
+      expect(quest.enemyHealth, quest.enemy.maxHealth);
+      expect(quest.enemyHealthProgress, 1);
+    });
+
+    test('çıplak can sıfırı terminal sonuç yerine geçmez', () {
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 2000,
+      );
+      quest.enemyHealth = 0;
+
+      expect(quest.isEnemyDefeated, isFalse);
+      expect(quest.battleOutcome, AdventureBattleOutcome.active);
+    });
+
+    test('Hayat Yürüyüşü yalnız yenilgide açılır ve 500 adımda biter', () {
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 500,
+        battleOutcome: AdventureBattleOutcome.defeat,
+        playerHealth: 0,
+      );
+
+      expect(quest.startRevival(), isTrue);
+      expect(quest.addRevivalSteps(499), 499);
+      expect(quest.revivalCompleted, isFalse);
+      expect(quest.addRevivalSteps(10), 1);
+      expect(quest.revivalCompleted, isTrue);
+      expect(quest.revivalSteps, AdventureQuest.revivalStepTarget);
+    });
+
+    test('revival ve terminal sonuç JSON turunda korunur', () {
+      final enemy = EnemyCatalog.byId('tense_soldier')!;
+      final quest = AdventureQuest(
+        enemy: enemy,
+        stepGoal: 500,
+        battleOutcome: AdventureBattleOutcome.defeat,
+        playerHealth: 0,
+        revivalStarted: true,
+        revivalSteps: 320,
+        victoryXpReward: 175,
+        victoryCoinReward: 42,
+      );
+
+      final restored = AdventureQuest.fromJson(quest.toJson(), enemy: enemy);
+
+      expect(restored.isPlayerDefeated, isTrue);
+      expect(restored.isRevivalActive, isTrue);
+      expect(restored.revivalSteps, 320);
+      expect(restored.revivalRemainingSteps, 180);
+      expect(restored.victoryXpReward, 175);
+      expect(restored.victoryCoinReward, 42);
+      expect(restored.roundTargetSteps, 0);
     });
   });
 }

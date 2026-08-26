@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
@@ -38,6 +39,14 @@ void main() {
 
   final enemy = EnemyCatalog.byId('night_oath')!;
   var shellSerial = 0;
+  late DateTime now;
+
+  setUp(() {
+    GameClock.reset();
+    now = DateTime(2026, 9, 1, 12);
+    GameClock.useSource(() => now);
+  });
+  tearDown(GameClock.reset);
 
   Future<UserProfile> pumpShell(
     WidgetTester tester, {
@@ -107,7 +116,7 @@ void main() {
 
       // 8. seviye tabanı: 100 + 10 * 7 = 170.
       expect(quest.playerMaxHealth, 170);
-      expect(quest.enemyHealth, enemy.maxHealth);
+      expect(quest.enemyHealth, quest.scaledEnemyMaxHealth);
     });
 
     testWidgets('tohum kurulmadan round çözülürse deterministik yedek kurulur', (
@@ -121,6 +130,7 @@ void main() {
         profile: UserProfile(avatar: _avatar, level: 4),
         adventure: quest,
       );
+      now = quest.nextEnemyAttackAt;
       await addSteps(tester, 1000);
 
       expect(quest.combatSeed, isNot(0));
@@ -145,13 +155,14 @@ void main() {
         adventure: quest,
       );
 
-      expect(quest.enemyHealth, enemy.maxHealth);
+      expect(quest.enemyHealth, quest.scaledEnemyMaxHealth);
       final healthBefore = quest.playerHealth;
+      now = quest.nextEnemyAttackAt;
       await addSteps(tester, 1000);
 
       expect(
         quest.enemyHealth,
-        lessThan(enemy.maxHealth),
+        lessThan(quest.scaledEnemyMaxHealth),
         reason: 'tam round düşmana hasar vermeli',
       );
       // Tam tamamlanan round hasar aldırmaz. (Can tavanı açılışta büyümüş
@@ -167,11 +178,27 @@ void main() {
       await pumpShell(tester, profile: profile, adventure: quest);
 
       final xpBefore = profile.xp;
+      final coinsBefore = profile.coins;
       final levelBefore = profile.level;
+      now = now.add(quest.totalAttackDuration);
       await addSteps(tester, 1000);
+      await tester.pump(const Duration(seconds: 1));
 
       expect(quest.isEnemyDefeated, isTrue);
       expect(quest.xpAwarded, isTrue);
+      expect(quest.victoryXpReward, greaterThan(0));
+      final minimumCoins = 4 + (quest.enemy.tier * 3);
+      final maximumCoins = 10 + (quest.enemy.tier * 6);
+      expect(
+        quest.victoryCoinReward,
+        inInclusiveRange(minimumCoins, maximumCoins),
+      );
+      expect(
+        profile.coins,
+        coinsBefore +
+            quest.victoryCoinReward +
+            (1000 ~/ GameConstants.stepsPerCoin),
+      );
       expect(
         profile.level > levelBefore || profile.xp > xpBefore,
         isTrue,
@@ -201,6 +228,7 @@ void main() {
         profile: UserProfile(avatar: _avatar, level: 4),
         adventure: quest,
       );
+      now = quest.nextEnemyAttackAt;
       await addSteps(tester, 1000);
       await GameStorage.flush();
 
@@ -226,7 +254,7 @@ void main() {
       final startedAt = DateTime(2026, 9, 1, 12);
       AdventureQuest fresh() => AdventureQuest(
         enemy: enemy,
-        stepGoal: 4000,
+        stepGoal: 5000,
         startedAt: startedAt,
         combatSeed: 777,
       );
@@ -234,7 +262,7 @@ void main() {
       final direct = fresh();
       direct.resolveExpiredRound(
         500,
-        startedAt.add(const Duration(seconds: 30)),
+        startedAt.add(const Duration(seconds: 180)),
       );
 
       // Aynı macera diske gidip geri gelirse round aynı çıkmalı.
@@ -245,7 +273,7 @@ void main() {
       );
       reloaded.resolveExpiredRound(
         500,
-        startedAt.add(const Duration(seconds: 30)),
+        startedAt.add(const Duration(seconds: 180)),
       );
 
       expect(reloaded.enemyHealth, direct.enemyHealth);
@@ -278,7 +306,10 @@ void main() {
       final adventure = restored!.adventure!;
 
       // Düşman canının yarısı gitmiş olmalı, tam canla geri gelmemeli.
-      expect(adventure.enemyHealth, (enemy.maxHealth * 0.5).round());
+      expect(
+        adventure.enemyHealth,
+        (adventure.scaledEnemyMaxHealth * 0.5).round(),
+      );
       expect(adventure.isEnemyDefeated, isFalse);
 
       // Oyuncunun canı oranı korunarak yeni tavana taşınır: 6. seviye = 150.

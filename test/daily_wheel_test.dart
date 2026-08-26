@@ -60,6 +60,21 @@ void main() {
 
   Finder spinButton() => find.widgetWithText(FilledButton, 'Çarkı Çevir');
 
+  testWidgets('eski segmentli arka çark olmadan yedi dişli gösterilir', (
+    tester,
+  ) async {
+    await pumpWheel(tester, alreadySpunToday: false);
+
+    expect(find.byType(StillGifFrame), findsNWidgets(7));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('chance-wheel-face')),
+        matching: find.byType(CustomPaint),
+      ),
+      findsNothing,
+    );
+  });
+
   group('günlük hak', () {
     testWidgets('hak duruyorsa çevirme düğmesi çıkar', (tester) async {
       await pumpWheel(tester, alreadySpunToday: false);

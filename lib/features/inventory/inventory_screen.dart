@@ -21,8 +21,9 @@ import '../../models/user_profile.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/archetype_badge.dart';
 import '../../widgets/rarity_badge.dart';
+import '../../widgets/scroll_to_top_button.dart';
 import '../../widgets/section_card.dart';
-import 'blacksmith_screen.dart';
+import '../tutorial/tutorial_guide.dart';
 
 /// Envanter ekranının okuduğu anlık durum.
 ///
@@ -112,6 +113,7 @@ class InventoryScreen extends StatefulWidget {
 
   /// Aynı eşyanın aynı nadirlikteki örneklerini birleştirir (demirci).
   final void Function(String itemId, RewardRarity rarity) onMerge;
+  final String? tutorialItemId;
 
   const InventoryScreen({
     super.key,
@@ -122,6 +124,7 @@ class InventoryScreen extends StatefulWidget {
     required this.onSell,
     required this.onUpgrade,
     required this.onMerge,
+    this.tutorialItemId,
   });
 
   @override
@@ -129,15 +132,27 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   /// `null` = bütün slotlar.
   ItemCategory? _categoryFilter;
 
   /// Yalnızca seviyesi yeten itemleri göster.
   bool _onlyUsable = false;
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   List<InventoryEntry> _visible(InventoryState state) {
     final entries =
         state.entries.where((entry) {
+          if (widget.tutorialItemId != null &&
+              entry.item.id != widget.tutorialItemId) {
+            return false;
+          }
           if (_categoryFilter != null &&
               entry.item.category != _categoryFilter) {
             return false;
@@ -179,22 +194,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return;
       }
     }
-  }
-
-  /// Demirciyi açar. Ekran veri tutmuyor; aynı [readState] ve `revision`
-  /// üzerinden `RootShell`'i canlı okuyor (GD27).
-  void _openBlacksmith() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder:
-            (_) => BlacksmithScreen(
-              revision: widget.revision,
-              readState: widget.readState,
-              onUpgrade: widget.onUpgrade,
-              onMerge: widget.onMerge,
-            ),
-      ),
-    );
   }
 
   void _notify(String message) {
@@ -275,6 +274,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (context, _, __) {
         final state = widget.readState();
         final visible = _visible(state);
+        if (widget.tutorialItemId != null) {
+          return _TutorialInventoryScaffold(
+            state: state,
+            entry: visible.isEmpty ? null : visible.first,
+            onEquip: widget.onEquip,
+          );
+        }
         final slots = state.slots;
         final categories =
             slots
@@ -289,13 +295,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           appBar: AppBar(
             title: const Text('Envanter'),
             actions: [
-              // Demirci belirgin bir örs düğmesi olarak duruyor: yükseltme ve
-              // birleştirme kuşanma listesinin arasında kaybolmasın.
-              IconButton(
-                tooltip: 'Demirci',
-                icon: const Icon(Icons.hardware),
-                onPressed: _openBlacksmith,
-              ),
               Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: Center(
@@ -316,7 +315,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ],
           ),
+          floatingActionButton: ScrollToTopButton(
+            controller: _scrollController,
+          ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerFloat,
           body: CustomScrollView(
+            key: const ValueKey('inventory-scroll-view'),
+            controller: _scrollController,
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -395,7 +401,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                     sliver: SliverList.builder(
                       itemCount: visible.length,
                       itemBuilder: (context, index) {
@@ -417,6 +423,128 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Eğitim sırasında yalnızca az önce alınan silahı ve zorunlu Kuşan eylemini
+/// gösterir. İçerik tek ekrana sığar; sayfa veya kart kaydırılamaz.
+class _TutorialInventoryScaffold extends StatelessWidget {
+  final InventoryState state;
+  final InventoryEntry? entry;
+  final void Function(int instanceId) onEquip;
+
+  const _TutorialInventoryScaffold({
+    required this.state,
+    required this.entry,
+    required this.onEquip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Envanter'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Row(
+                children: [
+                  const Icon(Icons.monetization_on, color: AppColors.streak),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${state.profile.coins}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        child:
+            entry == null
+                ? const Center(child: Text('Eğitim silahı bulunamadı.'))
+                : _TutorialEquipCard(
+                  entry: entry!,
+                  onEquip: () => onEquip(entry!.instanceId),
+                ),
+      ),
+    );
+  }
+}
+
+class _TutorialEquipCard extends StatelessWidget {
+  final InventoryEntry entry;
+  final VoidCallback onEquip;
+
+  const _TutorialEquipCard({required this.entry, required this.onEquip});
+
+  @override
+  Widget build(BuildContext context) {
+    final item = entry.item;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SectionCard(
+        title: 'İlk silahın',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 112,
+              child: Image.asset(
+                item.assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+                errorBuilder:
+                    (_, _, _) => const Icon(
+                      Icons.inventory_2_outlined,
+                      size: 64,
+                      color: Colors.white24,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              item.name,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 7,
+              runSpacing: 6,
+              children: [
+                RarityBadge(rarity: item.rarity),
+                ArchetypeBadge(archetype: item.archetype),
+                _Tag(text: item.category.label, color: AppColors.primary),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              item.buff.labels.join(' · '),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.xp, height: 1.3),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              key: TutorialGuideTargetKeys.inventoryItem,
+              onPressed: entry.equipped ? null : onEquip,
+              icon: Icon(entry.equipped ? Icons.check : Icons.shield_outlined),
+              label: Text(entry.equipped ? 'Kuşanıldı' : 'Kuşan'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -684,12 +812,6 @@ class CharacterPowerPanel extends StatelessWidget {
             total: '×${_multiplier(buffs.enemyXpMultiplier)}',
           ),
           _StatRow(
-            label: 'Günlük coin sınırı',
-            base: '${GameConstants.maxDailyStepCoins}',
-            bonus: _flat(buffs.dailyCoinCapBonus),
-            total: '${buffs.dailyCoinCap}',
-          ),
-          _StatRow(
             label: 'Dondurma stoğu',
             base: '${GameConstants.maxStreakFreezes}',
             bonus: _flat(buffs.streakFreezeCapBonus),
@@ -841,9 +963,7 @@ class _StreakBonusSection extends StatelessWidget {
         // Bölümün kendi sütun başlıkları: üstteki tabloda "EKİPMAN" yazan
         // sütun burada seri gününü taşıyor, aynı başlığı kullanmak yanıltıcı
         // olurdu.
-        const _StatHeader(
-          columns: ['GÜN', 'BONUS', 'DURUM'],
-        ),
+        const _StatHeader(columns: ['GÜN', 'BONUS', 'DURUM']),
         for (final stat in StreakStatBonuses.pool)
           if (bonuses.daysFor(stat) > 0)
             _StatRow(

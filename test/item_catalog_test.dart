@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/data/item_archetypes.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -192,9 +193,12 @@ void main() {
       }
     });
 
-    test('en ucuz item günlük coin tavanının altında', () {
-      // Günlük tavan 400 coin; ilk item bir günden kısa sürede alınabilmeli.
-      expect(costFor(RewardRarity.common, 1), lessThan(400));
+    test('en ucuz item referans bir günlük kazancın erişiminde', () {
+      final referenceDailyCoins = 6000 ~/ GameConstants.stepsPerCoin;
+      expect(
+        costFor(RewardRarity.common, 1),
+        lessThanOrEqualTo(referenceDailyCoins),
+      );
     });
   });
 
@@ -264,7 +268,7 @@ void main() {
 
     test('imza dağılımı dengeli ve hiçbir bonus türü boşta kalmıyor', () {
       // Eski invariant "her sınıfın imzası ayrı" idi. 18 oynanabilir sınıf ve
-      // sekiz bonus türüyle bu **matematiksel olarak imkânsız**; test sekiz
+      // sekiz bonus türüyle bu **matematiksel olarak imkânsız**; test eski
       // ölü sınıfa baktığı için yanlışlıkla geçiyordu (bkz. GD36).
       //
       // Yerine geçen kural: dağılım dengeli olmalı ve hiçbir tür sahipsiz
@@ -280,7 +284,7 @@ void main() {
               // Ağırlıklı çekilişte imza her zaman ilk sırada çıkmaz; imzayı
               // doğrudan ölçmek için tek elemanlık bir tohum kullanılıyor.
               id: '__signature_probe__',
-              count: 8,
+              count: ItemBuffType.values.length,
             ).first;
         counts[_signatureOf(characterClass)] =
             counts[_signatureOf(characterClass)]! + 1;
@@ -299,10 +303,7 @@ void main() {
           reason: '${entry.key.name} çok fazla sınıfa imza oluyor',
         );
       }
-      expect(
-        counts.values.fold<int>(0, (a, b) => a + b),
-        _allClasses.length,
-      );
+      expect(counts.values.fold<int>(0, (a, b) => a + b), _allClasses.length);
     });
 
     test('aynı görsel sınıfa göre farklı item olur', () {
@@ -361,8 +362,8 @@ void main() {
         'adım parası +%6 · adım XP +%6',
       );
       expect(
-        ItemBuff.stats(dailyCoinCapBonus: 30, streakStepRelief: 200).labels,
-        ['günlük coin sınırı +30', 'seri eşiği -200 adım'],
+        ItemBuff.stats(stepCoinBonus: 0.075, streakStepRelief: 200).labels,
+        ['adım parası +%7,5', 'seri eşiği -200 adım'],
       );
     });
   });

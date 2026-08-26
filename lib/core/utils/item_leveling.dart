@@ -17,10 +17,10 @@
 ///
 /// ## ⚠️ Yükseltme yalnızca SAVAŞ statlarını büyütür
 ///
-/// Ekonomi bonusları (adım→para, adım→XP, çark XP, düşman XP, tavanlar, seri
+/// Ekonomi bonusları (adım→para, adım→XP, çark XP, düşman XP, stoklar, seri
 /// eşiği) **sabit kalır**. Ekonomi dikkatle dengelendi
-/// (`economy_pacing_test.dart` ve dört tavan); çarpanlar seviyeyle büyüseydi
-/// günlük coin tavanı katlanır ve denge çökerdi. Bu kural
+/// (`economy_pacing_test.dart` ve ekonomi sınırları); çarpanlar seviyeyle
+/// büyüseydi adım kazancı katlanır ve denge çökerdi. Bu kural
 /// [scaleForLevel] içinde kodla zorlanıyor ve testle bağlı.
 library;
 

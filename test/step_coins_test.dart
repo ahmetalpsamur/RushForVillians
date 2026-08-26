@@ -23,10 +23,10 @@ const _avatar = AvatarProfile(
 );
 
 final _rate = GameConstants.stepsPerCoin;
-final _cap = GameConstants.maxDailyStepCoins;
+final _legacyCap = GameConstants.maxDailyStepCoins;
 
 /// Kazanç akışının test kopyası: RootShell'deki `_onStepsReported` ile aynı
-/// sırayı izler — delta hesabı, işaretçi ilerletme, günlük tavan.
+/// sırayı izler — delta hesabı, işaretçi ilerletme ve sınırsız ödeme.
 ///
 /// Hız kontrolü burada yok; bu dosya demo (fiziksel olmayan) kaynağın yolunu
 /// test ediyor, orada raporlanan adımın tamamı kredilenir. Hız kontrolünün
@@ -101,47 +101,47 @@ void main() {
     });
   });
 
-  group('günlük tavan', () {
-    test('tavana kadar öder, üstünü ödemez', () {
+  group('sınırsız günlük kazanç', () {
+    test('eski tavanın üstündeki kazanç da tam ödenir', () {
       final reward = calculateStepCoins(
-        pendingSteps: _rate * (_cap + 100),
+        pendingSteps: _rate * (_legacyCap + 100),
         coinsEarnedToday: 0,
       );
 
-      expect(reward.coins, _cap);
-      expect(reward.capReached, isTrue);
+      expect(reward.coins, _legacyCap + 100);
+      expect(reward.capReached, isFalse);
     });
 
-    test('tavana dayanınca kalan adımlar yarına taşınmaz', () {
-      final pending = _rate * (_cap + 100);
+    test('yüksek kazançta coin altı artık adımlar korunur', () {
+      final pending = _rate * (_legacyCap + 100) + 17;
       final reward = calculateStepCoins(
         pendingSteps: pending,
         coinsEarnedToday: 0,
       );
 
-      // Tüm bekleyen adım tüketilir; biriktirip ertesi gün bozdurmak yok.
-      expect(reward.consumedSteps, pending);
+      expect(reward.consumedSteps, pending - 17);
     });
 
-    test('tavan doluyken yeni adım para kazandırmaz', () {
+    test('eski günlük toplam yeni adımların kazancını durdurmaz', () {
       final reward = calculateStepCoins(
         pendingSteps: _rate * 50,
-        coinsEarnedToday: _cap,
+        coinsEarnedToday: _legacyCap,
       );
 
-      expect(reward.coins, 0);
-      expect(reward.capReached, isTrue);
+      expect(reward.coins, 50);
+      expect(reward.capReached, isFalse);
       expect(reward.consumedSteps, _rate * 50);
     });
 
-    test('kısmi tavan payı doğru hesaplanır', () {
+    test('eski dailyCap parametresi ödemeyi kırpmaz', () {
       final reward = calculateStepCoins(
         pendingSteps: _rate * 30,
-        coinsEarnedToday: _cap - 10,
+        coinsEarnedToday: _legacyCap - 10,
+        dailyCap: _legacyCap,
       );
 
-      expect(reward.coins, 10);
-      expect(reward.capReached, isTrue);
+      expect(reward.coins, 30);
+      expect(reward.capReached, isFalse);
     });
   });
 
@@ -157,14 +157,14 @@ void main() {
       expect(reward.consumedSteps, _rate * 10);
     });
 
-    test('çarpan günlük tavanı aşamaz', () {
+    test('çarpan eski günlük tavan tarafından kırpılmaz', () {
       final reward = calculateStepCoins(
-        pendingSteps: _rate * _cap,
+        pendingSteps: _rate * _legacyCap,
         coinsEarnedToday: 0,
         multiplier: 3,
       );
 
-      expect(reward.coins, _cap);
+      expect(reward.coins, _legacyCap * 3);
     });
 
     test('varsayılan çarpan davranışı değiştirmez', () {
@@ -249,18 +249,18 @@ void main() {
       expect(award(profile, today, _rate * 10).coins, 0);
     });
 
-    test('dünkü tavan bugünü etkilemez', () {
+    test('dünkü sınırsız kazanç bugünün sayacını etkilemez', () {
       final profile = UserProfile(avatar: _avatar);
       var today = DailyProgress(date: DateTime(2026, 8, 18));
 
-      award(profile, today, _rate * (_cap + 100));
-      expect(profile.coins, _cap);
+      award(profile, today, _rate * (_legacyCap + 100));
+      expect(profile.coins, _legacyCap + 100);
 
       today = DailyProgress(date: DateTime(2026, 8, 19));
-      award(profile, today, _rate * (_cap + 100) + _rate * 5);
+      award(profile, today, _rate * (_legacyCap + 100) + _rate * 5);
 
       expect(today.coinsEarned, 5);
-      expect(profile.coins, _cap + 5);
+      expect(profile.coins, _legacyCap + 105);
     });
   });
 

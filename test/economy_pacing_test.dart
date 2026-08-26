@@ -17,7 +17,7 @@ import 'package:rush_for_villains/models/reward_rarity.dart';
 /// birbirinden kopmuşsa kapılardan biri dekoratif hâle gelir.
 ///
 /// Bu test şu sabitlerden herhangi biri değişirse alarm verir:
-/// `stepsPerCoin`, `stepsPerXp`, `maxDailyStepCoins`, `baseXpPerLevel`,
+/// `stepsPerCoin`, `stepsPerXp`, `baseXpPerLevel`,
 /// `item_rules.dart:_costBase`, `_levelBand`.
 void main() {
   /// Referans oyuncu. Günlük hedefle aynı (bkz. Aşama 1b/2b tabloları).
@@ -40,10 +40,7 @@ void main() {
   const maxRatio = 1.8;
 
   final dailyXp = dailySteps / GameConstants.stepsPerXp;
-  final dailyCoins = (dailySteps / GameConstants.stepsPerCoin).clamp(
-    0,
-    GameConstants.maxDailyStepCoins.toDouble(),
-  );
+  final dailyCoins = dailySteps / GameConstants.stepsPerCoin;
 
   /// N. seviyeye ulaşmak için gereken toplam XP.
   ///

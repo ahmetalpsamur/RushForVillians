@@ -24,6 +24,7 @@ flutter:
   uses-material-design: true
   assets:
     - lib/Start/
+    - lib/All_Assets/coins/
     - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Archer/Archer/
     - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Armored Axeman/Armored Axeman/
     - lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Armored Orc/Armored Orc/
@@ -65,6 +66,9 @@ flutter:
     - lib/Backgrounds/
     - lib/ChanceWheel/
     - lib/SoundEffects/
+    - lib/Tutorial_Guy/Mavili/
+    - lib/Tutorial_Guy/Pinky/
+    - lib/Tutorial_Guy/Kupkuzu/
     - lib/Items/arch/
     - lib/Items/axes_halberds/
     - lib/Items/maces_hammers/

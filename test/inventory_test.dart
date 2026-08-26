@@ -724,12 +724,11 @@ void main() {
       final after = resolveOwnedItem(base, profile.ownedItems.single);
       expect(profile.ownedItems.single.level, 2);
 
-      // Ekonomi bonusları **sabit**: yükseltme günlük coin tavanını
+      // Ekonomi bonusları **sabit**: yükseltme adım kazançlarını
       // katlamamalı (`economy_pacing_test.dart` bu dengeyi ölçüyor).
       expect(after.buff.stepCoinBonus, before.buff.stepCoinBonus);
       expect(after.buff.stepXpBonus, before.buff.stepXpBonus);
       expect(after.buff.enemyXpBonus, before.buff.enemyXpBonus);
-      expect(after.buff.dailyCoinCapBonus, before.buff.dailyCoinCapBonus);
 
       // Savaş statlarından en az biri büyümüş olmalı.
       final grew = [
@@ -814,6 +813,34 @@ void main() {
         profile.grantExtraWheelSpin();
       }
       expect(profile.extraWheelSpins, GameConstants.maxExtraWheelSpins);
+    });
+  });
+
+  group('sayfa başına dön', () {
+    testWidgets('envanter aşağı kaydırılınca kısayol görünür ve başa döner', (
+      tester,
+    ) async {
+      await pumpInventory(
+        tester,
+        profile: makeProfile(owned: List.filled(20, sword.id)),
+      );
+
+      final scrollFinder = find.byKey(const ValueKey('inventory-scroll-view'));
+      final scrollView = tester.widget<CustomScrollView>(scrollFinder);
+      final controller = scrollView.controller!;
+
+      expect(find.byTooltip('Başa dön'), findsNothing);
+
+      await tester.drag(scrollFinder, const Offset(0, -1200));
+      await tester.pump();
+
+      expect(controller.offset, greaterThan(200));
+      expect(find.byTooltip('Başa dön'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Başa dön'));
+      await tester.pumpAndSettle();
+
+      expect(controller.offset, closeTo(0, 0.1));
     });
   });
 }

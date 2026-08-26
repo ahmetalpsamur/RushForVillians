@@ -358,7 +358,7 @@ void main() {
   });
 
   group('hile koruması akışta', () {
-    test('sallanan telefon günlük tavanı dolduramaz', () async {
+    test('sallanan telefon gerçek dışı coin üretemez', () async {
       final harness = Harness();
       addTearDown(harness.dispose);
 
@@ -367,7 +367,7 @@ void main() {
       await harness.emit(50000, advance: const Duration(seconds: 10));
 
       expect(harness.profile.totalSteps, lessThan(1000));
-      expect(harness.profile.coins, lessThan(GameConstants.maxDailyStepCoins));
+      expect(harness.profile.coins, lessThan(1000 ~/ _rate));
     });
 
     test('gerçek yürüyüş hız kontrolünden etkilenmez', () async {

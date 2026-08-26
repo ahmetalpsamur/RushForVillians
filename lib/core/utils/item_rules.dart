@@ -182,8 +182,8 @@ ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
   'Swordsman' || 'Elite Orc' || 'Armored Axeman' => ItemBuffType.enemyXp,
   // Zırhlı olanlar kararlıdır: serilerini korurlar.
   'Knight' || 'Armored Skeleton' => ItemBuffType.streakFreezeCap,
-  // Yağmacılar günlük kazanç tavanını zorlar.
-  'Orc' || 'Werewolf' => ItemBuffType.dailyCoinCap,
+  // Yağmacılar yürüyüş ivmesini doğrudan paraya çevirir.
+  'Orc' || 'Werewolf' => ItemBuffType.stepCoinMomentum,
   // Gezginler için yol para eder.
   'Archer' || 'Soldier' => ItemBuffType.stepCoin,
   // Öğrenenler adımdan bilgi devşirir.
@@ -202,7 +202,7 @@ ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
   // sessizce başka bir bonusa kaymamalı.
   'SwordMan' => ItemBuffType.enemyXp,
   'Paladin' => ItemBuffType.streakFreezeCap,
-  'Thief' || 'Bat' => ItemBuffType.dailyCoinCap,
+  'Thief' || 'Bat' => ItemBuffType.stepCoinMomentum,
   'Lancer' || 'Orc rider' => ItemBuffType.stepCoin,
   'Magic' => ItemBuffType.stepXp,
   'DarkMagic' || 'Necromancer' => ItemBuffType.wheelXp,
@@ -214,7 +214,7 @@ ItemBuffType _classSignature(String characterClass) => switch (characterClass) {
 /// Kategorinin rolüne göre ikincil bonus eğilimi.
 ///
 /// - yakın dövüş → XP ve düşman XP'si (savaş gücü hızlı seviye demek),
-/// - menzil → para ve kazanç tavanı (hazırlıklı gezgin daha çok toplar),
+/// - menzil → para, para ivmesi ve çark stoğu,
 /// - savunma → dayanıklılık (seri koruma, eşik indirimi),
 /// - büyü → çark ve XP (şans ve bilgi).
 ///
@@ -229,7 +229,7 @@ List<ItemBuffType> _roleOrder(ItemRole role) => switch (role) {
   ],
   ItemRole.ranged => const [
     ItemBuffType.stepCoin,
-    ItemBuffType.dailyCoinCap,
+    ItemBuffType.stepCoinMomentum,
     ItemBuffType.wheelSpinCap,
   ],
   ItemRole.defense => const [
@@ -467,17 +467,20 @@ ItemEffect _ruleEffect(ItemBuffType type, double value) {
     case ItemBuffType.stepCoin:
     case ItemBuffType.stepXp:
       return ItemEffect(stat: type.stat, value: _cappedRate(value));
+    // Eski günlük coin tavanı kanalının yerini alan ikinci para eğilimi.
+    // Ayrı katsayı katalog çeşitliliğini korur; ödeme yine sınırsız stepCoin
+    // çarpanından geçer ve günlük bir tavana dönüşmez.
+    case ItemBuffType.stepCoinMomentum:
+      return ItemEffect(
+        stat: ItemStat.stepCoin,
+        value: _cappedRate(value * 0.75),
+      );
     // Çark ve düşman XP'si nadir olaylar: aynı bütçe payı orada daha az
     // hissedilir, bu yüzden iki katına çıkarılıyor — ama tek item tavanını
     // ([GameConstants.maxSingleItemEconomyBonus]) yine de aşamıyor.
     case ItemBuffType.wheelXp:
     case ItemBuffType.enemyXp:
       return ItemEffect(stat: type.stat, value: _cappedRate(value * 2));
-    case ItemBuffType.dailyCoinCap:
-      return ItemEffect.flat(
-        stat: type.stat,
-        value: _roundTo(value * 600, 5).toDouble(),
-      );
     case ItemBuffType.streakFreezeCap:
     case ItemBuffType.wheelSpinCap:
       return ItemEffect.flat(

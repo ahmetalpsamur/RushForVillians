@@ -34,6 +34,7 @@ class ProfileScreen extends StatelessWidget {
   final EquippedBuffs buffs;
 
   final VoidCallback onOpenInventory;
+  final VoidCallback onOpenBlacksmith;
 
   const ProfileScreen({
     super.key,
@@ -43,6 +44,7 @@ class ProfileScreen extends StatelessWidget {
     required this.onEditCharacter,
     required this.canEditCharacter,
     required this.onOpenInventory,
+    required this.onOpenBlacksmith,
     this.equippedItems = const [],
     this.buffs = EquippedBuffs.none,
     this.adventure,
@@ -76,8 +78,6 @@ class ProfileScreen extends StatelessWidget {
       if (buffs.stepXpBonus > 0) rate('adım XP', buffs.stepXpBonus),
       if (buffs.wheelXpBonus > 0) rate('çark XP', buffs.wheelXpBonus),
       if (buffs.enemyXpBonus > 0) rate('düşman XP', buffs.enemyXpBonus),
-      if (buffs.dailyCoinCapBonus > 0)
-        'günlük sınır +${buffs.dailyCoinCapBonus}',
       if (buffs.streakFreezeCapBonus > 0)
         'dondurma stoğu +${buffs.streakFreezeCapBonus}',
       if (buffs.wheelSpinCapBonus > 0) 'çark stoğu +${buffs.wheelSpinCapBonus}',
@@ -172,6 +172,49 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('profile-blacksmith-entry'),
+                onTap: onOpenBlacksmith,
+                borderRadius: BorderRadius.circular(14),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.white10,
+                        child: Icon(Icons.hardware, color: AppColors.streak),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Demirci',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Silahlarını birleştir, gücüne güç kat.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: Colors.white54),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),

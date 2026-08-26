@@ -8,7 +8,8 @@ class DailyProgress {
   int steps;
   final int stepGoal;
 
-  /// Bugün **adımlardan** kazanılan para. Günlük tavan buna göre uygulanır.
+  /// Bugün **adımlardan** kazanılan para. Yalnızca gösterim/geçmiş için
+  /// tutulur; günlük kazanç tavanı yoktur.
   /// Gün değişince yeni bir [DailyProgress] kurulduğu için kendiliğinden
   /// sıfırlanır.
   int coinsEarned;
@@ -26,8 +27,9 @@ class DailyProgress {
     this.xpEarned = 0,
   });
 
-  /// Günlük adım-para tavanı doldu mu.
-  bool get coinCapReached => coinsEarned >= GameConstants.maxDailyStepCoins;
+  /// Eski UI çağrı noktaları için korunur. Günlük kazanç tavanı
+  /// kaldırıldığından artık hiçbir zaman dolmaz.
+  bool get coinCapReached => false;
 
   double get stepProgress => (steps / stepGoal).clamp(0, 1);
 

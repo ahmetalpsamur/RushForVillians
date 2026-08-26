@@ -6,12 +6,15 @@ import 'core/theme/app_theme.dart';
 import 'features/character/character_creation_screen.dart';
 import 'features/root/root_shell.dart';
 import 'features/start/start_screen.dart';
+import 'features/tutorial/guide_selection_screen.dart';
 import 'models/avatar_profile.dart';
 import 'models/game_state.dart';
+import 'models/tutorial_guide_variant.dart';
 import 'services/adventure_notification_service.dart';
 import 'services/character_storage.dart';
 import 'services/game_storage.dart';
 import 'services/launch_sound.dart';
+import 'services/tutorial_guide_storage.dart';
 
 class RushForVilliansApp extends StatefulWidget {
   const RushForVilliansApp({super.key});
@@ -25,6 +28,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
 
   AvatarProfile? _avatar;
   GameState? _gameState;
+  TutorialGuideVariant? _selectedGuide;
   bool _isLoading = true;
 
   /// Kayıt okunamadıysa `true`. Bu durumda kayıt **silinmez**; kullanıcı
@@ -59,8 +63,10 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     // sürer ve kullanıcı açılış görselinde asılı kalırdı.
     AvatarProfile? avatar;
     GameState? gameState;
+    TutorialGuideVariant? selectedGuide;
     try {
       avatar = await CharacterStorage.load();
+      selectedGuide = await TutorialGuideStorage.load();
       // Oyun durumu avatara bağlı okunur; avatar yoksa yeni oyuncu demektir.
       gameState =
           avatar == null ? null : await GameStorage.load(avatar: avatar);
@@ -83,6 +89,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     setState(() {
       _avatar = avatar;
       _gameState = gameState;
+      _selectedGuide = selectedGuide;
       _isLoading = false;
     });
     _showStorageWarningIfNeeded();
@@ -118,6 +125,16 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     setState(() => _avatar = avatar);
   }
 
+  Future<void> _saveGuide(TutorialGuideVariant guide) async {
+    try {
+      await TutorialGuideStorage.save(guide);
+    } catch (error) {
+      debugPrint('Yol arkadaşı kaydedilemedi ($error)');
+    }
+    if (!mounted) return;
+    setState(() => _selectedGuide = guide);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -128,11 +145,15 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       home:
           _isLoading
               ? const StartScreen()
+              : _avatar == null && _selectedGuide == null
+              ? GuideSelectionScreen(onSelected: _saveGuide)
               : _avatar == null
               ? CharacterCreationScreen(onCompleted: _saveCharacter)
               : RootShell(
                 avatar: _avatar!,
                 initialState: _gameState,
+                startTutorial: true,
+                initialTutorialGuide: _selectedGuide,
                 onAvatarChanged: _saveCharacter,
               ),
     );

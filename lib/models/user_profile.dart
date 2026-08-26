@@ -67,9 +67,8 @@ class UserProfile {
   /// [totalSteps]'in XP'ye çevrilmiş olduğu nokta.
   ///
   /// [lastRewardedStepCount]'tan **bilerek ayrı**: ikisi aynı işaretçiyi
-  /// paylaşsaydı, günlük para tavanı dolduğunda o işaretçi bekleyen tüm
-  /// adımları tükettiği için XP de dururdu. İki ekonominin oranı, tavanı ve
-  /// artık-adım davranışı farklı.
+  /// paylaşsaydı, farklı dönüşüm oranları bir işaretçinin diğer ödüle ait
+  /// artık adımları tüketmesine ve XP'nin kaybolmasına yol açardı.
   int lastXpRewardedStepCount;
 
   /// Adım kaynağından **raporlanmış** son kümülatif değer.
@@ -163,6 +162,18 @@ class UserProfile {
   /// açmak yeni bir zar attırmaz.
   DateTime? lastStreakBonusDay;
 
+  /// Tutorial bir kez tamamlandıktan sonra yeniden açılmaz.
+  bool hasCompletedTutorial;
+
+  /// Yarım kalan tutorialın kaldığı merkezi adım indeksi.
+  int tutorialStep;
+
+  /// İlk kurulumda seçilen yol arkadaşının kalıcı kimliği.
+  String tutorialGuideId;
+
+  /// Eğitimin satın aldıracağı, sınıfa uygun ilk silahın kimliği.
+  String? tutorialStarterItemId;
+
   UserProfile({
     required this.avatar,
     int? hp,
@@ -192,6 +203,10 @@ class UserProfile {
     this.streakStatBonuses = StreakStatBonuses.empty,
     this.streakBonusSeed = 0,
     this.lastStreakBonusDay,
+    this.hasCompletedTutorial = false,
+    this.tutorialStep = 0,
+    this.tutorialGuideId = 'mavili',
+    this.tutorialStarterItemId,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItems = ownedItems ?? <OwnedItem>[],
@@ -558,6 +573,10 @@ class UserProfile {
     'streakStatBonuses': streakStatBonuses.toJson(),
     'streakBonusSeed': streakBonusSeed,
     'lastStreakBonusDay': lastStreakBonusDay?.toIso8601String(),
+    'hasCompletedTutorial': hasCompletedTutorial,
+    'tutorialStep': tutorialStep,
+    'tutorialGuideId': tutorialGuideId,
+    'tutorialStarterItemId': tutorialStarterItemId,
   };
 
   /// Eksik alanlar varsayılana düşer; böylece eski kayıtlar okunabilir kalır.
@@ -609,6 +628,15 @@ class UserProfile {
       streakBonusSeed: json['streakBonusSeed'] as int? ?? 0,
       lastStreakBonusDay: _parseDate(json['lastStreakBonusDay']),
       xpBoostUntil: _parseDate(json['xpBoostUntil']),
+      // Alanın eksik olması eski bir kaydı gösterir; mevcut oyunculara tutorialı
+      // zorla yeniden oynatmayız. Yeni profiller constructor varsayılanıyla false.
+      hasCompletedTutorial: json['hasCompletedTutorial'] as bool? ?? true,
+      tutorialStep: switch (json['tutorialStep']) {
+        final int value when value >= 0 => value,
+        _ => 0,
+      },
+      tutorialGuideId: json['tutorialGuideId'] as String? ?? 'mavili',
+      tutorialStarterItemId: json['tutorialStarterItemId'] as String?,
     );
   }
 

@@ -15,8 +15,10 @@ import '../../models/daily_progress.dart';
 import '../../models/enemy.dart';
 import '../../services/character_catalog.dart';
 import '../../widgets/pixel_sprite.dart';
+import '../../widgets/scroll_to_top_button.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
+import '../tutorial/tutorial_guide.dart';
 
 class AdventureScreen extends StatefulWidget {
   final AdventureQuest? adventure;
@@ -24,8 +26,10 @@ class AdventureScreen extends StatefulWidget {
   final AvatarProfile avatar;
   final DailyProgress today;
   final ValueChanged<AdventureQuest> onAdventureSelected;
+  final VoidCallback onStartRevival;
   final VoidCallback onChooseNewAdventure;
   final VoidCallback onAdventureUpdated;
+  final bool tutorialMode;
 
   const AdventureScreen({
     super.key,
@@ -34,8 +38,10 @@ class AdventureScreen extends StatefulWidget {
     required this.avatar,
     required this.today,
     required this.onAdventureSelected,
+    required this.onStartRevival,
     required this.onChooseNewAdventure,
     required this.onAdventureUpdated,
+    this.tutorialMode = false,
   });
 
   @override
@@ -57,6 +63,7 @@ class _AdventureScreenState extends State<AdventureScreen>
 
   int _stepGoal = 500;
   Enemy? _selectedEnemy;
+  final ScrollController _scrollController = ScrollController();
   late final AnimationController _damageMessageController;
   late final Animation<double> _damageMessageOpacity;
   late final AnimationController _roundAttackController;
@@ -149,18 +156,34 @@ class _AdventureScreenState extends State<AdventureScreen>
 
   void _prepareDamageFeedback() {
     final adventure = widget.adventure;
+    _roundAttackController.stop();
+    _roundTransitionController.stop();
+    _damageMessageController.stop();
+    _frozenDeathFrame?.dispose();
+    _frozenDeathFrame = null;
     _pendingDamage = 0;
     _playerDamage = 0;
     _showHurt = false;
     _showAttack = false;
     _showDeath = false;
     _showCongratulations = false;
+    _showRoundVictory = false;
     _showEnemyRoundVictory = false;
+    _showRoundTransition = false;
+    _isFinalVictory = false;
+    _showEnemyDeath = false;
+    _showFrozenEnemy = false;
+    _showDeathCongratulations = false;
+    _victoryCycle = 0;
+    _enemyVictoryCycle = 0;
+    _overlayEnemyHealth = 1;
+    _roundPlayerAttackAsset = null;
+    _roundEnemyAttackAsset = null;
     if (adventure == null) return;
 
     if (adventure.roundOutcomeSerial > adventure.presentedRoundOutcomeSerial) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted || widget.adventure != adventure) return;
         if (adventure.lastRoundWon) {
           _playRoundVictory(adventure);
         } else {
@@ -173,23 +196,26 @@ class _AdventureScreenState extends State<AdventureScreen>
     _pendingDamage = adventure.takePendingDamage();
     if (adventure.isEnemyDefeated) {
       if (adventure.deathAnimationPlayed) {
-        _showCongratulations = true;
+        _showRoundVictory = true;
+        _isFinalVictory = true;
+        _showEnemyDeath = true;
+        _showDeathCongratulations = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _restoreVictoryCorpse(adventure);
+        });
         return;
       }
 
       adventure.deathAnimationPlayed = true;
-      _showDeath = true;
-      if (_pendingDamage > 0) {
-        _damageMessageController.forward(from: 0);
-      }
+      _showRoundVictory = true;
+      _isFinalVictory = true;
+      _showEnemyDeath = true;
+      _showDeathCongratulations = true;
       _enemyAnimationTimer = Timer(
         Duration(milliseconds: adventure.enemy.deathAnimationDurationMs),
         () {
           if (!mounted) return;
-          setState(() {
-            _showDeath = false;
-            _showCongratulations = true;
-          });
+          _restoreVictoryCorpse(adventure);
         },
       );
       return;
@@ -201,6 +227,20 @@ class _AdventureScreenState extends State<AdventureScreen>
     _damageMessageController.forward(from: 0);
     _enemyAnimationTimer = Timer(const Duration(milliseconds: 2400), () {
       if (mounted) setState(() => _showHurt = false);
+    });
+  }
+
+  Future<void> _restoreVictoryCorpse(AdventureQuest adventure) async {
+    final frame = await _decodeLastGifFrame(adventure.enemy.deathAsset);
+    if (!mounted || widget.adventure != adventure) {
+      frame?.dispose();
+      return;
+    }
+    _frozenDeathFrame?.dispose();
+    _frozenDeathFrame = frame;
+    setState(() {
+      _showEnemyDeath = false;
+      _showFrozenEnemy = frame != null;
     });
   }
 
@@ -222,10 +262,11 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Future<void> _playRoundVictory(AdventureQuest adventure) async {
+    if (widget.adventure != adventure) return;
     _enemyAnimationTimer?.cancel();
     _roundAttackController.stop();
     final classes = await CharacterCatalog.load();
-    if (!mounted) return;
+    if (!mounted || widget.adventure != adventure) return;
     final matchingClasses = classes.where(
       (characterClass) => characterClass.id == widget.avatar.characterClass,
     );
@@ -245,15 +286,13 @@ class _AdventureScreenState extends State<AdventureScreen>
             : candidates[Random().nextInt(candidates.length)];
     _lastRoundPlayerAttackAsset = playerAttackAsset;
     final playerAttackDuration = await GifTiming.cycle(playerAttackAsset);
-    if (!mounted) return;
+    if (!mounted || widget.adventure != adventure) return;
     _roundAttackController.duration = playerAttackDuration;
 
     final isFinalVictory = adventure.isEnemyDefeated;
-    final finalRoundSteps =
-        adventure.stepGoal % AdventureQuest.stageStepTarget == 0
-            ? min(adventure.stepGoal, AdventureQuest.stageStepTarget)
-            : adventure.stepGoal % AdventureQuest.stageStepTarget;
-    final healthBeforeFinalRound = finalRoundSteps / adventure.stepGoal;
+    final finalDamage = max(1, adventure.lastPlayerDamage);
+    final healthBeforeFinalRound =
+        (finalDamage / adventure.scaledEnemyMaxHealth).clamp(0.02, 1.0);
     setState(() {
       _showRoundVictory = true;
       _showEnemyRoundVictory = false;
@@ -315,15 +354,6 @@ class _AdventureScreenState extends State<AdventureScreen>
         _showDeathCongratulations = true;
         adventure.deathAnimationPlayed = true;
       });
-      await Future<void>.delayed(const Duration(milliseconds: 2200));
-      if (!mounted) return;
-    }
-
-    if (isFinalVictory) {
-      setState(() {
-        _showRoundVictory = false;
-        _showCongratulations = true;
-      });
       _markRoundOutcomePresented(adventure);
       return;
     }
@@ -359,8 +389,21 @@ class _AdventureScreenState extends State<AdventureScreen>
       ui.Image? lastFrame;
       for (var index = 0; index < codec.frameCount; index++) {
         final frame = await codec.getNextFrame();
-        lastFrame?.dispose();
-        lastFrame = frame.image;
+        final pixels = await frame.image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        var visiblePixels = 0;
+        if (pixels != null) {
+          for (var offset = 3; offset < pixels.lengthInBytes; offset += 4) {
+            if (pixels.getUint8(offset) > 8 && ++visiblePixels >= 12) break;
+          }
+        }
+        if (visiblePixels >= 12) {
+          lastFrame?.dispose();
+          lastFrame = frame.image;
+        } else {
+          frame.image.dispose();
+        }
       }
       codec.dispose();
       return lastFrame;
@@ -439,6 +482,7 @@ class _AdventureScreenState extends State<AdventureScreen>
   @override
   void dispose() {
     _enemyAnimationTimer?.cancel();
+    _scrollController.dispose();
     _damageMessageController.dispose();
     _roundAttackController.dispose();
     _roundTransitionController.dispose();
@@ -553,9 +597,6 @@ class _AdventureScreenState extends State<AdventureScreen>
                                   setSheetState(() => draftGoal = nextGoal);
                                 },
                                 childDelegate: ListWheelChildBuilderDelegate(
-                                  // Negatif indeksleri tamamen kapatır; pratikte
-                                  // sınırsız bir üst aralık bırakırken ilk değer
-                                  // her zaman 500 adım olarak kalır.
                                   childCount: 0x7fffffff,
                                   builder: (context, index) {
                                     final goal = (index + 1) * increment;
@@ -570,7 +611,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                               selected
                                                   ? Colors.white
                                                   : Colors.white70,
-                                          fontSize: selected ? 43 : 27,
+                                          fontSize: selected ? 39 : 25,
                                           fontWeight:
                                               selected
                                                   ? FontWeight.w900
@@ -708,13 +749,19 @@ class _AdventureScreenState extends State<AdventureScreen>
     final content =
         adventure == null
             ? _buildSelection(context)
-            : _showCongratulations
-            ? _buildCongratulations(context, adventure)
-            : adventure.playerHealth <= 0 && !_showAttack
+            : adventure.isPlayerDefeated && adventure.revivalCompleted
+            ? _buildRevivalCompleted(context, adventure)
+            : adventure.isPlayerDefeated && adventure.isRevivalActive
+            ? _buildRevivalWalk(context, adventure)
+            : adventure.isPlayerDefeated
             ? _buildPlayerDefeat(context, adventure)
+            : adventure.isEnemyDefeated && _showCongratulations
+            ? _buildCongratulations(context, adventure)
             : _buildAdventure(context, adventure);
     return Scaffold(
       appBar: AppBar(title: const Text('Macera')),
+      floatingActionButton: ScrollToTopButton(controller: _scrollController),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: Stack(
         children: [
           Positioned.fill(child: content),
@@ -728,203 +775,273 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Widget _buildRoundVictoryOverlay(AdventureQuest adventure) {
-    return ColoredBox(
-      color: Colors.black.withValues(alpha: 0.9),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(),
-              Text(
-                '$_victoryRound. ROUND',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _showDeathCongratulations ? 'TEBRİKLER!' : 'ROUND SENİN!',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  shadows: const [
-                    Shadow(color: AppColors.primary, blurRadius: 28),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                _showDeathCongratulations
-                    ? '${adventure.enemy.name} yenildi!'
-                    : 'Round hedefini süresi dolmadan tamamladın',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white60),
-              ),
-              if (_isFinalVictory) ...[
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.favorite, color: AppColors.hp, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TweenAnimationBuilder<double>(
-                        duration: const Duration(milliseconds: 420),
-                        tween: Tween<double>(end: _overlayEnemyHealth),
-                        builder: (context, health, _) {
-                          return LinearProgressIndicator(
-                            value: health.clamp(0, 1),
-                            minHeight: 9,
-                            borderRadius: BorderRadius.circular(99),
-                            color: AppColors.hp,
-                            backgroundColor: AppColors.hp.withValues(
-                              alpha: 0.18,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${(_overlayEnemyHealth * adventure.stepGoal).round()} CAN',
-                      style: const TextStyle(
-                        color: AppColors.hp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const Spacer(),
-              SizedBox(
-                height: 260,
-                child: AnimatedBuilder(
-                  animation: _roundAttackAmount,
-                  builder: (context, _) {
-                    final attack = _roundAttackAmount.value;
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Positioned(
-                          left: -12,
-                          bottom: -2,
-                          width: 210,
-                          height: 230,
-                          child: PixelSprite(
-                            asset:
-                                _roundPlayerAttackAsset ??
-                                widget.avatar.characterAsset,
-                            scale: 3,
-                            imageKey: ValueKey(
-                              'player-attack-$_victoryRound-$_victoryCycle',
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          width: 210,
-                          height: 230,
-                          child: Transform.translate(
-                            offset: Offset(attack * 10, 0),
-                            child: ClipRect(
-                              child: Transform.scale(
-                                scale: 3,
-                                child:
-                                    _showFrozenEnemy &&
-                                            _frozenDeathFrame != null
-                                        ? RawImage(
-                                          image: _frozenDeathFrame,
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.none,
-                                        )
-                                        : Image.asset(
-                                          _showEnemyDeath
-                                              ? adventure.enemy.deathAsset
-                                              : adventure.enemy.hurtAsset,
-                                          key: ValueKey(
-                                            _showEnemyDeath
-                                                ? 'round-death-$_victoryRound'
-                                                : 'round-hurt-$_victoryRound-$_victoryCycle',
-                                          ),
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.none,
-                                          gaplessPlayback: false,
-                                        ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!_showEnemyDeath &&
-                            !_showFrozenEnemy &&
-                            attack > 0.38 &&
-                            attack < 0.9)
-                          const Positioned(
-                            left: 0,
-                            right: 0,
-                            top: 62,
-                            child: Text(
-                              'VURUŞ!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppColors.streak,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                fontStyle: FontStyle.italic,
-                                shadows: [
-                                  Shadow(color: Colors.black, blurRadius: 8),
-                                  Shadow(
-                                    color: AppColors.streak,
-                                    blurRadius: 18,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _showDeathCongratulations
-                    ? 'Canavar yere serildi'
-                    : _showEnemyDeath
-                    ? 'Son darbe!'
-                    : 'Saldırı $_victoryCycle / 2',
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 18),
-              LinearProgressIndicator(
-                value:
-                    _showDeathCongratulations
-                        ? 1
-                        : _showEnemyDeath
-                        ? 0.92
-                        : _victoryCycle / 2,
-                minHeight: 5,
-                borderRadius: BorderRadius.circular(99),
-                backgroundColor: Colors.white10,
-              ),
-              const Spacer(),
-            ],
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            adventure.backgroundAsset,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.none,
           ),
         ),
-      ),
+        Positioned.fill(
+          child: ColoredBox(color: Colors.black.withValues(alpha: 0.68)),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Spacer(),
+                Text(
+                  '$_victoryRound. ROUND',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _showDeathCongratulations ? 'ZAFER!' : 'ROUND SENİN!',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    shadows: const [
+                      Shadow(color: AppColors.primary, blurRadius: 28),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  _showDeathCongratulations
+                      ? '${adventure.enemy.name} yenildi!'
+                      : 'Round hedefini süresi dolmadan tamamladın',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white60),
+                ),
+                if (_showDeathCongratulations) ...[
+                  const SizedBox(height: 12),
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 700),
+                    tween: Tween(begin: 0.72, end: 1),
+                    curve: Curves.elasticOut,
+                    builder:
+                        (context, scale, child) =>
+                            Transform.scale(scale: scale, child: child),
+                    child: Column(
+                      children: [
+                        Text(
+                          '+${adventure.victoryCoinReward} ALTIN',
+                          key: const ValueKey('victory-coin-reward'),
+                          style: const TextStyle(
+                            color: AppColors.streak,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 8),
+                              Shadow(color: AppColors.streak, blurRadius: 24),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '+${adventure.victoryXpReward} XP',
+                          key: const ValueKey('victory-xp-reward'),
+                          style: const TextStyle(
+                            color: AppColors.xp,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 8),
+                              Shadow(color: AppColors.xp, blurRadius: 22),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (_isFinalVictory) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.favorite, color: AppColors.hp, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 420),
+                          tween: Tween<double>(end: _overlayEnemyHealth),
+                          builder: (context, health, _) {
+                            return LinearProgressIndicator(
+                              value: health.clamp(0, 1),
+                              minHeight: 9,
+                              borderRadius: BorderRadius.circular(99),
+                              color: AppColors.hp,
+                              backgroundColor: AppColors.hp.withValues(
+                                alpha: 0.18,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${(_overlayEnemyHealth * adventure.stepGoal).round()} CAN',
+                        style: const TextStyle(
+                          color: AppColors.hp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const Spacer(),
+                SizedBox(
+                  height: 260,
+                  child: AnimatedBuilder(
+                    animation: _roundAttackAmount,
+                    builder: (context, _) {
+                      final attack = _roundAttackAmount.value;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            left: -12,
+                            bottom: -2,
+                            width: 210,
+                            height: 230,
+                            child: PixelSprite(
+                              asset:
+                                  _roundPlayerAttackAsset ??
+                                  widget.avatar.characterAsset,
+                              scale: 3,
+                              imageKey: ValueKey(
+                                'player-attack-$_victoryRound-$_victoryCycle',
+                              ),
+                            ),
+                          ),
+                          if (_showDeathCongratulations) ..._coinScatter(),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            width: 210,
+                            height: 230,
+                            child: Transform.translate(
+                              offset: Offset(attack * 10, 0),
+                              child: ClipRect(
+                                child: Transform.scale(
+                                  scale: 3,
+                                  child:
+                                      _showFrozenEnemy &&
+                                              _frozenDeathFrame != null
+                                          ? RawImage(
+                                            key: const ValueKey(
+                                              'victory-enemy-corpse',
+                                            ),
+                                            image: _frozenDeathFrame,
+                                            fit: BoxFit.contain,
+                                            filterQuality: FilterQuality.none,
+                                          )
+                                          : Image.asset(
+                                            _showEnemyDeath
+                                                ? adventure.enemy.deathAsset
+                                                : adventure.enemy.hurtAsset,
+                                            key: ValueKey(
+                                              _showEnemyDeath
+                                                  ? 'victory-enemy-corpse'
+                                                  : 'round-hurt-$_victoryRound-$_victoryCycle',
+                                            ),
+                                            fit: BoxFit.contain,
+                                            filterQuality: FilterQuality.none,
+                                            gaplessPlayback: false,
+                                          ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (!_showEnemyDeath &&
+                              !_showFrozenEnemy &&
+                              attack > 0.38 &&
+                              attack < 0.9)
+                            const Positioned(
+                              left: 0,
+                              right: 0,
+                              top: 62,
+                              child: Text(
+                                'VURUŞ!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.streak,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  fontStyle: FontStyle.italic,
+                                  shadows: [
+                                    Shadow(color: Colors.black, blurRadius: 8),
+                                    Shadow(
+                                      color: AppColors.streak,
+                                      blurRadius: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const Spacer(),
+                if (_showDeathCongratulations)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey('victory-choose-adventure'),
+                      onPressed: widget.onChooseNewAdventure,
+                      icon: const Icon(Icons.explore),
+                      label: const Text('YENİ MACERA SEÇ'),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    _showEnemyDeath
+                        ? 'Son darbe!'
+                        : 'Saldırı $_victoryCycle / 2',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  LinearProgressIndicator(
+                    value: _showEnemyDeath ? 0.92 : _victoryCycle / 2,
+                    minHeight: 5,
+                    borderRadius: BorderRadius.circular(99),
+                    backgroundColor: Colors.white10,
+                  ),
+                ],
+                const Spacer(),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
+  List<Widget> _coinScatter() => const [
+    _ScatteredCoin(left: 156, top: 150, size: 34, angle: -0.25),
+    _ScatteredCoin(left: 202, top: 174, size: 26, angle: 0.18),
+    _ScatteredCoin(right: 8, top: 128, size: 38, angle: 0.3),
+    _ScatteredCoin(right: 52, top: 202, size: 29, angle: -0.12),
+    _ScatteredCoin(right: 98, top: 214, size: 23, angle: 0.42),
+  ];
+
   Widget _buildEnemyRoundVictoryOverlay(AdventureQuest adventure) {
-    final healthProgress =
-        adventure.playerHealthProgress;
+    final healthProgress = adventure.playerHealthProgress;
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.9),
       child: SafeArea(
@@ -1010,9 +1127,8 @@ class _AdventureScreenState extends State<AdventureScreen>
                           bottom: 0,
                           width: 210,
                           height: 230,
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.diagonal3Values(-1, 1, 1),
+                          child: Transform.flip(
+                            flipX: true,
                             child: PixelSprite(
                               asset:
                                   _roundEnemyAttackAsset ??
@@ -1070,7 +1186,9 @@ class _AdventureScreenState extends State<AdventureScreen>
   Widget _buildPlayerDefeat(BuildContext context, AdventureQuest adventure) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        key: const ValueKey('adventure-scroll-view'),
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 88),
         child: SectionCard(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1085,18 +1203,128 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                '${adventure.enemy.name} karşısında canın tükendi. '
-                'Yeni ve daha dengeli bir macera seçebilirsin.',
+                '${adventure.enemy.name} karşısında canın tükendi. Yeni '
+                'maceralara açılmak için 500 adımlık Hayat Yürüyüşünü '
+                'tamamlamalısın.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Bu özel yürüyüş boyunca XP kazanılmaz; yürümeye devam '
+                'ettiğinde yeniden doğarsın.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.streak, fontSize: 12),
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
+                  key: const ValueKey('start-revival-walk'),
+                  onPressed: widget.onStartRevival,
+                  icon: const Icon(Icons.directions_walk),
+                  label: const Text('Hayat Yürüyüşüne Çık'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRevivalWalk(BuildContext context, AdventureQuest adventure) {
+    return Center(
+      child: SingleChildScrollView(
+        key: const ValueKey('adventure-scroll-view'),
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 88),
+        child: SectionCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.directions_walk,
+                color: AppColors.streak,
+                size: 76,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Hayat Yürüyüşü',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Durma; yeniden doğmak için düşük tempoda yürümeye devam et. '
+                'Bu 500 adım XP kazandırmaz.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 20),
+              LinearProgressIndicator(
+                key: const ValueKey('revival-progress-bar'),
+                value: adventure.revivalProgress,
+                minHeight: 12,
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.streak,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${adventure.revivalSteps} / '
+                '${AdventureQuest.revivalStepTarget} adım',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${adventure.revivalRemainingSteps} adım kaldı',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRevivalCompleted(
+    BuildContext context,
+    AdventureQuest adventure,
+  ) {
+    return Center(
+      child: SingleChildScrollView(
+        key: const ValueKey('adventure-scroll-view'),
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 88),
+        child: SectionCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.favorite, color: AppColors.hp, size: 82),
+              const SizedBox(height: 16),
+              Text(
+                'Yeniden doğdun!',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: AppColors.streak,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Hayat Yürüyüşünü tamamladın. Bu yürüyüş XP vermedi; şimdi '
+                'yeniden maceraya açılabilirsin.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey('acknowledge-revival'),
                   onPressed: widget.onChooseNewAdventure,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Macera Seçimine Dön'),
+                  icon: const Icon(Icons.explore),
+                  label: const Text('Maceralara Dön'),
                 ),
               ),
             ],
@@ -1109,11 +1337,22 @@ class _AdventureScreenState extends State<AdventureScreen>
   Widget _buildCongratulations(BuildContext context, AdventureQuest adventure) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        key: const ValueKey('adventure-scroll-view'),
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 88),
         child: SectionCard(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Image.asset(
+                'lib/All_Assets/coins/coin_gold_large_shine.gif',
+                key: const ValueKey('final-victory-gold-coin'),
+                width: 64,
+                height: 64,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+              ),
+              const SizedBox(height: 8),
               const Icon(Icons.emoji_events, color: AppColors.xp, size: 82),
               const SizedBox(height: 16),
               Text(
@@ -1155,8 +1394,16 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Widget _buildSelection(BuildContext context) {
+    final visibleEnemies =
+        widget.tutorialMode
+            ? EnemyCatalog.enemies.take(1)
+            : EnemyCatalog.enemies;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      key: const ValueKey('adventure-scroll-view'),
+      controller: _scrollController,
+      physics:
+          widget.tutorialMode ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
         Text(
           'Bugünkü maceranı seç',
@@ -1179,16 +1426,31 @@ class _AdventureScreenState extends State<AdventureScreen>
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
-        ...EnemyCatalog.enemies.map((enemy) {
+        ...visibleEnemies.map((enemy) {
           final unlocked = _stepGoal >= enemy.minimumDailySteps;
           final selected = _selectedEnemy?.id == enemy.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _EnemyChoiceCard(
+              key:
+                  widget.tutorialMode && enemy == EnemyCatalog.enemies.first
+                      ? TutorialGuideTargetKeys.enemy
+                      : null,
               enemy: enemy,
               unlocked: unlocked,
               selected: selected,
-              onTap: unlocked ? () => _showEnemyPreview(enemy) : null,
+              onTap:
+                  unlocked
+                      ? () {
+                        if (widget.tutorialMode &&
+                            enemy == EnemyCatalog.enemies.first) {
+                          setState(() => _selectedEnemy = enemy);
+                          _startAdventure();
+                        } else {
+                          _showEnemyPreview(enemy);
+                        }
+                      }
+                      : null,
             ),
           );
         }),
@@ -1208,7 +1470,9 @@ class _AdventureScreenState extends State<AdventureScreen>
     final defeated = adventure.isEnemyDefeated;
     final remaining = adventure.remainingEnemyHealth;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      key: const ValueKey('adventure-scroll-view'),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
         SectionCard(
           child: Column(
@@ -1415,15 +1679,14 @@ class _AdventureScreenState extends State<AdventureScreen>
                 icon: Icons.favorite,
                 color: AppColors.hp,
                 progress: adventure.enemyHealthProgress,
-                valueText: '$remaining / ${adventure.enemy.maxHealth}',
+                valueText: '$remaining / ${adventure.scaledEnemyMaxHealth}',
               ),
               const SizedBox(height: 14),
               StatBar(
                 label: 'Senin Canın',
                 icon: Icons.shield,
                 color: AppColors.xp,
-                progress:
-                    adventure.playerHealthProgress,
+                progress: adventure.playerHealthProgress,
                 valueText:
                     '${adventure.playerHealth} / ${adventure.playerMaxHealth}',
               ),
@@ -1482,7 +1745,7 @@ class _AdventureScreenState extends State<AdventureScreen>
         .toString()
         .padLeft(2, '0');
     final countdownCard = SectionCard(
-      title: '${adventure.currentRound}. Round • Düşman saldırısına kalan süre',
+      title: 'Round ${adventure.currentRound}/${adventure.totalRounds}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1546,9 +1809,8 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Her round için ${adventure.roundTargetSteps} adım ve '
-            '${adventure.roundDurationLabel} süren var. '
-            'Hedef eksik kalırsa '
+            'Her round ${adventure.roundDurationLabel}. Hedefi erken '
+            'tamamlarsan round anında biter. Süre dolduğunda hedef eksik kalırsa '
             '${adventure.enemy.name}, eksik oranına göre saldırır; '
             'savunman gelen hasarı azaltır.',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
@@ -1613,9 +1875,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                               ],
                             ),
                           ),
-                          const Text(
-                            'BAŞLADI',
-                            style: TextStyle(
+                          Text(
+                            'YENİ ROUND BAŞLADI',
+                            style: const TextStyle(
                               color: AppColors.primary,
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -1661,6 +1923,46 @@ String _formatNumber(int value) {
     output.write(digits[index]);
   }
   return output.toString();
+}
+
+class _ScatteredCoin extends StatelessWidget {
+  final double? left;
+  final double? right;
+  final double top;
+  final double size;
+  final double angle;
+
+  const _ScatteredCoin({
+    this.left,
+    this.right,
+    required this.top,
+    required this.size,
+    required this.angle,
+  });
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    left: left,
+    right: right,
+    top: top,
+    child: Transform.rotate(
+      angle: angle,
+      child: Image.asset(
+        'lib/All_Assets/coins/coin_gold_medium_shine.gif',
+        key: const ValueKey('victory-scattered-coin'),
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.none,
+        errorBuilder:
+            (context, error, stackTrace) => Icon(
+              Icons.monetization_on,
+              size: size,
+              color: AppColors.streak,
+            ),
+      ),
+    ),
+  );
 }
 
 class _GoalSelectorButton extends StatelessWidget {
@@ -1748,9 +2050,19 @@ class _GoalSelectorButton extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    Text(
+                      '${(goal / AdventureQuest.stageStepTarget).ceil()} round • '
+                      'round başına ${AdventureQuest.configuredRoundDurationLabel}',
+                      style: const TextStyle(
+                        color: AppColors.streak,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     const Text(
                       'Değiştirmek için dokun',
-                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   ],
                 ),
@@ -1805,6 +2117,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
   @override
   Widget build(BuildContext context) {
     final enemy = widget.enemy;
+    final scaledStats = enemy.stats;
     return Material(
       color: Colors.black.withValues(alpha: 0.94),
       child: SafeArea(
@@ -1919,13 +2232,19 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                         ),
                         _EnemyInfoChip(
                           icon: Icons.favorite,
-                          label: '${_formatNumber(enemy.maxHealth)} can',
+                          label:
+                              '${_formatNumber(scaledStats.maxHealth.round())} can',
                           color: AppColors.hp,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.flash_on,
-                          label: '${enemy.stats.attack.round()} saldırı',
+                          label: '${scaledStats.attack.round()} saldırı',
                           color: AppColors.accent,
+                        ),
+                        _EnemyInfoChip(
+                          icon: Icons.timer_outlined,
+                          label: AdventureQuest.configuredRoundDurationLabel,
+                          color: AppColors.streak,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.shield_moon,
@@ -1982,9 +2301,9 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Her round 1.000 adım ve '
-                            '${AdventureQuest.configuredRoundDurationLabel}. Süreyi '
-                            'kaçırırsan düşman eksik adım oranında saldırır.',
+                            'Her round en fazla 1.000 adım ve 15 dakika sürer. '
+                            'Hedefe erken ulaşırsan round anında tamamlanır; '
+                            'süreyi kaçırırsan düşman eksik adım oranında saldırır.',
                             style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 12,
@@ -2079,6 +2398,7 @@ class _EnemyChoiceCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _EnemyChoiceCard({
+    super.key,
     required this.enemy,
     required this.unlocked,
     required this.selected,
@@ -2087,19 +2407,19 @@ class _EnemyChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: unlocked ? 1 : 0.45,
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: selected ? AppColors.primary : Colors.transparent,
-            width: 2,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Opacity(
+        opacity: unlocked ? 1 : 0.45,
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
           ),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(

@@ -256,10 +256,10 @@ extension ItemCategoryX on ItemCategory {
 /// [ItemEffect] listesi taşır ve buradaki türlerle sınırlı değildir.
 enum ItemBuffType {
   stepCoin,
+  stepCoinMomentum,
   stepXp,
   wheelXp,
   enemyXp,
-  dailyCoinCap,
   streakFreezeCap,
   wheelSpinCap,
   streakRelief,
@@ -269,10 +269,10 @@ extension ItemBuffTypeX on ItemBuffType {
   /// Kural türetmesindeki türün karşılık geldiği stat.
   ItemStat get stat => switch (this) {
     ItemBuffType.stepCoin => ItemStat.stepCoin,
+    ItemBuffType.stepCoinMomentum => ItemStat.stepCoin,
     ItemBuffType.stepXp => ItemStat.stepXp,
     ItemBuffType.wheelXp => ItemStat.wheelXp,
     ItemBuffType.enemyXp => ItemStat.enemyXp,
-    ItemBuffType.dailyCoinCap => ItemStat.dailyCoinCap,
     ItemBuffType.streakFreezeCap => ItemStat.streakFreezeCap,
     ItemBuffType.wheelSpinCap => ItemStat.wheelSpinCap,
     ItemBuffType.streakRelief => ItemStat.streakRelief,
@@ -404,7 +404,8 @@ class ItemBuff {
   /// Düşman yenince kazanılan XP'ye eklenen oran.
   double get enemyXpBonus => _rate(ItemStat.enemyXp);
 
-  /// Günlük adım-para tavanına eklenen coin.
+  /// Eski item kayıtları için günlük tavan bonusu. Aktif katalog üretmez;
+  /// kuşanıldığında adım-parası oranına dönüştürülür.
   int get dailyCoinCapBonus => _flat(ItemStat.dailyCoinCap);
 
   /// Seri dondurma stoğuna eklenen hak.
