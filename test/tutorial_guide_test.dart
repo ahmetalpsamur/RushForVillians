@@ -58,6 +58,16 @@ void main() {
     );
   });
 
+  test('tutorial sonunda pet çağırma düğmesini anlatır', () {
+    final frame = TutorialGuideFrame.forStep(
+      TutorialGuideStep.farewellYourTurn,
+    );
+    expect(
+      frame.message,
+      contains('adım çemberinin sol altındaki pet butonuna'),
+    );
+  });
+
   test(
     'tutorial ilerlemesi kaydedilir ve eski kayıtlar tamamlanmış sayılır',
     () {
@@ -288,16 +298,22 @@ void main() {
     expect(profile.tutorialStep, TutorialGuideStep.finalReady.index);
     expect(find.byType(DailyWheelScreen), findsNothing);
 
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 5; i++) {
       await tester.tap(find.byKey(const Key('tutorial-primary-action')));
       await tester.pump(const Duration(milliseconds: 650));
     }
+    expect(profile.tutorialStep, TutorialGuideStep.farewellYourTurn.index);
+    expect(find.byKey(const ValueKey('home-pet-toggle')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('tutorial-primary-action')));
+    await tester.pump(const Duration(milliseconds: 650));
     expect(profile.tutorialStep, TutorialGuideStep.farewell.index);
     expect(find.text('Eğitimi Bitir'), findsOneWidget);
     await tester.tap(find.text('Eğitimi Bitir'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1100));
     expect(profile.hasCompletedTutorial, isTrue);
+    expect(profile.petCompanionEnabled, isFalse);
     expect(find.byType(InventoryScreen), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());

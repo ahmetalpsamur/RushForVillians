@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../models/adventure_quest.dart';
 import '../models/daily_progress.dart';
+import '../models/tutorial_guide_variant.dart';
 import '../models/user_profile.dart';
+import '../features/tutorial/tutorial_guide.dart';
 import 'avatar_view.dart';
 import 'stat_bar.dart';
 
@@ -16,12 +18,18 @@ class HeroProgressRings extends StatelessWidget {
   /// Savaş canının gerçek kaynağı. Macera yokken can çubuğu gösterilmez;
   /// [UserProfile.hp] hiç azalmadığı için "can" diye gösterilmesi yanlıştı.
   final AdventureQuest? adventure;
+  final TutorialGuideVariant petGuide;
+  final bool petEnabled;
+  final VoidCallback? onTogglePet;
 
   const HeroProgressRings({
     super.key,
     required this.profile,
     required this.today,
     this.adventure,
+    this.petGuide = TutorialGuideVariant.mavili,
+    this.petEnabled = true,
+    this.onTogglePet,
   });
 
   @override
@@ -38,9 +46,11 @@ class HeroProgressRings extends StatelessWidget {
             final arrowProgress =
                 today.steps > 0 && remainder == 0 ? 1.0 : remainder;
             return SizedBox.square(
+              key: const ValueKey('home-progress-ring-stack'),
               dimension: size,
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
                   Positioned.fill(
                     child: CustomPaint(
@@ -103,6 +113,7 @@ class HeroProgressRings extends StatelessWidget {
                   Positioned(
                     bottom: 7,
                     child: Container(
+                      key: const ValueKey('home-step-progress-label'),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 13,
                         vertical: 6,
@@ -134,6 +145,20 @@ class HeroProgressRings extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Son çocuk: büyütülmüş karakter GIF'inin şeffaf tuvali
+                  // dokunma alanının önüne geçmesin.
+                  if (onTogglePet != null)
+                    Positioned(
+                      // Yazı kapsülünün dikey merkezine oturur; solda ise
+                      // halkanın dış boşluğuna taşarak köşeyi dengeler.
+                      left: -12,
+                      bottom: -7,
+                      child: _PetToggleButton(
+                        guide: petGuide,
+                        enabled: petEnabled,
+                        onPressed: onTogglePet!,
+                      ),
+                    ),
                 ],
               ),
             );
@@ -169,6 +194,88 @@ class HeroProgressRings extends StatelessWidget {
           valueText: '${profile.xp} / ${profile.xpToNextLevel} XP',
         ),
       ],
+    );
+  }
+}
+
+class _PetToggleButton extends StatelessWidget {
+  final TutorialGuideVariant guide;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _PetToggleButton({
+    required this.guide,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = enabled ? AppColors.primary : Colors.white24;
+    return Semantics(
+      key: TutorialGuideTargetKeys.petToggle,
+      button: true,
+      toggled: enabled,
+      label: enabled ? 'Peti kapat' : 'Peti çağır',
+      child: Tooltip(
+        message: enabled ? 'Peti kapat' : 'Peti çağır',
+        child: GestureDetector(
+          key: const ValueKey('home-pet-toggle'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color:
+                  enabled ? const Color(0xFF292044) : const Color(0xFF121018),
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: [
+                if (enabled)
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.55),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  )
+                else ...[
+                  const BoxShadow(
+                    color: Colors.black,
+                    blurRadius: 14,
+                    spreadRadius: 5,
+                  ),
+                  const BoxShadow(
+                    color: Colors.black87,
+                    blurRadius: 3,
+                    spreadRadius: -1,
+                  ),
+                ],
+              ],
+            ),
+            child: ClipOval(
+              child: SizedBox.expand(
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Opacity(
+                    opacity: enabled ? 1 : .38,
+                    child: Image.asset(
+                      guide.idleAsset,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.none,
+                      errorBuilder:
+                          (_, __, ___) => Icon(
+                            Icons.pets,
+                            color: enabled ? AppColors.xp : Colors.white38,
+                          ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

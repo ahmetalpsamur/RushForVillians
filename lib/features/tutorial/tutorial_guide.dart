@@ -15,6 +15,8 @@ enum TutorialGuideAnimation {
   reacting,
   celebrating,
   talking,
+  climbing,
+  dying,
   leaving,
 }
 
@@ -70,6 +72,7 @@ enum TutorialGuideTarget {
   upgradeButton,
   wheel,
   wheelReward,
+  petToggle,
 }
 
 /// Spotlight'ın oran tahmini yerine gerçek ekrandaki hedefi izlemesini sağlar.
@@ -84,6 +87,7 @@ abstract final class TutorialGuideTargetKeys {
   static final wheelReward = GlobalKey(
     debugLabel: 'tutorial-wheel-reward-target',
   );
+  static final petToggle = GlobalKey(debugLabel: 'tutorial-pet-toggle-target');
 }
 
 /// Gerçek dosya taramasından çıkan üç karakterin animasyon eşlemesi.
@@ -105,6 +109,8 @@ abstract final class TutorialGuideAssets {
       TutorialGuideAnimation.reacting => '${base}_Hurt_4.gif',
       TutorialGuideAnimation.celebrating => '${base}_Jump_8.gif',
       TutorialGuideAnimation.talking => '${base}_Idle_4.gif',
+      TutorialGuideAnimation.climbing => '${base}_Climb_4.gif',
+      TutorialGuideAnimation.dying => '${base}_Death_8.gif',
       TutorialGuideAnimation.leaving => '${base}_Walk_6.gif',
     };
   }
@@ -299,13 +305,16 @@ class TutorialGuideFrame {
       primaryLabel: 'Devam',
     ),
     TutorialGuideStep.farewellYourTurn => const TutorialGuideFrame(
-      message: 'Şimdi sıra sende.',
+      message:
+          'Artık buralar sana emanet. Seninle dövüşmemi istersen ana '
+          'sayfadaki adım çemberinin sol altındaki pet butonuna basabilirsin.',
       animation: TutorialGuideAnimation.pointing,
+      target: TutorialGuideTarget.petToggle,
       alignment: Alignment(-0.35, 0.18),
       primaryLabel: 'Devam',
     ),
     TutorialGuideStep.farewell => const TutorialGuideFrame(
-      message: 'Ben gidiyorum. Macerada görüşürüz!',
+      message: 'Şimdilik gidiyorum. Beni çağırırsan yine yanında olacağım!',
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(0.05, 0.18),
       primaryLabel: 'Eğitimi Bitir',
@@ -505,6 +514,12 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
         size.width * .76,
         usableHeight * .42,
       ),
+      TutorialGuideTarget.petToggle => Rect.fromLTWH(
+        size.width * .06,
+        safe.top + usableHeight * .28,
+        64,
+        64,
+      ),
     };
   }
 
@@ -516,6 +531,7 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
         TutorialGuideTargetKeys.inventoryItem,
       TutorialGuideTarget.wheel => TutorialGuideTargetKeys.wheel,
       TutorialGuideTarget.wheelReward => TutorialGuideTargetKeys.wheelReward,
+      TutorialGuideTarget.petToggle => TutorialGuideTargetKeys.petToggle,
       _ => null,
     };
     if (key == null) return null;

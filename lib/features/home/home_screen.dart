@@ -10,6 +10,7 @@ import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/game_title.dart';
 import '../../models/streak_stat_bonuses.dart';
+import '../../models/tutorial_guide_variant.dart';
 import '../../models/user_profile.dart';
 import '../../services/step_permission_service.dart';
 import '../../widgets/day_reset_countdown.dart';
@@ -33,6 +34,9 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenStore;
   final VoidCallback onOpenInventory;
   final ValueChanged<int> onSimulateSteps;
+  final TutorialGuideVariant petGuide;
+  final bool petEnabled;
+  final VoidCallback onTogglePet;
 
   /// Adımların gerçek sensörden mi geldiği. Demo butonları yalnızca manuel
   /// kaynakta çalışır.
@@ -61,6 +65,9 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenStore,
     required this.onOpenInventory,
     required this.onSimulateSteps,
+    required this.petGuide,
+    required this.petEnabled,
+    required this.onTogglePet,
     required this.usingRealPedometer,
     required this.stepPermission,
     required this.onOpenStepSettings,
@@ -115,6 +122,9 @@ class HomeScreen extends StatelessWidget {
                   profile: profile,
                   today: today,
                   adventure: adventure,
+                  petGuide: petGuide,
+                  petEnabled: petEnabled,
+                  onTogglePet: onTogglePet,
                 ),
                 const SizedBox(height: 14),
                 _DailyEarnings(today: today),

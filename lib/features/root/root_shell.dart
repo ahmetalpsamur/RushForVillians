@@ -147,6 +147,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     TutorialGuideStep.welcome,
   );
   bool _tutorialBattleRunning = false;
+  bool _showPetDismissal = false;
 
   bool get _tutorialActive =>
       widget.startTutorial && !_profile.hasCompletedTutorial;
@@ -305,8 +306,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   /// Takılı ünvan (yoksa null).
-  GameTitle? get _equippedTitle =>
-      TitleCatalog.byId(_profile.equippedTitleId);
+  GameTitle? get _equippedTitle => TitleCatalog.byId(_profile.equippedTitleId);
 
   /// Sahip olunan ünvanlar, katalog sırasında.
   List<GameTitle> get _ownedTitles => [
@@ -370,9 +370,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _persist();
     final title = TitleCatalog.byId(id);
     _showStoreNotice(
-      title == null
-          ? 'Ünvanın çıkarıldı.'
-          : '"${title.name}" ünvanını taktın.',
+      title == null ? 'Ünvanın çıkarıldı.' : '"${title.name}" ünvanını taktın.',
     );
   }
 
@@ -387,9 +385,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       return;
     }
     if (_profile.coins < title.cost) {
-      _showStoreNotice(
-        '${title.cost - _profile.coins} altın daha gerekiyor.',
-      );
+      _showStoreNotice('${title.cost - _profile.coins} altın daha gerekiyor.');
       return;
     }
     setState(() {
@@ -397,9 +393,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _profile.grantTitle(title.id);
     });
     _persist();
-    _showStoreNotice(
-      '"${title.name}" ünvanı alındı. Profilden takabilirsin.',
-    );
+    _showStoreNotice('"${title.name}" ünvanı alındı. Profilden takabilirsin.');
   }
 
   /// Kazanılan ünvanları kullanıcıya duyurur.
@@ -837,10 +831,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // olamaz (CLAUDE.md §4.4, GD18/GD50).
     final baseCoins =
         forcedCoins ??
-        adventure.victoryCoinRoll(
-          minimum: minimumCoins,
-          maximum: maximumCoins,
-        );
+        adventure.victoryCoinRoll(minimum: minimumCoins, maximum: maximumCoins);
     // Eğitimde verilen sabit altın çarpanla bozulmamalı: eğitim tam hedefte
     // damgalandığı için `speed` zaten 1, ama niyet açık kalsın diye
     // `forcedCoins` çarpandan muaf.
@@ -1811,6 +1802,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (_profile.hasCompletedTutorial) return;
     _returnToTutorialRoot();
     _profile.hasCompletedTutorial = true;
+    // Tutorial rehberi sahneden ayrıldıktan sonra serbest dolaşan pet olarak
+    // kendiliğinden geri gelmez. Ana ekrandaki düğme kararı oyuncuya bırakır.
+    _profile.petCompanionEnabled = false;
+    _showPetDismissal = false;
     _profile.tutorialStep = TutorialGuideStep.completed.index;
     _tutorialStep.value = TutorialGuideStep.completed;
     _persist();
@@ -1864,6 +1859,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       case TutorialGuideStep.ratingRequest:
         _setTutorialStep(TutorialGuideStep.farewellWorkDone);
       case TutorialGuideStep.farewellWorkDone:
+        // Pet düğmesini anlatan son adım doğrudan düğmenin bulunduğu ana
+        // sayfada gösterilir. Kullanıcı mağazada kaldıysa hedef artık fallback
+        // bir kutu değil, gerçek pet düğmesi olur.
+        _selectTab(0);
         _setTutorialStep(TutorialGuideStep.farewellYourTurn);
       case TutorialGuideStep.farewellYourTurn:
         _setTutorialStep(TutorialGuideStep.farewell);
@@ -1917,8 +1916,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// Rehberin dolaşmasını açar/kapatır. Ayar kalıcı (şema v20).
   void _setPetCompanionEnabled(bool enabled) {
     if (_profile.petCompanionEnabled == enabled) return;
-    setState(() => _profile.petCompanionEnabled = enabled);
+    setState(() {
+      _profile.petCompanionEnabled = enabled;
+      _showPetDismissal = !enabled;
+    });
     _persist();
+  }
+
+  void _onPetDismissed() {
+    if (!mounted || _profile.petCompanionEnabled) return;
+    setState(() => _showPetDismissal = false);
   }
 
   Widget _tutorialOverlay() => TutorialGuideOverlay(
@@ -2042,6 +2049,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenStore: _openStore,
         onOpenInventory: _openInventory,
         onSimulateSteps: _simulateSteps,
+        petGuide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+        petEnabled: !_tutorialActive && _profile.petCompanionEnabled,
+        onTogglePet:
+            _tutorialActive
+                ? () {}
+                : () => _setPetCompanionEnabled(!_profile.petCompanionEnabled),
         usingRealPedometer: _stepSource.isPhysical,
         stepPermission: _stepPermission,
         onOpenStepSettings: _openStepPermissionSettings,
@@ -2100,7 +2113,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onEditCharacter: _editCharacter,
         onOpenInventory: _openInventory,
         onOpenBlacksmith: _openBlacksmith,
-        onTogglePetCompanion: _setPetCompanionEnabled,
       ),
     ];
 
@@ -2128,12 +2140,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           ),
         ),
         if (_tutorialActive) _tutorialOverlay(),
-        // Eğitim sürerken rehber **dolaşmaz**: iki anlatıcı aynı anda
-        // konuşmamalı. Oyuncu ayarı kapattıysa katman hiç kurulmuyor.
-        if (!_tutorialActive && _profile.petCompanionEnabled)
+        // Kapatılırken katman death GIF'i tamamlanana kadar tutulur. Kayıttan
+        // kapalı gelirse doğrudan kurulmaz.
+        if (!_tutorialActive &&
+            (_profile.petCompanionEnabled || _showPetDismissal))
           PetCompanionOverlay(
             situation: _petSituation,
             guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+            enabled: _profile.petCompanionEnabled,
+            onDismissed: _onPetDismissed,
           ),
       ],
     );

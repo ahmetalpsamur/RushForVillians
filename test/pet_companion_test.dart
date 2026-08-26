@@ -146,6 +146,7 @@ void main() {
                 ),
                 PetCompanionOverlay(
                   situation: situation,
+                  initialDelay: Duration.zero,
                   silence: const Duration(seconds: 30),
                   bubbleDuration: const Duration(seconds: 5),
                   bottomInset: 24,
@@ -156,9 +157,10 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
     }
 
-    testWidgets('açılır açılmaz bir şey söyler', (tester) async {
+    testWidgets('planlanan zamanda konuşur', (tester) async {
       await pumpOverlay(tester);
       expect(
         find.byKey(const ValueKey('pet-companion-bubble')),
@@ -219,9 +221,7 @@ void main() {
       expect(find.byType(IgnorePointer), findsWidgets);
     });
 
-    testWidgets('bağlam değişince sessizlik payını beklemeden konuşur', (
-      tester,
-    ) async {
+    testWidgets('bağlam değişince yeniden konuşmaz', (tester) async {
       await pumpOverlay(tester);
       await tester.pump(const Duration(seconds: 6));
       expect(find.byKey(const ValueKey('pet-companion-bubble')), findsNothing);
@@ -229,10 +229,107 @@ void main() {
       await pumpOverlay(tester, situation: tavern);
       await tester.pump();
 
-      expect(
-        find.byKey(const ValueKey('pet-companion-bubble')),
-        findsOneWidget,
+      expect(find.byKey(const ValueKey('pet-companion-bubble')), findsNothing);
+    });
+
+    testWidgets('sağ kenarda balon ekrandan taşmaz', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: PetCompanionOverlay(
+              situation: tavern,
+              initialDelay: Duration.zero,
+              restDuration: Duration.zero,
+              edgeActionDuration: Duration.zero,
+              strollDuration: Duration(milliseconds: 100),
+              bottomInset: 24,
+            ),
+          ),
+        ),
       );
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final bubble = tester.getRect(
+        find.byKey(const ValueKey('pet-companion-bubble')),
+      );
+      expect(bubble.right, lessThanOrEqualTo(308));
+    });
+
+    testWidgets('köşede idle, climb ve walking sırasını kullanır', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: PetCompanionOverlay(
+            situation: home,
+            initialDelay: Duration(hours: 1),
+            restDuration: Duration(milliseconds: 100),
+            edgeActionDuration: Duration(milliseconds: 100),
+            strollDuration: Duration(milliseconds: 200),
+          ),
+        ),
+      );
+
+      String spriteAsset() {
+        final image = tester.widget<Image>(
+          find.descendant(
+            of: find.byKey(const ValueKey('pet-companion-sprite')),
+            matching: find.byType(Image),
+          ),
+        );
+        return (image.image as AssetImage).assetName;
+      }
+
+      expect(spriteAsset(), contains('_Idle_4.gif'));
+      await tester.pump(const Duration(milliseconds: 101));
+      expect(spriteAsset(), contains('_Climb_4.gif'));
+      await tester.pump(const Duration(milliseconds: 101));
+      expect(spriteAsset(), contains('_Walk_6.gif'));
+      await tester.pump(const Duration(milliseconds: 201));
+      expect(spriteAsset(), contains('_Idle_4.gif'));
+    });
+
+    testWidgets('kapatılınca death oynar, donar ve kaybolur', (tester) async {
+      var enabled = true;
+      var dismissed = 0;
+      late StateSetter setHostState;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              setHostState = setState;
+              return PetCompanionOverlay(
+                situation: home,
+                enabled: enabled,
+                onDismissed: () => dismissed++,
+                initialDelay: const Duration(hours: 1),
+                restDuration: const Duration(hours: 1),
+              );
+            },
+          ),
+        ),
+      );
+
+      setHostState(() => enabled = false);
+      await tester.pump();
+      final dying = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const ValueKey('pet-companion-sprite')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect((dying.image as AssetImage).assetName, contains('_Death_8.gif'));
+
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 350)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(dismissed, 1);
     });
   });
 
@@ -301,22 +398,23 @@ void main() {
       expect(find.byType(PetCompanionOverlay), findsNothing);
     });
 
-    testWidgets('profildeki anahtar ayarı kapatır ve diske yazar', (
+    testWidgets('ana çemberdeki pet butonu kapatır ve diske yazar', (
       tester,
     ) async {
       final profile = await pumpShell(tester);
 
-      await tester.tap(tab('Profil'));
-      await tester.pumpAndSettle();
-
-      final toggle = find.byKey(const ValueKey('pet-companion-toggle'));
-      await tester.ensureVisible(toggle);
-      await tester.pumpAndSettle();
+      final toggle = find.byKey(const ValueKey('home-pet-toggle'));
+      expect(toggle, findsOneWidget);
       await tester.tap(toggle);
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(profile.petCompanionEnabled, isFalse);
-      expect(find.byType(PetCompanionOverlay), findsNothing);
+      expect(
+        find.byType(PetCompanionOverlay),
+        findsOneWidget,
+        reason: 'death animasyonu bitene kadar katman kalmalı',
+      );
+      expect(find.byKey(const ValueKey('pet-companion-toggle')), findsNothing);
 
       await GameStorage.flush();
       final preferences = await SharedPreferences.getInstance();

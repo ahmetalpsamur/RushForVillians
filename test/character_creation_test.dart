@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/features/character/character_creation_screen.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/services/character_catalog.dart';
+import 'package:rush_for_villains/widgets/avatar_view.dart';
 
 /// Karakter yaratma sihirbazı — sınıf seçimi.
 ///
@@ -140,6 +141,20 @@ void main() {
       // İkinci bir onay istenmiyor: ızgara geride kaldı, özet adımı açık.
       expect(find.text('Hangi sınıfa aitsin?'), findsNothing);
       expect(find.text('MACERAYA BAŞLA'), findsOneWidget);
+    });
+
+    testWidgets('özet karakteri görünür piksel merkezine hizalanır', (
+      tester,
+    ) async {
+      await pumpToClassStep(tester);
+      await openFirstReveal(tester);
+      await tester.tap(find.text('BU SINIFI SEÇ'));
+      await settle(tester);
+
+      final avatar = tester.widget<AvatarView>(
+        find.byKey(const ValueKey('character-summary-avatar')),
+      );
+      expect(avatar.spriteOffset, isNot(Offset.zero));
     });
 
     testWidgets('düzenleme modunda kayıtlı sınıf onaylı sayılır', (

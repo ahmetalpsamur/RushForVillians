@@ -12,6 +12,7 @@ class AvatarView extends StatelessWidget {
   final double size;
   final bool showBackground;
   final bool combatLoop;
+  final Offset spriteOffset;
 
   const AvatarView({
     super.key,
@@ -19,6 +20,7 @@ class AvatarView extends StatelessWidget {
     this.size = 180,
     this.showBackground = true,
     this.combatLoop = false,
+    this.spriteOffset = Offset.zero,
   });
 
   @override
@@ -43,8 +45,16 @@ class AvatarView extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child:
           combatLoop
-              ? _AvatarCombatLoop(avatar: avatar, scale: spriteScale)
-              : PixelSprite(asset: avatar.characterAsset, scale: spriteScale),
+              ? _AvatarCombatLoop(
+                avatar: avatar,
+                scale: spriteScale,
+                offset: spriteOffset,
+              )
+              : PixelSprite(
+                asset: avatar.characterAsset,
+                scale: spriteScale,
+                offset: spriteOffset,
+              ),
     );
   }
 }
@@ -52,8 +62,13 @@ class AvatarView extends StatelessWidget {
 class _AvatarCombatLoop extends StatefulWidget {
   final AvatarProfile avatar;
   final double scale;
+  final Offset offset;
 
-  const _AvatarCombatLoop({required this.avatar, required this.scale});
+  const _AvatarCombatLoop({
+    required this.avatar,
+    required this.scale,
+    required this.offset,
+  });
 
   @override
   State<_AvatarCombatLoop> createState() => _AvatarCombatLoopState();
@@ -135,6 +150,7 @@ class _AvatarCombatLoopState extends State<_AvatarCombatLoop> {
   Widget build(BuildContext context) => PixelSprite(
     asset: _asset,
     scale: widget.scale,
+    offset: widget.offset,
     imageKey: ValueKey('avatar-combat-$_phaseSerial-$_asset'),
   );
 }

@@ -38,8 +38,6 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback onOpenInventory;
   final VoidCallback onOpenBlacksmith;
 
-  /// Rehberin dolaşma ayarı (Bölüm D). `null` ise satır hiç çizilmez.
-  final ValueChanged<bool>? onTogglePetCompanion;
   final VoidCallback onOpenTitles;
 
   /// Takılı ünvan (Bölüm C.2). Oyuncu adının hemen altında gösterilir.
@@ -57,7 +55,6 @@ class ProfileScreen extends StatelessWidget {
     required this.canEditCharacter,
     required this.onOpenInventory,
     required this.onOpenBlacksmith,
-    this.onTogglePetCompanion,
     required this.onOpenTitles,
     this.equippedTitle,
     this.ownedTitleCount = 0,
@@ -429,24 +426,6 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-          if (onTogglePetCompanion != null)
-            SectionCard(
-              child: SwitchListTile(
-                key: const ValueKey('pet-companion-toggle'),
-                value: profile.petCompanionEnabled,
-                onChanged: onTogglePetCompanion,
-                secondary: const Icon(
-                  Icons.pets,
-                  color: AppColors.xp,
-                ),
-                title: const Text('Rehber ekranda dolaşsın'),
-                subtitle: const Text(
-                  'Eğitimi bitiren rehberin arada laf atar. Kapatırsan '
-                  'tamamen susar; oyunun hiçbir kuralı değişmez.',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
         ],
       ),
     );

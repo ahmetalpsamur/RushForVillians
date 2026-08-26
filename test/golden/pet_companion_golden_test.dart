@@ -5,6 +5,12 @@ import 'package:rush_for_villains/data/mock_data.dart';
 import 'package:rush_for_villains/data/pet_sayings.dart';
 import 'package:rush_for_villains/features/team/team_screen.dart';
 import 'package:rush_for_villains/features/tutorial/pet_companion.dart';
+import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/daily_progress.dart';
+import 'package:rush_for_villains/models/tutorial_guide_variant.dart';
+import 'package:rush_for_villains/models/user_profile.dart';
+import 'package:rush_for_villains/services/character_catalog.dart';
+import 'package:rush_for_villains/widgets/hero_progress_rings.dart';
 
 /// Dolaşan rehberin ve Taverna karşılamasının görsel denetimi (Bölüm D).
 ///
@@ -34,6 +40,7 @@ void main() {
                 // En uzun cümlenin çıktığı bağlam: baloncuk en kötü
                 // genişliğinde ölçülüyor.
                 situation: PetSituation(context: PetContext.tavern),
+                initialDelay: Duration.zero,
                 bottomInset: 40,
               ),
             ],
@@ -94,4 +101,62 @@ void main() {
       matchesGoldenFile('goldens/tavern_320.png'),
     );
   });
+
+  for (final enabled in [true, false]) {
+    testWidgets('ana çember pet düğmesi ${enabled ? 'açık' : 'kapalı'}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 620);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final profile = UserProfile(
+        avatar: const AvatarProfile(
+          name: 'Gakai',
+          age: 24,
+          weight: 72,
+          gender: 'Erkek',
+          characterClass: 'Knight',
+          characterAsset:
+              'lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Knight/Knight/Knight_Walk.gif',
+        ),
+        level: 1,
+      );
+      CharacterCatalog.reset(const []);
+      addTearDown(CharacterCatalog.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: HeroProgressRings(
+                  profile: profile,
+                  today: DailyProgress(
+                    date: DateTime(2026, 8, 27),
+                    stepGoal: 20000,
+                  ),
+                  petGuide: TutorialGuideVariant.kupkuzu,
+                  petEnabled: enabled,
+                  onTogglePet: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 260)),
+      );
+      await tester.pump();
+
+      await expectLater(
+        find.byType(HeroProgressRings),
+        matchesGoldenFile(
+          'goldens/home_pet_toggle_${enabled ? 'active' : 'inactive'}_390.png',
+        ),
+      );
+    });
+  }
 }

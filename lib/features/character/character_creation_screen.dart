@@ -1331,9 +1331,39 @@ class _NeonAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: AvatarView(avatar: avatar, size: 230),
+      child: AvatarView(
+        key: const ValueKey('character-summary-avatar'),
+        avatar: avatar,
+        size: 230,
+        // 100x100 GIF tuvalindeki görünür pikseller her sınıfta tam merkeze
+        // oturmuyor. Özet karesi tuvali değil karakteri ortalar.
+        spriteOffset: _summarySpriteOffset(avatar.characterClass),
+      ),
     );
   }
+
+  Offset _summarySpriteOffset(String characterClass) =>
+      switch (characterClass) {
+        'Archer' => const Offset(-3, 4.5),
+        'Armored Axeman' => const Offset(-10.5, 9),
+        'Armored Orc' => const Offset(-13.5, 7.5),
+        'Armored Skeleton' => const Offset(-15, 12),
+        'Elite Orc' => const Offset(-18, 13.5),
+        'Greatsword Skeleton' => const Offset(16.5, 6),
+        'Knight' => const Offset(-12, 6),
+        'Knight Templar' => const Offset(-19.5, 6),
+        'Orc' => const Offset(-15, 1.5),
+        'Priest' => const Offset(-6, 6),
+        'Skeleton' => const Offset(-18, 3),
+        'Skeleton Archer' => const Offset(-7.5, 4.5),
+        'Slime' => const Offset(3, -1.5),
+        'Soldier' => const Offset(1.5, 3),
+        'Swordsman' => const Offset(-12, 1.5),
+        'Werebear' => const Offset(-7.5, 4.5),
+        'Werewolf' => const Offset(-18, 3),
+        'Wizard' => const Offset(-4.5, 4.5),
+        _ => Offset.zero,
+      };
 }
 
 class _BottomControls extends StatelessWidget {

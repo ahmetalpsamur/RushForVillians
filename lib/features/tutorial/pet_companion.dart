@@ -1,63 +1,52 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/pet_sayings.dart';
 import '../../models/tutorial_guide_variant.dart';
 import 'tutorial_guide.dart';
 
-/// Eğitim bittikten sonra ekranda serbest dolaşan rehber (Bölüm D).
+/// Tutorial bittikten sonra ekranın altında dolaşan rehber pet.
 ///
-/// **Mevcut pet bileşeni yeniden yazılmadı.** Sprite, animasyon eşlemesi ve
-/// karakter seçimi hâlâ `tutorial_guide.dart` içindeki
-/// [TutorialGuideAssets] / [TutorialGuideVariant] üzerinden geliyor; bu
-/// katman yalnızca **nerede duracağını ve ne zaman konuşacağını** ekliyor.
-/// Eğitim akışına (adımlar, spotlight, etkileşim bariyeri) hiç dokunulmadı.
-///
-/// Üç sert kural:
-///
-/// 1. **Hiçbir düğmeyi engellemez.** Bütün katman [IgnorePointer] içinde;
-///    dokunuşlar altındaki ekrana geçer. Rehber tıklanabilir olsaydı, dar
-///    ekranda alt gezinme çubuğunun ya da satın alma düğmesinin üstüne
-///    denk geldiği anda oyuncuyu kilitlerdi.
-/// 2. **Sık konuşmaz.** İki söz arasında en az [silence] geçer ve baloncuk
-///    [bubbleDuration] kadar durur. Sekme değişimi bu bekleyişi **atlar**:
-///    yeni bağlama girildiği an rehberin söyleyecek bir şeyi vardır.
-/// 3. **Arka arkaya aynı şeyi söylemez** — son cümle hatırlanıp havuzdan
-///    eleniyor.
-///
-/// Eğitim sürerken bu katman hiç kurulmaz (`RootShell` karar veriyor):
-/// iki anlatıcının aynı anda konuşması hem görsel hem anlatı olarak yanlış.
+/// Katman dokunuşları yutmaz. Pet seyrek konuşur, ekranın iki kenarında kısa
+/// bir idle + climb/attack gösterisi yapar ve ancak sonra yön değiştirir.
 class PetCompanionOverlay extends StatefulWidget {
-  /// Rehberin o an baktığı durum; değişince yeni bir söz tetiklenir.
   final PetSituation situation;
-
-  /// Oyuncunun seçtiği karakter.
   final TutorialGuideVariant guide;
 
-  /// İki söz arasındaki en kısa süre.
+  /// False olduğunda pet bulunduğu yerde death animasyonunu oynatıp kaybolur.
+  final bool enabled;
+  final VoidCallback? onDismissed;
+
+  /// İlk söz uygulama/overlay açılır açılmaz gelmez.
+  final Duration initialDelay;
+
+  /// İki söz arasındaki sessiz süre.
   final Duration silence;
-
-  /// Baloncuğun ekranda kalma süresi.
   final Duration bubbleDuration;
-
-  /// Uçtan uca bir yürüyüşün süresi.
   final Duration strollDuration;
 
-  /// İki yürüyüş arasında rehberin durup beklediği süre.
+  /// Köşede idle animasyonunun kaldığı süre.
   final Duration restDuration;
 
-  /// Alt gezinme çubuğuna bırakılan pay; rehber onun üstünde yürür.
+  /// Idle sonrasındaki climb/attack gösterisinin süresi.
+  final Duration edgeActionDuration;
   final double bottomInset;
 
   const PetCompanionOverlay({
     super.key,
     required this.situation,
     this.guide = TutorialGuideVariant.mavili,
-    this.silence = const Duration(seconds: 45),
-    this.bubbleDuration = const Duration(seconds: 6),
+    this.enabled = true,
+    this.onDismissed,
+    this.initialDelay = const Duration(seconds: 25),
+    this.silence = const Duration(seconds: 90),
+    this.bubbleDuration = const Duration(seconds: 5),
     this.strollDuration = const Duration(seconds: 14),
-    this.restDuration = const Duration(seconds: 12),
+    this.restDuration = const Duration(seconds: 3),
+    this.edgeActionDuration = const Duration(milliseconds: 900),
     this.bottomInset = 96,
   });
 
@@ -65,67 +54,82 @@ class PetCompanionOverlay extends StatefulWidget {
   State<PetCompanionOverlay> createState() => _PetCompanionOverlayState();
 }
 
+enum _PetMotion { idle, walking, climbing, attacking, dying, frozen }
+
 class _PetCompanionOverlayState extends State<PetCompanionOverlay>
     with SingleTickerProviderStateMixin {
   static const double _spriteSize = 56;
+  static const double _bubbleMaxWidth = 232;
+  static const _deathFreeze = Duration(milliseconds: 320);
+  static const _deathFade = Duration(milliseconds: 260);
 
   late final AnimationController _stroll = AnimationController(
     vsync: this,
     duration: widget.strollDuration,
   );
 
+  Timer? _speechTimer;
   Timer? _bubbleTimer;
-  Timer? _strollTimer;
+  Timer? _patrolTimer;
+  Completer<void>? _patrolDelay;
+  Timer? _deathTimer;
+  Completer<void>? _deathDelay;
   String? _line;
   String? _lastLine;
   int _seed = 0;
+  int _patrolRun = 0;
+  int _deathRun = 0;
+  int _edgeActionIndex = 0;
+  int _spriteSerial = 0;
+  bool _facingLeft = false;
+  double _spriteOpacity = 1;
+  _PetMotion _motion = _PetMotion.idle;
+  ui.Image? _deathFinalFrame;
 
   @override
   void initState() {
     super.initState();
-    // Sekmeye girer girmez bir şey söylesin: ilk izlenim sessiz olmamalı.
-    _speak();
-    _scheduleStroll();
-  }
-
-  /// Rehber **sürekli** yürümüyor: bir tur atıyor, sonra durup dinleniyor.
-  ///
-  /// Bu yalnızca bir tempo tercihi değil, teknik bir zorunluluk: sonsuz
-  /// tekrar eden bir animasyon her karede yeni bir kare planlar ve
-  /// `pumpAndSettle` **hiçbir zaman** dönmez — projenin bütün `RootShell`
-  /// widget testleri o çağrıya dayanıyor (CLAUDE.md test ortamı notu).
-  /// Bitimli tur + zamanlayıcı, hem cihazda daha sakin duruyor hem 60'tan
-  /// fazla mevcut testi ayakta tutuyor.
-  void _scheduleStroll() {
-    _strollTimer?.cancel();
-    _strollTimer = Timer(widget.restDuration, () {
-      if (!mounted) return;
-      final forward = _stroll.value < 0.5;
-      final walk = forward ? _stroll.forward() : _stroll.reverse();
-      walk.whenComplete(() {
-        if (mounted) _scheduleStroll();
-      });
-    });
-  }
-
-  @override
-  void didUpdateWidget(PetCompanionOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.situation.context != widget.situation.context) {
-      // Bağlam değişti: bekleme süresi atlanır (kural 2).
-      _speak();
+    if (widget.enabled) {
+      _activate();
+    } else {
+      _beginDeath();
     }
   }
 
   @override
-  void dispose() {
-    _bubbleTimer?.cancel();
-    _strollTimer?.cancel();
-    _stroll.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant PetCompanionOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.strollDuration != widget.strollDuration) {
+      _stroll.duration = widget.strollDuration;
+    }
+    if (oldWidget.enabled && !widget.enabled) {
+      _beginDeath();
+    } else if (!oldWidget.enabled && widget.enabled) {
+      _activate();
+    }
+    // Bağlam değişimi artık anında konuşturmaz. Bir sonraki planlı söz yeni
+    // bağlamın havuzundan seçilir; sekmelere her dokunuşta balon çıkmaz.
+  }
+
+  void _activate() {
+    _deathRun++;
+    _cancelDeathDelay();
+    _disposeDeathFrame();
+    _spriteOpacity = 1;
+    _motion = _PetMotion.idle;
+    _spriteSerial++;
+    _scheduleSpeech(widget.initialDelay);
+    _startPatrol();
+  }
+
+  void _scheduleSpeech(Duration delay) {
+    _speechTimer?.cancel();
+    if (!widget.enabled) return;
+    _speechTimer = Timer(delay, _speak);
   }
 
   void _speak() {
+    if (!mounted || !widget.enabled) return;
     final line = PetSayings.pick(
       widget.situation,
       seed: _seed++,
@@ -142,15 +146,223 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
   void _hush() {
     if (!mounted) return;
     setState(() => _line = null);
-    // Sessizlik payı: rehber ancak bu süre dolduktan sonra tekrar konuşur.
-    _bubbleTimer = Timer(widget.silence, () {
-      if (mounted) _speak();
+    _scheduleSpeech(widget.silence);
+  }
+
+  void _startPatrol() {
+    _cancelPatrolDelay();
+    final run = ++_patrolRun;
+    unawaited(_patrol(run));
+  }
+
+  Future<void> _patrol(int run) async {
+    while (mounted && widget.enabled && run == _patrolRun) {
+      await _waitForPatrol(widget.restDuration);
+      if (!mounted || !widget.enabled || run != _patrolRun) return;
+
+      final action =
+          (_edgeActionIndex++).isEven
+              ? _PetMotion.climbing
+              : _PetMotion.attacking;
+      _setMotion(action);
+      await _waitForPatrol(widget.edgeActionDuration);
+      if (!mounted || !widget.enabled || run != _patrolRun) return;
+
+      final towardRight = _stroll.value < .5;
+      _facingLeft = !towardRight;
+      _setMotion(_PetMotion.walking);
+      try {
+        await (towardRight ? _stroll.forward() : _stroll.reverse()).orCancel;
+      } on TickerCanceled {
+        return;
+      }
+      if (!mounted || !widget.enabled || run != _patrolRun) return;
+      _setMotion(_PetMotion.idle);
+    }
+  }
+
+  Future<void> _waitForPatrol(Duration duration) {
+    _patrolTimer?.cancel();
+    final completer = Completer<void>();
+    _patrolDelay = completer;
+    _patrolTimer = Timer(duration, () {
+      _patrolTimer = null;
+      if (!completer.isCompleted) completer.complete();
+      if (identical(_patrolDelay, completer)) _patrolDelay = null;
     });
+    return completer.future;
+  }
+
+  void _cancelPatrolDelay() {
+    _patrolTimer?.cancel();
+    _patrolTimer = null;
+    final completer = _patrolDelay;
+    _patrolDelay = null;
+    if (completer != null && !completer.isCompleted) completer.complete();
+  }
+
+  void _setMotion(_PetMotion motion) {
+    if (!mounted) return;
+    setState(() {
+      _motion = motion;
+      _spriteSerial++;
+    });
+  }
+
+  void _beginDeath() {
+    _patrolRun++;
+    _cancelPatrolDelay();
+    _cancelDeathDelay();
+    _speechTimer?.cancel();
+    _bubbleTimer?.cancel();
+    _stroll.stop();
+    _disposeDeathFrame();
+    final run = ++_deathRun;
+    setState(() {
+      _line = null;
+      _motion = _PetMotion.dying;
+      _spriteOpacity = 1;
+      _spriteSerial++;
+    });
+    unawaited(_playDeath(run));
+  }
+
+  Future<void> _playDeath(int run) async {
+    final asset = TutorialGuideAssets.forAnimation(
+      TutorialGuideAnimation.dying,
+      widget.guide,
+    );
+    final stopwatch = Stopwatch()..start();
+    final captured = await _decodeLastFrame(asset);
+    final duration = captured?.duration ?? const Duration(milliseconds: 900);
+    final remaining = duration - stopwatch.elapsed;
+    if (remaining > Duration.zero) await _waitForDeath(remaining);
+
+    if (!mounted || widget.enabled || run != _deathRun) {
+      captured?.image.dispose();
+      return;
+    }
+    setState(() {
+      _deathFinalFrame = captured?.image;
+      _motion = _PetMotion.frozen;
+      _spriteSerial++;
+    });
+    await _waitForDeath(_deathFreeze);
+    if (!mounted || widget.enabled || run != _deathRun) return;
+    setState(() => _spriteOpacity = 0);
+    await _waitForDeath(_deathFade);
+    if (mounted && !widget.enabled && run == _deathRun) {
+      widget.onDismissed?.call();
+    }
+  }
+
+  Future<void> _waitForDeath(Duration duration) {
+    _deathTimer?.cancel();
+    final completer = Completer<void>();
+    _deathDelay = completer;
+    _deathTimer = Timer(duration, () {
+      _deathTimer = null;
+      if (!completer.isCompleted) completer.complete();
+      if (identical(_deathDelay, completer)) _deathDelay = null;
+    });
+    return completer.future;
+  }
+
+  void _cancelDeathDelay() {
+    _deathTimer?.cancel();
+    _deathTimer = null;
+    final completer = _deathDelay;
+    _deathDelay = null;
+    if (completer != null && !completer.isCompleted) completer.complete();
+  }
+
+  Future<_CapturedGifFrame?> _decodeLastFrame(String asset) async {
+    ui.Codec? codec;
+    ui.Image? lastImage;
+    try {
+      final data = await rootBundle.load(asset);
+      codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      var duration = Duration.zero;
+      for (var index = 0; index < codec.frameCount; index++) {
+        final frame = await codec.getNextFrame();
+        duration += frame.duration;
+        lastImage?.dispose();
+        lastImage = frame.image;
+      }
+      if (lastImage == null) return null;
+      return _CapturedGifFrame(image: lastImage, duration: duration);
+    } catch (_) {
+      lastImage?.dispose();
+      return null;
+    } finally {
+      codec?.dispose();
+    }
+  }
+
+  void _disposeDeathFrame() {
+    _deathFinalFrame?.dispose();
+    _deathFinalFrame = null;
+  }
+
+  TutorialGuideAnimation get _animation => switch (_motion) {
+    _PetMotion.idle => TutorialGuideAnimation.idle,
+    _PetMotion.walking => TutorialGuideAnimation.walking,
+    _PetMotion.climbing => TutorialGuideAnimation.climbing,
+    _PetMotion.attacking => TutorialGuideAnimation.attacking,
+    _PetMotion.dying || _PetMotion.frozen => TutorialGuideAnimation.dying,
+  };
+
+  Widget _sprite() {
+    final frozen = _deathFinalFrame;
+    final image =
+        _motion == _PetMotion.frozen && frozen != null
+            ? RawImage(
+              image: frozen,
+              width: _spriteSize,
+              height: _spriteSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.none,
+            )
+            : Image.asset(
+              TutorialGuideAssets.forAnimation(_animation, widget.guide),
+              key: ValueKey('pet-$_spriteSerial-${_animation.name}'),
+              width: _spriteSize,
+              height: _spriteSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.none,
+              gaplessPlayback: false,
+              errorBuilder:
+                  (_, __, ___) => const Icon(
+                    Icons.assistant,
+                    size: 44,
+                    color: Color(0xFF8D6BFF),
+                  ),
+            );
+    return AnimatedOpacity(
+      key: const ValueKey('pet-companion-sprite'),
+      opacity: _spriteOpacity,
+      duration: _deathFade,
+      child: Transform.flip(flipX: _facingLeft, child: image),
+    );
+  }
+
+  @override
+  void dispose() {
+    _patrolRun++;
+    _deathRun++;
+    _speechTimer?.cancel();
+    _bubbleTimer?.cancel();
+    _cancelPatrolDelay();
+    _cancelDeathDelay();
+    _stroll.dispose();
+    _disposeDeathFrame();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Bütün katman dokunuşa kapalı: rehber hiçbir düğmenin önünü kesemez.
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -158,51 +370,51 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
             0.0,
             double.infinity,
           );
-          // Yürüyüşün kendisi GIF; her karede yeniden **inşa** edilmemesi
-          // için sprite `child` olarak dışarıda tutuluyor (GD60 deseni).
-          final sprite = Image.asset(
-            TutorialGuideAssets.forAnimation(
-              TutorialGuideAnimation.walking,
-              widget.guide,
-            ),
-            key: const ValueKey('pet-companion-sprite'),
-            width: _spriteSize,
-            height: _spriteSize,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.none,
-            errorBuilder: (_, __, ___) => const Icon(
-              Icons.assistant,
-              size: 44,
-              color: Color(0xFF8D6BFF),
-            ),
+          final bubbleWidth = (constraints.maxWidth - 24).clamp(
+            0.0,
+            _bubbleMaxWidth,
           );
-          return Stack(
-            children: [
-              AnimatedBuilder(
-                animation: _stroll,
-                builder: (context, child) {
-                  final goingLeft = _stroll.status == AnimationStatus.reverse;
-                  return Positioned(
-                    left: 12 + travel * _stroll.value,
-                    bottom: widget.bottomInset,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_line != null) _PetBubble(text: _line!),
-                        Transform.flip(flipX: goingLeft, child: child),
-                      ],
+          final maxBubbleLeft = constraints.maxWidth - bubbleWidth - 12;
+          final sprite = _sprite();
+
+          return AnimatedBuilder(
+            animation: _stroll,
+            child: sprite,
+            builder: (context, child) {
+              final petLeft = 12 + travel * _stroll.value;
+              final bubbleLeft = (petLeft + _spriteSize * .2).clamp(
+                12.0,
+                maxBubbleLeft,
+              );
+              return Stack(
+                children: [
+                  if (_line != null)
+                    Positioned(
+                      left: bubbleLeft,
+                      bottom: widget.bottomInset + _spriteSize + 6,
+                      width: bubbleWidth,
+                      child: _PetBubble(text: _line!),
                     ),
-                  );
-                },
-                child: sprite,
-              ),
-            ],
+                  Positioned(
+                    left: petLeft,
+                    bottom: widget.bottomInset,
+                    child: child!,
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
     );
   }
+}
+
+class _CapturedGifFrame {
+  final ui.Image image;
+  final Duration duration;
+
+  const _CapturedGifFrame({required this.image, required this.duration});
 }
 
 class _PetBubble extends StatelessWidget {
@@ -217,8 +429,6 @@ class _PetBubble extends StatelessWidget {
       label: text,
       child: Container(
         key: const ValueKey('pet-companion-bubble'),
-        constraints: const BoxConstraints(maxWidth: 232),
-        margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
         decoration: BoxDecoration(
           color: const Color(0xEE201A35),
