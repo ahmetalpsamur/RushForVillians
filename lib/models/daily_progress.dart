@@ -19,12 +19,20 @@ class DailyProgress {
   /// yazılmaz — bu satır "yürüyerek ne kazandım" sorusunu cevaplar.
   int xpEarned;
 
+  /// Bugün en az bir düşman devrildi mi (Bölüm A.6).
+  ///
+  /// Seri ve çark kilidi artık **yalnızca** adım eşiğine bakmıyor: bir düşman
+  /// devirmek de ikisini açıyor. Gün değişince yeni bir [DailyProgress]
+  /// kurulduğu için kendiliğinden sıfırlanır.
+  bool enemyDefeated;
+
   DailyProgress({
     required this.date,
     this.steps = 0,
     this.stepGoal = GameConstants.dragonStepGoal,
     this.coinsEarned = 0,
     this.xpEarned = 0,
+    this.enemyDefeated = false,
   });
 
   /// Eski UI çağrı noktaları için korunur. Günlük kazanç tavanı
@@ -35,7 +43,14 @@ class DailyProgress {
 
   bool get stepGoalReached => steps >= stepGoal;
 
-  bool get isWheelUnlocked => steps >= GameConstants.dailyWheelUnlockSteps;
+  /// Çark bugün açık mı (Bölüm A.6).
+  ///
+  /// İki kapıdan **hangisi önce gelirse**: adım eşiği ya da bir zafer.
+  /// Adım eşiği bilerek kaldırılmadı — macera oynamayan ama gerçekten yürüyen
+  /// oyuncu cezalanmamalı, ve `streakRelief` gibi eşiğe bağlı item etkileri
+  /// anlamını korumalı.
+  bool get isWheelUnlocked =>
+      enemyDefeated || steps >= GameConstants.dailyWheelUnlockSteps;
 
   void addSteps(int amount) {
     steps += amount;
@@ -51,6 +66,7 @@ class DailyProgress {
     'stepGoal': stepGoal,
     'coinsEarned': coinsEarned,
     'xpEarned': xpEarned,
+    'enemyDefeated': enemyDefeated,
   };
 
   factory DailyProgress.fromJson(Map<String, dynamic> json) {
@@ -63,6 +79,7 @@ class DailyProgress {
       stepGoal: json['stepGoal'] as int? ?? GameConstants.dragonStepGoal,
       coinsEarned: json['coinsEarned'] as int? ?? 0,
       xpEarned: json['xpEarned'] as int? ?? 0,
+      enemyDefeated: json['enemyDefeated'] as bool? ?? false,
     );
   }
 }

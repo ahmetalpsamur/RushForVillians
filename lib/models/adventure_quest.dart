@@ -1,4 +1,5 @@
 import '../core/constants/attack_config.dart';
+import '../core/constants/game_constants.dart';
 import '../core/utils/base_combat_stats.dart';
 import '../core/utils/combat_engine.dart';
 import '../core/utils/enemy_stats.dart';
@@ -12,6 +13,39 @@ import 'item_effect.dart';
 ///
 /// Savaşın ödül ve ekran akışını yöneten otoriter terminal sonucu.
 enum AdventureBattleOutcome { active, victory, defeat }
+
+/// Maceranın oyuncuya gösterilen fazı (Bölüm A).
+///
+/// Savaş sonucu ([AdventureBattleOutcome]) **otoriter durumdur**; bu enum ise
+/// o durumdan ve yürüyüş ilerlemesinden türeyen sunum katmanıdır. İkinci bir
+/// kalıcı alan olarak saklanmaz — tek doğruluk kaynağı [AdventureQuest]
+/// alanlarıdır.
+enum AdventureQuestPhase {
+  /// Düşman ayakta; adımlar vuruşa dönüşüyor.
+  combat,
+
+  /// Düşman devrildi ama maceranın adım taahhüdü sürüyor. Kazanç bonuslu.
+  walk,
+
+  /// Düşman devrildi ve taahhüt doldu. Macera gerçekten bitti.
+  completed,
+
+  /// Oyuncu düştü; 500 adımlık Hayat Yürüyüşü sürüyor ya da bekliyor.
+  revival,
+
+  /// Hayat Yürüyüşü tamamlandı.
+  revivalCompleted,
+}
+
+extension AdventureQuestPhaseLabel on AdventureQuestPhase {
+  String get label => switch (this) {
+    AdventureQuestPhase.combat => 'Savaş fazı',
+    AdventureQuestPhase.walk => 'Yürüyüş fazı',
+    AdventureQuestPhase.completed => 'Macera tamamlandı',
+    AdventureQuestPhase.revival => 'Hayat Yürüyüşü',
+    AdventureQuestPhase.revivalCompleted => 'Hayat Yürüyüşü tamamlandı',
+  };
+}
 
 class AdventureQuest {
   static const String defaultBackgroundAsset =
@@ -102,6 +136,26 @@ class AdventureQuest {
   bool revivalStarted;
   int revivalSteps;
 
+  /// Düşman devrildiği anda maceranın kaç adımı harcanmıştı (Bölüm A).
+  ///
+  /// `-1` = "henüz zafer yok ya da eski kayıt". Zafer anında damgalanır ve
+  /// **iki** şeyin tek kaynağı olur: yürüyüş fazının hedefi
+  /// ([walkTargetSteps]) ve zafer ödülünün hız çarpanı
+  /// ([speedRewardMultiplier]).
+  ///
+  /// Neden ayrı bir "faz" bayrağı yok: faz durumdan türetilebiliyor
+  /// (`zafer + kalan yürüyüş adımı`), ikinci bir kalıcı alan iki doğruluk
+  /// kaynağı üretirdi.
+  int victorySteps;
+
+  /// Düşmanı deviren roundun numarası. Yalnızca gösterim için: oyuncuya
+  /// "3 round'da bitirdin" diyebilmek gerekiyor.
+  int victoryRounds;
+
+  /// Yürüyüş fazında biriken adım. [revivalSteps] ile aynı desende: kabul
+  /// edilen adım kadar ilerler, hedefi aşamaz.
+  int walkSteps;
+
   AdventureQuest({
     required this.enemy,
     required this.stepGoal,
@@ -131,8 +185,12 @@ class AdventureQuest {
     this.playerDefeatPending = false,
     this.revivalStarted = false,
     int revivalSteps = 0,
+    this.victorySteps = -1,
+    this.victoryRounds = 0,
+    int walkSteps = 0,
     DateTime? startedAt,
   }) : roundStartingSteps = roundStartingSteps ?? startingSteps,
+       walkSteps = walkSteps < 0 ? 0 : walkSteps,
        currentRound = currentRound < 1 ? 1 : currentRound,
        enemyHealth = enemyHealth ?? _scaledEnemyMaxHealth(enemy, stepGoal),
        revivalSteps = revivalSteps.clamp(0, revivalStepTarget),
@@ -149,10 +207,17 @@ class AdventureQuest {
         this.enemyHealth = 0;
         revivalStarted = false;
         this.revivalSteps = 0;
+        // Zafer damgası olmadan gelen bir kayıt (v16 ve öncesi) yürüyüş
+        // fazına **geriye dönük sokulmaz**: tamamlanmış bir macerayı
+        // güncelleme sonrası yeniden açmak, oyuncunun bitirdiği işi geri
+        // almak olurdu. Tam hedefte devrilmiş sayılır: yürüyüş hedefi 0,
+        // hız çarpanı ×1.
+        if (victorySteps < 0) victorySteps = stepGoal;
       } else {
         playerHealth = 0;
       }
     }
+    this.walkSteps = this.walkSteps.clamp(0, walkTargetSteps);
   }
 
   static AttackTargetConfig _attackConfig(int stepGoal) =>
@@ -179,6 +244,12 @@ class AdventureQuest {
     lastRoundWon = true;
     roundOutcomeSerial += 1;
     enemyHealth = 0;
+    // Eğitim savaşını guide kazanıyor, oyuncu değil. Bu yüzden zafer **tam
+    // hedefte** damgalanır: yürüyüş fazı açılmaz ve hız çarpanı ×1 kalır.
+    // Aksi hâlde hiç adım atmamış yeni oyuncu ×2 ödül alır ve eğitimin
+    // ortasında binlerce adımlık bir yürüyüşe kilitlenirdi. Yürüyüş fazı
+    // eğitimde **anlatılır**, ilk gerçek macerada yaşanır.
+    stampVictory(questStepsAtVictory: stepGoal, round: currentRound);
     battleOutcome = AdventureBattleOutcome.victory;
     enemyDefeatPending = false;
     playerDefeatPending = false;
@@ -329,6 +400,12 @@ class AdventureQuest {
         battleOutcome = AdventureBattleOutcome.defeat;
       } else if (outcome.enemyDefeated) {
         battleOutcome = AdventureBattleOutcome.victory;
+        // Zaferin geldiği nokta burada damgalanır: yürüyüş fazının hedefi ve
+        // ödülün hız çarpanı ikisi de bundan türüyor (Bölüm A.1/A.2).
+        stampVictory(
+          questStepsAtVictory: questSteps(currentSteps),
+          round: currentRound,
+        );
       }
     }
 
@@ -509,6 +586,9 @@ class AdventureQuest {
     'playerDefeatPending': playerDefeatPending,
     'revivalStarted': revivalStarted,
     'revivalSteps': revivalSteps,
+    'victorySteps': victorySteps,
+    'victoryRounds': victoryRounds,
+    'walkSteps': walkSteps,
   };
 
   /// Kayıttan geri yükler. Tur hedefi ve geri sayım kurucuda hesaplandığı
@@ -574,6 +654,21 @@ class AdventureQuest {
       revivalSteps:
           restoredOutcome == AdventureBattleOutcome.defeat
               ? json['revivalSteps'] as int? ?? 0
+              : 0,
+      // Zafer damgası yalnızca zaferli kayıtlarda anlamlı. Eksikse
+      // kurucu `stepGoal` ile doldurur: eski kayıt yürüyüş fazına geriye
+      // dönük sokulmaz (bkz. kurucu gövdesi).
+      victorySteps:
+          restoredOutcome == AdventureBattleOutcome.victory
+              ? json['victorySteps'] as int? ?? -1
+              : -1,
+      victoryRounds:
+          restoredOutcome == AdventureBattleOutcome.victory
+              ? json['victoryRounds'] as int? ?? 0
+              : 0,
+      walkSteps:
+          restoredOutcome == AdventureBattleOutcome.victory
+              ? json['walkSteps'] as int? ?? 0
               : 0,
     );
 
@@ -648,6 +743,113 @@ class AdventureQuest {
 
   double get revivalProgress =>
       (revivalSteps / revivalStepTarget).clamp(0.0, 1.0);
+
+  // ---------------------------------------------------------------------
+  // Yürüyüş fazı (Bölüm A)
+  //
+  // Macera iki fazlı: **savaş** düşman devrilene kadar, **yürüyüş** ondan
+  // sonra maceranın adım taahhüdü bitene kadar. Macera ancak taahhüt
+  // dolduğunda gerçekten biter. Düşmanı erken deviren oyuncu ödülünü hemen
+  // alır ve kalan yolu bonuslu yürür.
+  //
+  // Alanlar [revivalSteps] / [revivalStepTarget] desenini birebir izler:
+  // hedef türetilir, ilerleme kalıcı, ekleme kabul edilen miktarı döndürür.
+  // ---------------------------------------------------------------------
+
+  /// Zafer damgalandı mı. `false` ise yürüyüş fazı henüz tanımlı değil.
+  bool get hasVictoryStamp => victorySteps >= 0;
+
+  /// Yürüyüş fazında yürünmesi gereken adım.
+  ///
+  /// Düşman adım taahhüdünün tamamı harcandıktan **sonra** devrildiyse 0 —
+  /// yani yürüyüş fazı hiç açılmaz ve macera zaferle biter.
+  int get walkTargetSteps {
+    if (!hasVictoryStamp) return 0;
+    return (stepGoal - victorySteps).clamp(0, stepGoal);
+  }
+
+  int get walkRemainingSteps =>
+      (walkTargetSteps - walkSteps).clamp(0, walkTargetSteps);
+
+  double get walkProgress {
+    final target = walkTargetSteps;
+    if (target <= 0) return 1;
+    return (walkSteps / target).clamp(0.0, 1.0);
+  }
+
+  /// Şu an yürüyüş fazında mıyız.
+  bool get isWalkPhaseActive => isEnemyDefeated && walkRemainingSteps > 0;
+
+  /// Macera gerçekten bitti mi: düşman devrildi **ve** adım taahhüdü doldu.
+  ///
+  /// [isEnemyDefeated] artık "macera bitti" demek değil; ekranlar ve ödül
+  /// kapıları bu ayrımı gözetmeli.
+  bool get isAdventureCompleted =>
+      isEnemyDefeated && walkRemainingSteps == 0;
+
+  /// Maceranın hangi fazında olduğu. Yenilgi ve Hayat Yürüyüşü ayrı dallar.
+  AdventureQuestPhase get phase {
+    if (isPlayerDefeated) {
+      return revivalCompleted
+          ? AdventureQuestPhase.revivalCompleted
+          : AdventureQuestPhase.revival;
+    }
+    if (!isEnemyDefeated) return AdventureQuestPhase.combat;
+    return isWalkPhaseActive
+        ? AdventureQuestPhase.walk
+        : AdventureQuestPhase.completed;
+  }
+
+  /// Yürüyüş fazına adım ekler; gerçekten kabul edilen miktarı döndürür.
+  int addWalkSteps(int amount) {
+    if (amount <= 0 || !isWalkPhaseActive) return 0;
+    final accepted = amount.clamp(0, walkRemainingSteps);
+    walkSteps += accepted;
+    return accepted;
+  }
+
+  /// Zaferin hangi noktada geldiğini damgalar (Bölüm A.1 + A.2).
+  ///
+  /// Yalnızca ilk çağrıda yazar: ikinci bir çağrı yürüyüş hedefini ve hız
+  /// çarpanını sonradan değiştiremez.
+  void stampVictory({required int questStepsAtVictory, required int round}) {
+    if (hasVictoryStamp) return;
+    victorySteps = questStepsAtVictory.clamp(0, stepGoal);
+    victoryRounds = round < 1 ? 1 : round;
+  }
+
+  /// Zafer ödülünün hız çarpanı (Bölüm A.2).
+  ///
+  /// **Ölçü adımdır, round değil.** Gerekçe:
+  /// - Round sayısı kaba: 500 adımlık bir macerada toplam **tek** round var,
+  ///   yani round ölçüsüyle o hedefte hız ödülü hiç oluşamazdı.
+  /// - Yürüyüş fazının kendisi de adımla tanımlı; aynı büyüklüğün iki sistemi
+  ///   birden sürmesi, "erken bitirdim" ile "kalan yol" arasındaki ilişkiyi
+  ///   tutarlı kılıyor: harcamadığın her adım hem çarpana hem bonuslu
+  ///   yürüyüşe yazılıyor.
+  /// - Beklemek bir kaçamak değil: savaş motoru verilen hasarı round
+  ///   tamamlanma oranıyla ölçekliyor, yani hiç yürümeden düşman devrilmiyor.
+  ///
+  /// Sınırlar: hedefin tamamı harcandıysa ×1, hiç harcanmadıysa
+  /// [GameConstants.maxVictorySpeedMultiplier].
+  double get speedRewardMultiplier {
+    if (!hasVictoryStamp || stepGoal <= 0) return 1;
+    final ratio = (victorySteps / stepGoal).clamp(0.0, 1.0);
+    final span = GameConstants.maxVictorySpeedMultiplier - 1;
+    return 1 + (1 - ratio) * span;
+  }
+
+  /// Kademe bazlı zafer altınının **tohumlu** çekilişi.
+  ///
+  /// Eskiden `Random()` ile atılıyordu; kalıcı bir ödülü etkileyen rastgelelik
+  /// tohumlu olmalı ve tekrarlanabilir kalmalı (CLAUDE.md §4.4, GD18/GD50).
+  /// `String.hashCode` **kullanılmaz** (GD8): sürümler arası sabit değil.
+  int victoryCoinRoll({required int minimum, required int maximum}) {
+    if (maximum <= minimum) return minimum;
+    final span = maximum - minimum + 1;
+    return minimum +
+        stableSpread('victory-coins|${enemy.id}|$startingSteps|$stepGoal', span);
+  }
 
   /// Otoriter yenilgiden sonra Hayat Yürüyüşünü başlatır.
   bool startRevival() {

@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 16;
+  static const int schemaVersion = 17;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -227,6 +227,13 @@ class GameStorage {
     // altın macera kaydında tutuluyor. Eski kayıtlarda alanlar model tarafından
     // sıfır varsayılanıyla okunur; tamamlanmış ödül ikinci kez verilmez.
     15: (state) => state,
+    // 16 -> 17: macera iki fazlı oldu (Bölüm A). Zafer artık `victorySteps`
+    // ve `victoryRounds` ile damgalanıyor; yürüyüş fazı `walkSteps` ile
+    // ilerliyor. Eski kayıtlarda üç alan da yok: `AdventureQuest.fromJson`
+    // eksik damgayı `stepGoal` ile dolduruyor, yani **zaten bitmiş bir
+    // macera yürüyüş fazına geriye dönük sokulmuyor** ve ×1 ödülüyle kalıyor.
+    // Veri silen bir dönüşüm gerekmiyor.
+    16: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

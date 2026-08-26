@@ -298,6 +298,26 @@ void main() {
         find.byKey(const ValueKey('victory-enemy-corpse')),
         findsOneWidget,
       );
+      // Bölüm A.5: ganimet cesedin **önünde** çizilmeli. `Stack` çocukları
+      // sırayla boyandığı için ağaç sırası doğrudan katman sırasıdır: ceset
+      // önce gelmeli, altınlar sonra. Eskiden tersiydi ve ceset altınları
+      // örtüyordu.
+      final layerOrder =
+          find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget.key == const ValueKey('victory-enemy-corpse') ||
+                    widget.key == const ValueKey('victory-scattered-coin'),
+              )
+              .evaluate()
+              .map((element) => element.widget.key)
+              .toList();
+      expect(layerOrder.first, const ValueKey('victory-enemy-corpse'));
+      expect(
+        layerOrder.skip(1),
+        everyElement(const ValueKey('victory-scattered-coin')),
+        reason: 'altınlar cesetten sonra boyanmalı',
+      );
       expect(find.text('Yeni bir macera seni bekliyor.'), findsNothing);
       await expectLater(
         find.byType(AdventureScreen),

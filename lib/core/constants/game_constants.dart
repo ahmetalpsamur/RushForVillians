@@ -87,6 +87,26 @@ class GameConstants {
   /// 1-2 anlamlı satın alma.
   static const int stepsPerCoin = 50;
 
+  /// Yürüyüş fazında kaç adımın 1 coin ettiği (Bölüm A.3).
+  ///
+  /// Düşman devrildikten sonra maceranın adım taahhüdü bitene kadar süren
+  /// faz boyunca oran [stepsPerCoin] yerine bu değerdir; macera tamamen
+  /// bitince oran kendiliğinden 50'ye döner. Yürüyüşün asıl amacı olan
+  /// "yürümeye devam et" davranışını ödüllendirir.
+  ///
+  /// **Neden yalnızca coin, XP değil:** iki kaldıracı birden oynatmak dengeyi
+  /// ölçülemez hâle getirir. XP eğrisi (`stepsPerXp`) ayrıca gerekçelendirilmiş
+  /// ve `step_xp_test.dart` ile bağlı; ona dokunmuyoruz.
+  static const int walkPhaseStepsPerCoin = 30;
+
+  /// Zafer ödülü hız çarpanının tavanı (Bölüm A.2).
+  ///
+  /// Düşmanı adım taahhüdünün ne kadar erken bir noktasında devirdiysen ödül
+  /// o kadar büyür: hiç adım harcamadan devirmek teorik üst sınır (×2), tam
+  /// hedefte devirmek taban (×1). Tavan olmadan güçlü oyuncunun ödülü
+  /// sınırsız büyürdü.
+  static const double maxVictorySpeedMultiplier = 2.0;
+
   /// Kaç adımın 1 XP ettiği.
   ///
   /// Seviye eğrisinden ([baseXpPerLevel]) türetildi: 10. seviyeye ulaşmak

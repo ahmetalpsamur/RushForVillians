@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/gif_timing.dart';
@@ -195,6 +196,13 @@ class _AdventureScreenState extends State<AdventureScreen>
 
     _pendingDamage = adventure.takePendingDamage();
     if (adventure.isEnemyDefeated) {
+      // Zafer kutlaması **bir kez** oynar. Yürüyüş fazı açıldıysa ve kutlama
+      // zaten gösterildiyse ekran doğrudan yürüyüş sahnesine düşer; aksi
+      // hâlde oyuncu Macera sekmesine her dönüşünde aynı kutlamayla
+      // karşılaşır ve yürüyüşe geçemezdi (Bölüm A.1).
+      if (adventure.deathAnimationPlayed && adventure.isWalkPhaseActive) {
+        return;
+      }
       if (adventure.deathAnimationPlayed) {
         _showRoundVictory = true;
         _isFinalVictory = true;
@@ -864,6 +872,34 @@ class _AdventureScreenState extends State<AdventureScreen>
                       ],
                     ),
                   ),
+                  // Hız ödülü (Bölüm A.2): oyuncu neyi neden kazandığını
+                  // görmeli, yoksa çarpan görünmez bir kural olur.
+                  if (adventure.speedRewardMultiplier > 1.001) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${adventure.victoryRounds} round · '
+                      '${_formatNumber(adventure.victorySteps)} adım — '
+                      'hız ödülü ×'
+                      '${adventure.speedRewardMultiplier.toStringAsFixed(1)}',
+                      key: const ValueKey('victory-speed-bonus'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.xp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                  if (adventure.isWalkPhaseActive) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Macera bitmedi: ${_formatNumber(adventure.walkRemainingSteps)} '
+                      'adımlık yürüyüş fazı kaldı. Bu fazda '
+                      '${GameConstants.walkPhaseStepsPerCoin} adım = 1 altın.',
+                      key: const ValueKey('victory-walk-phase-note'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ],
                 ],
                 if (_isFinalVictory) ...[
                   const SizedBox(height: 16),
@@ -924,7 +960,6 @@ class _AdventureScreenState extends State<AdventureScreen>
                               ),
                             ),
                           ),
-                          if (_showDeathCongratulations) ..._coinScatter(),
                           Positioned(
                             right: 0,
                             bottom: 0,
@@ -963,6 +998,12 @@ class _AdventureScreenState extends State<AdventureScreen>
                               ),
                             ),
                           ),
+                          // Altınlar düşmanın **önünde** çizilmeli: ganimet
+                          // cesedin üstüne düşer, altına değil. `Stack`
+                          // çocukları sırayla boyandığı için bu blok düşman
+                          // sprite'ından **sonra** gelmek zorunda; eskiden
+                          // önce geliyordu ve ceset altınları örtüyordu.
+                          if (_showDeathCongratulations) ..._coinScatter(),
                           if (!_showEnemyDeath &&
                               !_showFrozenEnemy &&
                               attack > 0.38 &&
@@ -998,12 +1039,27 @@ class _AdventureScreenState extends State<AdventureScreen>
                 if (_showDeathCongratulations)
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.icon(
-                      key: const ValueKey('victory-choose-adventure'),
-                      onPressed: widget.onChooseNewAdventure,
-                      icon: const Icon(Icons.explore),
-                      label: const Text('YENİ MACERA SEÇ'),
-                    ),
+                    child:
+                        adventure.isWalkPhaseActive
+                            // Düşman devrildi ama macera bitmedi: adım
+                            // taahhüdü sürüyor (Bölüm A.1). Buton oyuncuyu
+                            // yeni macera seçmeye değil, bonuslu yürüyüşe
+                            // yönlendirir.
+                            ? FilledButton.icon(
+                              key: const ValueKey('victory-continue-walk'),
+                              onPressed:
+                                  () => setState(
+                                    () => _showRoundVictory = false,
+                                  ),
+                              icon: const Icon(Icons.directions_walk),
+                              label: const Text('YÜRÜYÜŞE DEVAM ET'),
+                            )
+                            : FilledButton.icon(
+                              key: const ValueKey('victory-choose-adventure'),
+                              onPressed: widget.onChooseNewAdventure,
+                              icon: const Icon(Icons.explore),
+                              label: const Text('YENİ MACERA SEÇ'),
+                            ),
                   )
                 else ...[
                   Text(
@@ -1466,7 +1522,200 @@ class _AdventureScreenState extends State<AdventureScreen>
     );
   }
 
+  /// Yürüyüş fazı ekranı (Bölüm A.1/A.3/A.4).
+  ///
+  /// Savaş sahnesinden **net biçimde ayrışır**: düşman yok, oyuncu sahneyi
+  /// baştan sona yürüyor, kart savaş yerine kalan taahhüdü ve bonuslu oranı
+  /// anlatıyor. Sahne, savaştaki 260 px'lik kutuyu ve aynı ölçeği kullanır ki
+  /// iki faz arasında geçiş sıçramasın.
+  Widget _buildWalkPhase(BuildContext context, AdventureQuest adventure) {
+    return ListView(
+      key: const ValueKey('adventure-scroll-view'),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      children: [
+        SectionCard(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 260,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: _WalkPhaseScene(
+                    key: const ValueKey('walk-phase-scene'),
+                    backgroundAsset: adventure.backgroundAsset,
+                    walkAsset: widget.avatar.characterAsset,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Zafer senin',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${adventure.enemy.name} devrildi. Yolun geri kalanı senin.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: AdventureQuestPhase.walk.label,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.monetization_on,
+                    color: AppColors.streak,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Yürüyüş fazı · '
+                      '${GameConstants.walkPhaseStepsPerCoin} adım = 1 altın',
+                      key: const ValueKey('walk-phase-rate'),
+                      style: const TextStyle(
+                        color: AppColors.streak,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                key: const ValueKey('walk-phase-progress-bar'),
+                value: adventure.walkProgress,
+                minHeight: 10,
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.streak,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.directions_walk,
+                    size: 15,
+                    color: AppColors.streak,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${_formatNumber(adventure.walkSteps)} / '
+                      '${_formatNumber(adventure.walkTargetSteps)} adım — '
+                      'kalan ${_formatNumber(adventure.walkRemainingSteps)}',
+                      key: const ValueKey('walk-phase-remaining'),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Macera adım taahhüdün dolunca biter. O ana kadar attığın her '
+                'adım normalden değerli: oran ${GameConstants.stepsPerCoin} '
+                'yerine ${GameConstants.walkPhaseStepsPerCoin}. Faz bitince '
+                'oran ${GameConstants.stepsPerCoin} adım = 1 altına döner. '
+                'XP oranı değişmez.',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: 'Zafer özeti',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bolt, color: AppColors.xp, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${adventure.victoryRounds} round · '
+                      '${_formatNumber(adventure.victorySteps)} adımda '
+                      'devirdin — hız ödülü ×'
+                      '${adventure.speedRewardMultiplier.toStringAsFixed(1)}',
+                      key: const ValueKey('walk-phase-speed-bonus'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.monetization_on,
+                    color: AppColors.streak,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '+${adventure.victoryCoinReward} altın · '
+                      '+${adventure.victoryXpReward} XP',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department,
+                    color: AppColors.streak,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Serin ve çark hakkın bu zaferle güvence altında.',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('walk-phase-abandon'),
+            onPressed: widget.onChooseNewAdventure,
+            icon: const Icon(Icons.explore),
+            label: const Text('YÜRÜYÜŞÜ BIRAK, YENİ MACERA SEÇ'),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Bırakırsan bonuslu oran biter; zafer ödülün sende kalır.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAdventure(BuildContext context, AdventureQuest adventure) {
+    // Yürüyüş fazı savaş ekranını paylaşmaz (Bölüm A.4): düşman sahneden
+    // çıkar, oyuncu yürür, kart bonuslu oranı gösterir. İki fazın görsel
+    // olarak karışmaması şartın kendisi.
+    if (adventure.isWalkPhaseActive) {
+      return _buildWalkPhase(context, adventure);
+    }
     final defeated = adventure.isEnemyDefeated;
     final remaining = adventure.remainingEnemyHealth;
     return ListView(
@@ -1923,6 +2172,132 @@ String _formatNumber(int value) {
     output.write(digits[index]);
   }
   return output.toString();
+}
+
+/// Yürüyüş fazının sahnesi (Bölüm A.4).
+///
+/// Savaş sahnesinden ayrıştıran üç şey: düşman yok, karakter sahnede
+/// **yürüyor** ve üstte fazı söyleyen bir şerit var.
+///
+/// Karakter sahneden çıkmaz: uçtan uca gidip geri dönüyor ve dönüşte yatay
+/// olarak aynalanıyor. Tek yönlü sonsuz bir geçiş "yol" duygusu verirdi ama
+/// karakteri zamanın yarısında ekran dışında bırakırdı — kullanıcı yürüyüş
+/// fazına baktığında birini yürürken görmeli.
+///
+/// Performans: tek bir [AnimationController] var ve yalnızca bir
+/// [Transform.translate] sürüyor — yeniden çizilen alt ağaç `child` olarak
+/// dışarıda tutuluyor, yani her karede yeniden **inşa** edilmiyor. Yürüyüşün
+/// kendisi zaten GIF; ek bir kare üretimi yok.
+class _WalkPhaseScene extends StatefulWidget {
+  final String backgroundAsset;
+  final String walkAsset;
+
+  const _WalkPhaseScene({
+    super.key,
+    required this.backgroundAsset,
+    required this.walkAsset,
+  });
+
+  @override
+  State<_WalkPhaseScene> createState() => _WalkPhaseSceneState();
+}
+
+class _WalkPhaseSceneState extends State<_WalkPhaseScene>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _travel = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _travel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spriteWidth = 180.0;
+        const edgeInset = 6.0;
+        // Sprite tuvalinin iki yanında şeffaf boşluk var; kutuyu tamamen
+        // içeride tutmak yerine biraz taşırmak figürü kenara yaslamıyor.
+        final travelSpan =
+            (constraints.maxWidth - spriteWidth + 40).clamp(0.0, 400.0);
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                widget.backgroundAsset,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.none,
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            AnimatedBuilder(
+              animation: _travel,
+              // `child` sabit: her karede yeniden inşa edilmez, yalnızca
+              // taşınır. 60 FPS'i düşüren şey animasyon değil, her karede
+              // yeniden kurulan alt ağaç olurdu.
+              child: SizedBox(
+                width: spriteWidth,
+                height: 230,
+                child: PixelSprite(asset: widget.walkAsset, scale: 3),
+              ),
+              builder: (context, child) {
+                final headingBack = _travel.status == AnimationStatus.reverse;
+                return Positioned(
+                  left: edgeInset - 20 + travelSpan * _travel.value,
+                  bottom: -22,
+                  child: Transform.flip(flipX: headingBack, child: child),
+                );
+              },
+            ),
+            Positioned(
+              left: 8,
+              right: 8,
+              top: 6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: Text(
+                    'YÜRÜYÜŞ FAZI',
+                    key: ValueKey('walk-phase-banner'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.streak,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.6,
+                      shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _ScatteredCoin extends StatelessWidget {

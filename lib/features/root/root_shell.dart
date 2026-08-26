@@ -682,15 +682,32 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }) {
     if (!adventure.isEnemyDefeated || adventure.xpAwarded) return null;
     adventure.xpAwarded = true;
+    // Hız çarpanı (Bölüm A.2) **hem XP'ye hem altına** uygulanır.
+    //
+    // Neden ikisine birden: çarpanın işi hızlı zaferi hissettirmek; tek bir
+    // ödüle uygulanınca etkisi yarıya iniyor. Risk ikisinde de sınırlı —
+    // XP'nin harcanacağı bir yer yok (projenin kendi gerekçesi), altın
+    // tarafında ise çarpan yalnızca kademe bazlı **zafer damlasına** biniyor
+    // (en yüksek kademede ~130 coin), adım parasına değil. Tavan ×2.
+    final speed = adventure.speedRewardMultiplier;
     final xp = _awardXp(
-      (adventure.enemy.xpReward * _buffs.enemyXpMultiplier).floor(),
+      (adventure.enemy.xpReward * _buffs.enemyXpMultiplier * speed).floor(),
     );
     final tier = adventure.enemy.tier;
     final minimumCoins = 4 + (tier * 3);
     final maximumCoins = 10 + (tier * 6);
-    final coins =
+    // Tohumlu çekiliş: kalıcı bir ödülü etkileyen rastgelelik `Random()`
+    // olamaz (CLAUDE.md §4.4, GD18/GD50).
+    final baseCoins =
         forcedCoins ??
-        minimumCoins + Random().nextInt(maximumCoins - minimumCoins + 1);
+        adventure.victoryCoinRoll(
+          minimum: minimumCoins,
+          maximum: maximumCoins,
+        );
+    // Eğitimde verilen sabit altın çarpanla bozulmamalı: eğitim tam hedefte
+    // damgalandığı için `speed` zaten 1, ama niyet açık kalsın diye
+    // `forcedCoins` çarpandan muaf.
+    final coins = forcedCoins ?? (baseCoins * speed).floor();
     adventure.victoryXpReward = xp;
     adventure.victoryCoinReward = coins;
     _profile.coins += coins;
@@ -721,6 +738,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           adventure,
           forcedCoins: educationCoins,
         );
+        // Eğitim zaferi de gerçek bir zafer: seriyi ve çarkı açar (A.6).
+        // Eğitimin son durağı zaten çark; kilitli bir çarkla karşılaşmamalı.
+        _today.enemyDefeated = true;
       });
       _persist();
       unawaited(AdventureNotificationService.cancelAdventureReminders());
@@ -802,16 +822,42 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         revivalCompleted = revivalAdventure.revivalCompleted;
       }
 
+      // Yürüyüş fazı (Bölüm A.3): düşman devrildikten sonra maceranın adım
+      // taahhüdü bitene kadar oran 50/1 yerine 30/1. Adımlar **önce** faza
+      // yazılır ki para hesabı bu partinin kaçının bonuslu olduğunu bilsin.
+      // Düşmanın devrildiği partide bu değer 0'dır (round çözümü aşağıda,
+      // paradan sonra çalışıyor) — yani savaş adımı bonus almaz, doğru olan da
+      // bu.
+      final walkAccepted = _adventure?.addWalkSteps(amount) ?? 0;
+
       // Para adım deltasından kazanılır: işaretçi yalnızca paraya çevrilen
       // adım kadar ilerler, artan adımlar bir sonraki hesaba kalır.
+      //
+      // İki geçiş: önce bonuslu yürüyüş payı, sonra kalan normal oranla.
+      // İşaretçi her geçişte yalnızca **tüketilen** adım kadar ilerlediği
+      // için parti faz sınırını geçse bile çift sayma olmaz.
+      var pendingCoinSteps =
+          _profile.totalSteps - _profile.lastRewardedStepCount;
+      var coinsGained = 0;
+      if (walkAccepted > 0 && pendingCoinSteps > 0) {
+        final walkReward = calculateStepCoins(
+          pendingSteps: min(pendingCoinSteps, walkAccepted),
+          multiplier: _buffs.stepCoinMultiplier,
+          stepsPerCoin: GameConstants.walkPhaseStepsPerCoin,
+        );
+        coinsGained += walkReward.coins;
+        _profile.lastRewardedStepCount += walkReward.consumedSteps;
+        pendingCoinSteps -= walkReward.consumedSteps;
+      }
       final coinReward = calculateStepCoins(
-        pendingSteps: _profile.totalSteps - _profile.lastRewardedStepCount,
+        pendingSteps: pendingCoinSteps,
         // Günlük tavan yoktur; ekipman yalnızca adım başına kazancı büyütür.
         multiplier: _buffs.stepCoinMultiplier,
       );
-      _profile.coins += coinReward.coins;
+      coinsGained += coinReward.coins;
       _profile.lastRewardedStepCount += coinReward.consumedSteps;
-      _today.coinsEarned += coinReward.coins;
+      _profile.coins += coinsGained;
+      _today.coinsEarned += coinsGained;
 
       // XP'nin kendi işaretçisi var; iki ödül ekonomisi birbirine karışmaz.
       final xpReward = calculateStepXp(
@@ -841,12 +887,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         final granted = _grantAdventureVictoryXpIfNeeded(adventure);
         if (granted != null) {
           enemyDefeated = true;
+          // Bölüm A.6: zafer seriyi ve çarkı **o anda** açar. Yürüyüş fazı
+          // bonustur, zorunluluk değil.
+          _today.enemyDefeated = true;
         }
       }
       // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı. Kuşanılan
       // ekipman bu eşiği düşürebilir (`streakRelief`); eşik yalnızca **o an**
       // kontrol ediliyor, yani kuşanmayı çıkarmak geçmiş günleri bozmaz.
-      if (_today.steps >= _buffs.streakStepThreshold &&
+      if ((_today.enemyDefeated ||
+              _today.steps >= _buffs.streakStepThreshold) &&
           _profile.registerStreakDay(now)) {
         // Günün savaş stat bonusu: seri ilerledikten **sonra** çekilir.
         // Aynı oyun gününde ikinci çağrı null döner, yani kapat-aç ile
@@ -938,12 +988,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       //
       // `coinsEarned` / `xpEarned` de taşınır: ikisi de günün yürüyüş
       // kazancını gösteren sayaçlardır; macera seçmek geçmişi silmemeli.
+      // `enemyDefeated` aynı gerekçeyle taşınır: bugün kazanılmış bir seri ve
+      // açılmış bir çark, yeni macera seçilince geri alınamaz.
       _today = DailyProgress(
         date: _today.date,
         steps: _today.steps,
         stepGoal: adventure.stepGoal,
         coinsEarned: _today.coinsEarned,
         xpEarned: _today.xpEarned,
+        enemyDefeated: _today.enemyDefeated,
       );
     });
     _persist();
@@ -979,6 +1032,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         steps: _today.steps,
         coinsEarned: _today.coinsEarned,
         xpEarned: _today.xpEarned,
+        enemyDefeated: _today.enemyDefeated,
       );
     });
     _persist();

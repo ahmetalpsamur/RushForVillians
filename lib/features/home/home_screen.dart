@@ -158,9 +158,14 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.casino,
                   label: 'Günlük Çark',
                   enabled: today.isWheelUnlocked,
+                  // Bölüm A.6: iki kapıdan hangisi önce gelirse. Kilitli
+                  // kart neden kilitli olduğunu **ikisini birden** söylemeli
+                  // (Model Kuralları #4), yoksa oyuncu bir maceranın da çarkı
+                  // açtığını hiç öğrenemez.
                   disabledReason:
-                      'Çark ${GameConstants.dailyWheelUnlockSteps} adımda '
-                      'açılıyor. ${_wheelStepsLeft()} adım kaldı.',
+                      'Çarkı açmak için bir macera tamamla (düşmanı devir) '
+                      'ya da ${GameConstants.dailyWheelUnlockSteps} adım at. '
+                      '${_wheelStepsLeft()} adım kaldı.',
                   // Çevrildiyse kart tıklanabilir kalır: çark ekranı neden
                   // çevrilemediğini ve kalan süreyi açıklar.
                   status:
@@ -499,9 +504,10 @@ class _StreakCardState extends State<_StreakCard> {
           const SizedBox(height: 8),
           Text(
             completed
-                ? 'Seri sürüyor. Yarın ${GameConstants.streakStepThreshold} '
-                    'adım atarak devam ettir.'
-                : 'Seriyi sürdürmek için $stepsLeft adım kaldı.',
+                ? 'Seri sürüyor. Yarın bir düşman devir ya da '
+                    '${GameConstants.streakStepThreshold} adım at.'
+                : 'Seriyi güvenceye almak için bir düşman devir — ya da '
+                    '$stepsLeft adım daha at.',
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
           if (nextMilestone != null) ...[

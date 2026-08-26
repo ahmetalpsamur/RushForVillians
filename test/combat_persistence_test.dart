@@ -189,9 +189,18 @@ void main() {
       expect(quest.victoryXpReward, greaterThan(0));
       final minimumCoins = 4 + (quest.enemy.tier * 3);
       final maximumCoins = 10 + (quest.enemy.tier * 6);
+      // Bölüm A.2: zafer altını artık hız çarpanıyla büyüyebilir. Üst sınır
+      // bu yüzden kademe tavanının [maxVictorySpeedMultiplier] katı.
       expect(
         quest.victoryCoinReward,
-        inInclusiveRange(minimumCoins, maximumCoins),
+        inInclusiveRange(
+          minimumCoins,
+          (maximumCoins * GameConstants.maxVictorySpeedMultiplier).floor(),
+        ),
+      );
+      expect(
+        quest.speedRewardMultiplier,
+        inInclusiveRange(1.0, GameConstants.maxVictorySpeedMultiplier),
       );
       expect(
         profile.coins,

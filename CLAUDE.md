@@ -3881,6 +3881,186 @@ Toplam **453 test geçiyor**, `flutter analyze` temiz.
 - **Neden veri değiştirilmedi:** etkiler `item_effects.dart` içinde tasarım
   verisi. Sözü tutulur hâle getirmek, sözü değiştirmekten yeğ.
 
+### GD55. Macera iki fazlı; faz durumdan türetiliyor, ayrı bir alan değil (2026-08-26)
+- **Nerede:** `models/adventure_quest.dart` — `victorySteps`, `walkSteps`,
+  `AdventureQuestPhase`
+- **Karar:** düşman devrilince macera **bitmiyor**; adım taahhüdü dolana kadar
+  bir **yürüyüş fazı** sürüyor. Faz için kalıcı bir bayrak yok: zaferin
+  geldiği nokta (`victorySteps`) damgalanıyor, yürüyüş hedefi ondan türüyor
+  (`stepGoal - victorySteps`), ilerleme `walkSteps` ile birikiyor.
+- **Neden ayrı bayrak yok:** iki doğruluk kaynağı, er ya da geç çelişir.
+  `battleOutcome` zaten otoriter durum; faz onun ve yürüyüş ilerlemesinin
+  **türevi**. `AdventureQuestPhase` bu yüzden sunum enumu, kalıcı alan değil.
+- **Neden `revivalSteps` deseni:** arkadaşımın Hayat Yürüyüşü aynı şekli
+  kuruyor (hedef türetilir, ilerleme kalıcı, ekleme kabul edileni döner).
+  İkinci bir desen uydurmak yerine olanı izledim (Kural 1/3).
+- **Eski kayıt yürüyüş fazına geriye dönük sokulmuyor:** damgası olmayan
+  zaferli kayıtta `victorySteps = stepGoal` kurulur → yürüyüş hedefi 0,
+  çarpan ×1. Tamamlanmış bir macerayı güncelleme sonrası yeniden açmak,
+  oyuncunun bitirdiği işi geri almak olurdu.
+- **Zafer kutlaması bir kez oynar:** `deathAnimationPlayed && isWalkPhaseActive`
+  ise ekran doğrudan yürüyüş sahnesine düşer. Aksi hâlde oyuncu Macera
+  sekmesine her dönüşünde aynı kutlamayla karşılaşıp yürüyüşe geçemezdi.
+- **Geri dönülecek nokta:** gün değişiminde macera hâlâ düşüyor (Aşama 0'ın
+  açık notu). Yürüyüş fazı harcanan adımı artık daha görünür kıldığı için o
+  telafi kararı bir sonraki turda ele alınmalı.
+
+### GD56. Hız ödülü **adımla** ölçülüyor, roundla değil (2026-08-26)
+- **Nerede:** `AdventureQuest.speedRewardMultiplier`,
+  `GameConstants.maxVictorySpeedMultiplier`
+- **Karar:** çarpan = `1 + (1 - victorySteps/stepGoal) × (tavan - 1)`, tavan
+  **×2**. Tam hedefte devirmek ×1, hiç adım harcamadan devirmek ×2.
+- **Neden round değil:**
+  1. Round sayısı kaba. 500 adımlık hedefte `totalRounds` **1**; round
+     ölçüsüyle o hedefte hız ödülü hiç oluşamazdı.
+  2. Yürüyüş fazı zaten adımla tanımlı. Aynı büyüklüğün iki sistemi birden
+     sürmesi ilişkiyi tutarlı kılıyor: **harcamadığın her adım hem çarpana
+     hem bonuslu yürüyüşe yazılıyor.**
+  3. "Beklersem bedava çarpan alırım" kaçamağı yok: savaş motoru verilen
+     hasarı round tamamlanma oranıyla ölçekliyor, yani yürümeden düşman
+     devrilmiyor. Dört round idle geçirip beşincide devirmek can pahasına
+     olur ve yürüyüş fazını kısaltmaz.
+- **Hem XP'ye hem altına uygulanıyor.** Çarpanın işi hızlı zaferi
+  hissettirmek; tek ödüle uygulanınca etkisi yarıya iner. Risk ikisinde de
+  sınırlı: XP'nin harcanacağı yer yok (projenin kendi gerekçesi), altın
+  tarafında çarpan yalnızca **kademe bazlı zafer damlasına** biniyor (en üst
+  kademede ~130 coin), adım parasına değil.
+- **Gösterim şart:** görünmeyen çarpan kural değil, sürprizdir. Zafer
+  ekranında ve yürüyüş kartında "N round · M adım — hız ödülü ×1.8" yazıyor.
+
+### GD57. Zafer altını tohumlu oldu (E1 düzeltmesi) (2026-08-26)
+- **Nerede:** `AdventureQuest.victoryCoinRoll`
+- **Sorun:** `root_shell.dart` kademe bazlı zafer altınını tohumsuz `Random()`
+  ile atıyordu. Kalıcı bir ödülü (`victoryCoinReward` diske yazılıyor, coin
+  profile ekleniyor) etkileyen rastgelelik CLAUDE.md §4.4 / GD18 / GD50 gereği
+  tohumlu olmalı. `xpAwarded` kapısı yeniden zar atmayı engellediği için
+  sömürülebilir değildi, ama **test edilemezdi** ve A.2 bu ödülü hız
+  çarpanıyla çarpacağı için önce sağlama alınması gerekti.
+- **Karar:** çekiliş `stableSpread('victory-coins|<düşman>|<başlangıçAdımı>|<hedef>')`
+  üzerinden. Deterministik, macera başına farklı, sürümler arası sabit.
+  `String.hashCode` **kullanılmadı** (GD8).
+
+### GD58. Yürüyüş fazı oranı 30/1; para hesabı iki geçişli (2026-08-26)
+- **Nerede:** `GameConstants.walkPhaseStepsPerCoin`,
+  `calculateStepCoins(stepsPerCoin:)`, `root_shell.dart:_onStepsReported`
+- **Karar:** yürüyüş fazı boyunca **30 adım = 1 altın**; faz bitince oran
+  `stepsPerCoin` (50) değerine döner. XP oranı **değişmiyor**.
+- **Neden yalnızca coin:** iki kaldıracı birden oynatmak dengeyi ölçülemez
+  hâle getirir. XP eğrisi Aşama 2b'de ayrıca gerekçelendirilmiş ve
+  `step_xp_test.dart` ile bağlı (15/9 günlük ulaşma süreleri testli).
+- **İki geçiş, çünkü bir parti faz sınırını geçebilir:** önce bonuslu payı
+  (`min(bekleyen, kabul edilen yürüyüş adımı)`) 30/1 ile, sonra kalanı 50/1
+  ile. İşaretçi her geçişte yalnızca **tüketilen** adım kadar ilerlediği için
+  çift sayma yok; bir coin'e yetmeyen artık adım (en fazla 29) sonraki
+  hesaba devreder. 5.000 adımlık bir parti 1.000 adımlık yürüyüş hedefine
+  denk gelirse: 33 + 80 = 113 coin, tüketilen 4.990, devreden 10 — testle
+  bağlı.
+- **Adımlar paradan **önce** yürüyüş fazına yazılıyor**, ki hesap bu partinin
+  kaçının bonuslu olduğunu bilsin. Düşmanın devrildiği partide bu değer 0'dır
+  (round çözümü paradan sonra çalışıyor) — yani **savaş adımı bonus almaz**,
+  doğru olan da bu.
+
+#### Ekonomi ölçümü (A.3)
+
+⚠️ **Günlük 400 coin tavanı artık yok.** Arkadaşım `a3569a0` ile kaldırdı
+(`coin_calculator.dart`, `DailyProgress.coinCapReached` → `false`,
+`ItemStat.dailyCoinCap` emekliye ayrıldı). Ölçüm bu yüzden **tavansız gerçek
+ekonomiye** göre yapıldı; tavan geri getirilmedi (Kural 7).
+
+Günde **bir** macera varsayımıyla, teorik en iyi durum (düşman hiç adım
+harcanmadan devriliyor, yani hedefin tamamı yürüyüş fazı):
+
+| Günlük adım | Taban coin | 2.000'lik hedef | 5.000'lik hedef | 10.000'lik hedef |
+|---|---|---|---|---|
+| 3.000 | 60 | 86 (+26) | — | — |
+| 6.000 (referans) | 120 | **146 (+26)** | 186 (+66) | — |
+| 10.000 | 200 | 226 (+26) | 266 (+66) | 333 (+133) |
+| 20.000 | 400 | 426 (+26) | 466 (+66) | 533 (+133) |
+
+Gerçekçi durum (düşman hedefin ~%40'ında devriliyor, yürüyüş fazı hedefin
+%60'ı):
+
+| Günlük adım | Hedef | Coin | Sapma |
+|---|---|---|---|
+| 6.000 | 2.000 | 136 | **+%13** |
+| 6.000 | 5.000 | 160 | +%33 |
+| 10.000 | 10.000 | 280 | +%40 |
+| 20.000 | 10.000 | 480 | +%20 |
+
+**Karar: 30/1 korundu, faz uzunluğu ayarlanmadı.** Gerekçe:
+- Referans oyuncunun sapması **+%13** — 120 coin/gün dengesi ayakta.
+- Kazanç **yapısal olarak sınırlı**: bir maceranın verebileceği ek coin en
+  fazla `stepGoal × (1/30 − 1/50) = stepGoal/75`. Yürüyüş hedefi, savaş ne
+  kadar uzun sürerse o kadar küçülür — yani kazanç kendi kendini frenler.
+- Ek kazanç bir düşman devirmeyi gerektiriyor; bedava değil.
+- Tavansız ekonomide oyuncular arası doğal fark (60 ↔ 400 coin/gün) bu
+  sapmanın kat kat üstünde.
+
+**Geri dönülecek nokta:** günde birden çok macera tamamlamak mümkün olduğu
+için, ekonomi ileride sıkılaştırılacaksa ilk bakılacak yer "gün başına kaç
+macera yürüyüş bonusu alabilir" sorusudur. Bugün sınır yok.
+
+### GD59. Seri ve çark **iki kapıdan** açılıyor: zafer ya da adım eşiği (2026-08-26)
+- **Nerede:** `DailyProgress.enemyDefeated` / `isWheelUnlocked`,
+  `root_shell.dart:_onStepsReported`
+- **Karar (A.6):** bir düşman devirmek günlük seriyi güvenceye alır **ve**
+  çarkı açar. Mevcut adım eşikleri (`streakStepThreshold` 2.000,
+  `dailyWheelUnlockSteps` 3.000) **kaldırılmadı**; hangisi önce gelirse o
+  açar.
+- **Neden eşikler kaldırılmadı** (CLAUDE.md Bölüm 5a/5b "adım eşiği tamamen
+  kalksın" diyordu):
+  1. Macera oynamayan ama gerçekten yürüyen oyuncu cezalanmamalı. Serinin
+     amacı alışkanlık; onu tek bir oyun moduna kilitlemek dar bir kural.
+  2. `ItemStat.streakRelief` buff'ı eşiğe bağlı. Eşik kalksaydı bu tür ölü
+     kalır ve GD36'nın "boşta bonus türü kalmasın" invariantı kırılırdı —
+     ya da türün yeniden anlamlandırılması Bölüm A'nın kapsamını şişirirdi.
+  3. 66 mevcut seri testi eşiğe dayanıyor; ikinci bir kapı eklemek hiçbirini
+     kırmıyor, eşiği kaldırmak hepsini yeniden yazdırırdı.
+- **Zafer bayrağı `DailyProgress` üzerinde**, yani gün değişince kendiliğinden
+  sıfırlanıyor — ayrı bir sıfırlama koduna gerek yok.
+- **Macera değiştirmek bayrağı yakmıyor:** `_selectAdventure` /
+  `_chooseNewAdventure` `enemyDefeated`'i de taşıyor. Aksi hâlde bugün
+  kazanılmış bir seri ve açılmış bir çark, yeni macera seçilince geri
+  alınırdı — B1 ve "günlük tavan sıfırlanıyor" hatalarının tam olarak aynı
+  sınıfı.
+- **Yürüyüş fazı zorunlu değil:** streak zaferde güvenceye alınır, yürüyüş
+  bonustur. Oyuncuyu hedefin tamamını yürümeye mecbur bırakmak seriyi
+  kırılgan yapardı. Arayüz bunu açıkça söylüyor ("Serin ve çark hakkın bu
+  zaferle güvence altında").
+- **Eğitim zaferi de gerçek zafer sayılıyor:** eğitimin son durağı çark;
+  kilitli bir çarkla karşılaşmamalı.
+
+### GD60. Yürüyüş fazının kendi sahnesi var; savaş sahnesine dokunulmadı (2026-08-26)
+- **Nerede:** `adventure_screen.dart` — `_buildWalkPhase`, `_WalkPhaseScene`
+- **Karar (A.4):** yürüyüş fazı savaş ekranını paylaşmıyor. Düşman sahneden
+  çıkıyor, karakter `_Walk.gif` ile sahnede yürüyor, üstte "YÜRÜYÜŞ FAZI"
+  şeridi var, kartlar savaş yerine kalan taahhüdü ve bonuslu oranı anlatıyor.
+  Arkadaşımın savaş sahnesine **hiç dokunulmadı** (Kural 7).
+- **Karakter sahneden çıkmıyor:** uçtan uca gidip geri dönüyor ve dönüşte
+  yatay olarak aynalanıyor. Tek yönlü sonsuz geçiş daha "yol" gibi dururdu
+  ama karakteri zamanın yarısında ekran dışında bırakırdı — yürüyüş fazına
+  bakan biri yürüyen birini görmeli. (İlk golden bunu yakaladı: figür
+  çerçevenin dışındaydı.)
+- **Yeni asset gerekmedi.** `lib/All_Assets/.../<Sınıf>_Walk.gif` zaten var ve
+  `avatar.characterAsset` bunu gösteriyor. Triajdaki C9 klasörleri
+  (`lib/GIF Animations/Soldier/`) ölü kopya; kullanılmadı.
+- **Performans:** tek `AnimationController`, tek `Transform`. Yeniden çizilen
+  alt ağaç `AnimatedBuilder`'ın `child`'ı olarak dışarıda tutuluyor, yani her
+  karede yeniden **inşa** edilmiyor; yürüyüşün kendisi zaten GIF. Ölçüm:
+  `pumpAndSettle` kullanılamıyor (sonsuz animasyon), golden sabit kare
+  dizisiyle üretiliyor ve iki genişlikte de taşma yok.
+
+### GD61. Ganimet düşmanın önünde (A.5 düzeltmesi) (2026-08-26)
+- **Nerede:** `adventure_screen.dart` zafer sahnesi `Stack`'i
+- **Sorun:** `..._coinScatter()` düşman `Positioned`'ından **önce** geliyordu.
+  `Stack` çocukları sırayla boyandığı için ceset altınları örtüyordu.
+- **Karar:** altın bloğu düşmandan sonraya taşındı. Aynı sahnedeki diğer
+  katmanlar (hasar mesajı, "VURUŞ!" yazısı) zaten doğru sıradaydı; gözden
+  geçirildi, başka yanlış sıralanmış katman bulunmadı.
+- **Nasıl bağlandı:** golden **tek başına yetmez** (kırpılmış bir altın
+  gözle kaçabilir). Test ağaç sırasını doğrudan ölçüyor: ceset anahtarı ilk,
+  altın anahtarları sonra. Golden ayrıca gözle doğrulandı.
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -5491,3 +5671,89 @@ eklenirse oraya bağlanmalı, beşinci bir hesap yazılmamalı.
   çalışan özelliği bozma.
 - Her adımdan sonra `flutter analyze` temiz + testler yeşil.
 - Kararları "GERİ DÖNÜLECEK KARARLAR" başlığına gerekçesiyle yaz.
+
+---
+---
+---
+
+# Bölüm A — Macera iki fazlı oldu ✅ (2026-08-26)
+
+Kararlar **GD55–GD61**. Şema **v16 → v17**.
+
+## Ne değişti
+
+| | Önce | Sonra |
+|---|---|---|
+| Zafer | Düşman ölünce macera biterdi | Düşman ölünce **yürüyüş fazı** başlar; macera adım taahhüdü dolunca biter |
+| Zafer ödülü | Sabit XP + tohumsuz rastgele altın | **Hız çarpanıyla** ölçekli XP + altın; altın artık **tohumlu** |
+| Yürüyüş kazancı | 50 adım = 1 altın | Yürüyüş fazında **30 adım = 1 altın**, faz bitince 50'ye döner |
+| Seri / çark | Yalnızca adım eşiği | **Zafer ya da** adım eşiği — hangisi önce gelirse |
+| Zafer sahnesi | Altınlar düşmanın **arkasında** | Altınlar düşmanın **önünde** |
+| Yürüyüş görseli | Yok | Kendi sahnesi: düşman yok, karakter yürüyor, "YÜRÜYÜŞ FAZI" şeridi |
+
+## Model
+
+`AdventureQuest` üç kalıcı alan aldı; hepsi `revivalSteps` desenini izliyor:
+
+| Alan | Rol |
+|---|---|
+| `victorySteps` | Zafer anında harcanmış macera adımı. `-1` = damga yok. **İki şeyin tek kaynağı:** yürüyüş hedefi ve hız çarpanı |
+| `victoryRounds` | Düşmanı deviren round. Yalnızca gösterim |
+| `walkSteps` | Yürüyüş fazında biriken adım |
+
+Türetilenler: `walkTargetSteps`, `walkRemainingSteps`, `walkProgress`,
+`isWalkPhaseActive`, `isAdventureCompleted`, `speedRewardMultiplier`,
+`phase` (`AdventureQuestPhase`).
+
+⚠️ **`isEnemyDefeated` artık "macera bitti" demek değil.** Ödül kapıları ve
+ekranlar bu ayrımı gözetmeli; yeni kod `isAdventureCompleted` kullanmalı.
+
+## Denge
+
+| Sabit | Değer | Nereden |
+|---|---|---|
+| `walkPhaseStepsPerCoin` | 30 | Şartname; ekonomi ölçümü GD58'de |
+| `maxVictorySpeedMultiplier` | 2.0 | Tavansız çarpan güçlü oyuncuda sınırsız büyürdü |
+
+Referans oyuncunun (6.000 adım/gün, 2.000'lik hedef) günlük coin sapması
+**+%13**. Tam tablo ve gerekçe: GD58.
+
+## Test
+
+- `test/walk_phase_test.dart` — **30 test**: faz geçişleri (savaş → yürüyüş →
+  tamamlandı), yenilgi dalının etkilenmemesi, hedefin aşılamaması, damganın
+  ikinci kez yazılmaması; hız çarpanının tavanı ve doğrusallığı (şartnamedeki
+  ×1.8 örneği testli), tohumlu altının tekrarlanabilirliği; 30/1 oranı ve
+  faz bitince 50/1'e dönüş, faz sınırını geçen partinin **çift saymaması** ve
+  artık adımın devretmesi, aynı adımın ikinci kez paraya çevrilmemesi;
+  seri/çark tetikleyicisinin iki kapısı; kayıt turu ve **eski kaydın yürüyüş
+  fazına geriye dönük sokulmaması**; yürüyüş ekranının savaş ekranından
+  ayrışması.
+- `test/golden/walk_phase_golden_test.dart` — **3 test**: 320/390 dp golden
+  (PNG'ler üretildi ve gözle doğrulandı: karakter tam görünür, düşman yok,
+  taşma yok) + savaş göstergelerinin gerçekten kaybolduğu.
+- `test/adventure_progress_test.dart` — **+1 iddia**: altınların ağaç
+  sırasında cesetten **sonra** geldiği (A.5 regresyonu). Golden tek başına
+  yetmezdi.
+- `test/combat_persistence_test.dart` — güncellendi (silinmedi): zafer altını
+  artık hız çarpanıyla kademe tavanını aşabiliyor.
+
+Toplam **713 test geçiyor**, `flutter analyze` temiz.
+
+### Yeniden üretilen golden'lar
+
+Arkadaşımın commit'inde **8 golden kırmızıydı** ve bunlar kod regresyonu
+değildi: `pubspec.yaml`'a eklenen yeni asset klasörleri (`Tutorial_Guy`,
+`coins`) yüzünden test asset paketi bayattı. Paket yenilenince
+`victory_scene_390` gerçek altın sprite'larını (eskiden sarı kare yer
+tutucu), `blacksmith_*` / `store_card_*` / `forge_*` ise yalnızca yuvarlak
+köşe anti-aliasing farkını gösterdi. Hepsi incelenip yeniden üretildi.
+
+## Açık kalan
+
+- **Gün değişiminde macera hâlâ düşüyor** (Aşama 0'ın açık notu). Yürüyüş
+  fazı harcanan adımı daha görünür kıldı; telafi kararı hâlâ verilmedi.
+- **Günde kaç macera yürüyüş bonusu alabilir** sınırı yok (GD58).
+- Faz **eğitimde anlatılmıyor** — Bölüm F'nin işi. Eğitim savaşı bilerek tam
+  hedefte damgalanıyor: yeni oyuncu ×2 ödül almıyor ve eğitimin ortasında
+  binlerce adımlık yürüyüşe kilitlenmiyor.
