@@ -20,6 +20,7 @@ import '../../core/utils/title_rules.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
+import '../../data/pet_sayings.dart';
 import '../../data/title_catalog.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
@@ -56,6 +57,7 @@ import '../rewards/rewards_screen.dart';
 import '../store/xp_store_screen.dart';
 import '../titles/titles_screen.dart';
 import '../team/team_screen.dart';
+import '../tutorial/pet_companion.dart';
 import '../tutorial/tutorial_guide.dart';
 import '../wheel/daily_wheel_screen.dart';
 
@@ -1894,6 +1896,24 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
+  /// Rehberin o an neye bakabileceği (Bölüm D).
+  ///
+  /// Bağlam yalnızca sekme değil: aynı sekmede oyuncunun durumu farklıysa
+  /// söylenen de farklı olmalı.
+  PetSituation get _petSituation => PetSituation(
+    context: PetContext.fromTabIndex(_tabIndex),
+    hasAdventure: _adventure != null,
+    wheelAvailable: _profile.canSpinWheel,
+    streakSecured: _profile.streakCompletedOn(GameClock.now()),
+  );
+
+  /// Rehberin dolaşmasını açar/kapatır. Ayar kalıcı (şema v20).
+  void _setPetCompanionEnabled(bool enabled) {
+    if (_profile.petCompanionEnabled == enabled) return;
+    setState(() => _profile.petCompanionEnabled = enabled);
+    _persist();
+  }
+
   Widget _tutorialOverlay() => TutorialGuideOverlay(
     step: _tutorialStep,
     guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
@@ -2073,6 +2093,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onEditCharacter: _editCharacter,
         onOpenInventory: _openInventory,
         onOpenBlacksmith: _openBlacksmith,
+        onTogglePetCompanion: _setPetCompanionEnabled,
       ),
     ];
 
@@ -2091,12 +2112,22 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                 icon: Icon(Icons.storefront),
                 label: 'Mağaza',
               ),
-              NavigationDestination(icon: Icon(Icons.groups), label: 'Takım'),
+              NavigationDestination(
+                icon: Icon(Icons.sports_bar),
+                label: 'Taverna',
+              ),
               NavigationDestination(icon: Icon(Icons.person), label: 'Profil'),
             ],
           ),
         ),
         if (_tutorialActive) _tutorialOverlay(),
+        // Eğitim sürerken rehber **dolaşmaz**: iki anlatıcı aynı anda
+        // konuşmamalı. Oyuncu ayarı kapattıysa katman hiç kurulmuyor.
+        if (!_tutorialActive && _profile.petCompanionEnabled)
+          PetCompanionOverlay(
+            situation: _petSituation,
+            guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+          ),
       ],
     );
   }

@@ -179,6 +179,13 @@ class UserProfile {
   ///
   /// Model Kuralları #1: yalnızca `String` tutulur; ünvanın adı, nadirliği ve
   /// etkileri her açılışta [TitleCatalog] üzerinden çözülür.
+  /// Rehber eğitim bittikten sonra ekranda dolaşsın mı (Bölüm D).
+  ///
+  /// Varsayılan açık: rehber oyunun anlatıcısı ve eğitimden sonra kaybolması
+  /// bir kayıp olurdu. Kapatmak isteyen profilden kapatabiliyor — sürekli
+  /// görünen bir eşlikçi herkese göre değil.
+  bool petCompanionEnabled;
+
   List<String> ownedTitleIds;
 
   /// Şu an takılı ünvanın kimliği. `null` = hiçbiri takılı değil.
@@ -246,6 +253,7 @@ class UserProfile {
     this.tutorialStarterItemId,
     List<String>? ownedTitleIds,
     this.equippedTitleId,
+    this.petCompanionEnabled = true,
     this.enemiesDefeated = 0,
     this.adventuresCompleted = 0,
     this.wheelSpins = 0,
@@ -667,6 +675,7 @@ class UserProfile {
     'tutorialStarterItemId': tutorialStarterItemId,
     'ownedTitleIds': ownedTitleIds,
     'equippedTitleId': equippedTitleId,
+    'petCompanionEnabled': petCompanionEnabled,
     'enemiesDefeated': enemiesDefeated,
     'adventuresCompleted': adventuresCompleted,
     'wheelSpins': wheelSpins,
@@ -737,6 +746,7 @@ class UserProfile {
       // gelirse sessizce düşer: elle düzenlenmiş kayıt bilinmeyen bir ünvanın
       // buff'ını uygulayamaz.
       equippedTitleId: json['equippedTitleId'] as String?,
+      petCompanionEnabled: json['petCompanionEnabled'] as bool? ?? true,
       enemiesDefeated: _nonNegative(json['enemiesDefeated']),
       adventuresCompleted: _nonNegative(json['adventuresCompleted']),
       wheelSpins: _nonNegative(json['wheelSpins']),

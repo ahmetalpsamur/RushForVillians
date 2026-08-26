@@ -4269,6 +4269,79 @@ macera yürüyüş bonusu alabilir" sorusudur. Bugün sınır yok.
   "Sahipsin" rozeti anında tazeleniyor. Ünvan **ekranı** ise itilen rotada
   ama veri tutmuyor — `revision` + `readState` ile canlı okuyor (GD27).
 
+### GD74. Taverna bir **ad değişikliği**; takım ekranı olduğu gibi duruyor (2026-08-26)
+- **Nerede:** `features/team/team_screen.dart`, `root_shell.dart` gezinme çubuğu
+- **Karar (D.1):** "Takım" sekmesi **Taverna** oldu; ikon `Icons.groups` →
+  `Icons.sports_bar`. Ekranın tepesine rehberin ağzından tek bir karşılama
+  kartı eklendi ("Çevrimiçi çok yakında — hadi git git…"). **Taverna'nın
+  işlevi yazılmadı**: mevcut takım önizlemesi, "yan yana yürüme" hesabı ve
+  `MockData.defaultTeam()` hiç değişmedi.
+- **Sınıf adı `TeamScreen` korundu** — GD10 ile aynı gerekçe: yeniden
+  adlandırma çağrı noktalarını gezmek demek ve kullanıcıya görünen tek şey
+  başlık. Dosya da yerinde kaldı (Kural 8: silme yok).
+- **Neden önizleme kaldırılmadı:** boş bir ekran, "burada bir şey olacak"
+  demenin en zayıf yolu. Duran liste, gelecekteki ekranın şeklini gösteriyor
+  ve açıkça "şimdilik bir önizleme" diye etiketli.
+
+### GD75. Dolaşan rehber, mevcut pet bileşeninin **üstüne** yazıldı (2026-08-26)
+- **Nerede:** `features/tutorial/pet_companion.dart`
+- **Karar (D.2):** yeni katman sprite'ı, animasyon eşlemesini ve karakter
+  seçimini hâlâ `tutorial_guide.dart` içindeki `TutorialGuideAssets` /
+  `TutorialGuideVariant` üzerinden alıyor. Eğitim akışının hiçbir parçasına
+  (adım enum'u, spotlight, etkileşim bariyeri, konuşma baloncuğu)
+  dokunulmadı.
+- **Neden ayrı bir baloncuk yazıldı:** eğitimin `_SpeechBubble`'ı düğme
+  taşıyor ve eğitim akışına bağlı; dolaşan rehberin baloncuğu ise
+  dokunulamaz ve düğmesiz. Onu yeniden kullanmak, eğitim baloncuğunu
+  "bazen düğmesiz" hâle getirmek için değiştirmek demekti — tam olarak
+  yapmamam istenen şey.
+- **Eğitim sürerken katman hiç kurulmuyor:** iki anlatıcının aynı anda
+  konuşması hem görsel hem anlatı olarak yanlış. Karar `RootShell`'de,
+  `_tutorialActive` dalında.
+
+### GD76. Rehber sürekli yürümüyor; tur atıp duruyor (2026-08-26)
+- **Nerede:** `pet_companion.dart:_scheduleStroll`
+- **Sorun:** ilk uygulama `AnimationController.repeat(reverse: true)`
+  kullanıyordu. Sonsuz tekrar eden animasyon **her karede yeni bir kare
+  planlıyor**, dolayısıyla `pumpAndSettle` hiçbir zaman dönmüyor. Katman
+  `RootShell`'in içinde olduğu için **58 mevcut test** aynı anda zaman
+  aşımına uğradı (mağaza, demirci, envanter, ünvan).
+- **Karar:** rehber bitimli bir tur atıyor (`strollDuration`), sonra
+  `restDuration` kadar duruyor ve zamanlayıcı bir sonraki turu başlatıyor.
+  Zamanlayıcı kare planlamadığı için `pumpAndSettle` sorunsuz dönüyor.
+- **Neden testleri değiştirmek yerine tasarımı değiştirdim:** 58 testi
+  `pumpAndSettle`'dan vazgeçirmek, projenin en çok kullanılan test desenini
+  bir süs animasyonu uğruna bozmak olurdu. Üstelik durup dinlenen bir
+  rehber cihazda da daha sakin duruyor.
+- **Yan kural:** iki zamanlayıcı da (`_strollTimer`, `_bubbleTimer`)
+  `dispose` içinde iptal ediliyor; aksi hâlde test ortamı "bekleyen
+  zamanlayıcı" diye düşerdi.
+
+### GD77. Rehber hiçbir düğmeyi engelleyemez ve sık konuşmaz (2026-08-26)
+- **Nerede:** `pet_companion.dart` — `IgnorePointer`, `silence`,
+  `bubbleDuration`, `avoid`
+- **Üç sert kural, üçü de testle bağlı:**
+  1. **Engellemez.** Bütün katman `IgnorePointer` içinde. Rehber
+     tıklanabilir olsaydı, dar ekranda alt gezinme çubuğunun ya da satın
+     alma düğmesinin üstüne denk geldiği anda oyuncuyu kilitlerdi. Bu yüzden
+     rehbere dokunma davranışı **hiç eklenmedi** — engellememe garantisi
+     dokunulabilirlikten daha değerli.
+  2. **Sık konuşmaz.** İki söz arasında en az 45 sn, baloncuk 6 sn duruyor.
+     Sekme değişimi bu bekleyişi **atlıyor**: yeni bağlama girildiği an
+     rehberin söyleyecek bir şeyi olmalı.
+  3. **Tekrarlamaz.** Son cümle hatırlanıp havuzdan eleniyor.
+- **Sözler tek dosyada** (`data/pet_sayings.dart`) ve bağlama duyarlı:
+  sekme + macera var mı + çark hakkı duruyor mu + seri güvencede mi.
+  Test iki yönü de bağlıyor: hiçbir havuz boş değil **ve** hiçbir cümle iki
+  bağlamda birden geçmiyor.
+- **Seçim tohumlu ama tohum saklanmıyor:** kalıcı bir sonuç üretmiyor
+  (CLAUDE.md §4.4 — yalnızca sunumu etkileyen rastgelelik serbest); tohum
+  burada golden ve widget testlerini tekrarlanabilir kılmak için.
+- **Ayar kalıcı ve varsayılan açık** (`UserProfile.petCompanionEnabled`,
+  şema **v20**): rehber oyunun anlatıcısı, eğitimden sonra kaybolması bir
+  kayıp olurdu. Kapatan profilden kapatıyor ve oyunun hiçbir kuralı
+  değişmiyor — bu, ayarın altında yazılı.
+
 ### GD47. Adım partisinin **bütün** bildirimleri frame sonuna alındı (2026-08-25)
 - **Nerede:** `root_shell.dart:_onStepsReported`
 - **Sorun (GD46'nın devamı):** `_showLevelUp` `hideCurrentSnackBar()` çağırıyor
@@ -6201,3 +6274,87 @@ Toplam **779 test geçiyor**, `flutter analyze` temiz.
 - Ünvan **eğitimde anlatılmıyor** — Bölüm F'nin işi.
 - Kozmetik bir "görünüm" alanı yok; pelerin görseli üretilirse ünvan sistemi
   oraya genişletilebilir (GD67).
+
+---
+---
+---
+
+# Bölüm D — Taverna ve dolaşan rehber ✅ (2026-08-26)
+
+Kararlar **GD74–GD77**. Şema **v19 → v20**.
+
+## D.1 — Taverna
+
+| | Önce | Sonra |
+|---|---|---|
+| Sekme adı | Takım | **Taverna** |
+| Sekme ikonu | `Icons.groups` | `Icons.sports_bar` |
+| Ekran başlığı | Takım adı ("Kızıl Yürüyüşçüler") | **Taverna** |
+| Tepe kartı | — | Rehberin karşılaması + "şimdilik bir önizleme" |
+
+**İşlev yazılmadı** (GD74): takım modeli, "yan yana yürüme" hesabı ve
+`MockData.defaultTeam()` hiç değişmedi; `TeamScreen` sınıf adı korundu
+(GD10 deseni). Çevrimiçi mod Aşama 6'nın ve arkadaşımın işi.
+
+## D.2 — Dolaşan rehber
+
+Yeni katman: `features/tutorial/pet_companion.dart`. Sözler tek dosyada:
+`data/pet_sayings.dart`.
+
+**Mevcut pet bileşeni yeniden yazılmadı** (GD75): sprite, animasyon eşlemesi
+ve karakter seçimi hâlâ `TutorialGuideAssets` / `TutorialGuideVariant`
+üzerinden geliyor. Eğitim akışının hiçbir parçasına dokunulmadı.
+
+| Kural | Nasıl |
+|---|---|
+| Hiçbir düğmeyi engellemez | Bütün katman `IgnorePointer` içinde; rehbere dokunma davranışı hiç eklenmedi |
+| Sık konuşmaz | Baloncuk 6 sn, iki söz arası en az 45 sn; sekme değişimi bekleyişi atlar |
+| Tekrarlamaz | Son cümle havuzdan eleniyor |
+| Eğitimde susar | `_tutorialActive` iken katman hiç kurulmuyor |
+| Kapatılabilir | Profilde anahtar; ayar kalıcı, varsayılan açık |
+
+### Bağlam duyarlılığı
+
+Havuz yalnızca sekmeye değil oyuncunun durumuna da bakıyor:
+
+| Bağlam | Ayrım |
+|---|---|
+| Ana sayfa | Seri güvencede mi · çark hakkı duruyor mu |
+| Macera | Sürmekte olan macera var mı |
+| Mağaza / Taverna / Profil | Sabit havuz |
+
+Test iki yönü birden bağlıyor: hiçbir havuz boş değil **ve** hiçbir cümle iki
+bağlamda birden geçmiyor.
+
+### Performans
+
+Rehber **sürekli yürümüyor**: bitimli bir tur atıp duruyor (GD76). Bu bir
+tempo tercihi değil, teknik bir zorunluluk — ilk uygulamadaki sonsuz
+`repeat()` her karede yeni kare planladığı için `pumpAndSettle` hiç dönmedi
+ve **58 mevcut test** aynı anda zaman aşımına uğradı. Tek `AnimationController`,
+tek `Transform`, sprite `AnimatedBuilder`'ın `child`'ı olarak dışarıda
+tutuluyor (GD60 deseni): her karede yeniden **inşa** edilen bir şey yok.
+
+## Test
+
+- `test/pet_companion_test.dart` — **19 test**: söz havuzlarının doluluğu ve
+  bağlamlar arası ayrışması, duruma göre havuzun değişmesi, tohumlu seçimin
+  tekrarlanabilirliği, `avoid` ile tekrarın önlenmesi, sekme→bağlam eşlemesi;
+  katman davranışı (açılışta konuşma, susma, sessizlik payı, **altındaki
+  düğmeyi engellememesi**, bağlam değişince beklemeden konuşma); `RootShell`
+  bütünleşmesi (ayar açık/kapalı, **eğitimde hiç kurulmaması**, profildeki
+  anahtarın diske yazması, Taverna sekmesinin teaser'ı); kalıcılık
+  (v19 kaydında ayarın açık gelmesi, kayıt turu).
+- `test/golden/pet_companion_golden_test.dart` — **3 test**: 320/390 dp
+  rehber golden'ı ve Taverna karşılaması (PNG'ler üretildi ve gözle
+  doğrulandı — baloncuk taşmıyor, rehber alt çubuğun üstünde kalıyor,
+  Taverna kartı sığıyor).
+
+Toplam **801 test geçiyor**, `flutter analyze` temiz.
+
+## Açık kalan
+
+- Rehberin dolaşırken söyledikleri **eğitimin içeriğinden bağımsız**; Bölüm
+  F eğitim metinlerini güncellerken ton tutarlılığı ayrıca gözden
+  geçirilmeli.
+- Taverna'nın gerçek işlevi (takım kurma, çevrimiçi eşleşme) Aşama 6'ya ait.

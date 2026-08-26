@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../data/pet_sayings.dart';
 import '../../models/team.dart';
 import '../../widgets/section_card.dart';
 
-/// Takım ekranı: üyeler ve "yan yana yürüme" (aynı anda yürüyor olma)
-/// durumunun takibi.
+/// Taverna: takımların buluşacağı yer (Bölüm D).
+///
+/// **İşlevi henüz yok.** Bu birimde yalnızca ad ve çerçeve değişti; takım
+/// modeli, "yan yana yürüme" hesabı ve üye listesi olduğu gibi duruyor
+/// (Kural 7/8). Çevrimiçi mod geldiğinde (Aşama 6 — arkadaşımın işi) bu
+/// ekran gerçek takımları gösterecek.
+///
+/// Sınıf adı [TeamScreen] olarak **korundu**: GD10 ile aynı gerekçe —
+/// yeniden adlandırma çağrı noktalarını gezmek demek ve kullanıcıya görünen
+/// tek şey başlık.
 class TeamScreen extends StatelessWidget {
   final Team team;
 
@@ -14,10 +23,41 @@ class TeamScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(team.name)),
+      appBar: AppBar(title: const Text('Taverna')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          SectionCard(
+            key: const ValueKey('tavern-coming-soon'),
+            child: Row(
+              children: [
+                const Icon(Icons.sports_bar, color: AppColors.streak),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Taverna daha açılmadı',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        PetSayings.tavernTeaser,
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Aşağıdaki takım şimdilik bir önizleme.',
+                        style: TextStyle(color: Colors.white38, fontSize: 11.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           SectionCard(
             child: Row(
               children: [
