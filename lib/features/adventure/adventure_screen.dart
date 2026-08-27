@@ -927,9 +927,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        // GD49'dan sonra düşman canı adım hedefinden bağımsız;
-                        // oran gerçek can tavanıyla çarpılmalı.
-                        '${(_overlayEnemyHealth * adventure.scaledEnemyMaxHealth).round()} CAN',
+                        '${(_overlayEnemyHealth * adventure.stepGoal).round()} CAN',
                         style: const TextStyle(
                           color: AppColors.hp,
                           fontWeight: FontWeight.w900,
@@ -2105,12 +2103,10 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Bu round için ${adventure.roundTargetSteps} adım ve '
-            '${adventure.roundDurationLabel} süren var '
-            '(${GameConstants.stepsPerMinute} adım/dk). Hedefi süre dolmadan '
-            'bitirirsen mükemmel round ve erken bitirme bonusu kazanırsın. '
-            'Kaçırırsan seri sıfırlanır; ${adventure.enemy.name} eksik '
-            'oranının eğrisine göre saldırır.',
+            'Tempo ${GameConstants.stepsPerMinute} adım/dk · bu round '
+            '${adventure.roundDurationLabel}. Hedefi süre dolmadan bitirirsen '
+            'mükemmel round ve erken bitirme bonusu kazanırsın. Kaçırırsan seri '
+            'sıfırlanır; ${adventure.enemy.name} eksik oranının eğrisine göre saldırır.',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
@@ -2485,10 +2481,9 @@ class _GoalSelectorButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${AttackConfig.roundCountForSteps(goal)} round × '
-                      '${_formatNumber(AttackConfig.roundStepsForSteps(goal))} adım • '
-                      '${AdventureQuest.durationLabel(AttackConfig.roundDurationForTier(goal))}/round • '
-                      '${AdventureQuest.durationLabel(AttackConfig.totalDurationForSteps(goal))} toplam',
+                      '${AttackConfig.roundCountForSteps(goal)} round • '
+                      '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(goal))} toplam • '
+                      '${GameConstants.stepsPerMinute} adım/dk',
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2680,7 +2675,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                         _EnemyInfoChip(
                           icon: Icons.timer_outlined,
                           label:
-                              '${AdventureQuest.durationLabel(AttackConfig.totalDurationForSteps(widget.selectedGoal))} toplam',
+                              '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(widget.selectedGoal))} toplam',
                           color: AppColors.streak,
                         ),
                         _EnemyInfoChip(
@@ -2738,11 +2733,8 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Her round için '
-                            '${_formatNumber(AttackConfig.roundStepsForSteps(widget.selectedGoal))} adım ve '
-                            '${AdventureQuest.durationLabel(AttackConfig.roundDurationForTier(widget.selectedGoal))} '
-                            'süren var; toplam '
-                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round. '
+                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round, '
+                            '${GameConstants.stepsPerMinute} adım/dk temposundan türetilir. '
                             'Hedefe süre dolmadan ulaşırsan mükemmel round serisi '
                             'hasarını büyütür; kaçırırsan seri kırılır ve düşman '
                             'eksik oranının eğrisine göre saldırır.',

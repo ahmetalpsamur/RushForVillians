@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD88)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD81)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -108,7 +108,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v21 + migration | Firebase |
+| Yerel kalıcılık, şema v20 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | Çoklu dil (yalnızca Türkçe) |
 
@@ -1130,59 +1130,25 @@ inisiyatif (speed) → sıyrılma → kritik → değişkenlik (±%12, luck band
 Savunan ilk vuruşta öldüyse ikinci vuruş yapılmaz — `speed` bu yüzden gerçek
 bir stat.
 
-**Adım ↔ savaş bağı.** İki taraf da roundun **oranıyla** ölçülür, mutlak
-adımla değil. `c = clamp(yürünen / roundHedefi, 0, 1)` ve
-`a = roundHedefi / 250` (roundun ağırlığı, GD86) olmak üzere:
+**Adım ↔ savaş bağı:** `c = clamp(yürünen / roundHedefi, 0, 1)` olmak üzere:
 
 ```
-oyuncuHasarı = normalOyuncuHasarı × c × a × mükemmelRoundÇarpanı
+oyuncuHasarı = normalOyuncuHasarı × c × mükemmelRoundÇarpanı
 düşmanHasarı = normalDüşmanHasarı × (1 − c)^1,5
 ```
 
-**Neden oran, neden mutlak sayı değil:** round büyüklüğü kademe tablosuyla
-250'den 2.000'e kadar değişiyor. 2.000'lik roundda 200 adım kaçırmak %10,
-250'lik roundda aynı 200 adım %80. Formül mutlak kaçırılan adıma bakarsa küçük
-düşmanlar orantısız cezalandırılır. Ölçülen: aynı oran dört round
-büyüklüğünde de **birebir aynı** hasarı veriyor (testle bağlı).
-
 Tam round (`c=1`) = tam vuruş + **kesinlikle sıfır** düşman hasarı; hiç
 yürümemek (`c=0`) = hiç vuramamak + **tam** düşman hasarı. Aradaki eğri hafif
-dışbükeydir — ölçülen düşman hasar ölçeği:
+dışbükeydir: %90→%50 tamamlama arasındaki ceza artışı, %50→%10 arasındakinden
+küçüktür. Böylece az kaçıran oyuncu doğrusal formüldeki kadar sert
+cezalandırılmaz; büyük ölçüde yürümemek belirgin biçimde acıtır. Üs tek denge
+sabiti `missedRoundDamageExponent = 1.5` içindedir.
 
-| Tamamlama | %100 | %90 | %75 | %50 | %25 | %10 | %0 |
-|---|---|---|---|---|---|---|---|
-| Ölçek | 0,000 | 0,032 | 0,125 | 0,354 | 0,650 | 0,854 | 1,000 |
-
-%90→%50 arasındaki artış 0,32; %50→%10 arasındaki 0,50. Az kaçıran oyuncu
-doğrusal formüldeki kadar sert cezalandırılmaz; büyük ölçüde yürümemek belirgin
-biçimde acıtır. Üs tek denge sabiti `missedRoundDamageExponent = 1.5`.
-
-**Round ağırlığı `a` yalnızca oyuncunun vuruşuna uygulanır** (GD86): bir round
-bir yürüyüş taahhüdüdür ve 2.000 adımlık round 250 adımlıktan sekiz kat ağır
-bir taahhüt, sekiz kat ağır bir vuruş. Düşmanın vuruşu ağırlıksız kalır —
-kaçırılan bir round hangi kademede olursa olsun oyuncu canının aynı oranını
-götürür; 2.000 adımlık tek bir round kaçırmak oyuncuyu tek hamlede
-öldürmemeli.
-
-**Mükemmel round ve seri.** Roundun adım hedefi süre dolmadan tamamlanırsa
-oyuncu hasarı bonus alır: `çarpan = 1 + (tavan − 1) × kalanSüreOranı`. Ne kadar
-erken bitirirsen bonus o kadar büyük. Ardışık mükemmel roundlar erişilebilir
-**tavanı** büyütür ve tavan ×2'de durur:
-
-| Seri | 1 | 2 | 3 | 4+ |
-|---|---|---|---|---|
-| Tavan | ×1,2 | ×1,5 | ×2,0 | ×2,0 |
-
-Kaçırılan her round seriyi **sıfırlar**. Arayüz iki yerden gösterir: geri sayım
-kartında `MÜKEMMEL SERİ n · tavan ×x` (seri değişince `ValueKey` ile yeniden
-canlanır) ve round geçiş perdesinde `MÜKEMMEL · SERİ n`. Kırılma sessiz
-kalmaz — `RootShell._showPerfectRoundFeedback` "Mükemmel round serin kırıldı.
-Çarpan ×1'e döndü." diyen kırmızı bir bildirim gösterir. Seri ve son geri
+**Mükemmel round:** hedef deadline'dan önce tamamlanırsa oyuncu hasarı bonus
+alır. Round süresinin ne kadarı kaldıysa bonus o oranda büyür. Ardışık
+mükemmel roundlar erişilebilir tavanı **×1,2 → ×1,5 → ×2** yapar; üçüncüden
+sonra ×2'de kalır. Kaçırılan her round seriyi sıfırlar. Seri ve son geri
 bildirim v21 kaydında tutulur; yeni macera/yeni oyun gününde sıfırdan başlar.
-
-**Bonus doğrudan para basmaz:** yalnızca hasarı büyütür. Etkisi düşmanı erken
-indirmeyi kolaylaştırmak, yani mevcut (tavanı ×2 olan) hız ödülünü ve bonuslu
-yürüyüş fazını beslemek. Ekonomiye yeni bir musluk açmıyor.
 
 ### Altı koşullu tetikleyici — hepsi çalışıyor
 
@@ -1219,13 +1185,8 @@ saldırı, savunma, hız, kritik ve sıyrılma kademeden ve arketipten türetili
 
 İki hedef sayı:
 1. **Can** = o kademeye denk seviyedeki ölçüt oyuncunun round başına hasarı ×
-   beklenen **referans round** sayısı (`kilitEşiği / 250`, GD86). Kilit eşiğini
-   seçen ölçüt oyuncu maceranın sonunda devirir, güçlü oyuncu erken.
-   Ölçü neden ekrandaki round sayısı değil: kademe tablosu round büyüklüğünü
-   hedefe göre değiştiriyor, 3.000 adım 3 round ama 2.500 adım 5 round. Can o
-   sayıya bağlansaydı 6. kademe düşman 5. kademeden **zayıf** çıkardı. Ağırlık
-   adımla birlikte her zaman büyüyor ve oyuncunun vuruşu da aynı ağırlıkla
-   ölçeklendiği için söz bozulmuyor.
+   beklenen round sayısı. Kilit eşiğini seçen ölçüt oyuncu maceranın sonunda
+   devirir, güçlü oyuncu erken.
 2. **Saldırı** = tamamen kaçırılan bir roundun oyuncu canının %15'ini
    götürmesi. Ölçülen: hiç yürümeyen oyuncu 4–12 round içinde düşüyor
    (hedef ~7).
@@ -1247,50 +1208,24 @@ gösterir + tek cümlelik davranış açıklaması.
 `features/adventure/adventure_screen.dart` (~2.900 satır) +
 `models/adventure_quest.dart`.
 
-### Saldırı yapısı — **sabit kademe tablosu** (GD85)
+### Saldırı yapısı — `attack_config.dart`
 
-Bir macera **bir saldırıdır**. Round adımı ve round süresi bir formülden
-türetilmez; düşmanın **toplam** adım hedefinin düştüğü kademeden okunur.
-Tablo `GameConstants.combatRoundTiers` içinde, elle yazılı:
+Bir macera **bir saldırıdır**. Sürenin tek doğruluk kaynağı
+`GameConstants.stepsPerMinute = 100`:
 
-| Toplam adım hedefi | Round adımı | Round süresi |
-|---|---|---|
-| 1000'den az | 250 | 2,5 dk |
-| 1000 – 2999 | 500 | 5 dk |
-| 3000 – 9999 | 1000 | 10 dk |
-| 10000 ve üstü | 2000 | 20 dk |
+```
+toplamSüreDakika = toplamAdım / stepsPerMinute
+roundSayısı = clamp(ceil(toplamAdım / 250), 2, 5)
+roundAdımı = toplamAdım / roundSayısı  // kalan adımlar ilk roundlara dağıtılır
+roundSüresi = roundAdımı / stepsPerMinute
+```
 
-**İki değer birbirinden türetilmez** — ikisi de `CombatRoundTier` içinde ayrı
-alan. `GameConstants.stepsPerMinute = 100` artık bir *anlatım* sabiti: dört
-kademe de tam olarak o kadansı tutuyor, arayüz oyuncuya tempoyu onunla
-anlatıyor, ama round süresi tablodan geliyor. Bu bir ayar değil; oyuncuya
-açılmıyor, seçenek sunulmuyor.
-
-Ölçülen sonuçlar (`attack_config_test.dart` dokuz satırın hepsini ayrı ayrı
-doğruluyor):
-
-| Hedef | Round adımı | Round süresi | Round | Toplam |
-|---|---|---|---|---|
-| 500 | 250 | 2,5 dk | 2 | 5 dk |
-| 1.000 | 500 | 5 dk | 2 | 10 dk |
-| 1.500 | 500 | 5 dk | 3 | 15 dk |
-| 2.000 | 500 | 5 dk | 4 | 20 dk |
-| 2.500 | 500 | 5 dk | 5 | 25 dk |
-| 3.000 | 1.000 | 10 dk | 3 | 30 dk |
-| 9.000 | 1.000 | 10 dk | 9 | 90 dk |
-| 10.000 | 2.000 | 20 dk | 5 | 100 dk |
-| 20.000 | 2.000 | 20 dk | 10 | 200 dk |
-
-**Artan bölüm — kısa son round.** Hedef round adımına tam bölünmüyorsa kalan
-adımlar **kısa bir son round** olur ve süresi adım oranıyla kısalır:
-1.200 → `[500, 500, 200]` ve `[5 dk, 5 dk, 2 dk]`. Kalıntı
-`minFinalRoundSteps` (50 adım) altındaysa ayrı round sayılmaz, bir önceki
-rounda katılır — 1 adımlık, 1 saniyelik bir "round" round değil, yuvarlama
-artığıdır. Hedef çarkı 500'ün katlarını verdiği için bu dal pratikte yalnızca
-eski kayıtlarda çalışır.
-
-**Toplam kadans her hedefte 100 adım/dk** kalıyor: `toplamSüre = toplamAdım × 0,6 sn`.
-Bu testle bağlı (100–20.000 arası her 50 adımda bir taranıyor).
+250, hedef round boyudur; bir düşmana elle round/süre yazılmaz. Alt sınır 2,
+500 adımlık başlangıç savaşını tek roundluk gerilimsiz bir sayaç olmaktan
+çıkarır. 1.000 adım **4 × 250** olarak seçilir: 2 round fazla kaba, 10–11
+round tekrarlı olur. Üst sınır 5, 10.000 adımlık düşmanın 40 rounda dönüşmesini
+engeller. Uzun hedeflerde round başına adım ve süre büyür, toplam kadans hep
+100 adım/dakika kalır.
 
 **Altı seçilebilir hedef:**
 
@@ -1302,67 +1237,6 @@ Bu testle bağlı (100–20.000 arası her 50 adımda bir taranıyor).
 | 3.000 | 30 dk | ×1,55 |
 | 5.000 | 50 dk | ×1,85 |
 | 10.000 | 100 dk | ×2,40 |
-
-Hedef çarkı bu altı değerle sınırlı değil: 500'ün her katı seçilebiliyor, o
-yüzden kademe tablosu keyfî hedefleri de karşılamak zorunda.
-`enemyPowerMultiplier` bugün **kullanılmıyor** (GD49 düşman canını adımdan
-kopardı); sütun tarihsel.
-
-### Kademe tablosunun denge ölçümü (Bölüm B.4)
-
-Sayılar ölçüldü, tahmin edilmedi. Ölçüt oyuncu: kademesine denk seviye,
-ekipmansız, serisiz; her roundu tam tamamlıyor.
-
-| Kd | Düşman | Arketip | Hedef | Round yapısı | Süre | Can | Saldırı | Devirme |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Kül Muhafızı | tank | 500 | 2 × 250 | 5 dk | 27 | 13,8 | 3 round |
-| 2 | Gece Yeminlisi | bruiser | 1.000 | 2 × 500 | 10 dk | 44 | 18,2 | 2 round |
-| 3 | Hiçlik Şövalyesi | bruiser | 1.500 | 3 × 500 | 15 dk | 76 | 20,2 | 3 round |
-| 4 | Kan Dokuyan | caster | 2.000 | 4 × 500 | 20 dk | 84 | 28,9 | 3 round |
-| 5 | Kızıl Kanat | swift | 2.500 | 5 × 500 | 25 dk | 121 | 23,1 | 6 round |
-| 6 | Kor Sireni | caster | 3.000 | 3 × 1.000 | 30 dk | 153 | 34,5 | 3 round |
-| 7 | Alacakaranlık Cadısı | swift | 3.500 | 4 × 1.000 | 35 dk | 202 | 27,4 | 4 round |
-| 8 | Boynuzlu Cellat | bruiser | 4.000 | 4 × 1.000 | 40 dk | 320 | 31,1 | 5 round |
-| 9 | Cehennem Nöbetçisi | tank | 4.500 | 5 × 1.000 | 45 dk | 519 | 28,5 | 9 round |
-| 10 | Kara Pençe | swift | 5.000 | 5 × 1.000 | 50 dk | 352 | 34,1 | 5 round |
-| 11 | Alev Tahtının Varisi | bruiser | 5.500 | 6 × 1.000 | 55 dk | 524 | 38,4 | 5 round |
-| 12 | Uçurum Hükümdarı | caster | 6.000 | 6 × 1.000 | 60 dk | 460 | 53,2 | 5 round |
-| 13 | Hiçliğin Gözü | caster | 6.500 | 7 × 1.000 | 65 dk | 524 | 34,0 | 5 round |
-| 14 | Köz Devi | tank | 7.000 | 7 × 1.000 | 70 dk | 1.009 | 39,3 | 10 round |
-| 15 | Ruh Alevi | swift | 7.500 | 8 × 1.000 | 75 dk | 672 | 46,5 | 6 round |
-| 16 | Cehennem Kanadı | swift | 8.000 | 8 × 1.000 | 80 dk | 745 | 49,2 | 9 round |
-| 17 | Kül Diş | bruiser | 8.500 | 9 × 1.000 | 85 dk | 1.035 | 54,6 | 9 round |
-| 18 | Magma Yutan | tank | 9.000 | 9 × 1.000 | 90 dk | 1.472 | 48,9 | 12 round |
-| 19 | Labirent Kasabı | bruiser | 9.500 | 10 × 1.000 | 95 dk | 1.231 | 62,8 | 11 round |
-| 20 | Son Mührün Efendisi | caster | 10.000 | 5 × 2.000 | 100 dk | 1.063 | 91,7 | 4 round |
-
-**Okuma.** Hiçbir kademe imkânsız ya da saçma değil:
-- **Can her arketipte monoton artıyor** — tank 27 → 519 → 1.009 → 1.472,
-  bruiser 44 → 76 → 320 → 524 → 1.035 → 1.231, caster 84 → 153 → 460 → 524 →
-  1.063, swift 121 → 202 → 352 → 672 → 745. (Ağırlık ölçüsü olmasaydı 6. ve
-  20. kademe düşerdi; GD86 tam olarak bunu çözüyor.)
-- **Devirme round sayısı ≈ maceranın round sayısı.** Dayanıklı (tank) düşman
-  1–3 round taşıyor, cam top (caster/swift) erken düşüyor — arketipin işi bu.
-- **Hiç yürümeyen oyuncu 5–9 roundda düşüyor** (hedef ~7). Tier 20'de tam 5:
-  maceranın round sayısı da 5, yani hiç yürümeyen oyuncu tam maceranın sonunda
-  düşüyor.
-
-**Ekonomiye etkisi: yok.** Toplam macera süresi `toplamAdım / 100` dakika,
-yani kademe tablosundan **önceki** değerin aynısı; değişen yalnızca o sürenin
-kaç rounda bölündüğü. Adım → coin/XP hattına, zafer ödülüne
-(`4 + 3·kademe` … `10 + 6·kademe` coin, kademe XP'si) ve hız çarpanına hiç
-dokunulmadı. §6.11'deki 500/1.000 adımlık ekonomi tablosu aynen geçerli: 500
-hedefinde round yapısı zaten birebir aynı, 1.000 hedefinde ölçüt oyuncu yine
-tam 1.000 adımda deviriyor (2 × 500, eskiden 4 × 250) → hız çarpanı yine ×1.
-Bu yüzden **ödüle dokunulmadı**; sapma ölçülüp sıfır bulundu.
-
-**10.000 adımlık düşman 100 dakika — makul mü?** Bu süre kademe tablosundan
-gelmiyor, `stepsPerMinute` kadansından geliyor ve **değişmedi**. Gelirin büyük
-kısmı zaten süreyle doğrusal: 10.000 adım = 200 coin + 5.000 XP; kademe
-damlası (64–130 coin + 2.750 XP) bunun üstüne biniyor. Yani "uzun macera daha
-az ödüyor" durumu yok. Kademe damlasını büyütmek `economy_pacing_test`'in
-ölçtüğü 120 coin/gün tabanını bozardı; **ödül artırılmadı**. İleride
-sıkılaştırma gerekirse kaldıraç tempo değil `maxVictorySpeedMultiplier`.
 
 ### Tempo sonrası ekonomi kontrolü
 
@@ -1636,9 +1510,9 @@ dönüşür.**
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v21**
+## Şema — **güncel sürüm v20**
 
-`GameStorage.schemaVersion = 21` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 20` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -1656,7 +1530,6 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 17 → 18 | Seri bonusu gün sayısından **bindeye**: her değer ×10 |
 | 18 → 19 | Ejderha Pelerini → "Gece Yürüyüşçüsü" ünvanı; `title_villain_hunter` → gerçek ünvan |
 | 19 → 20 | Rehberin serbest dolaşma ayarı |
-| 20 → 21 | Mükemmel round serisi alanları (`perfectRoundStreak`, `lastRoundPerfect`, `lastPerfectDamageMultiplier`, `lastPerfectStreakBroken`) |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,
 `debugPrint` ile loglanır, `null` dönülür → temiz varsayılan. **Yeni** sürümdeki
@@ -1727,7 +1600,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**882 test** (`flutter test --no-test-assets`), hepsi yeşil. Test, bu projede dokümantasyonun
+**830 test** (`flutter test --no-test-assets`). Test, bu projede dokümantasyonun
 bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -1806,7 +1679,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD88)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD84)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -1897,17 +1770,13 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD81 | Çark altın veriyor; epik/efsanevi ekipman çarktan kalktı | Altın adım ekonomisinden **ayrı** bir kaynak (işaretçiye dokunmuyor). Epik/efsanevi kaldırma GD19'un geri gelmesi |
 | GD82 | Rehber `Scaffold.body` içinde yaşıyor; konumu sabit pikselden çıkmıyor | Body'nin alt kenarı zaten alt gezinme çubuğunun üst kenarı → `bottom: 0` "barın hemen üstü" demek. Ölçüm, tema sorgusu ya da 96 px tahmini gerekmiyor; jest çubuğu olan/olmayan cihazda, bar gizlendiğinde ve klavye açıldığında kendiliğinden doğru |
 | GD83 | Eğitim rehberi ekrandan yürüyerek çıkmıyor, **death** animasyonuyla veda ediyor | Çıkış artık pet'i kapatmakla aynı hissi veriyor. Süre sabit (960 ms): üç rehberin `*_Death_8.gif` dosyası da 8 kare × 120 ms, ve geçişi gerçek dosya okumasına bağlamak hem testlerde sahte saatle ilerletilemez hem asset okunamazsa eğitimi biteceği anda takardı |
-| GD84 | *(GD85 ile geçersiz)* Round sayısı 250 hedefinden 2–5 arası türetiliyordu | Türetme, 1.000 adımı 4 × 250'ye, 3.000 adımı 5 × 600'e bölüyordu; 5 tavanı 20.000 adımı 4.000'lik roundlara çeviriyordu. Mükemmel seri ×2 tavanı GD84'ten aynen kaldı |
-| GD85 | Round adımı ve round süresi **sabit dört kademelik tabloda**, elle yazılı; ikisi birbirinden türetilmiyor | Formül okunabilir değildi ve istenen tempo tablosunu tutturamıyordu (dokuz örneğin altısı yanlıştı). Tablo `GameConstants.combatRoundTiers`'ta tek yerde duruyor — bu ayarlanabilirlik değil, dağınık if-else zinciri olmasın diye. Artan bölüm kısa bir son round olur (süresi orantılı kısalır); 50 adımdan küçük kalıntı round sayılmaz, önceki rounda katılır |
-| GD86 | Oyuncunun vuruşu roundun **ağırlığıyla** (`roundAdımı / 250`) ölçekleniyor; düşmanınki ölçeklenmiyor | Round büyüklüğü kademeyle 250'den 2.000'e çıkıyor. Ağırlık olmasaydı 2.000 adım yürümek 250 adım yürümekle aynı hasarı ederdi ve düşman canı kademe atlarken **küçülmek** zorunda kalırdı (ölçüldü: 6. ve 20. kademede düşüş). Düşman tarafı bilerek ağırlıksız: kaçırılan round her kademede oyuncu canının aynı oranını götürmeli, 2.000 adımlık tek round oyuncuyu tek hamlede öldürmemeli |
-| GD87 | Zafer perdesindeki "N CAN" sayısı düşmanın **can tavanından** okunuyor | Etiket `oran × adımHedefi` yazıyordu. GD49 düşman canını adım hedefinden kopardıktan sonra bu ilgisiz bir sayı: 10.000 adımlık macerada "10000 CAN" görünüyordu, düşmanın gerçek canı 84'tü. Ölçülen hatanın kendisi teste yazıldı |
-| GD88 | `ListTile.leading` görselleri **dışarıdan boyutlanıyor** (`SizedBox`) | Görsel yüklenemeyince Flutter `Image`'ı boyutsuz bir `Stack`'e sarıyor; `ListTile` "leading bütün genişliği yedi" diye assertion atıyor ve tek bozuk asset Vitrin sekmesini kırmızıya çeviriyor. Kutuyu dışarıdan sabitlemek içeriden ne gelirse gelsin düzeni ayakta tutar. **Yeni bir `leading` görseli eklerken aynı deseni kullan** |
+| GD84 | Savaş temposu tek sabitten **100 adım/dk**; round sayısı 250 hedefinden 2–5 arası türetiliyor; mükemmel seri ×2 tavanlı | Eski 1.000 adım/15 dk roundu ile yüzdeli config çelişiyordu; bazı UI hedefleri sprint istiyordu. 500→2 ve 1.000→4 round gerilimi korurken, 5 tavanı uzun düşmanlarda tekrar hissini engelliyor |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
 | # | Ne | Neden dokunulmadı |
 |---|---|---|
-| K2 | *(GD85 ile geçersiz)* Round süresi adımdan bağımsızdı | Süre artık toplam hedefin düştüğü kademeden elle yazılı olarak okunuyor |
+| K2 | *(GD84 ile geçersiz)* Round süresi adımdan bağımsızdı | Kullanıcı tempo dengelemesiyle süre artık tek kadans sabitinden türetiliyor |
 | K3 | Round erken tamamlanınca anında kazanılıyor | Sonsuz döngü ve çift hasar yok — satır satır doğrulandı |
 | K4 | Sunum durumu (`presentedRoundOutcomeSerial`) modelde | Model Kuralları #1'i ihlal etmiyor (`int`); ayırmak modeli, ekranı ve şemayı birlikte değiştirmek demek |
 | K5 | Ekran, model nesnesini doğrudan değiştiriyor | Mevcut `setState` mimarisi zaten buna dayanıyor. Riverpod/Bloc geçişinde ilk kırılacak yer |
@@ -1919,28 +1788,18 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 # §12 — Bilinen açıklar ve teknik borç
 
-## Şu an kırmızı olan testler — **yok**
+## Şu an kırmızı olan testler
 
-`flutter test --no-test-assets` → **882 test, hepsi yeşil.**
+`flutter test --no-test-assets` → **830 test, 7 başarısız.** Hepsi **golden**:
 
-Daha önce buraya yazılan 7 (ölçüldüğünde 10) golden kırığının sebebi kod
-regresyonu değil, **bayat test asset paketiydi** — §5.2'nin uyardığı durum.
-Teşhis ve çözüm, aynı belirti tekrar ederse:
+- `character_creation_test` — tanıtım ekranı (320 dp, 800 dp)
+- `golden/pet_companion_golden_test` — ana çember pet düğmesi (açık, kapalı)
+- ve 3 tanesi daha
 
-1. `build/unit_test_assets/AssetManifest.bin` eksikti (147 KB; tazelendiğinde
-   278 KB oldu). Eksik asset'te `Image.asset` **boyutsuz bir `Stack`**'e
-   sarılıyor ve `ListTile.leading` bütün genişliği yiyor → ödül koleksiyonu
-   ekranı `ListTile` assertion'ı atıyordu. Bu bir kod hatası gibi görünüyordu,
-   değildi.
-2. Kalan farklar yuvarlatılmış köşelerdeki **kenar yumuşatma** (%0,09–%0,34) ve
-   sınıf tanıtım ekranındaki tek bir **GIF karesi** (%1,5–%8,4) idi. Üçü de
-   `isolatedDiff` PNG'sine bakılarak doğrulandı: düzen bozulması yok.
-3. Paket tazelenip golden'lar yeniden üretildi.
-
-**Yordam:** bir golden beklenmedik yerde kırmızıysa önce paketi tazele
-(bir kez normal `flutter test <tek dosya>` — çökecek ama paketi yazacak),
-sonra `test/**/failures/*_isolatedDiff.png` dosyasına **gerçekten bak**,
-ancak ondan sonra `--update-goldens`.
+**Muhtemel sebep kod regresyonu değil, bayat test asset paketi** (§5.2'nin
+uyarısı): `pubspec.yaml`'a `Tutorial_Guy` ve `coins` klasörleri eklendikten
+sonra paket yenilenmediyse golden'lar sahte sebeplerle kırılır. Elden geçirmeden
+önce paketi tazele, sonra farkı **PNG'ye bakarak** değerlendir.
 
 ## Zaman güvenliği
 
@@ -1984,7 +1843,6 @@ ancak ondan sonra `--update-goldens`.
 | C10 | `README.md` hâlâ "A new Flutter project." | Şablon artığı |
 | C11 | Release imzası hâlâ debug key | Yayına çıkmadan önce |
 | C13 | `RewardRarityX.color` model katmanında `Color` döndürüyor | Extension getter, persist edilmiyor — teknik olarak kural ihlali değil |
-| C14 | `AttackTargetConfig.enemyPowerMultiplier` ve `AttackRoundConfig.percentage`'ın süre/adım yardımcıları ölü | GD49 düşman çarpanını, GD85 yüzdeli türetmeyi devre dışı bıraktı. Yüzdeler hâlâ faz ağırlığını ve `hasValidRoundPercentages` doğrulamasını taşıyor; çarpan sütunu tarihsel. **Silme onaya tabi** |
 | A7 | `features/boss/boss_battle_screen.dart` hiçbir yerden çağrılmıyor | `models/boss_quest.dart`, `MockData.dailyDragon()`, `reward_calculator.dart` ile birlikte ölü zincir. **Silinmedi** |
 | — | `ios/Podfile` yok | İlk macOS derlemesinde üretilecek; `permission_handler` `PERMISSION_*` makroları kısıtlanmalı, yoksa App Store incelemesinde sorun çıkar |
 | — | `_openWheel`, `_openRewards`, `_editCharacter` hâlâ `_push` | Bugün güvenli (kendi durumlarını tutuyorlar). **Canlı state yansıtması gereken yeni bir ekran eklenirse** ya sekmeye alınmalı ya GD27 deseni kullanılmalı |

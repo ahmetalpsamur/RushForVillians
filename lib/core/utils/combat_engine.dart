@@ -172,11 +172,6 @@ class CombatRoundOutcome {
 /// [completion] roundun tamamlanma oranı (0..1): `yürünenAdım / hedefAdım`.
 /// [onHitEffects] oyuncunun vuruş anında tetiklenen etkileri; her biri kendi
 /// [ItemEffect.chance] ihtimaliyle, aynı tohum akışından çözülür.
-///
-/// [playerDamageMultiplier] mükemmel round bonusunu **ve** roundun büyüklük
-/// ağırlığını taşır (GD86): 2000 adımlık bir round 250 adımlıktan sekiz kat
-/// ağır vurur. Kırpma yalnızca negatif/NaN değerlere karşı; birden küçük bir
-/// çarpan (kısalan son round) gerçekten zayıf vurmalı.
 CombatRoundOutcome resolveCombatRound({
   required CombatStats player,
   required CombatStats enemy,
@@ -221,7 +216,7 @@ CombatRoundOutcome resolveCombatRound({
     // cezaya dönüşür; az kaçıran oyuncu orantısız hasar yemez.
     final scale =
         isPlayer
-            ? ratio * playerDamageMultiplier.clamp(0.0, double.infinity)
+            ? ratio * playerDamageMultiplier.clamp(1.0, double.infinity)
             : enemyDamageScaleForCompletion(ratio);
 
     if (scale <= 0) continue;

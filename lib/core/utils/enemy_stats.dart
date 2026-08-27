@@ -35,29 +35,17 @@ import 'base_combat_stats.dart';
 /// Tamamen kaçırılan bir roundun oyuncunun canından götürdüğü oran.
 ///
 /// %15: yedi round üst üste hiç yürümeyen oyuncu ölür. Daha düşüğü ölümü
-/// imkânsız kılar, daha yükseği tek kötü günü yenilgiye çevirir.
-///
-/// Oran **round başına** sabittir, roundun büyüklüğüne bakmaz: kaçırılan bir
-/// round hangi kademede olursa olsun aynı yarayı açar. Oyuncunun vuruşu round
-/// ağırlığıyla büyürken düşmanınkinin büyümemesi bilinçli — 2.000 adımlık tek
-/// bir roundu kaçırmak oyuncuyu tek hamlede öldürmemeli.
+/// imkânsız kılar (macera en fazla 10 round), daha yükseği tek kötü günü
+/// yenilgiye çevirir.
 const double missedRoundHealthCost = 0.15;
 
 /// Kademenin doğrusal saldırı beklentisi. Katalogdaki değer buna oranlanır.
 double expectedCatalogAttack(int tier) => 7 + tier.toDouble();
 
-/// Kademe *i* için beklenen **referans round** sayısı (GD86).
-///
-/// Ölçü, ekrandaki round sayısı değil, roundların toplam **hasar ağırlığı**:
-/// `toplamAdım / 250`. Kademe tablosu (GD85) round büyüklüğünü hedefe göre
-/// değiştirdiği için ekrandaki round sayısı kademeyle birlikte azalabiliyor —
-/// 3.000 adım 3 round, 2.500 adım 5 round. Can o sayıya bağlansaydı üst kademe
-/// düşman alt kademeden zayıf çıkardı. Ağırlık ise adımla birlikte **her zaman**
-/// büyür ve oyuncunun vuruşu da aynı ağırlıkla ölçeklendiği için "kilit eşiğini
-/// seçen ölçüt oyuncu maceranın sonunda devirir" sözü aynen korunur.
-double expectedRoundsForTier(int tier) {
+/// Kademe *i* için beklenen round sayısı.
+int expectedRoundsForTier(int tier) {
   final steps = tier * 500;
-  return AttackConfig.totalRoundWeightForSteps(steps);
+  return AttackConfig.roundCountForSteps(steps);
 }
 
 /// Arketipin stat bütçesini nasıl kaydırdığı.

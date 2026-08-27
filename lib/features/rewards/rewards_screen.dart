@@ -662,20 +662,13 @@ class _ShowcaseTile extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     child: ListTile(
       onTap: onTap,
-      // `SizedBox` şart: görsel yüklenemediğinde Flutter `Image`'ı boyutsuz
-      // bir `Stack`'e sarıyor ve `ListTile` "leading bütün genişliği yedi"
-      // diye assertion atıyor — tek bozuk asset Vitrin sekmesini kırmızıya
-      // çeviriyordu. Kutuyu dışarıdan sabitlemek içeriden ne gelirse gelsin
-      // düzeni ayakta tutar.
-      leading: SizedBox(
+      leading: Image.asset(
+        reward.assetPath,
         width: 48,
         height: 48,
-        child: Image.asset(
-          reward.assetPath,
-          fit: BoxFit.contain,
-          cacheWidth: 96,
-          filterQuality: FilterQuality.none,
-        ),
+        fit: BoxFit.contain,
+        cacheWidth: 96,
+        filterQuality: FilterQuality.none,
       ),
       title: Text(reward.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text('${reward.rarity.label} • ${_date(earnedAt)}'),
