@@ -2229,11 +2229,34 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       ),
     ];
 
+    // Rehber katmanı `Scaffold.body` **içinde** duruyor. Body'nin alt kenarı
+    // alt gezinme çubuğunun üst kenarıdır, yani `bottom: 0` hiçbir sabit
+    // piksel hesabı olmadan "barın hemen üstü" demek: jest çubuğu olan ve
+    // olmayan cihazda, bar gizlendiğinde ve klavye açıldığında doğru
+    // kalır (bkz. GD82). Eğitim katmanı ise tam ekran kalmalı — spotlight
+    // alt bardaki sekmeleri de aydınlatıyor.
+    final showPet =
+        !_tutorialActive && (_profile.petCompanionEnabled || _showPetDismissal);
+
     return Stack(
       fit: StackFit.expand,
       children: [
         Scaffold(
-          body: tabs[_tabIndex],
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              tabs[_tabIndex],
+              // Kapatılırken katman death GIF'i tamamlanana kadar tutulur.
+              // Kayıttan kapalı gelirse doğrudan kurulmaz.
+              if (showPet)
+                PetCompanionOverlay(
+                  situation: _petSituation,
+                  guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+                  enabled: _profile.petCompanionEnabled,
+                  onDismissed: _onPetDismissed,
+                ),
+            ],
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tabIndex,
             onDestinationSelected: _selectTab,
@@ -2253,16 +2276,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           ),
         ),
         if (_tutorialActive) _tutorialOverlay(),
-        // Kapatılırken katman death GIF'i tamamlanana kadar tutulur. Kayıttan
-        // kapalı gelirse doğrudan kurulmaz.
-        if (!_tutorialActive &&
-            (_profile.petCompanionEnabled || _showPetDismissal))
-          PetCompanionOverlay(
-            situation: _petSituation,
-            guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
-            enabled: _profile.petCompanionEnabled,
-            onDismissed: _onPetDismissed,
-          ),
       ],
     );
   }

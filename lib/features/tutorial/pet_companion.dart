@@ -33,6 +33,14 @@ class PetCompanionOverlay extends StatefulWidget {
 
   /// Idle sonrasındaki climb/attack gösterisinin süresi.
   final Duration edgeActionDuration;
+
+  /// Pet'in ayağının basacağı taban çizgisinin, katmanın **kendi** alt
+  /// kenarından yüksekliği.
+  ///
+  /// Varsayılan `0`: katman `Scaffold.body` içine yerleştirildiğinde body'nin
+  /// alt kenarı zaten alt gezinme çubuğunun üst kenarıdır, yani pet hiçbir
+  /// sabit piksel hesabı olmadan "barın üstünde" yürür (bkz. GD82). Katmanı
+  /// tam ekran bir yere koyan çağıran taraf kendi payını verir.
   final double bottomInset;
 
   const PetCompanionOverlay({
@@ -47,8 +55,25 @@ class PetCompanionOverlay extends StatefulWidget {
     this.strollDuration = const Duration(seconds: 14),
     this.restDuration = const Duration(seconds: 3),
     this.edgeActionDuration = const Duration(milliseconds: 900),
-    this.bottomInset = 96,
+    this.bottomInset = 0,
   });
+
+  /// Sprite kenarı: ekran genişliğinin oranı, makul sınırlar içinde.
+  ///
+  /// Sabit 56 px küçük telefonda devasa, tablette minik duruyordu. Sınırlar
+  /// oranın uçlarda saçmalamasını engelliyor (320 dp → 48, 800 dp → 88).
+  static double spriteSizeFor(double screenWidth) =>
+      (screenWidth * 0.15).clamp(44.0, 88.0);
+
+  /// Yatay yürüyüş şeridinin iki yanındaki boşluk.
+  ///
+  /// Alt sınır 12: baloncuğun dar ekranda kenara yapışmaması bu paya bağlı.
+  static double marginFor(double screenWidth) =>
+      (screenWidth * 0.035).clamp(12.0, 28.0);
+
+  /// Konuşma baloncuğunun en fazla genişliği.
+  static double bubbleWidthFor(double screenWidth) =>
+      (screenWidth * 0.66).clamp(180.0, 320.0);
 
   @override
   State<PetCompanionOverlay> createState() => _PetCompanionOverlayState();
@@ -58,8 +83,6 @@ enum _PetMotion { idle, walking, climbing, attacking, dying, frozen }
 
 class _PetCompanionOverlayState extends State<PetCompanionOverlay>
     with SingleTickerProviderStateMixin {
-  static const double _spriteSize = 56;
-  static const double _bubbleMaxWidth = 232;
   static const _deathFreeze = Duration(milliseconds: 320);
   static const _deathFade = Duration(milliseconds: 260);
 
@@ -314,22 +337,22 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
     _PetMotion.dying || _PetMotion.frozen => TutorialGuideAnimation.dying,
   };
 
-  Widget _sprite() {
+  Widget _sprite(double spriteSize) {
     final frozen = _deathFinalFrame;
     final image =
         _motion == _PetMotion.frozen && frozen != null
             ? RawImage(
               image: frozen,
-              width: _spriteSize,
-              height: _spriteSize,
+              width: spriteSize,
+              height: spriteSize,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.none,
             )
             : Image.asset(
               TutorialGuideAssets.forAnimation(_animation, widget.guide),
               key: ValueKey('pet-$_spriteSerial-${_animation.name}'),
-              width: _spriteSize,
-              height: _spriteSize,
+              width: spriteSize,
+              height: spriteSize,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.none,
               gaplessPlayback: false,
@@ -366,38 +389,57 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final travel = (constraints.maxWidth - _spriteSize - 24).clamp(
+          // Ölçek **ekran** genişliğinden çıkar, katmanın kendi genişliğinden
+          // değil: pet aynı cihazda hep aynı boyutta olmalı, katman nereye
+          // yerleştirilirse yerleştirilsin.
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          final spriteSize = PetCompanionOverlay.spriteSizeFor(screenWidth);
+          final margin = PetCompanionOverlay.marginFor(screenWidth);
+
+          // Alt gezinme çubuğu varken `Scaffold` body'den SafeArea payını
+          // zaten düşüyor, yani burada `0` gelir ve pet çubuğun üstünde
+          // kalır. Çubuk **yokken** pay düşülmez ve pet jest çubuğunun
+          // altına kayardı; o yüzden kalan payı burada ekliyoruz. İki durum
+          // da tek satırla doğru (GD82).
+          final baseline =
+              widget.bottomInset + MediaQuery.paddingOf(context).bottom;
+
+          // Yürüyüş şeridi katmanın gerçek genişliğinden türer; pet hiçbir
+          // ekranda dışarı taşmaz. Kenar GIF'lerinin tetiklenmesi bu hesaba
+          // değil, devriye döngüsüne ve `_stroll.value`'ya bağlı — bu yüzden
+          // sınır değişmesi animasyon durumlarını etkilemez.
+          final travel = (constraints.maxWidth - spriteSize - margin * 2).clamp(
             0.0,
             double.infinity,
           );
-          final bubbleWidth = (constraints.maxWidth - 24).clamp(
+          final bubbleWidth = (constraints.maxWidth - margin * 2).clamp(
             0.0,
-            _bubbleMaxWidth,
+            PetCompanionOverlay.bubbleWidthFor(screenWidth),
           );
-          final maxBubbleLeft = constraints.maxWidth - bubbleWidth - 12;
-          final sprite = _sprite();
+          final maxBubbleLeft = constraints.maxWidth - bubbleWidth - margin;
+          final sprite = _sprite(spriteSize);
 
           return AnimatedBuilder(
             animation: _stroll,
             child: sprite,
             builder: (context, child) {
-              final petLeft = 12 + travel * _stroll.value;
-              final bubbleLeft = (petLeft + _spriteSize * .2).clamp(
-                12.0,
-                maxBubbleLeft,
+              final petLeft = margin + travel * _stroll.value;
+              final bubbleLeft = (petLeft + spriteSize * .2).clamp(
+                margin,
+                maxBubbleLeft < margin ? margin : maxBubbleLeft,
               );
               return Stack(
                 children: [
                   if (_line != null)
                     Positioned(
                       left: bubbleLeft,
-                      bottom: widget.bottomInset + _spriteSize + 6,
+                      bottom: baseline + spriteSize + 6,
                       width: bubbleWidth,
                       child: _PetBubble(text: _line!),
                     ),
                   Positioned(
                     left: petLeft,
-                    bottom: widget.bottomInset,
+                    bottom: baseline,
                     child: child!,
                   ),
                 ],

@@ -311,7 +311,10 @@ void main() {
     expect(find.text('Eğitimi Bitir'), findsOneWidget);
     await tester.tap(find.text('Eğitimi Bitir'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1100));
+    // Veda ölümü oynarken eğitim henüz kapanmamalı (GD83).
+    await tester.pump(TutorialGuideOverlay.farewellDeathHold);
+    expect(profile.hasCompletedTutorial, isFalse);
+    await tester.pump(TutorialGuideOverlay.farewellFade);
     expect(profile.hasCompletedTutorial, isTrue);
     expect(profile.petCompanionEnabled, isFalse);
     expect(find.byType(InventoryScreen), findsNothing);
@@ -319,7 +322,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('dar ekranda konuşma balonu taşmaz ve final yürüyerek biter', (
+  testWidgets('dar ekranda konuşma balonu taşmaz ve final death ile biter', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
@@ -344,8 +347,124 @@ void main() {
 
     step.value = TutorialGuideStep.leaving;
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1100));
+    await tester.pump(TutorialGuideOverlay.farewellExit);
     expect(completed, 1);
     expect(tester.takeException(), isNull);
+  });
+
+  group('veda çıkışı death animasyonuyla biter (GD83)', () {
+    Future<ValueNotifier<TutorialGuideStep>> pumpFarewell(
+      WidgetTester tester, {
+      VoidCallback? onUnderlyingTap,
+      VoidCallback? onCompleted,
+    }) async {
+      final step = ValueNotifier(TutorialGuideStep.farewell);
+      addTearDown(step.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                Center(
+                  child: FilledButton(
+                    onPressed: onUnderlyingTap ?? () {},
+                    child: const Text('ALTTAKİ DÜĞME'),
+                  ),
+                ),
+                TutorialGuideOverlay(
+                  step: step,
+                  onPrimary: (_) {},
+                  onSecondary: (_) {},
+                  onLeavingCompleted: onCompleted ?? () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      return step;
+    }
+
+    String guideAsset(WidgetTester tester) {
+      final image = tester.widget<Image>(find.byType(Image).first);
+      return (image.image as AssetImage).assetName;
+    }
+
+    testWidgets('rehber yürüyüp kaybolmaz, death GIF oynar', (tester) async {
+      final step = await pumpFarewell(tester);
+      expect(guideAsset(tester), isNot(contains('_Death_8.gif')));
+
+      step.value = TutorialGuideStep.leaving;
+      await tester.pump();
+
+      expect(guideAsset(tester), contains('_Death_8.gif'));
+    });
+
+    testWidgets('animasyon bitmeden rehber kaldırılmaz', (tester) async {
+      var completed = 0;
+      final step = await pumpFarewell(tester, onCompleted: () => completed++);
+
+      step.value = TutorialGuideStep.leaving;
+      await tester.pump();
+
+      // Death çevrimi boyunca hâlâ ekranda ve eğitim kapanmamış.
+      await tester.pump(
+        TutorialGuideOverlay.farewellDeathHold - const Duration(milliseconds: 1),
+      );
+      expect(completed, 0);
+      expect(guideAsset(tester), contains('_Death_8.gif'));
+
+      await tester.pump(const Duration(milliseconds: 1));
+      // Solma başladı ama daha bitmedi.
+      expect(completed, 0);
+
+      await tester.pump(TutorialGuideOverlay.farewellFade);
+      expect(completed, 1);
+    });
+
+    testWidgets('animasyon oynarken arayüz kilitli kalmaz', (tester) async {
+      var taps = 0;
+      final step = await pumpFarewell(tester, onUnderlyingTap: () => taps++);
+
+      // Veda adımında bariyer hâlâ görevde: eğitim bitmedi.
+      await tester.tap(find.text('ALTTAKİ DÜĞME'), warnIfMissed: false);
+      await tester.pump();
+      expect(taps, 0);
+
+      step.value = TutorialGuideStep.leaving;
+      await tester.pump();
+
+      // Çıkış animasyonu oynarken oyuncu oynamaya devam edebilir.
+      await tester.tap(find.text('ALTTAKİ DÜĞME'));
+      await tester.pump();
+      expect(taps, 1);
+
+      await tester.pump(TutorialGuideOverlay.farewellExit);
+    });
+
+    testWidgets('üç rehberin de death süresi aynı sabitle örtüşür', (
+      tester,
+    ) async {
+      // Üç varyantın `*_Death_8.gif` dosyası da 8 kare × 120 ms = 960 ms.
+      // Sabit bu ölçüme dayanıyor; asset değişirse burası uyarır.
+      expect(TutorialGuideOverlay.farewellDeathHold.inMilliseconds, 960);
+      expect(
+        TutorialGuideOverlay.farewellExit,
+        TutorialGuideOverlay.farewellDeathHold +
+            TutorialGuideOverlay.farewellFade,
+      );
+      for (final guide in TutorialGuideVariant.values) {
+        expect(
+          TutorialGuideAssets.forAnimation(
+            TutorialGuideAnimation.dying,
+            guide,
+          ),
+          endsWith('_Death_8.gif'),
+        );
+      }
+    });
   });
 }

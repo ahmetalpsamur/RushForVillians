@@ -319,10 +319,13 @@ class TutorialGuideFrame {
       alignment: Alignment(0.05, 0.18),
       primaryLabel: 'Eğitimi Bitir',
     ),
+    // Rehber ekrandan **yürüyerek çıkmıyor**, bulunduğu yerde death
+    // animasyonunu oynatıp soluyor (bkz. GD83). Hizalama vedadakiyle aynı:
+    // değişmediği için `_prepareFrame` yürüyüş geçişini de tetiklemez.
     TutorialGuideStep.leaving => const TutorialGuideFrame(
       message: '',
-      animation: TutorialGuideAnimation.leaving,
-      alignment: Alignment(1.8, 0.18),
+      animation: TutorialGuideAnimation.dying,
+      alignment: Alignment(0.05, 0.18),
     ),
     TutorialGuideStep.completed => const TutorialGuideFrame(
       message: '',
@@ -340,6 +343,20 @@ class TutorialGuideOverlay extends StatefulWidget {
   final VoidCallback onLeavingCompleted;
   final TutorialGuideVariant guide;
 
+  /// Veda ölümünün ekranda kaldığı süre.
+  ///
+  /// Üç rehberin de `*_Death_8.gif` dosyası 8 kare × 120 ms = **960 ms**;
+  /// yani tam bir çevrim. Ölçüm yerine sabit: geçiş gerçek dosya okumasına
+  /// bağlanırsa hem testlerde sahte saatle ilerletilemez hem de asset
+  /// okunamadığında eğitim biteceği anda takılır (bkz. GD83).
+  static const Duration farewellDeathHold = Duration(milliseconds: 960);
+
+  /// Death animasyonu bittikten sonraki yumuşak solma.
+  static const Duration farewellFade = Duration(milliseconds: 280);
+
+  /// Veda çıkışının toplam süresi. Testler bu değeri kullanmalı.
+  static const Duration farewellExit = Duration(milliseconds: 1240);
+
   const TutorialGuideOverlay({
     super.key,
     required this.step,
@@ -356,14 +373,17 @@ class TutorialGuideOverlay extends StatefulWidget {
 class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
   Timer? _settleTimer;
   Timer? _leaveTimer;
+  Timer? _fadeTimer;
   Alignment? _lastAlignment;
   TutorialGuideAnimation? _transientAnimation;
   bool _targetRefreshScheduled = false;
+  double _leaveOpacity = 1;
 
   @override
   void dispose() {
     _settleTimer?.cancel();
     _leaveTimer?.cancel();
+    _fadeTimer?.cancel();
     super.dispose();
   }
 
@@ -381,9 +401,16 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
         if (mounted) setState(() => _transientAnimation = null);
       });
     }
+    // Veda çıkışı: death animasyonu bir tam çevrim oynar, sonra rehber
+    // solar, ancak ondan sonra eğitim kapanır. Katman animasyon boyunca
+    // ekranda kalır ama **hiçbir dokunuşu engellemez** (bkz. `build`).
     if (step == TutorialGuideStep.leaving && _leaveTimer == null) {
-      _leaveTimer = Timer(const Duration(milliseconds: 1050), () {
-        if (mounted) widget.onLeavingCompleted();
+      _leaveTimer = Timer(TutorialGuideOverlay.farewellDeathHold, () {
+        if (!mounted) return;
+        setState(() => _leaveOpacity = 0);
+        _fadeTimer = Timer(TutorialGuideOverlay.farewellFade, () {
+          if (mounted) widget.onLeavingCompleted();
+        });
       });
     }
   }
@@ -404,6 +431,11 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
               size,
               MediaQuery.paddingOf(context),
             );
+            // Veda çıkışı oynarken oyuncu kilitlenmez: eğitim bitmiştir,
+            // geriye yalnızca bir animasyon kalmıştır. Bariyer bu adımda
+            // hiç kurulmaz, katman da tamamen dokunuş geçirir.
+            final leaving = step == TutorialGuideStep.leaving;
+
             return Stack(
               children: [
                 if (target != null)
@@ -412,7 +444,8 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
                       child: CustomPaint(painter: _SpotlightPainter(target)),
                     ),
                   ),
-                Positioned.fill(child: _TutorialInteractionBarrier(target)),
+                if (!leaving)
+                  Positioned.fill(child: _TutorialInteractionBarrier(target)),
                 if (target != null) _TargetArrow(rect: target),
                 AnimatedAlign(
                   duration:
@@ -423,26 +456,32 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
                           : const Duration(milliseconds: 560),
                   curve: Curves.easeInOutCubic,
                   alignment: frame.alignment,
-                  child: IgnorePointer(
-                    // Yalnızca bilgi veren balon hedefin üzerinden geçerken bile
-                    // zorunlu hedef dokunmasını engellememeli. Eylem düğmeli
-                    // balonlar ise kendi düğmelerini almaya devam eder.
-                    ignoring:
-                        frame.primaryLabel == null &&
-                        frame.secondaryLabel == null,
-                    child: _GuideConversation(
-                      key: ValueKey(step),
-                      frame: frame,
-                      animation: _transientAnimation ?? frame.animation,
-                      guide: widget.guide,
-                      onPrimary:
-                          frame.primaryLabel == null
-                              ? null
-                              : () => widget.onPrimary(step),
-                      onSecondary:
-                          frame.secondaryLabel == null
-                              ? null
-                              : () => widget.onSecondary(step),
+                  child: AnimatedOpacity(
+                    key: const ValueKey('tutorial-guide-body'),
+                    opacity: _leaveOpacity,
+                    duration: TutorialGuideOverlay.farewellFade,
+                    child: IgnorePointer(
+                      // Yalnızca bilgi veren balon hedefin üzerinden geçerken
+                      // bile zorunlu hedef dokunmasını engellememeli. Eylem
+                      // düğmeli balonlar kendi düğmelerini almaya devam eder.
+                      ignoring:
+                          leaving ||
+                          (frame.primaryLabel == null &&
+                              frame.secondaryLabel == null),
+                      child: _GuideConversation(
+                        key: ValueKey(step),
+                        frame: frame,
+                        animation: _transientAnimation ?? frame.animation,
+                        guide: widget.guide,
+                        onPrimary:
+                            frame.primaryLabel == null
+                                ? null
+                                : () => widget.onPrimary(step),
+                        onSecondary:
+                            frame.secondaryLabel == null
+                                ? null
+                                : () => widget.onSecondary(step),
+                      ),
                     ),
                   ),
                 ),
