@@ -70,7 +70,12 @@ void main() {
     return rounds;
   }
 
-  int expectedRounds(Enemy enemy) => expectedRoundsForTier(enemy.tier);
+  /// Düşmanın canını taşıyan **referans round** ağırlığı (GD86).
+  ///
+  /// `roundsToKill` motoru ağırlıksız (tek referans round) çalıştırdığı için
+  /// ölçüt de ağırlık cinsinden: oyunda 2.000 adımlık tek round burada sekiz
+  /// referans rounda karşılık gelir.
+  double expectedRounds(Enemy enemy) => expectedRoundsForTier(enemy.tier);
 
   group('düşman kataloğu', () {
     test('20 düşman, hepsinin savaş statı ve arketipi var', () {
@@ -173,10 +178,13 @@ void main() {
           greaterThanOrEqualTo(1),
           reason: '${enemy.name} tek vuruşta bile ölmüyor olamaz',
         );
-        // Arketip bandı: dayanıklı düşman uzatır, cam top kısaltır.
+        // Arketip bandı **oransal**: dayanıklı düşman canı ×1,45'e kadar
+        // çıkıyor, cam top ×0,7'ye iniyor. Sabit "+3" bandı yalnızca beş
+        // roundluk eski tavana göre anlamlıydı; ağırlık ölçüsünde beklenen
+        // sayı kademeyle birlikte 2'den 40'a çıkıyor (GD86).
         expect(
           rounds,
-          lessThanOrEqualTo(expected + 3),
+          lessThanOrEqualTo((expected * 1.6).ceil() + 3),
           reason:
               '${enemy.name} (${enemy.archetype.name}) çok uzun sürüyor: '
               '$rounds round, beklenen $expected',

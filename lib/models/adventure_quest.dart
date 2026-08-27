@@ -209,7 +209,7 @@ class AdventureQuest {
        revivalSteps = revivalSteps.clamp(0, revivalStepTarget),
        roundTargetSteps = _roundTargetFor(stepGoal, currentRound),
        nextEnemyAttackAt = (startedAt ?? GameClock.now()).add(
-         roundDurationForSteps(_roundTargetFor(stepGoal, currentRound)),
+         _roundDurationFor(stepGoal, currentRound),
        ),
        nextReminderAt = (startedAt ?? GameClock.now()).add(reminderInterval) {
     if (battleOutcome != AdventureBattleOutcome.active) {
@@ -233,15 +233,35 @@ class AdventureQuest {
     this.walkSteps = this.walkSteps.clamp(0, walkTargetSteps);
   }
 
+  /// [round] (1 tabanlı) roundunun adım hedefi — kademe tablosundan (GD85).
+  ///
+  /// Adım taahhüdü bitmiş ama düşman ayaktaysa round numarası toplam round
+  /// sayısını aşabiliyor; indeks bu yüzden son rounda kırpılıyor.
   static int _roundTargetFor(int stepGoal, int round) {
     if (stepGoal <= 0) return 0;
     final count = AttackConfig.roundCountForSteps(stepGoal);
-    final index = (round - 1).clamp(0, count - 1);
-    final base = stepGoal ~/ count;
-    final remainder = stepGoal % count;
-    return base + (index < remainder ? 1 : 0);
+    if (count <= 0) return 0;
+    return AttackConfig.roundStepTargetAt(
+      stepGoal,
+      (round - 1).clamp(0, count - 1),
+    );
   }
 
+  /// [round] (1 tabanlı) roundunun süresi — kademe tablosundan (GD85).
+  static Duration _roundDurationFor(int stepGoal, int round) {
+    if (stepGoal <= 0) return Duration.zero;
+    final count = AttackConfig.roundCountForSteps(stepGoal);
+    if (count <= 0) return Duration.zero;
+    return AttackConfig.roundDurationAt(
+      stepGoal,
+      (round - 1).clamp(0, count - 1),
+    );
+  }
+
+  /// Adım miktarını tempo sabitiyle süreye çeviren **anlatım** yardımcısı.
+  ///
+  /// Round süresi buradan gelmiyor; onu [_roundDurationFor] kademe tablosundan
+  /// okuyor.
   static Duration roundDurationForSteps(int steps) =>
       AttackConfig.durationForSteps(steps);
 
@@ -284,9 +304,20 @@ class AdventureQuest {
 
   AttackPhase get currentPhase => currentRoundConfig.phase;
 
-  Duration get totalAttackDuration => AttackConfig.durationForSteps(stepGoal);
+  Duration get totalAttackDuration =>
+      AttackConfig.totalDurationForSteps(stepGoal);
 
-  Duration get currentRoundDuration => roundDurationForSteps(roundTargetSteps);
+  Duration get currentRoundDuration =>
+      _roundDurationFor(stepGoal, currentRound);
+
+  /// Bu roundun **hasar ağırlığı**: kaç referans round (250 adım) ediyor.
+  ///
+  /// 2000 adımlık bir round 250 adımlıktan sekiz kat ağır bir taahhüt; vuruşu
+  /// da sekiz kat ağır olmalı (GD86). Ağırlık olmasaydı büyük roundlu
+  /// maceralarda aynı yürüyüş çok daha az hasar ederdi ve düşman canı kademeyle
+  /// birlikte küçülmek zorunda kalırdı.
+  double get currentRoundWeight =>
+      AttackConfig.roundWeightForSteps(roundTargetSteps);
 
   double get enemyPowerMultiplier => 1;
 
@@ -335,9 +366,16 @@ class AdventureQuest {
 
   int get roundDurationMinutes => currentRoundDuration.inMinutes;
 
+  /// Süreyi oyuncuya okunur biçimde yazar.
+  ///
+  /// Kademe tablosunda 2,5 dakikalık round var (GD85); `inMinutes` bunu
+  /// "2 dakika" diye yuvarlayıp yanlış bilgi veriyordu. Tam dakika değilse
+  /// ondalık gösteriliyor.
   static String durationLabel(Duration duration) {
     if (duration.inSeconds < 60) return '${duration.inSeconds} saniye';
-    return '${duration.inMinutes} dakika';
+    if (duration.inSeconds % 60 == 0) return '${duration.inMinutes} dakika';
+    final minutes = (duration.inSeconds / 60).toStringAsFixed(1);
+    return '${minutes.replaceAll('.', ',')} dakika';
   }
 
   String get roundDurationLabel => durationLabel(currentRoundDuration);
@@ -404,6 +442,8 @@ class AdventureQuest {
       streak: perfectRoundStreak,
       earlyFraction: earlyFraction,
     );
+    // Roundun büyüklüğü vuruşun büyüklüğüdür (GD86).
+    final roundWeight = AttackConfig.roundWeightForSteps(targetSteps);
 
     final stats = (playerStats ?? defaultPlayerStats).sanitized();
     playerMaxHealth = stats.maxHealth.round();
@@ -426,7 +466,7 @@ class AdventureQuest {
         enemyHealth: enemyHealth,
         completion: walked / roundTargetSteps,
         seed: combatSeed,
-        playerDamageMultiplier: perfectMultiplier,
+        playerDamageMultiplier: perfectMultiplier * roundWeight,
         onHitEffects: onHitEffects,
         onKillEffects: onKillEffects,
       );

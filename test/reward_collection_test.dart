@@ -8,6 +8,7 @@ import 'package:rush_for_villains/features/rewards/rewards_screen.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/collection_reward.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
+import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/models/user_profile.dart';
 import 'package:rush_for_villains/services/reward_engine.dart';
 
@@ -107,6 +108,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(rewards.first.name), findsOneWidget);
     expect(find.text(rewards.last.name), findsNothing);
+  });
+
+  testWidgets('yüklenemeyen ödül görseli vitrini çökertmez', (tester) async {
+    // Görsel yüklenemeyince Flutter `Image`'ı **boyutsuz bir `Stack`**'e
+    // sarıyor; `ListTile.leading` o zaman bütün genişliği yiyor ve
+    // "Leading widget consumes the entire tile width" assertion'ı atıyor.
+    // Cihazda bozuk/eksik bir asset bütün Vitrin sekmesini kırmızıya çevirir.
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    const broken = CollectionReward(
+      id: 'broken_asset_reward',
+      name: 'Kayıp Ödül',
+      description: 'Görseli bulunamayan ödül.',
+      requirement: '1 villain yen',
+      conditionType: RewardConditionType.villainsDefeated,
+      target: 1,
+      assetPath: 'lib/Rewards/Unsorted/__bulunmayan_dosya__.png',
+      category: 'Unsorted',
+      subcategory: 'Unsorted',
+      rarity: RewardRarity.common,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: RewardsScreen(
+          rewards: const [broken],
+          statistics: const RewardStatistics(),
+          earnedRewardDates: {broken.id: DateTime.utc(2026, 8, 24)},
+          pinnedRewardIds: const [],
+          onTogglePinned: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Vitrin'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kayıp Ödül'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('boş vitrinde yönlendirici mesaj bulunur', (tester) async {

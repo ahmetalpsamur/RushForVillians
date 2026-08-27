@@ -9,20 +9,82 @@ class GameConstants {
 
   // --- Savaş temposu ve mükemmel round (Bölüm B) ---
 
-  /// Savaş roundlarının hedef yürüyüş temposu.
+  /// Yürüyüş temposunun **anlatım** değeri: 100 adım/dakika.
   ///
-  /// Bütün round süreleri `adım × 60 / [stepsPerMinute]` formülünden
-  /// türetilir. Dengeleme sırasında değiştirilmesi gereken tek tempo değeri
-  /// budur; roundlara veya düşmanlara ayrı süre yazılmaz.
+  /// Round süreleri artık bu sayıdan **türetilmiyor**; her kademenin süresi
+  /// [combatRoundTiers] içinde elle yazılı (GD85). Sayı yine de doğru: tablodaki
+  /// dört kademenin hepsi tam olarak 100 adım/dk kadansını tutuyor. Arayüz
+  /// oyuncuya tempoyu bu sabitle anlatıyor, kısalan son round süresi de bu
+  /// oranla ölçekleniyor.
   static const int stepsPerMinute = 100;
 
-  /// Round sayısı türetilirken hedeflenen yaklaşık adım miktarı.
-  static const int idealStepsPerCombatRound = 250;
+  /// Round büyüklüğü kademeleri — **sabit tablo, formül değil** (GD85).
+  ///
+  /// Düşmanın **toplam** adım hedefi hangi kademeye düşüyorsa, roundun adımı ve
+  /// süresi o kademenin elle yazılmış iki değeridir. İkisi birbirinden
+  /// türetilmez; ayrı ayrı yazılır ki tablo okunduğu gibi olsun.
+  ///
+  /// ```
+  /// | Toplam adım      | Round adımı | Round süresi |
+  /// | 1000'den az      |     250     |    2,5 dk    |
+  /// | 1000 – 2999      |     500     |      5 dk    |
+  /// | 3000 – 9999      |    1000     |     10 dk    |
+  /// | 10000 ve üstü    |    2000     |     20 dk    |
+  /// ```
+  ///
+  /// Bu bir ayar değil: oyuncuya açılmıyor, seçenek sunulmuyor.
+  static const List<CombatRoundTier> combatRoundTiers = [
+    CombatRoundTier(
+      minTotalSteps: 0,
+      roundSteps: 250,
+      roundDuration: Duration(seconds: 150),
+    ),
+    CombatRoundTier(
+      minTotalSteps: 1000,
+      roundSteps: 500,
+      roundDuration: Duration(minutes: 5),
+    ),
+    CombatRoundTier(
+      minTotalSteps: 3000,
+      roundSteps: 1000,
+      roundDuration: Duration(minutes: 10),
+    ),
+    CombatRoundTier(
+      minTotalSteps: 10000,
+      roundSteps: 2000,
+      roundDuration: Duration(minutes: 20),
+    ),
+  ];
+
+  /// Hasar ölçeğinin **birim** roundu: en küçük kademenin round adımı.
+  ///
+  /// Bir round bir yürüyüş taahhüdüdür; 2000 adımlık bir round 250 adımlık
+  /// rounddan sekiz kat daha fazla yürümek demektir ve vuruşu da o oranda
+  /// büyüktür (GD86). Düşman canı da aynı birimle ölçüldüğü için kademe tablosu
+  /// değişse bile "hedefi tutturan oyuncu maceranın sonunda devirir" sözü
+  /// bozulmaz.
+  static const int referenceRoundSteps = 250;
+
+  /// Son roundun ayrı bir round sayılabilmesi için gereken en az adım.
+  ///
+  /// Tam bölünmeyen hedeflerde kalan adımlar kısa bir **son round** olur
+  /// (GD85). Bundan küçük bir kalıntı round değil, yuvarlama artığıdır: bir
+  /// önceki rounda katılır ki 1 adımlık, 1 saniyelik round oluşmasın. Mağaza
+  /// çarkı 500'ün katlarını verdiği için bu dal pratikte yalnızca eski
+  /// kayıtlarda ve testlerde çalışır.
+  static const int minFinalRoundSteps = 50;
 
   /// Kısa macerada bile gerilim kurmak için gereken en az round.
+  ///
+  /// Kademe tablosu bunu kendiliğinden sağlıyor (en küçük hedef 500 adım =
+  /// 2 × 250). Sabit, eski kayıtları okuyan kod yolları ve tablo doğrulaması
+  /// için duruyor; round sayısını artık **kırpmıyor**.
   static const int minCombatRounds = 2;
 
-  /// Uzun maceraların tekrar hissine dönüşmemesi için round tavanı.
+  /// Saldırının fitness fazı sayısı (`AttackConfig.rounds`).
+  ///
+  /// Round **sayısının** tavanı değil: kademe tablosuyla bir macera 10 ve daha
+  /// fazla round sürebilir. Beş faz o roundlara dağıtılır.
   static const int maxCombatRounds = 5;
 
   /// Eksik round hasar eğrisinin üssü.
@@ -357,4 +419,26 @@ class GameConstants {
   /// erişemeyeceğin bir nadirliği erken kuşanabiliyorsun; ve nadirlik
   /// tavanı yükseldiği için eşya çok daha ileri yükseltilebiliyor.
   static const double itemMergeCostRatio = 0.5;
+}
+
+/// Tek bir round büyüklüğü kademesi.
+///
+/// [roundSteps] ve [roundDuration] birbirinden **türetilmez**; ikisi de
+/// [GameConstants.combatRoundTiers] içinde elle yazılır (GD85).
+class CombatRoundTier {
+  /// Kademenin geçerli olduğu en küçük **toplam** adım hedefi.
+  final int minTotalSteps;
+
+  /// Bu kademede bir roundun adım hedefi.
+  final int roundSteps;
+
+  /// Bu kademede bir roundun süresi.
+  final Duration roundDuration;
+
+  const CombatRoundTier({
+    required this.minTotalSteps,
+    required this.roundSteps,
+    required this.roundDuration,
+  }) : assert(minTotalSteps >= 0),
+       assert(roundSteps > 0);
 }

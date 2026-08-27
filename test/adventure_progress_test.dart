@@ -9,6 +9,7 @@ import 'package:rush_for_villains/data/enemy_catalog.dart';
 import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/combat_stats.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -170,7 +171,13 @@ void main() {
       );
 
       expect(find.text('MÜKEMMEL SERİ 2 · tavan ×1.5'), findsOneWidget);
-      expect(find.textContaining('Tempo 100 adım/dk'), findsOneWidget);
+      // Metin artık roundun **kendi** adımını ve süresini söylüyor: 2.000 adım
+      // 1000–2999 kademesinde, yani 4 × 500 adım ve 5 dk (GD85).
+      expect(
+        find.textContaining('Bu round için 500 adım ve 5 dakika süren var'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('100 adım/dk'), findsOneWidget);
     });
 
     testWidgets('round adımı yazıyla gösteriliyor', (tester) async {
@@ -180,7 +187,8 @@ void main() {
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(find.text('Bu round: 200 / 400 adım'), findsOneWidget);
+      // 2.000 adım → 1000–2999 kademesi → 4 × 500 adım (GD85).
+      expect(find.text('Bu round: 200 / 500 adım'), findsOneWidget);
     });
 
     testWidgets('round çubuğu ana çubuktan ince', (tester) async {
@@ -200,14 +208,14 @@ void main() {
     });
 
     testWidgets('round çubuğu round içi ilerlemeyi gösterir', (tester) async {
-      // İkinci roundda 200 / 400 adım → %50.
+      // İkinci roundda 200 / 500 adım → %40.
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(barValue(tester, 'round-progress-bar'), closeTo(0.5, 0.001));
+      expect(barValue(tester, 'round-progress-bar'), closeTo(0.4, 0.001));
       // Ana bar aynı anda %60'ta: round sıfırlansa da macera ilerlemesi durmaz.
       expect(mainBarValue(tester), closeTo(0.6, 0.001));
     });
@@ -350,6 +358,80 @@ void main() {
       expect(choseNewAdventure, isTrue);
     },
   );
+
+  testWidgets('zafer perdesindeki CAN sayısı düşmanın canından okunur', (
+    tester,
+  ) async {
+    // Eski hata: etiket `oran × adımHedefi` yazıyordu. GD49 düşman canını adım
+    // hedefinden kopardıktan sonra bu tamamen ilgisiz bir sayı: 10.000 adımlık
+    // macerada "10000 CAN" görünüyordu, düşmanın gerçek canı ise 84'tü.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final startedAt = GameClock.now();
+    final quest = AdventureQuest(
+      enemy: enemy,
+      stepGoal: 10000,
+      startedAt: startedAt,
+    );
+    // Tek roundda deviren güçlü oyuncu: perde "bitirici vuruştan önceki can"
+    // ile açılıyor.
+    quest.resolveRound(
+      quest.roundTargetSteps,
+      startedAt.add(const Duration(seconds: 5)),
+      playerStats: const CombatStats(
+        attack: 100000,
+        defense: 10000,
+        maxHealth: 10000,
+        speed: 10000,
+      ),
+    );
+    expect(quest.isEnemyDefeated, isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: AdventureScreen(
+          adventure: quest,
+          roundSerial: 0,
+          avatar: _avatar,
+          today: DailyProgress(
+            date: GameClock.now(),
+            steps: 2000,
+            stepGoal: 10000,
+          ),
+          onAdventureSelected: (_) {},
+          onStartRevival: () {},
+          onChooseNewAdventure: () {},
+          onAdventureUpdated: () {},
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 420)),
+    );
+    await tester.pump();
+
+    final canLabel = find.byWidgetPredicate(
+      (widget) => widget is Text && (widget.data ?? '').endsWith(' CAN'),
+    );
+    expect(canLabel, findsOneWidget);
+    final value = int.parse(
+      (tester.widget<Text>(canLabel).data!).split(' ').first,
+    );
+    expect(
+      value,
+      lessThanOrEqualTo(quest.scaledEnemyMaxHealth),
+      reason: 'CAN sayısı düşmanın can tavanını aşamaz',
+    );
+    expect(
+      value,
+      lessThan(quest.stepGoal),
+      reason: 'CAN sayısı adım hedefinden türetilmemeli',
+    );
+  });
 
   testWidgets('yeni maceraya geçince eski zafer overlayi tamamen temizlenir', (
     tester,

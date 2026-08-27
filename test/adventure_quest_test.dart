@@ -77,7 +77,7 @@ void main() {
     });
   });
 
-  group('100 adım/dk türetilmiş round düzeni', () {
+  group('sabit kademe tablosundan round düzeni', () {
     test('adım hedefi dolunca deadline beklenmeden round geçer', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
@@ -95,9 +95,11 @@ void main() {
       expect(early?.roundNumber, 1);
       expect(early?.targetReached, isTrue);
       expect(quest.currentRound, 2);
+      // 2.000 adım → 1000–2999 kademesi → 4 × 500 adım, round süresi 5 dk.
+      expect(quest.roundTargetSteps, 500);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 107, minutes: 4)),
+        startedAt.add(const Duration(seconds: 107, minutes: 5)),
       );
     });
 
@@ -111,7 +113,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         0,
-        startedAt.add(const Duration(minutes: 4)),
+        startedAt.add(const Duration(minutes: 5)),
       );
 
       expect(result, isNotNull);
@@ -224,9 +226,9 @@ void main() {
       expect(quest.questSteps(4000), 0);
       expect(quest.questSteps(5000), 1000);
       expect(quest.roundStartingSteps, 4000);
-      expect(quest.roundTargetSteps, 400);
+      expect(quest.roundTargetSteps, 500);
       expect(quest.stepsThisRound(4150), 150);
-      expect(quest.roundStepsRemaining(4150), 250);
+      expect(quest.roundStepsRemaining(4150), 350);
     });
 
     test('düşman canı hedefe göre ölçeklenmez', () {
@@ -293,18 +295,135 @@ void main() {
     });
   });
 
+  // --- Bölüm B.2: hasar formülü ORAN'a bakar, mutlak adıma değil ---
+  //
+  // Round büyüklüğü kademe tablosuyla 250'den 2.000'e çıkıyor. Formül mutlak
+  // kaçırılan adıma baksaydı 250'lik roundda 200 adım kaçırmak (%80) ile
+  // 2.000'lik roundda 200 adım kaçırmak (%10) aynı cezayı alırdı; küçük
+  // düşmanlar orantısız cezalandırılırdı.
+  group('hasar formülü oranla ölçülür', () {
+    /// Savunması sıfır ölçüm oyuncusu.
+    ///
+    /// [_durablePlayer]'ın 10.000 savunması gelen her vuruşu en düşük hasara
+    /// kırpıyor ve eğri ölçülemiyordu; burada düşmanın vuruşu olduğu gibi
+    /// okunmalı. Saldırısı 1 çünkü ölçüm **alınan** hasara bakıyor.
+    const probePlayer = CombatStats(
+      attack: 1,
+      defense: 0,
+      maxHealth: 100000,
+      speed: 10000,
+    );
+
+    /// [stepGoal] hedefli bir maceranın **ilk** roundunu [completion] oranıyla
+    /// süresi dolmuş olarak çözer ve oyuncunun aldığı hasarı döner.
+    int enemyDamageAt(int stepGoal, double completion) {
+      final startedAt = DateTime(2026, 8, 25, 12);
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: stepGoal,
+        startedAt: startedAt,
+      );
+      final walked = (quest.roundTargetSteps * completion).round();
+      final result = quest.resolveExpiredRound(
+        walked,
+        quest.nextEnemyAttackAt,
+        playerStats: probePlayer,
+      );
+      return result!.playerDamage;
+    }
+
+    test('farklı round büyüklüklerinde aynı oran aynı hasarı verir', () {
+      // 500 adım → 250'lik round · 2.000 adım → 500'lük round
+      // 3.000 adım → 1.000'lik round · 10.000 adım → 2.000'lik round
+      const goals = [500, 2000, 3000, 10000];
+      const sizes = [250, 500, 1000, 2000];
+      for (var i = 0; i < goals.length; i++) {
+        expect(
+          AdventureQuest(
+            enemy: EnemyCatalog.byId('tense_soldier')!,
+            stepGoal: goals[i],
+          ).roundTargetSteps,
+          sizes[i],
+        );
+      }
+
+      for (final completion in [0.2, 0.5, 0.8]) {
+        final damages = goals.map((goal) => enemyDamageAt(goal, completion));
+        expect(
+          damages.toSet(),
+          hasLength(1),
+          reason:
+              '%${(completion * 100).round()} tamamlama dört round '
+              'büyüklüğünde de aynı hasarı vermeli: ${damages.toList()}',
+        );
+      }
+    });
+
+    test('tam tamamlama sıfır hasar, hiç yürümemek tam hasar', () {
+      for (final goal in [500, 2000, 10000]) {
+        expect(enemyDamageAt(goal, 1), 0, reason: '$goal adım');
+        expect(enemyDamageAt(goal, 0), greaterThan(0), reason: '$goal adım');
+        expect(
+          enemyDamageAt(goal, 0),
+          greaterThan(enemyDamageAt(goal, 0.5)),
+          reason: '$goal adım: hiç yürümemek yarıdan çok acıtmalı',
+        );
+      }
+    });
+
+    test('az kaçıran orantısız cezalanmaz: eğri dışbükey', () {
+      // %90 → %50 arasındaki artış, %50 → %10 arasındakinden küçük olmalı.
+      final at90 = enemyDamageAt(2000, 0.9);
+      final at50 = enemyDamageAt(2000, 0.5);
+      final at10 = enemyDamageAt(2000, 0.1);
+      expect(at50 - at90, lessThan(at10 - at50));
+    });
+
+    test('roundun büyüklüğü oyuncunun vuruşunu ölçekler', () {
+      // Aynı oranı tutturan oyuncu, dört kat büyük bir roundda dört kat
+      // vurmalı (GD86) — yoksa büyük roundlu macerada yürümek değersizleşir.
+      int playerDamageAt(int stepGoal) {
+        final startedAt = DateTime(2026, 8, 25, 12);
+        final quest = AdventureQuest(
+          enemy: EnemyCatalog.byId('tense_soldier')!,
+          stepGoal: stepGoal,
+          startedAt: startedAt,
+        );
+        return quest
+            .resolveExpiredRound(
+              quest.roundTargetSteps,
+              quest.nextEnemyAttackAt,
+              playerStats: const CombatStats(
+                attack: 100,
+                defense: 10000,
+                maxHealth: 100000,
+                speed: 10000,
+              ),
+            )!
+            .enemyDamage;
+      }
+
+      final small = playerDamageAt(500); // 250'lik round → ağırlık 1
+      final large = playerDamageAt(3000); // 1.000'lik round → ağırlık 4
+      expect(large, greaterThan(small * 3));
+      expect(large, lessThan(small * 5));
+    });
+  });
+
   group('mükemmel round serisi', () {
     test('erken tamamlamalar seriyi büyütür, üçüncüde ×2 tavanını açar', () {
       final startedAt = DateTime(2026, 8, 20, 12);
+      // 1.500 adım → 1000–2999 kademesi → 3 × 500 adım, round süresi 5 dk.
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
-        stepGoal: 1000,
+        stepGoal: 1500,
         startedAt: startedAt,
       );
+      expect(quest.totalRounds, 3);
 
       for (var round = 1; round <= 3; round++) {
         final result = quest.resolveRound(
-          round * 250,
+          round * 500,
           startedAt.add(Duration(seconds: round)),
           playerStats: _durablePlayer,
         );
@@ -324,14 +443,16 @@ void main() {
         stepGoal: 1000,
         startedAt: startedAt,
       );
+      // 1.000 adım → 2 × 500 adım; ilk round erken tamamlanıyor.
+      expect(quest.roundTargetSteps, 500);
       quest.resolveRound(
-        250,
+        500,
         startedAt.add(const Duration(seconds: 1)),
         playerStats: _durablePlayer,
       );
 
       final missed = quest.resolveRound(
-        250,
+        500,
         quest.nextEnemyAttackAt,
         playerStats: _durablePlayer,
       );
