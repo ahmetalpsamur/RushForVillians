@@ -126,6 +126,8 @@ void main() {
     if (openStoreTab) {
       await tester.tap(find.text('Mağaza').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('store-page-tab-1')));
+      await tester.pumpAndSettle();
     }
     return profile;
   }
@@ -144,10 +146,13 @@ void main() {
     await tester.scrollUntilVisible(
       finder,
       280,
-      scrollable: find.descendant(
-        of: find.byKey(const ValueKey('store-scroll-view')),
-        matching: find.byType(Scrollable),
-      ).first,
+      scrollable:
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('store-scroll-view')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
     );
     await tester.pumpAndSettle();
   }
@@ -408,6 +413,8 @@ void main() {
       expect(profile.level, greaterThanOrEqualTo(lockedItem.requiredLevel));
 
       await tester.tap(find.text('Mağaza').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('store-page-tab-1')));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.lock), findsNothing);

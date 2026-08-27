@@ -21,10 +21,12 @@ import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../data/mock_data.dart';
 import '../../data/pet_sayings.dart';
+import '../../data/reward_catalog.dart';
 import '../../data/title_catalog.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/combat_stats.dart';
+import '../../models/collection_reward.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/game_state.dart';
@@ -33,7 +35,6 @@ import '../../models/item.dart';
 import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
 import '../../models/streak_stat_bonuses.dart';
-import '../../models/reward.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/tutorial_guide_variant.dart';
 import '../../models/user_profile.dart';
@@ -45,6 +46,7 @@ import '../../services/item_catalog.dart';
 import '../../services/level_events.dart';
 import '../../services/pedometer_step_source.dart';
 import '../../services/raw_step_sensor.dart';
+import '../../services/reward_engine.dart';
 import '../../services/step_permission_service.dart';
 import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
@@ -104,7 +106,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   late DailyProgress _today;
   AdventureQuest? _adventure;
   late List<DailyStepRecord> _stepHistory;
-  final List<Reward> _rewards = [];
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
 
@@ -148,6 +149,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   );
   bool _tutorialBattleRunning = false;
   bool _showPetDismissal = false;
+  OverlayEntry? _rewardNoticeEntry;
+  Timer? _rewardNoticeTimer;
+  bool _disposing = false;
 
   bool get _tutorialActive =>
       widget.startTutorial && !_profile.hasCompletedTutorial;
@@ -623,6 +627,21 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// kendi içinde sınırladığı için her state değişiminde çağrılabilir.
   void _persist() {
     _profile.lastSeenAt = GameClock.lastSeenAt;
+    final unlocked = RewardEngine.evaluate(
+      profile: _profile,
+      statistics: _rewardStatistics,
+      now: GameClock.now(),
+    );
+    if (unlocked.isNotEmpty && mounted && !_disposing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final message =
+            unlocked.length == 1
+                ? 'Yeni ödül: ${unlocked.single.name}'
+                : '${unlocked.length} yeni ödül koleksiyonuna eklendi!';
+        _showRewardNotice(message);
+      });
+    }
     // İtilen ekranlar (envanter) bu sayacı dinliyor; bkz. [_revision].
     _revision.value++;
     GameStorage.scheduleSave(
@@ -635,13 +654,78 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
+  RewardStatistics get _rewardStatistics => RewardEngine.statistics(
+    profile: _profile,
+    today: _today,
+    history: _stepHistory,
+  );
+
+  /// Ödül bildirimi mevcut oyun SnackBar kuyruğunu kesmez. Seri, seviye ve
+  /// satın alma bildirimleri kendi sıralarını korurken bu kısa toast üstte
+  /// bağımsız görünür.
+  void _showRewardNotice(String message) {
+    _rewardNoticeTimer?.cancel();
+    _rewardNoticeEntry?.remove();
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder:
+          (context) => Positioned(
+            top: MediaQuery.paddingOf(context).top + 12,
+            left: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Material(
+                color: Colors.transparent,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.streak.withValues(alpha: 0.65),
+                    ),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black54, blurRadius: 18),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.emoji_events, color: AppColors.streak),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            message,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+    );
+    _rewardNoticeEntry = entry;
+    overlay.insert(entry);
+    _rewardNoticeTimer = Timer(const Duration(seconds: 4), () {
+      if (_rewardNoticeEntry == entry) _rewardNoticeEntry = null;
+      entry.remove();
+    });
+  }
+
   @override
   void dispose() {
+    _disposing = true;
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_stepSubscription?.cancel());
     unawaited(_sensorFailureSubscription?.cancel());
     _stepSource.dispose();
     _adventureClock?.cancel();
+    _rewardNoticeTimer?.cancel();
+    _rewardNoticeEntry?.remove();
+    _rewardNoticeEntry = null;
     _persist();
     _revision.dispose();
     _tutorialStep.dispose();
@@ -842,6 +926,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // Ömür boyu kazanç: harcama bunu düşürmez, başarım ünvanları buna bakar.
     _profile.lifetimeCoins += coins;
     _profile.enemiesDefeated += 1;
+    final enemyId = adventure.enemy.id;
+    _profile.villainDefeatCounts[enemyId] =
+        (_profile.villainDefeatCounts[enemyId] ?? 0) + 1;
+    if (adventure.enemy.tier >= 15) _profile.rareVillainsDefeated += 1;
+    if (adventure.playerHealth >= adventure.playerMaxHealth) {
+      _profile.flawlessWins += 1;
+    }
+    _profile.currentWinStreak += 1;
+    if (_profile.currentWinStreak > _profile.bestWinStreak) {
+      _profile.bestWinStreak = _profile.currentWinStreak;
+    }
     return xp;
   }
 
@@ -942,6 +1037,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     setState(() {
       _today.addSteps(amount);
       _profile.totalSteps += amount;
+      if (amount > _profile.longestSingleWalkSteps) {
+        _profile.longestSingleWalkSteps = amount;
+      }
 
       // Hayat Yürüyüşünün kendi 500 adımı XP üretmez. İşaretçiyi yalnızca
       // gerçekten kabul edilen recovery adımı kadar ilerletmek, partide 500'ü
@@ -1023,6 +1121,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           onKillEffects: triggeredEffects(_buffs, ItemEffectTrigger.onKill),
         );
         playerDefeated = wasActive && adventure.isPlayerDefeated;
+        if (playerDefeated) _profile.currentWinStreak = 0;
       }
       if (adventure != null) {
         final granted = _grantAdventureVictoryXpIfNeeded(adventure);
@@ -1979,7 +2078,21 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
-  void _openRewards() => _push(RewardsScreen(rewards: _rewards));
+  void _openRewards() {
+    _persist();
+    _push(
+      RewardsScreen(
+        rewards: RewardCatalog.all,
+        statistics: _rewardStatistics,
+        earnedRewardDates: _profile.earnedRewardDates,
+        pinnedRewardIds: _profile.pinnedRewardIds,
+        onTogglePinned: (rewardId) {
+          RewardEngine.togglePinned(_profile, rewardId);
+          _persist();
+        },
+      ),
+    );
+  }
 
   void _editCharacter() {
     if (!_profile.ownedUpgradeIds.contains(_reincarnationPotionId)) {

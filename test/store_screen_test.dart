@@ -85,9 +85,10 @@ void main() {
           ownedTitleIds: ownedTitles,
           onPurchase: onPurchase ?? (_) {},
           onPurchaseEquipment: onPurchaseEquipment ?? (_) {},
-          onPurchaseTitle: titles.isEmpty && onPurchaseTitle == null
-              ? null
-              : onPurchaseTitle ?? (_) {},
+          onPurchaseTitle:
+              titles.isEmpty && onPurchaseTitle == null
+                  ? null
+                  : onPurchaseTitle ?? (_) {},
         ),
       ),
     );
@@ -562,8 +563,10 @@ void main() {
       );
 
       expect(
-        find.text('1 / ${storeTitles.length} ünvan sende · '
-            '${storeTitles.length} tanesi listede'),
+        find.text(
+          '1 / ${storeTitles.length} ünvan sende · '
+          '${storeTitles.length} tanesi listede',
+        ),
         findsOneWidget,
       );
     });
@@ -572,14 +575,13 @@ void main() {
       await pumpStore(tester, titles: storeTitles);
 
       final rarity = storeTitles.first.rarity;
-      await tester.tap(find.byKey(ValueKey('store-title-rarity-${rarity.name}')));
+      await tester.tap(
+        find.byKey(ValueKey('store-title-rarity-${rarity.name}')),
+      );
       await tester.pumpAndSettle();
 
       final expected = storeTitles.where((t) => t.rarity == rarity).length;
-      expect(
-        find.textContaining('$expected tanesi listede'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('$expected tanesi listede'), findsOneWidget);
     });
 
     testWidgets('"Alabileceklerim" parası yetmeyenleri eler', (tester) async {
@@ -590,20 +592,13 @@ void main() {
       await tester.pumpAndSettle();
 
       final expected = storeTitles.where((t) => t.cost <= cheapest.cost).length;
-      expect(
-        find.textContaining('$expected tanesi listede'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('$expected tanesi listede'), findsOneWidget);
       expect(find.byKey(ValueKey('buy-title-${cheapest.id}')), findsOneWidget);
     });
 
     testWidgets('"Sendekileri gizle" sahip olunanları eler', (tester) async {
       final owned = storeTitles.first;
-      await pumpStore(
-        tester,
-        titles: storeTitles,
-        ownedTitles: [owned.id],
-      );
+      await pumpStore(tester, titles: storeTitles, ownedTitles: [owned.id]);
 
       await tester.tap(find.byKey(const ValueKey('store-title-hide-owned')));
       await tester.pumpAndSettle();
@@ -642,4 +637,50 @@ void main() {
     });
   });
 
+  group('iki fazlı mağaza gezintisi', () {
+    testWidgets('yatay kaydırma sayfayı ve boncuk göstergesini değiştirir', (
+      tester,
+    ) async {
+      await pumpStore(
+        tester,
+        equipment: [cheapItem],
+        upgrades: const [freeze],
+        titles: TitleCatalog.purchasable,
+      );
+
+      expect(
+        find.byKey(const ValueKey('store-titles-section')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('store-page-bead-0'))).width,
+        24,
+      );
+
+      await tester.drag(
+        find.byKey(const ValueKey('store-page-view')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Yükseltmeler'), findsOneWidget);
+      expect(find.text('Ekipman'), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(const ValueKey('store-page-bead-1'))).width,
+        24,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('store-page-tab-0')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('store-titles-section')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('store-page-bead-0'))).width,
+        24,
+      );
+    });
+  });
 }

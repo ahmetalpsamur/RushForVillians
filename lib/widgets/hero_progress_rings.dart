@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/constants/game_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../models/adventure_quest.dart';
 import '../models/daily_progress.dart';
@@ -45,126 +46,100 @@ class HeroProgressRings extends StatelessWidget {
             final ringProgress = totalProgress.clamp(0.0, 1.0);
             final arrowProgress =
                 today.steps > 0 && remainder == 0 ? 1.0 : remainder;
-            return SizedBox.square(
-              key: const ValueKey('home-progress-ring-stack'),
-              dimension: size,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _StepRingPainter(
-                        progress: ringProgress,
-                        arrowProgress: arrowProgress,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: size * 0.68,
-                    height: size * 0.68,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF171521),
-                      border: Border.all(color: Colors.white12, width: 2),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black54, blurRadius: 24),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: AvatarView(
-                      avatar: profile.avatar,
-                      size: size * 0.68,
-                      showBackground: false,
-                      combatLoop: true,
-                    ),
-                  ),
-                  if (completedLaps > 0)
-                    Positioned(
-                      top: 5,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox.square(
+                  key: const ValueKey('home-progress-ring-stack'),
+                  dimension: size,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _StepRingPainter(
+                            progress: ringProgress,
+                            arrowProgress: arrowProgress,
+                          ),
                         ),
+                      ),
+                      Container(
+                        width: size * 0.68,
+                        height: size * 0.68,
                         decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: const Color(0xFF171521),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.primary),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.55),
-                              blurRadius: 14,
-                              spreadRadius: 1,
-                            ),
+                          border: Border.all(color: Colors.white12, width: 2),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black54, blurRadius: 24),
                           ],
                         ),
-                        child: Text(
-                          '$completedLaps TUR',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.1,
-                          ),
+                        clipBehavior: Clip.antiAlias,
+                        child: AvatarView(
+                          avatar: profile.avatar,
+                          size: size * 0.68,
+                          showBackground: false,
+                          combatLoop: true,
                         ),
                       ),
-                    ),
-                  Positioned(
-                    bottom: 7,
-                    child: Container(
-                      key: const ValueKey('home-step-progress-label'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF171521),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.directions_walk,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '${today.steps} / ${today.stepGoal} adım',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                      if (completedLaps > 0)
+                        Positioned(
+                          top: 5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF171521),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.primary),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.55,
+                                  ),
+                                  blurRadius: 14,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '$completedLaps TUR',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.1,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      // Son çocuk: büyütülmüş karakter GIF'inin şeffaf tuvali
+                      // dokunma alanının önüne geçmesin.
+                      if (onTogglePet != null)
+                        Positioned(
+                          // Yazı kapsülünün dikey merkezine oturur; solda ise
+                          // halkanın dış boşluğuna taşarak köşeyi dengeler.
+                          left: -12,
+                          bottom: -7,
+                          child: _PetToggleButton(
+                            guide: petGuide,
+                            enabled: petEnabled,
+                            onPressed: onTogglePet!,
+                          ),
+                        ),
+                    ],
                   ),
-                  // Son çocuk: büyütülmüş karakter GIF'inin şeffaf tuvali
-                  // dokunma alanının önüne geçmesin.
-                  if (onTogglePet != null)
-                    Positioned(
-                      // Yazı kapsülünün dikey merkezine oturur; solda ise
-                      // halkanın dış boşluğuna taşarak köşeyi dengeler.
-                      left: -12,
-                      bottom: -7,
-                      child: _PetToggleButton(
-                        guide: petGuide,
-                        enabled: petEnabled,
-                        onPressed: onTogglePet!,
-                      ),
-                    ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 10),
+                _StepProgressLabel(today: today),
+              ],
             );
           },
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
         Text(
           profile.avatar.characterClassLabel,
           style: const TextStyle(
@@ -173,7 +148,7 @@ class HeroProgressRings extends StatelessWidget {
             fontSize: 17,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 22),
         if (adventure != null) ...[
           StatBar(
             label: 'Savaş Canı',
@@ -194,6 +169,42 @@ class HeroProgressRings extends StatelessWidget {
           valueText: '${profile.xp} / ${profile.xpToNextLevel} XP',
         ),
       ],
+    );
+  }
+}
+
+class _StepProgressLabel extends StatelessWidget {
+  final DailyProgress today;
+
+  const _StepProgressLabel({required this.today});
+
+  @override
+  Widget build(BuildContext context) {
+    final kilometers = today.steps / GameConstants.stepsPerKilometer;
+    final distance = kilometers.toStringAsFixed(1).replaceAll('.', ',');
+    return Container(
+      key: const ValueKey('home-step-progress-label'),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF171521),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.directions_walk, size: 16, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              '${today.steps} / ${today.stepGoal} adım ($distance km)',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

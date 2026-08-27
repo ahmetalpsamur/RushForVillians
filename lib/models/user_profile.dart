@@ -218,6 +218,23 @@ class UserProfile {
   /// Ömür boyu kazanılan altın. Harcama bunu **düşürmez**.
   int lifetimeCoins;
 
+  // --- Ödül koleksiyonu ---
+
+  /// Ödül kimliği → ilk kazanılma anı. Aynı ödül ikinci kez açılamaz.
+  final Map<String, DateTime> earnedRewardDates;
+
+  /// Vitrinin üst kısmına sabitlenen kazanılmış ödül kimlikleri.
+  final List<String> pinnedRewardIds;
+
+  int totalXpEarned;
+  int longestSingleWalkSteps;
+  int flawlessWins;
+  int currentWinStreak;
+  int bestWinStreak;
+  int bossesDefeated;
+  int rareVillainsDefeated;
+  final Map<String, int> villainDefeatCounts;
+
   UserProfile({
     required this.avatar,
     int? hp,
@@ -259,11 +276,24 @@ class UserProfile {
     this.wheelSpins = 0,
     this.itemsMerged = 0,
     this.lifetimeCoins = 0,
+    Map<String, DateTime>? earnedRewardDates,
+    List<String>? pinnedRewardIds,
+    this.totalXpEarned = 0,
+    this.longestSingleWalkSteps = 0,
+    this.flawlessWins = 0,
+    this.currentWinStreak = 0,
+    this.bestWinStreak = 0,
+    this.bossesDefeated = 0,
+    this.rareVillainsDefeated = 0,
+    Map<String, int>? villainDefeatCounts,
   }) : hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItems = ownedItems ?? <OwnedItem>[],
        ownedUpgradeIds = ownedUpgradeIds ?? <String>[],
-       ownedTitleIds = ownedTitleIds ?? <String>[];
+       ownedTitleIds = ownedTitleIds ?? <String>[],
+       earnedRewardDates = earnedRewardDates ?? <String, DateTime>{},
+       pinnedRewardIds = pinnedRewardIds ?? <String>[],
+       villainDefeatCounts = villainDefeatCounts ?? <String, int>{};
 
   String get name => avatar.name;
 
@@ -626,6 +656,7 @@ class UserProfile {
 
   /// XP ekler, gerekiyorsa seviye atlatır. Kaç seviye atlandığını döner.
   int addXp(int amount) {
+    if (amount > 0) totalXpEarned += amount;
     xp += amount;
     var levelsGained = 0;
     while (xp >= xpToNextLevel) {
@@ -681,6 +712,19 @@ class UserProfile {
     'wheelSpins': wheelSpins,
     'itemsMerged': itemsMerged,
     'lifetimeCoins': lifetimeCoins,
+    'earnedRewardDates': {
+      for (final entry in earnedRewardDates.entries)
+        entry.key: entry.value.toUtc().toIso8601String(),
+    },
+    'pinnedRewardIds': pinnedRewardIds,
+    'totalXpEarned': totalXpEarned,
+    'longestSingleWalkSteps': longestSingleWalkSteps,
+    'flawlessWins': flawlessWins,
+    'currentWinStreak': currentWinStreak,
+    'bestWinStreak': bestWinStreak,
+    'bossesDefeated': bossesDefeated,
+    'rareVillainsDefeated': rareVillainsDefeated,
+    'villainDefeatCounts': villainDefeatCounts,
   };
 
   /// Eksik alanlar varsayılana düşer; böylece eski kayıtlar okunabilir kalır.
@@ -752,7 +796,39 @@ class UserProfile {
       wheelSpins: _nonNegative(json['wheelSpins']),
       itemsMerged: _nonNegative(json['itemsMerged']),
       lifetimeCoins: _nonNegative(json['lifetimeCoins']),
+      earnedRewardDates: _dateMap(json['earnedRewardDates']),
+      pinnedRewardIds: _stringList(json['pinnedRewardIds']),
+      totalXpEarned: _nonNegative(json['totalXpEarned']),
+      longestSingleWalkSteps: _nonNegative(json['longestSingleWalkSteps']),
+      flawlessWins: _nonNegative(json['flawlessWins']),
+      currentWinStreak: _nonNegative(json['currentWinStreak']),
+      bestWinStreak: _nonNegative(json['bestWinStreak']),
+      bossesDefeated: _nonNegative(json['bossesDefeated']),
+      rareVillainsDefeated: _nonNegative(json['rareVillainsDefeated']),
+      villainDefeatCounts: _countMap(json['villainDefeatCounts']),
     );
+  }
+
+  static Map<String, DateTime> _dateMap(Object? value) {
+    if (value is! Map) return <String, DateTime>{};
+    final result = <String, DateTime>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String || entry.value is! String) continue;
+      final date = DateTime.tryParse(entry.value as String);
+      if (date != null) result[entry.key as String] = date.toUtc();
+    }
+    return result;
+  }
+
+  static Map<String, int> _countMap(Object? value) {
+    if (value is! Map) return <String, int>{};
+    final result = <String, int>{};
+    for (final entry in value.entries) {
+      if (entry.key is String && entry.value is int && entry.value >= 0) {
+        result[entry.key as String] = entry.value as int;
+      }
+    }
+    return result;
   }
 
   /// Envanteri okur. Bozuk satırlar **sessizce atılır**; tek bozuk kayıt

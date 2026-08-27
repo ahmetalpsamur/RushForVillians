@@ -79,3 +79,34 @@ flutter:
     - lib/Items/spears/
     - lib/Items/special_other/
     - lib/Items/swords/
+    - lib/Rewards/Unsorted/
+    - lib/Rewards/Armor/Belts/
+    - lib/Rewards/Armor/Boots/
+    - lib/Rewards/Armor/Chestplates/
+    - lib/Rewards/Armor/Gloves/
+    - lib/Rewards/Armor/Helmets/
+    - lib/Rewards/Armor/Leggings/
+    - lib/Rewards/Consumables/Food/
+    - lib/Rewards/Handheld_Items/Hoes/
+    - lib/Rewards/Handheld_Items/Maces/
+    - lib/Rewards/Handheld_Items/Pickaxes/
+    - lib/Rewards/Handheld_Items/Scythes/
+    - lib/Rewards/Handheld_Items/Shovels/
+    - lib/Rewards/Handheld_Items/Spears/
+    - lib/Rewards/Handheld_Items/Swords/
+    - lib/Rewards/Handheld_Items/Warhammers/
+    - lib/Rewards/Materials_Items/Books/
+    - lib/Rewards/Materials_Items/Crystals/
+    - lib/Rewards/Materials_Items/Dust/
+    - lib/Rewards/Materials_Items/Electronics_Mechanics/
+    - lib/Rewards/Materials_Items/Fish_Fishing/
+    - lib/Rewards/Materials_Items/Ingots/
+    - lib/Rewards/Materials_Items/Keys/
+    - lib/Rewards/Materials_Items/Kitchen/
+    - lib/Rewards/Materials_Items/Musical_Instruments/
+    - lib/Rewards/Materials_Items/Plants_Flowers/
+    - lib/Rewards/Materials_Items/Tribal_Ritual/
+    - lib/Rewards/Mob_Drops/Eyes/
+    - lib/Rewards/Mob_Drops/Feathers/
+    - lib/Rewards/Mob_Drops/Other_Drops/
+    - lib/Rewards/Special_Events/Christmas/

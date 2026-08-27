@@ -13,6 +13,9 @@ class GameConstants {
   /// Ejderha görevini tamamlamak için gereken adım sayısı.
   static const int dragonStepGoal = 20000;
 
+  /// Yürüyüş özetlerinde kullanılan yaklaşık adım → mesafe dönüşümü.
+  static const int stepsPerKilometer = 1250;
+
   /// Bir seviye atlamak için gereken taban XP. Her seviyede artar.
   ///
   /// Eğri `baseXpPerLevel * level`: seviye başına maliyet **doğrusal** artar,
