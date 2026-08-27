@@ -77,7 +77,7 @@ void main() {
     });
   });
 
-  group('eski 1000 adımlık round düzeni', () {
+  group('100 adım/dk türetilmiş round düzeni', () {
     test('adım hedefi dolunca deadline beklenmeden round geçer', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
@@ -97,7 +97,7 @@ void main() {
       expect(quest.currentRound, 2);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 107, minutes: 15)),
+        startedAt.add(const Duration(seconds: 107, minutes: 4)),
       );
     });
 
@@ -111,7 +111,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         0,
-        startedAt.add(const Duration(minutes: 15)),
+        startedAt.add(const Duration(minutes: 4)),
       );
 
       expect(result, isNotNull);
@@ -140,7 +140,7 @@ void main() {
       expect(quest.enemyHealth, 0);
     });
 
-    test('round süresi sabit 15 dakikadır', () {
+    test('round sayısı ve süresi toplam hedeften türetilir', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
@@ -148,13 +148,13 @@ void main() {
         startedAt: startedAt,
       );
 
-      expect(AdventureQuest.roundDuration, const Duration(minutes: 15));
-      expect(quest.currentRoundDuration, const Duration(minutes: 15));
+      expect(quest.currentRoundDuration, const Duration(minutes: 5));
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 15)),
+        startedAt.add(const Duration(minutes: 5)),
       );
-      expect(quest.totalRounds, 3);
+      expect(quest.totalRounds, 5);
+      expect(quest.totalAttackDuration, const Duration(minutes: 25));
     });
   });
 
@@ -165,13 +165,13 @@ void main() {
       startedAt: startedAt,
     );
 
-    test('biriken 15 dakikalık roundların hepsi sırayla çözülür', () {
+    test('biriken türetilmiş roundların hepsi sırayla çözülür', () {
       final startedAt = DateTime(2026, 8, 18, 12);
       final quest = questAt(startedAt);
 
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(minutes: 46)),
+        startedAt.add(const Duration(minutes: 31)),
         playerStats: _durablePlayer,
       );
 
@@ -180,7 +180,7 @@ void main() {
       expect(quest.currentRound, 4);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 60)),
+        startedAt.add(const Duration(minutes: 40)),
       );
     });
 
@@ -190,7 +190,7 @@ void main() {
 
       final result = quest.resolveExpiredRounds(
         2500,
-        startedAt.add(const Duration(minutes: 46)),
+        startedAt.add(const Duration(minutes: 31)),
         playerStats: _durablePlayer,
       );
 
@@ -205,7 +205,7 @@ void main() {
 
       final result = quest.resolveExpiredRounds(
         0,
-        startedAt.add(const Duration(minutes: 14, seconds: 59)),
+        startedAt.add(const Duration(minutes: 9, seconds: 59)),
       );
 
       expect(result, isNull);
@@ -214,7 +214,7 @@ void main() {
   });
 
   group('ilerleme, ölçek ve yeniden doğuş', () {
-    test('başlangıç adımı düşülür ve round hedefi 1000 adımdır', () {
+    test('başlangıç adımı düşülür ve round hedefi toplamdan türetilir', () {
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
         stepGoal: 2000,
@@ -224,9 +224,9 @@ void main() {
       expect(quest.questSteps(4000), 0);
       expect(quest.questSteps(5000), 1000);
       expect(quest.roundStartingSteps, 4000);
-      expect(quest.roundTargetSteps, 1000);
+      expect(quest.roundTargetSteps, 400);
       expect(quest.stepsThisRound(4150), 150);
-      expect(quest.roundStepsRemaining(4150), 850);
+      expect(quest.roundStepsRemaining(4150), 250);
     });
 
     test('düşman canı hedefe göre ölçeklenmez', () {
@@ -290,6 +290,73 @@ void main() {
       expect(restored.victoryXpReward, 175);
       expect(restored.victoryCoinReward, 42);
       expect(restored.roundTargetSteps, 0);
+    });
+  });
+
+  group('mükemmel round serisi', () {
+    test('erken tamamlamalar seriyi büyütür, üçüncüde ×2 tavanını açar', () {
+      final startedAt = DateTime(2026, 8, 20, 12);
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 1000,
+        startedAt: startedAt,
+      );
+
+      for (var round = 1; round <= 3; round++) {
+        final result = quest.resolveRound(
+          round * 250,
+          startedAt.add(Duration(seconds: round)),
+          playerStats: _durablePlayer,
+        );
+        expect(result?.perfect, isTrue);
+        expect(result?.perfectStreak, round);
+      }
+
+      expect(quest.perfectRoundStreak, 3);
+      expect(quest.perfectStreakCap, 2);
+      expect(quest.lastPerfectDamageMultiplier, closeTo(2, 0.02));
+    });
+
+    test('kaçırılan round seriyi sıfırlar ve kırılmayı işaretler', () {
+      final startedAt = DateTime(2026, 8, 20, 12);
+      final quest = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 1000,
+        startedAt: startedAt,
+      );
+      quest.resolveRound(
+        250,
+        startedAt.add(const Duration(seconds: 1)),
+        playerStats: _durablePlayer,
+      );
+
+      final missed = quest.resolveRound(
+        250,
+        quest.nextEnemyAttackAt,
+        playerStats: _durablePlayer,
+      );
+
+      expect(missed?.perfect, isFalse);
+      expect(quest.perfectRoundStreak, 0);
+      expect(quest.lastPerfectStreakBroken, isTrue);
+      expect(quest.lastPerfectDamageMultiplier, 1);
+    });
+
+    test('seri JSON turunda korunur, yeni maceraya taşınmaz', () {
+      final enemy = EnemyCatalog.byId('tense_soldier')!;
+      final quest =
+          AdventureQuest(enemy: enemy, stepGoal: 1000)
+            ..perfectRoundStreak = 2
+            ..lastRoundPerfect = true
+            ..lastPerfectDamageMultiplier = 1.45;
+
+      final restored = AdventureQuest.fromJson(quest.toJson(), enemy: enemy);
+      final nextDayQuest = AdventureQuest(enemy: enemy, stepGoal: 1000);
+
+      expect(restored.perfectRoundStreak, 2);
+      expect(restored.lastRoundPerfect, isTrue);
+      expect(restored.lastPerfectDamageMultiplier, 1.45);
+      expect(nextDayQuest.perfectRoundStreak, 0);
     });
   });
 }

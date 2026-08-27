@@ -1,5 +1,4 @@
 import '../core/utils/enemy_stats.dart';
-import '../models/adventure_quest.dart';
 import '../models/enemy.dart';
 
 const _root = 'lib/All_Assets/Enemies/Characters(100x100 split)';
@@ -52,7 +51,6 @@ Enemy _enemy({
       tier: tier,
       archetype: archetype,
       catalogAttackDamage: attackDamage,
-      stageStepTarget: AdventureQuest.stageStepTarget,
     ),
     id: id,
     name: name,

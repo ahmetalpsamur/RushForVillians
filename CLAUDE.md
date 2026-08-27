@@ -1130,9 +1130,25 @@ inisiyatif (speed) → sıyrılma → kritik → değişkenlik (±%12, luck band
 Savunan ilk vuruşta öldüyse ikinci vuruş yapılmaz — `speed` bu yüzden gerçek
 bir stat.
 
-**Adım ↔ savaş bağı:** roundun **tamamlanma oranı** oyuncunun vuruşunu,
-kaçırılan oran düşmanınkini ölçekler. Tam round = tam vuruş + hiç hasar
-almama; hiç yürümemek = hiç vuramamak + tam hasar.
+**Adım ↔ savaş bağı:** `c = clamp(yürünen / roundHedefi, 0, 1)` olmak üzere:
+
+```
+oyuncuHasarı = normalOyuncuHasarı × c × mükemmelRoundÇarpanı
+düşmanHasarı = normalDüşmanHasarı × (1 − c)^1,5
+```
+
+Tam round (`c=1`) = tam vuruş + **kesinlikle sıfır** düşman hasarı; hiç
+yürümemek (`c=0`) = hiç vuramamak + **tam** düşman hasarı. Aradaki eğri hafif
+dışbükeydir: %90→%50 tamamlama arasındaki ceza artışı, %50→%10 arasındakinden
+küçüktür. Böylece az kaçıran oyuncu doğrusal formüldeki kadar sert
+cezalandırılmaz; büyük ölçüde yürümemek belirgin biçimde acıtır. Üs tek denge
+sabiti `missedRoundDamageExponent = 1.5` içindedir.
+
+**Mükemmel round:** hedef deadline'dan önce tamamlanırsa oyuncu hasarı bonus
+alır. Round süresinin ne kadarı kaldıysa bonus o oranda büyür. Ardışık
+mükemmel roundlar erişilebilir tavanı **×1,2 → ×1,5 → ×2** yapar; üçüncüden
+sonra ×2'de kalır. Kaçırılan her round seriyi sıfırlar. Seri ve son geri
+bildirim v21 kaydında tutulur; yeni macera/yeni oyun gününde sıfırdan başlar.
 
 ### Altı koşullu tetikleyici — hepsi çalışıyor
 
@@ -1194,30 +1210,55 @@ gösterir + tek cümlelik davranış açıklaması.
 
 ### Saldırı yapısı — `attack_config.dart`
 
-Bir macera **bir saldırıdır**: seçilen adım hedefi, ona bağlı süre ve
-**beş sabit round**.
+Bir macera **bir saldırıdır**. Sürenin tek doğruluk kaynağı
+`GameConstants.stepsPerMinute = 100`:
 
-| Round | Faz | Süre payı | Fitness talimatı |
-|---|---|---|---|
-| 1 | WARM-UP | %15 | Düşük tempoda yürüyüşe hazırlan |
-| 2 | ATTACK | %25 | Normal tempoda yürümeye devam et |
-| 3 | RUSH | %20 | Temponu artır |
-| 4 | RECOVERY | %15 | Durma; daha düşük tempoda sürdür |
-| 5 | FINAL RUSH | %25 | Son kez yüksek tempoya çık |
+```
+toplamSüreDakika = toplamAdım / stepsPerMinute
+roundSayısı = clamp(ceil(toplamAdım / 250), 2, 5)
+roundAdımı = toplamAdım / roundSayısı  // kalan adımlar ilk roundlara dağıtılır
+roundSüresi = roundAdımı / stepsPerMinute
+```
 
-Süre payı **adım payı olarak da** kullanılır: bütün roundlarda aynı hedef
-kadans korunur ve beş round hedefinin toplamı seçilen hedefe eşitlenir.
+250, hedef round boyudur; bir düşmana elle round/süre yazılmaz. Alt sınır 2,
+500 adımlık başlangıç savaşını tek roundluk gerilimsiz bir sayaç olmaktan
+çıkarır. 1.000 adım **4 × 250** olarak seçilir: 2 round fazla kaba, 10–11
+round tekrarlı olur. Üst sınır 5, 10.000 adımlık düşmanın 40 rounda dönüşmesini
+engeller. Uzun hedeflerde round başına adım ve süre büyür, toplam kadans hep
+100 adım/dakika kalır.
 
 **Altı seçilebilir hedef:**
 
 | Adım hedefi | Toplam süre | Düşman güç çarpanı |
 |---|---|---|
 | 500 | 5 dk | ×1,00 |
-| 1.000 | 8 dk | ×1,15 |
-| 2.000 | 12 dk | ×1,35 |
-| 3.000 | 15 dk | ×1,55 |
-| 5.000 | 20 dk | ×1,85 |
-| 10.000 | 30 dk | ×2,40 |
+| 1.000 | 10 dk | ×1,15 |
+| 2.000 | 20 dk | ×1,35 |
+| 3.000 | 30 dk | ×1,55 |
+| 5.000 | 50 dk | ×1,85 |
+| 10.000 | 100 dk | ×2,40 |
+
+### Tempo sonrası ekonomi kontrolü
+
+Referans oyuncu günde 6.000 adım atar: macera dışında **120 coin + 3.000
+XP** değişmemiştir. Aşağıdaki zafer hesabı buffsızdır; coin sütunu tohumlu
+aralığı, parantez içi ortalamayı gösterir. "İlk round mükemmel" sütunu güçlü
+oyuncunun ilk 250 adımda bitirdiği üst-sınır senaryosudur; kalan taahhüt 30/1
+yürüyüş coinine ve mevcut hız ödülüne girer.
+
+| Düşman | Savaş süresi | Normal günlük toplam | İlk round mükemmel üst sınırı |
+|---|---:|---:|---:|
+| 500 adım | 5 dk (2×250) | 127–136 coin (131,5) · 3.100 XP | en çok 147 coin · 3.150 XP |
+| 1.000 adım | 10 dk (4×250) | 130–142 coin (136) · 3.175 XP | en çok 168 coin · 3.306 XP |
+
+Eski **120 coin/gün** yürüyüş tabanı değişmedi. Normal tek macera 500'de
+ortalama +%9,6, 1.000'de +%13,3 ekler; bu zaten var olan zafer damlasıdır.
+Mükemmel round doğrudan coin/XP basmaz: yalnızca düşmanı erken indirmeyi
+kolaylaştırıp mevcut, tavanı ×2 olan hız ödülünü ve sınırlı yürüyüş-fazı
+farkını besler. En sert 1.000 adım senaryosu 120 tabanına göre +%40'tır ama
+yalnızca güçlü oyuncunun ilk roundda öldürmesiyle oluşur ve mutlak fark 48
+coindir. Bu nedenle ödül oranı düşürülmedi; ekonomi sapması büyürse ayarlanacak
+kaldıraç tempo değil `maxVictorySpeedMultiplier`dır.
 
 ### İki faz (GD55)
 
@@ -1638,7 +1679,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD83)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD84)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -1648,7 +1689,7 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 |---|---|---|
 | GD1 | Açılışta kayıt okunamazsa temiz varsayılanla devam + SnackBar | Sonsuza kadar açılış ekranında asılı kalmaktansa açılmak yeğ. **Risk:** `RootShell` `_persist()` çağırınca eski kayıt üzerine yazar; salt-okunur oturum yok |
 | GD2 | Bildirim planlaması `GameClock`'a bağlandı | İki farklı saat kaynağını karşılaştırmak, donmuş saatte hiç hatırlatma planlamıyordu |
-| GD3 | Round sistemine dokunulmadı | İncelendi, gerçek hata yok |
+| GD3 | *(GD84 ile geçersiz)* Round sistemine dokunulmadı | Eski tempo daha sonra oynanamaz bulundu |
 | GD4 | Gün sınırı 04:00; adım halkası da oyun gününü anahtarlıyor | 00:00 sınırı çarkın gece yarısı açığını geri açıyordu; ham tarihle arşivleme kaydı yanlış güne yazıyordu |
 | GD5 | Adım geçmişi 400 günle sınırlı | Tek anahtarda büyüyen liste her açılışı ve **her yazmayı** yavaşlatır. Veri kaybı geri alınamaz; tüketicisi yalnızca takvim ekranı |
 | GD6 | `_archiveDailySteps` saf fonksiyona taşındı | `StatefulWidget` private metodu test edilemiyordu ve sessizce yanlış veri üretebilecek türdendi |
@@ -1701,7 +1742,7 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD53 | Oyuncunun savaş canı sabit 100 olmaktan çıktı | Seviye + kuşanmadan geliyor. **Bedava iyileşme yok:** tavan büyüyünce mevcut can yükselmiyor |
 | GD54 | `onKill` etkileri **bitirici vuruşa** katılıyor | Savaş düşman ölünce bittiği için "sonraki tur" yok; etki ölü kalırdı. Sözü tutulur hâle getirmek, sözü değiştirmekten yeğ |
 | GD55 | Macera iki fazlı; faz **durumdan türetiliyor**, ayrı alan değil | İki doğruluk kaynağı er ya da geç çelişir. Eski kayıt geriye dönük yürüyüş fazına sokulmuyor |
-| GD56 | Hız ödülü **adımla** ölçülüyor, roundla değil | Round sayısı kaba (500'lük hedefte 1 round). Harcamadığın her adım hem çarpana hem bonuslu yürüyüşe yazılıyor |
+| GD56 | Hız ödülü **adımla** ölçülüyor, roundla değil | Round sayısı 2–5 arası kaba bir ölçü. Harcamadığın her adım hem çarpana hem bonuslu yürüyüşe yazılıyor |
 | GD57 | Zafer altını tohumlu | Kalıcı bir ödülü etkileyen rastgelelik tohumlu olmalı; ayrıca test edilemiyordu |
 | GD58 | Yürüyüş fazı oranı 30/1; para hesabı **iki geçişli** | Bir parti faz sınırını geçebilir. Ölçülen sapma referans oyuncuda **+%13**; kazanç yapısal olarak sınırlı (`stepGoal/75`) |
 | GD59 | Seri ve çark **iki kapıdan**: zafer ya da adım eşiği | Macera oynamayan ama yürüyen oyuncu cezalanmamalı; `streakRelief` buff'ı eşiğe bağlı; 66 mevcut test eşiğe dayanıyor |
@@ -1729,12 +1770,13 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD81 | Çark altın veriyor; epik/efsanevi ekipman çarktan kalktı | Altın adım ekonomisinden **ayrı** bir kaynak (işaretçiye dokunmuyor). Epik/efsanevi kaldırma GD19'un geri gelmesi |
 | GD82 | Rehber `Scaffold.body` içinde yaşıyor; konumu sabit pikselden çıkmıyor | Body'nin alt kenarı zaten alt gezinme çubuğunun üst kenarı → `bottom: 0` "barın hemen üstü" demek. Ölçüm, tema sorgusu ya da 96 px tahmini gerekmiyor; jest çubuğu olan/olmayan cihazda, bar gizlendiğinde ve klavye açıldığında kendiliğinden doğru |
 | GD83 | Eğitim rehberi ekrandan yürüyerek çıkmıyor, **death** animasyonuyla veda ediyor | Çıkış artık pet'i kapatmakla aynı hissi veriyor. Süre sabit (960 ms): üç rehberin `*_Death_8.gif` dosyası da 8 kare × 120 ms, ve geçişi gerçek dosya okumasına bağlamak hem testlerde sahte saatle ilerletilemez hem asset okunamazsa eğitimi biteceği anda takardı |
+| GD84 | Savaş temposu tek sabitten **100 adım/dk**; round sayısı 250 hedefinden 2–5 arası türetiliyor; mükemmel seri ×2 tavanlı | Eski 1.000 adım/15 dk roundu ile yüzdeli config çelişiyordu; bazı UI hedefleri sprint istiyordu. 500→2 ve 1.000→4 round gerilimi korurken, 5 tavanı uzun düşmanlarda tekrar hissini engelliyor |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
 | # | Ne | Neden dokunulmadı |
 |---|---|---|
-| K2 | Round süresi adımdan bağımsız | Denge kararı, kod hatası değil; testler birlikte güncellenmiş |
+| K2 | *(GD84 ile geçersiz)* Round süresi adımdan bağımsızdı | Kullanıcı tempo dengelemesiyle süre artık tek kadans sabitinden türetiliyor |
 | K3 | Round erken tamamlanınca anında kazanılıyor | Sonsuz döngü ve çift hasar yok — satır satır doğrulandı |
 | K4 | Sunum durumu (`presentedRoundOutcomeSerial`) modelde | Model Kuralları #1'i ihlal etmiyor (`int`); ayırmak modeli, ekranı ve şemayı birlikte değiştirmek demek |
 | K5 | Ekran, model nesnesini doğrudan değiştiriyor | Mevcut `setState` mimarisi zaten buna dayanıyor. Riverpod/Bloc geçişinde ilk kırılacak yer |

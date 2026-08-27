@@ -7,6 +7,36 @@ import '../../models/reward_rarity.dart';
 class GameConstants {
   GameConstants._();
 
+  // --- Savaş temposu ve mükemmel round (Bölüm B) ---
+
+  /// Savaş roundlarının hedef yürüyüş temposu.
+  ///
+  /// Bütün round süreleri `adım × 60 / [stepsPerMinute]` formülünden
+  /// türetilir. Dengeleme sırasında değiştirilmesi gereken tek tempo değeri
+  /// budur; roundlara veya düşmanlara ayrı süre yazılmaz.
+  static const int stepsPerMinute = 100;
+
+  /// Round sayısı türetilirken hedeflenen yaklaşık adım miktarı.
+  static const int idealStepsPerCombatRound = 250;
+
+  /// Kısa macerada bile gerilim kurmak için gereken en az round.
+  static const int minCombatRounds = 2;
+
+  /// Uzun maceraların tekrar hissine dönüşmemesi için round tavanı.
+  static const int maxCombatRounds = 5;
+
+  /// Eksik round hasar eğrisinin üssü.
+  ///
+  /// `hasar ölçeği = (1 - tamamlama)^1,5`: az kaçıran oyuncu yumuşak,
+  /// büyük kısmı kaçıran oyuncu belirgin biçimde daha ağır cezalandırılır.
+  static const double missedRoundDamageExponent = 1.5;
+
+  /// Mükemmel round serisinin erişebildiği hasar çarpanları.
+  ///
+  /// İlk, ikinci ve üçüncü mükemmel round sırasıyla ×1,2 / ×1,5 / ×2
+  /// tavanını açar; sonraki roundlar son değerde kalır.
+  static const List<double> perfectRoundStreakMultipliers = [1.2, 1.5, 2.0];
+
   /// Oyuncunun başlangıç / taban canı (HP).
   static const int baseHp = 5000;
 

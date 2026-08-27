@@ -33,6 +33,7 @@ void main() {
     int playerHealth = 200,
     int enemyHealth = 200,
     double completion = 1,
+    double playerDamageMultiplier = 1,
     int seed = 4242,
     List<ItemEffect> onHit = const [],
     List<ItemEffect> onKill = const [],
@@ -42,6 +43,7 @@ void main() {
     playerHealth: playerHealth,
     enemyHealth: enemyHealth,
     completion: completion,
+    playerDamageMultiplier: playerDamageMultiplier,
     seed: seed,
     onHitEffects: onHit,
     onKillEffects: onKill,
@@ -97,6 +99,35 @@ void main() {
       expect(outcome.damageTaken, greaterThan(0));
     });
 
+    test('düşman hasar eğrisi sınırları ve hafif cezayı korur', () {
+      expect(enemyDamageScaleForCompletion(1), 0);
+      expect(enemyDamageScaleForCompletion(0), 1);
+
+      final at90 = enemyDamageScaleForCompletion(0.9);
+      final at50 = enemyDamageScaleForCompletion(0.5);
+      final at10 = enemyDamageScaleForCompletion(0.1);
+      expect(at50 - at90, lessThan(at10 - at50));
+      expect(
+        at90,
+        lessThan(0.1),
+        reason: 'az kaçıran doğrusal cezadan az yemeli',
+      );
+    });
+
+    test('mükemmel seri tavanları ×1,2 → ×1,5 → ×2 büyür', () {
+      expect(perfectRoundDamageMultiplier(streak: 1, earlyFraction: 1), 1.2);
+      expect(perfectRoundDamageMultiplier(streak: 2, earlyFraction: 1), 1.5);
+      expect(perfectRoundDamageMultiplier(streak: 3, earlyFraction: 1), 2);
+      expect(perfectRoundDamageMultiplier(streak: 99, earlyFraction: 1), 2);
+    });
+
+    test('aynı seride daha erken bitirmek daha çok bonus hasar verir', () {
+      final late = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.1);
+      final early = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.9);
+      expect(early, greaterThan(late));
+      expect(early, lessThanOrEqualTo(1.5));
+    });
+
     test('tamamlanma oranı arttıkça oyuncunun hasarı artar', () {
       final low = round(completion: 0.25).damageDealt;
       final high = round(completion: 1).damageDealt;
@@ -145,7 +176,10 @@ void main() {
       }
       expect(critSeen, isTrue);
       expect(critTotal, greaterThan(plainTotal));
-      expect(round(player: attacker.copyWith(critChance: 0)).playerCrit, isFalse);
+      expect(
+        round(player: attacker.copyWith(critChance: 0)).playerCrit,
+        isFalse,
+      );
     });
 
     test('sıyrılma vuruşu tamamen boşa çıkarır', () {

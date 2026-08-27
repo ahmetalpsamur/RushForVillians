@@ -1207,6 +1207,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         _setTutorialStep(TutorialGuideStep.enemyReaction);
       }
     }
+    if (roundResult case final result?) {
+      _showPerfectRoundFeedback(result);
+    }
     if (revivalCompleted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1326,6 +1329,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (resolvedResult != null && resolvedResult.playerDamage > 0) {
       _showEnemyAttackNotice(adventure, resolvedResult.playerDamage);
     }
+    if (resolvedResult != null) _showPerfectRoundFeedback(resolvedResult);
     if (adventure.isBattleCompleted) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
     }
@@ -1451,6 +1455,35 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                 '${adventure.enemy.name} saldırdı! $damage can kaybettin.',
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPerfectRoundFeedback(CombatRoundResult result) {
+    if (!result.perfect && !(_adventure?.lastPerfectStreakBroken ?? false)) {
+      return;
+    }
+    final perfect = result.perfect;
+    final message =
+        perfect
+            ? 'Mükemmel round! Seri ${result.perfectStreak} · '
+                'hasar ×${result.perfectDamageMultiplier.toStringAsFixed(2)}'
+            : 'Mükemmel round serin kırıldı. Çarpan ×1’e döndü.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        backgroundColor: perfect ? const Color(0xFF4B3510) : AppColors.hp,
+        content: Row(
+          children: [
+            Icon(
+              perfect ? Icons.local_fire_department : Icons.heart_broken,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
           ],
         ),
       ),

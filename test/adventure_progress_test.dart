@@ -52,6 +52,7 @@ void main() {
     int? roundStartingSteps,
     Size size = const Size(390, 1400),
     bool resolveFirstRound = false,
+    int perfectRoundStreak = 0,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -64,7 +65,7 @@ void main() {
       startingSteps: startingSteps,
       roundStartingSteps: roundStartingSteps,
       startedAt: startedAt,
-    );
+    )..perfectRoundStreak = perfectRoundStreak;
     if (resolveFirstRound) {
       // "Düşmanın N canını aldın" mesajı artık round çözümünde oluşuyor:
       // savaş motorundan önce her adım 1 hasardı, şimdi hasar statlardan
@@ -160,6 +161,18 @@ void main() {
   });
 
   group('round ilerlemesi ikincil olarak duruyor', () {
+    testWidgets('mükemmel round serisi ve tavanı görünür', (tester) async {
+      await pumpAdventure(
+        tester,
+        stepGoal: 2000,
+        steps: 200,
+        perfectRoundStreak: 2,
+      );
+
+      expect(find.text('MÜKEMMEL SERİ 2 · tavan ×1.5'), findsOneWidget);
+      expect(find.textContaining('Tempo 100 adım/dk'), findsOneWidget);
+    });
+
     testWidgets('round adımı yazıyla gösteriliyor', (tester) async {
       await pumpAdventure(
         tester,
@@ -167,7 +180,7 @@ void main() {
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(find.text('Bu round: 200 / 1000 adım'), findsOneWidget);
+      expect(find.text('Bu round: 200 / 400 adım'), findsOneWidget);
     });
 
     testWidgets('round çubuğu ana çubuktan ince', (tester) async {
@@ -187,14 +200,14 @@ void main() {
     });
 
     testWidgets('round çubuğu round içi ilerlemeyi gösterir', (tester) async {
-      // İkinci roundda 200 / 1000 adım → %20.
+      // İkinci roundda 200 / 400 adım → %50.
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(barValue(tester, 'round-progress-bar'), closeTo(0.2, 0.001));
+      expect(barValue(tester, 'round-progress-bar'), closeTo(0.5, 0.001));
       // Ana bar aynı anda %60'ta: round sıfırlansa da macera ilerlemesi durmaz.
       expect(mainBarValue(tester), closeTo(0.6, 0.001));
     });

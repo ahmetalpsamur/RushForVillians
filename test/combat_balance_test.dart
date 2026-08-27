@@ -5,7 +5,6 @@ import 'package:rush_for_villains/core/utils/effective_stats.dart';
 import 'package:rush_for_villains/core/utils/enemy_stats.dart';
 import 'package:rush_for_villains/core/utils/equipped_buffs.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
-import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/combat_stats.dart';
 import 'package:rush_for_villains/models/enemy.dart';
 import 'package:rush_for_villains/models/item.dart';
@@ -71,8 +70,7 @@ void main() {
     return rounds;
   }
 
-  int expectedRounds(Enemy enemy) =>
-      expectedRoundsForTier(enemy.tier, AdventureQuest.stageStepTarget);
+  int expectedRounds(Enemy enemy) => expectedRoundsForTier(enemy.tier);
 
   group('düşman kataloğu', () {
     test('20 düşman, hepsinin savaş statı ve arketipi var', () {
@@ -117,7 +115,6 @@ void main() {
             tier: tier,
             archetype: EnemyArchetype.bruiser,
             catalogAttackDamage: expectedCatalogAttack(tier).round(),
-            stageStepTarget: AdventureQuest.stageStepTarget,
           ).attack;
 
       for (var tier = 2; tier <= 20; tier++) {
@@ -135,7 +132,6 @@ void main() {
         tier: tier,
         archetype: archetype,
         catalogAttackDamage: 17,
-        stageStepTarget: AdventureQuest.stageStepTarget,
       );
 
       final bruiser = statsFor(EnemyArchetype.bruiser);
@@ -160,7 +156,6 @@ void main() {
         tier: weak.tier,
         archetype: weak.archetype,
         catalogAttackDamage: expectedCatalogAttack(weak.tier).round(),
-        stageStepTarget: AdventureQuest.stageStepTarget,
       );
       expect(weak.stats.attack, lessThan(reference.attack));
     });

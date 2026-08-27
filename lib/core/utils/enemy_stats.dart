@@ -1,5 +1,6 @@
 import '../../models/combat_stats.dart';
 import '../../models/enemy.dart';
+import '../constants/attack_config.dart';
 import 'base_combat_stats.dart';
 
 /// Düşman savaş statlarını **kademeden ve arketipten** türeten saf kurallar.
@@ -18,7 +19,7 @@ import 'base_combat_stats.dart';
 ///
 /// 1. **Düşman canı**, o seviyedeki ölçüt oyuncunun tam tuttuğu round başına
 ///    verdiği hasar × beklenen round sayısı. Beklenen round sayısı düşmanın
-///    kilit eşiğinden geliyor (`minimumDailySteps / 1000`, en az 1). Yani
+///    kilit eşiğinin türetilmiş round yapısından geliyor. Yani
 ///    kilit eşiğini seçen ölçüt bir oyuncu, maceranın sonunda düşmanı devirir;
 ///    daha güçlü oyuncu **erken** devirir.
 /// 2. **Düşman saldırısı**, tamamen kaçırılan bir roundun o seviyedeki
@@ -42,10 +43,9 @@ const double missedRoundHealthCost = 0.15;
 double expectedCatalogAttack(int tier) => 7 + tier.toDouble();
 
 /// Kademe *i* için beklenen round sayısı.
-int expectedRoundsForTier(int tier, int stageStepTarget) {
+int expectedRoundsForTier(int tier) {
   final steps = tier * 500;
-  final rounds = (steps / stageStepTarget).ceil();
-  return rounds < 1 ? 1 : rounds;
+  return AttackConfig.roundCountForSteps(steps);
 }
 
 /// Arketipin stat bütçesini nasıl kaydırdığı.
@@ -111,12 +111,10 @@ double baseEnemyDefense(int tier) => 2 + tier.toDouble();
 /// Bir düşmanın savaş statları.
 ///
 /// [catalogAttackDamage] katalogdaki elle yazılmış saldırı değeri;
-/// [stageStepTarget] bir roundun adım hedefi ([AdventureQuest.stageStepTarget]).
 CombatStats enemyCombatStats({
   required int tier,
   required EnemyArchetype archetype,
   required int catalogAttackDamage,
-  required int stageStepTarget,
 }) {
   final profile = enemyArchetypeProfile(archetype);
   final player = baseCombatStats(tier);
@@ -128,7 +126,7 @@ CombatStats enemyCombatStats({
   final playerDamagePerRound = defenseForHealth.damageAfterDefense(
     player.attack,
   );
-  final rounds = expectedRoundsForTier(tier, stageStepTarget);
+  final rounds = expectedRoundsForTier(tier);
   final health = playerDamagePerRound * rounds * profile.health;
 
   // 2) Saldırı: kaçırılan roundun oyuncu canından götürdüğü oran sabit.

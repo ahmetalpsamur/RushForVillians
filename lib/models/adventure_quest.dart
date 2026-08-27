@@ -52,9 +52,6 @@ class AdventureQuest {
       'lib/Backgrounds/versionA_platform.png';
   static const int maxPlayerHealth = 100;
 
-  /// Her roundun üst adım sınırı.
-  static const int stageStepTarget = 1000;
-  static const Duration roundDuration = Duration(minutes: 15);
   static const int revivalStepTarget = 500;
   static const Duration reminderInterval = Duration(minutes: 5);
 
@@ -121,6 +118,18 @@ class AdventureQuest {
   int roundOutcomeSerial;
   int presentedRoundOutcomeSerial;
   bool lastRoundWon;
+
+  /// Arka arkaya tamamlanan mükemmel savaş roundu sayısı.
+  int perfectRoundStreak;
+
+  /// Son çözülen round mükemmel miydi? Sunum ve geri bildirim için saklanır.
+  bool lastRoundPerfect;
+
+  /// Son roundda uygulanan erken bitirme + seri hasar çarpanı.
+  double lastPerfectDamageMultiplier;
+
+  /// Son round mevcut mükemmel seriyi kırdı mı.
+  bool lastPerfectStreakBroken;
   AdventureBattleOutcome battleOutcome;
 
   /// Yeni sistemden eski round düzenine dönen kayıtlarla uyumluluk alanı.
@@ -180,6 +189,10 @@ class AdventureQuest {
     this.roundOutcomeSerial = 0,
     this.presentedRoundOutcomeSerial = 0,
     this.lastRoundWon = false,
+    this.perfectRoundStreak = 0,
+    this.lastRoundPerfect = false,
+    this.lastPerfectDamageMultiplier = 1,
+    this.lastPerfectStreakBroken = false,
     this.battleOutcome = AdventureBattleOutcome.active,
     this.enemyDefeatPending = false,
     this.playerDefeatPending = false,
@@ -194,9 +207,9 @@ class AdventureQuest {
        currentRound = currentRound < 1 ? 1 : currentRound,
        enemyHealth = enemyHealth ?? _scaledEnemyMaxHealth(enemy, stepGoal),
        revivalSteps = revivalSteps.clamp(0, revivalStepTarget),
-       roundTargetSteps = _targetForRemaining(stepGoal),
+       roundTargetSteps = _roundTargetFor(stepGoal, currentRound),
        nextEnemyAttackAt = (startedAt ?? GameClock.now()).add(
-         roundDurationForSteps(_targetForRemaining(stepGoal)),
+         roundDurationForSteps(_roundTargetFor(stepGoal, currentRound)),
        ),
        nextReminderAt = (startedAt ?? GameClock.now()).add(reminderInterval) {
     if (battleOutcome != AdventureBattleOutcome.active) {
@@ -220,19 +233,17 @@ class AdventureQuest {
     this.walkSteps = this.walkSteps.clamp(0, walkTargetSteps);
   }
 
-  static AttackTargetConfig _attackConfig(int stepGoal) =>
-      AttackConfig.forStepTarget(stepGoal);
-
-  static int _roundIndex(int currentRound) =>
-      currentRound.clamp(1, AttackConfig.roundCount) - 1;
-
-  static int _targetForRemaining(int remainingSteps) {
-    if (remainingSteps <= 0) return 0;
-    return remainingSteps < stageStepTarget ? remainingSteps : stageStepTarget;
+  static int _roundTargetFor(int stepGoal, int round) {
+    if (stepGoal <= 0) return 0;
+    final count = AttackConfig.roundCountForSteps(stepGoal);
+    final index = (round - 1).clamp(0, count - 1);
+    final base = stepGoal ~/ count;
+    final remainder = stepGoal % count;
+    return base + (index < remainder ? 1 : 0);
   }
 
   static Duration roundDurationForSteps(int steps) =>
-      steps <= 0 ? Duration.zero : roundDuration;
+      AttackConfig.durationForSteps(steps);
 
   /// İlk eğitim savaşını guide tamamlar. Gerçek adım sayacına dokunmaz; yalnızca
   /// bu maceranın otoriter savaş sonucunu zafere taşır.
@@ -261,14 +272,19 @@ class AdventureQuest {
   static int _scaledEnemyMaxHealth(Enemy enemy, int stepGoal) =>
       enemy.maxHealth;
 
-  AttackTargetConfig get attackConfig => _attackConfig(stepGoal);
+  AttackTargetConfig get attackConfig =>
+      AttackConfig.supportsStepTarget(stepGoal)
+          ? AttackConfig.forStepTarget(stepGoal)
+          : AttackTargetConfig(stepTarget: stepGoal, enemyPowerMultiplier: 1);
 
-  AttackRoundConfig get currentRoundConfig =>
-      AttackConfig.rounds[_roundIndex(currentRound)];
+  AttackRoundConfig get currentRoundConfig => AttackConfig.roundConfig(
+    (currentRound - 1).clamp(0, totalRounds - 1),
+    totalRounds,
+  );
 
   AttackPhase get currentPhase => currentRoundConfig.phase;
 
-  Duration get totalAttackDuration => roundDuration * totalRounds;
+  Duration get totalAttackDuration => AttackConfig.durationForSteps(stepGoal);
 
   Duration get currentRoundDuration => roundDurationForSteps(roundTargetSteps);
 
@@ -281,7 +297,21 @@ class AdventureQuest {
 
   int get scaledEnemyMaxHealth => scaledEnemyStats.maxHealth.round();
 
-  int get totalRounds => (stepGoal / stageStepTarget).ceil();
+  int get totalRounds => AttackConfig.roundCountForSteps(stepGoal);
+
+  double get perfectStreakCap {
+    if (perfectRoundStreak <= 0) return 1;
+    final multipliers = GameConstants.perfectRoundStreakMultipliers;
+    return multipliers[(perfectRoundStreak - 1).clamp(
+      0,
+      multipliers.length - 1,
+    )];
+  }
+
+  double get nextPerfectStreakCap {
+    final multipliers = GameConstants.perfectRoundStreakMultipliers;
+    return multipliers[perfectRoundStreak.clamp(0, multipliers.length - 1)];
+  }
 
   /// Macera başladığından beri atılan adım — düşmana verilen toplam hasar.
   /// Günlük sayaç sıfırlanmadığı için [startingSteps] farkı alınır.
@@ -310,9 +340,6 @@ class AdventureQuest {
     return '${duration.inMinutes} dakika';
   }
 
-  static String get configuredRoundDurationLabel =>
-      durationLabel(roundDuration);
-
   String get roundDurationLabel => durationLabel(currentRoundDuration);
 
   String get totalAttackDurationLabel => durationLabel(totalAttackDuration);
@@ -331,7 +358,7 @@ class AdventureQuest {
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
-  /// Round hedef erken tamamlanırsa anında, aksi halde 15 dakika sonunda çözülür.
+  /// Round hedefi erken tamamlanırsa anında, aksi halde türetilmiş sürede çözülür.
   ///
   /// Hasar artık adımdan değil **statlardan** geliyor: roundun tamamlanma
   /// oranı oyuncunun vuruşunu ölçekliyor, kaçırılan oran da düşmanınkini.
@@ -361,6 +388,22 @@ class AdventureQuest {
     final resolvedPhase = currentPhase;
     final walked = stepsThisRound(currentSteps);
     final targetSteps = roundTargetSteps;
+    final perfect = targetReached && now.isBefore(expiredAt);
+    final previousPerfectStreak = perfectRoundStreak;
+    if (perfect) {
+      perfectRoundStreak += 1;
+    } else {
+      perfectRoundStreak = 0;
+    }
+    final roundSeconds = currentRoundDuration.inMilliseconds;
+    final earlyFraction =
+        perfect && roundSeconds > 0
+            ? expiredAt.difference(now).inMilliseconds / roundSeconds
+            : 0.0;
+    final perfectMultiplier = perfectRoundDamageMultiplier(
+      streak: perfectRoundStreak,
+      earlyFraction: earlyFraction,
+    );
 
     final stats = (playerStats ?? defaultPlayerStats).sanitized();
     playerMaxHealth = stats.maxHealth.round();
@@ -383,6 +426,7 @@ class AdventureQuest {
         enemyHealth: enemyHealth,
         completion: walked / roundTargetSteps,
         seed: combatSeed,
+        playerDamageMultiplier: perfectMultiplier,
         onHitEffects: onHitEffects,
         onKillEffects: onKillEffects,
       );
@@ -423,6 +467,9 @@ class AdventureQuest {
     final resolvedRound = currentRound;
     lastResolvedRound = resolvedRound;
     lastRoundWon = targetReached;
+    lastRoundPerfect = perfect;
+    lastPerfectStreakBroken = !perfect && previousPerfectStreak > 0;
+    lastPerfectDamageMultiplier = perfectMultiplier;
     roundOutcomeSerial += 1;
 
     roundStartingSteps += walked;
@@ -432,11 +479,13 @@ class AdventureQuest {
       final remaining = stepGoal - questSteps(currentSteps);
       // Adım taahhüdü bitse bile düşman ayaktaysa savaş kilitlenmesin.
       roundTargetSteps =
-          remaining <= 0 ? stageStepTarget : _targetForRemaining(remaining);
+          remaining <= 0
+              ? _roundTargetFor(stepGoal, totalRounds)
+              : _roundTargetFor(stepGoal, currentRound);
       // Arka plan catch-up'ı `now`dan başlamaz; kaçırılan roundlar eski mutlak
       // zaman çizgisinde ilerler; erken tamamlanan round ise o anda yenilenir.
       final nextRoundStartsAt = expired ? expiredAt : now;
-      nextEnemyAttackAt = nextRoundStartsAt.add(roundDuration);
+      nextEnemyAttackAt = nextRoundStartsAt.add(currentRoundDuration);
       nextReminderAt = nextRoundStartsAt.add(reminderInterval);
     } else {
       roundTargetSteps = 0;
@@ -457,6 +506,9 @@ class AdventureQuest {
       playerDefeated: battleOutcome == AdventureBattleOutcome.defeat,
       playerActedFirst: playerActedFirst,
       battleOutcome: battleOutcome,
+      perfect: perfect,
+      perfectStreak: perfectRoundStreak,
+      perfectDamageMultiplier: perfectMultiplier,
     );
   }
 
@@ -502,6 +554,8 @@ class AdventureQuest {
     var actedFirst = true;
     var lastPhase = currentPhase;
     var outcome = battleOutcome;
+    var perfect = false;
+    var perfectMultiplier = 1.0;
 
     while (rounds < maxCatchUpRounds) {
       final result = resolveExpiredRound(
@@ -524,6 +578,8 @@ class AdventureQuest {
       lastRoundNumber = result.roundNumber;
       lastPhase = result.phase;
       outcome = result.battleOutcome;
+      perfect = result.perfect;
+      perfectMultiplier = result.perfectDamageMultiplier;
       rounds++;
     }
 
@@ -541,6 +597,9 @@ class AdventureQuest {
       playerDefeated: playerDown,
       playerActedFirst: actedFirst,
       battleOutcome: outcome,
+      perfect: perfect,
+      perfectStreak: perfectRoundStreak,
+      perfectDamageMultiplier: perfectMultiplier,
     );
   }
 
@@ -581,6 +640,10 @@ class AdventureQuest {
     'roundOutcomeSerial': roundOutcomeSerial,
     'presentedRoundOutcomeSerial': presentedRoundOutcomeSerial,
     'lastRoundWon': lastRoundWon,
+    'perfectRoundStreak': perfectRoundStreak,
+    'lastRoundPerfect': lastRoundPerfect,
+    'lastPerfectDamageMultiplier': lastPerfectDamageMultiplier,
+    'lastPerfectStreakBroken': lastPerfectStreakBroken,
     'battleOutcome': battleOutcome.name,
     'enemyDefeatPending': enemyDefeatPending,
     'playerDefeatPending': playerDefeatPending,
@@ -645,6 +708,12 @@ class AdventureQuest {
       presentedRoundOutcomeSerial:
           json['presentedRoundOutcomeSerial'] as int? ?? 0,
       lastRoundWon: json['lastRoundWon'] as bool? ?? false,
+      perfectRoundStreak: json['perfectRoundStreak'] as int? ?? 0,
+      lastRoundPerfect: json['lastRoundPerfect'] as bool? ?? false,
+      lastPerfectDamageMultiplier:
+          (json['lastPerfectDamageMultiplier'] as num?)?.toDouble() ?? 1,
+      lastPerfectStreakBroken:
+          json['lastPerfectStreakBroken'] as bool? ?? false,
       battleOutcome: restoredOutcome,
       enemyDefeatPending: false,
       playerDefeatPending: false,
@@ -784,8 +853,7 @@ class AdventureQuest {
   ///
   /// [isEnemyDefeated] artık "macera bitti" demek değil; ekranlar ve ödül
   /// kapıları bu ayrımı gözetmeli.
-  bool get isAdventureCompleted =>
-      isEnemyDefeated && walkRemainingSteps == 0;
+  bool get isAdventureCompleted => isEnemyDefeated && walkRemainingSteps == 0;
 
   /// Maceranın hangi fazında olduğu. Yenilgi ve Hayat Yürüyüşü ayrı dallar.
   AdventureQuestPhase get phase {
@@ -848,7 +916,10 @@ class AdventureQuest {
     if (maximum <= minimum) return minimum;
     final span = maximum - minimum + 1;
     return minimum +
-        stableSpread('victory-coins|${enemy.id}|$startingSteps|$stepGoal', span);
+        stableSpread(
+          'victory-coins|${enemy.id}|$startingSteps|$stepGoal',
+          span,
+        );
   }
 
   /// Otoriter yenilgiden sonra Hayat Yürüyüşünü başlatır.
@@ -903,6 +974,15 @@ class CombatRoundResult {
   /// Turu oyuncu mu açtı (inisiyatif).
   final bool playerActedFirst;
 
+  /// Hedef süre dolmadan tamamlandı mı.
+  final bool perfect;
+
+  /// Bu sonuçtan sonraki ardışık mükemmel round sayısı.
+  final int perfectStreak;
+
+  /// Bu roundda oyuncu hasarına uygulanan gerçek çarpan.
+  final double perfectDamageMultiplier;
+
   /// Bu round çözüldükten sonraki otoriter savaş sonucu.
   final AdventureBattleOutcome battleOutcome;
 
@@ -919,6 +999,9 @@ class CombatRoundResult {
     this.playerDefeated = false,
     this.playerActedFirst = true,
     this.battleOutcome = AdventureBattleOutcome.active,
+    this.perfect = false,
+    this.perfectStreak = 0,
+    this.perfectDamageMultiplier = 1,
   });
 
   bool get targetReached => walkedSteps >= targetSteps;

@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/constants/attack_config.dart';
 import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_clock.dart';
@@ -1048,9 +1049,8 @@ class _AdventureScreenState extends State<AdventureScreen>
                             ? FilledButton.icon(
                               key: const ValueKey('victory-continue-walk'),
                               onPressed:
-                                  () => setState(
-                                    () => _showRoundVictory = false,
-                                  ),
+                                  () =>
+                                      setState(() => _showRoundVictory = false),
                               icon: const Icon(Icons.directions_walk),
                               label: const Text('YÜRÜYÜŞE DEVAM ET'),
                             )
@@ -1552,9 +1552,9 @@ class _AdventureScreenState extends State<AdventureScreen>
               Text(
                 'Zafer senin',
                 textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -2005,6 +2005,51 @@ class _AdventureScreenState extends State<AdventureScreen>
               fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 420),
+            transitionBuilder:
+                (child, animation) => ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutBack,
+                  ),
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+            child: Container(
+              key: ValueKey(adventure.perfectRoundStreak),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.streak.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.streak.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department,
+                    size: 18,
+                    color: AppColors.streak,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      adventure.perfectRoundStreak == 0
+                          ? 'Mükemmel seri: — · sıradaki tavan ×${adventure.nextPerfectStreakCap.toStringAsFixed(1)}'
+                          : 'MÜKEMMEL SERİ ${adventure.perfectRoundStreak} · tavan ×${adventure.perfectStreakCap.toStringAsFixed(1)}',
+                      style: const TextStyle(
+                        color: AppColors.streak,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 10),
           // ANA BAR: macera ilerlemesi. Round başına **sıfırlanmaz**; oyuncu
           // tek bakışta maceranın neresinde olduğunu görmeli. Eskiden burada
@@ -2058,10 +2103,10 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Her round ${adventure.roundDurationLabel}. Hedefi erken '
-            'tamamlarsan round anında biter. Süre dolduğunda hedef eksik kalırsa '
-            '${adventure.enemy.name}, eksik oranına göre saldırır; '
-            'savunman gelen hasarı azaltır.',
+            'Tempo ${GameConstants.stepsPerMinute} adım/dk · bu round '
+            '${adventure.roundDurationLabel}. Hedefi süre dolmadan bitirirsen '
+            'mükemmel round ve erken bitirme bonusu kazanırsın. Kaçırırsan seri '
+            'sıfırlanır; ${adventure.enemy.name} eksik oranının eğrisine göre saldırır.',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
@@ -2098,11 +2143,15 @@ class _AdventureScreenState extends State<AdventureScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.bolt,
+                          Icon(
+                            widget.adventure?.lastPerfectStreakBroken == true
+                                ? Icons.heart_broken
+                                : widget.adventure?.lastRoundPerfect == true
+                                ? Icons.local_fire_department
+                                : Icons.bolt,
                             color: AppColors.streak,
                             size: 38,
-                            shadows: [
+                            shadows: const [
                               Shadow(color: AppColors.streak, blurRadius: 22),
                             ],
                           ),
@@ -2125,7 +2174,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                             ),
                           ),
                           Text(
-                            'YENİ ROUND BAŞLADI',
+                            widget.adventure?.lastPerfectStreakBroken == true
+                                ? 'SERİ KIRILDI · ×1.0'
+                                : widget.adventure?.lastRoundPerfect == true
+                                ? 'MÜKEMMEL · SERİ ${widget.adventure!.perfectRoundStreak}'
+                                : 'YENİ ROUND BAŞLADI',
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontSize: 14,
@@ -2223,8 +2276,10 @@ class _WalkPhaseSceneState extends State<_WalkPhaseScene>
         const edgeInset = 6.0;
         // Sprite tuvalinin iki yanında şeffaf boşluk var; kutuyu tamamen
         // içeride tutmak yerine biraz taşırmak figürü kenara yaslamıyor.
-        final travelSpan =
-            (constraints.maxWidth - spriteWidth + 40).clamp(0.0, 400.0);
+        final travelSpan = (constraints.maxWidth - spriteWidth + 40).clamp(
+          0.0,
+          400.0,
+        );
         return Stack(
           children: [
             Positioned.fill(
@@ -2426,8 +2481,9 @@ class _GoalSelectorButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${(goal / AdventureQuest.stageStepTarget).ceil()} round • '
-                      'round başına ${AdventureQuest.configuredRoundDurationLabel}',
+                      '${AttackConfig.roundCountForSteps(goal)} round • '
+                      '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(goal))} toplam • '
+                      '${GameConstants.stepsPerMinute} adım/dk',
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2618,7 +2674,8 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                         ),
                         _EnemyInfoChip(
                           icon: Icons.timer_outlined,
-                          label: AdventureQuest.configuredRoundDurationLabel,
+                          label:
+                              '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(widget.selectedGoal))} toplam',
                           color: AppColors.streak,
                         ),
                         _EnemyInfoChip(
@@ -2676,9 +2733,11 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Her round en fazla 1.000 adım ve 15 dakika sürer. '
-                            'Hedefe erken ulaşırsan round anında tamamlanır; '
-                            'süreyi kaçırırsan düşman eksik adım oranında saldırır.',
+                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round, '
+                            '${GameConstants.stepsPerMinute} adım/dk temposundan türetilir. '
+                            'Hedefe süre dolmadan ulaşırsan mükemmel round serisi '
+                            'hasarını büyütür; kaçırırsan seri kırılır ve düşman '
+                            'eksik oranının eğrisine göre saldırır.',
                             style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 12,

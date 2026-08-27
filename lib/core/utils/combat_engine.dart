@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../constants/game_constants.dart';
 import '../../models/combat_stats.dart';
 import '../../models/item_effect.dart';
 
@@ -57,6 +58,32 @@ const double luckToVarianceShift = 0.0125;
 
 /// Verilen hasarın en düşük değeri. Sıfır hasar, savaşı kilitler.
 const int minimumDamage = 1;
+
+/// Round tamamlama oranını düşman hasar ölçeğine çevirir.
+///
+/// Eğri hafif dışbükeydir: `%90 → %50` tamamlama arasındaki hasar farkı,
+/// `%50 → %10` arasındakinden küçüktür. Sınırlar kesindir: tamamlama 1 ise
+/// sıfır, 0 ise tam hasar.
+double enemyDamageScaleForCompletion(double completion) {
+  final ratio = completion.isNaN ? 0.0 : completion.clamp(0.0, 1.0);
+  return pow(1 - ratio, GameConstants.missedRoundDamageExponent).toDouble();
+}
+
+/// Mükemmel roundun erken bitirme ve seri kaynaklı hasar çarpanı.
+///
+/// [earlyFraction] round süresinin bitiş anında kalan oranıdır (0..1).
+/// Seri, erişilebilecek tavanı ×1,2 → ×1,5 → ×2 büyütür; hedefe son anda
+/// ulaşmak küçük, çok erken ulaşmak tavana yakın bonus verir.
+double perfectRoundDamageMultiplier({
+  required int streak,
+  required double earlyFraction,
+}) {
+  if (streak <= 0) return 1;
+  final caps = GameConstants.perfectRoundStreakMultipliers;
+  final cap = caps[(streak - 1).clamp(0, caps.length - 1)];
+  final early = earlyFraction.isNaN ? 0.0 : earlyFraction.clamp(0.0, 1.0);
+  return 1 + (cap - 1) * early;
+}
 
 /// Tohumu bir sonraki adıma ilerletir.
 ///
@@ -152,6 +179,7 @@ CombatRoundOutcome resolveCombatRound({
   required int enemyHealth,
   required double completion,
   required int seed,
+  double playerDamageMultiplier = 1,
   List<ItemEffect> onHitEffects = const [],
   List<ItemEffect> onKillEffects = const [],
 }) {
@@ -184,8 +212,12 @@ CombatRoundOutcome resolveCombatRound({
     final isPlayer = attacker == Combatant.player;
     final attackerStats = isPlayer ? player : enemy;
     final defenderStats = isPlayer ? enemy : player;
-    // Oyuncu yürüdüğü kadar vurur, düşman kaçırılan kadar.
-    final scale = isPlayer ? ratio : 1 - ratio;
+    // Oyuncu yürüdüğü kadar vurur. Düşmanın eksik oranı hafif eğrili bir
+    // cezaya dönüşür; az kaçıran oyuncu orantısız hasar yemez.
+    final scale =
+        isPlayer
+            ? ratio * playerDamageMultiplier.clamp(1.0, double.infinity)
+            : enemyDamageScaleForCompletion(ratio);
 
     if (scale <= 0) continue;
 

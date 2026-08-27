@@ -55,6 +55,9 @@ GameState _sampleState() {
   adventure.roundOutcomeSerial = 2;
   adventure.presentedRoundOutcomeSerial = 1;
   adventure.lastRoundWon = true;
+  adventure.perfectRoundStreak = 2;
+  adventure.lastRoundPerfect = true;
+  adventure.lastPerfectDamageMultiplier = 1.4;
 
   return GameState(
     profile: profile,
@@ -151,6 +154,9 @@ void main() {
       expect(adventure.roundOutcomeSerial, 2);
       expect(adventure.presentedRoundOutcomeSerial, 1);
       expect(adventure.lastRoundWon, isTrue);
+      expect(adventure.perfectRoundStreak, 2);
+      expect(adventure.lastRoundPerfect, isTrue);
+      expect(adventure.lastPerfectDamageMultiplier, 1.4);
       // Geri sayım kurucuda yeniden hesaplanmamalı, kayıttan gelmeli.
       expect(
         adventure.nextEnemyAttackAt,

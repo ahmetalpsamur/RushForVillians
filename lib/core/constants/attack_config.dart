@@ -1,3 +1,5 @@
+import 'game_constants.dart';
+
 /// Bir saldırının değişmeyen beş yürüyüş yoğunluğu.
 ///
 /// Sıra bu enumun sırasıdır ve oyun kuralıdır; kayıtta ordinal yerine [name]
@@ -14,11 +16,11 @@ extension AttackPhaseLabel on AttackPhase {
   };
 
   String get fitnessDescription => switch (this) {
-    AttackPhase.warmUp => 'Düşük tempoda yürüyüşe hazırlan.',
-    AttackPhase.attack => 'Normal tempoda yürümeye devam et.',
-    AttackPhase.rush => 'Temponu artır.',
-    AttackPhase.recovery => 'Durma; daha düşük tempoda yürümeyi sürdür.',
-    AttackPhase.finalRush => 'Son kez yüksek tempoya çık.',
+    AttackPhase.warmUp => '100 adım/dk ritmini yakala.',
+    AttackPhase.attack => 'Ritmini koru ve hedefe odaklan.',
+    AttackPhase.rush => 'Erken bitirme bonusu için ritmi aksatma.',
+    AttackPhase.recovery => 'Durma; 100 adım/dk ritmini koru.',
+    AttackPhase.finalRush => 'Seriyi korumak için son hedefi tamamla.',
   };
 }
 
@@ -46,45 +48,49 @@ class AttackRoundConfig {
 /// Seçilebilir tek bir saldırı hedefi ve ona bağlı denge değerleri.
 class AttackTargetConfig {
   final int stepTarget;
-  final Duration totalAttackDuration;
   final double enemyPowerMultiplier;
 
   const AttackTargetConfig({
     required this.stepTarget,
-    required this.totalAttackDuration,
     required this.enemyPowerMultiplier,
   }) : assert(stepTarget > 0),
        assert(enemyPowerMultiplier > 0);
 
-  List<Duration> get roundDurations => List.unmodifiable(
-    AttackConfig.rounds.map((round) => round.durationFor(totalAttackDuration)),
+  Duration get totalAttackDuration => AttackConfig.durationForSteps(stepTarget);
+
+  int get roundCount => AttackConfig.roundCountForSteps(stepTarget);
+
+  List<int> get roundStepTargets => List.unmodifiable(
+    List.generate(roundCount, (index) => roundStepTarget(index)),
   );
+
+  List<Duration> get roundDurations =>
+      List.unmodifiable(roundStepTargets.map(AttackConfig.durationForSteps));
 
   Duration roundDuration(int zeroBasedRoundIndex) {
     RangeError.checkValidIndex(
       zeroBasedRoundIndex,
-      AttackConfig.rounds,
+      List.filled(roundCount, 0),
       'zeroBasedRoundIndex',
     );
-    return AttackConfig.rounds[zeroBasedRoundIndex].durationFor(
-      totalAttackDuration,
-    );
+    return AttackConfig.durationForSteps(roundStepTarget(zeroBasedRoundIndex));
   }
 
   int roundStepTarget(int zeroBasedRoundIndex) {
     RangeError.checkValidIndex(
       zeroBasedRoundIndex,
-      AttackConfig.rounds,
+      List.filled(roundCount, 0),
       'zeroBasedRoundIndex',
     );
-    return AttackConfig.rounds[zeroBasedRoundIndex].stepTargetFor(stepTarget);
+    final base = stepTarget ~/ roundCount;
+    final remainder = stepTarget % roundCount;
+    return base + (zeroBasedRoundIndex < remainder ? 1 : 0);
   }
 }
 
 /// Attack UI, round zamanlaması ve düşman ölçeklemesinin tek doğruluk kaynağı.
 abstract final class AttackConfig {
-  static const int version = 1;
-  static const int roundCount = 5;
+  static const int version = 2;
 
   static const List<AttackRoundConfig> rounds = [
     AttackRoundConfig(phase: AttackPhase.warmUp, percentage: 0.15),
@@ -95,37 +101,46 @@ abstract final class AttackConfig {
   ];
 
   static const List<AttackTargetConfig> targets = [
-    AttackTargetConfig(
-      stepTarget: 500,
-      totalAttackDuration: Duration(minutes: 5),
-      enemyPowerMultiplier: 1.00,
-    ),
-    AttackTargetConfig(
-      stepTarget: 1000,
-      totalAttackDuration: Duration(minutes: 8),
-      enemyPowerMultiplier: 1.15,
-    ),
-    AttackTargetConfig(
-      stepTarget: 2000,
-      totalAttackDuration: Duration(minutes: 12),
-      enemyPowerMultiplier: 1.35,
-    ),
-    AttackTargetConfig(
-      stepTarget: 3000,
-      totalAttackDuration: Duration(minutes: 15),
-      enemyPowerMultiplier: 1.55,
-    ),
-    AttackTargetConfig(
-      stepTarget: 5000,
-      totalAttackDuration: Duration(minutes: 20),
-      enemyPowerMultiplier: 1.85,
-    ),
-    AttackTargetConfig(
-      stepTarget: 10000,
-      totalAttackDuration: Duration(minutes: 30),
-      enemyPowerMultiplier: 2.40,
-    ),
+    AttackTargetConfig(stepTarget: 500, enemyPowerMultiplier: 1.00),
+    AttackTargetConfig(stepTarget: 1000, enemyPowerMultiplier: 1.15),
+    AttackTargetConfig(stepTarget: 2000, enemyPowerMultiplier: 1.35),
+    AttackTargetConfig(stepTarget: 3000, enemyPowerMultiplier: 1.55),
+    AttackTargetConfig(stepTarget: 5000, enemyPowerMultiplier: 1.85),
+    AttackTargetConfig(stepTarget: 10000, enemyPowerMultiplier: 2.40),
   ];
+
+  /// Toplam hedeften round sayısını türetir.
+  ///
+  /// 250 adım/round hedeflenir; iki round gerilim için alt sınır, beş round
+  /// tekrar hissini önleyen üst sınırdır. Böylece 500 → 2, 1.000 → 4;
+  /// daha uzun maceralar 5 roundda kalır.
+  static int roundCountForSteps(int stepTarget) {
+    if (stepTarget <= 0) return 0;
+    return (stepTarget / GameConstants.idealStepsPerCombatRound).ceil().clamp(
+      GameConstants.minCombatRounds,
+      GameConstants.maxCombatRounds,
+    );
+  }
+
+  /// Adım hedefini 100 adım/dakika temposunda gereken süreye çevirir.
+  static Duration durationForSteps(int steps) {
+    if (steps <= 0) return Duration.zero;
+    return Duration(
+      seconds: (steps * 60 / GameConstants.stepsPerMinute).ceil(),
+    );
+  }
+
+  /// Değişken round sayısında kullanılacak fitness fazını seçer.
+  static AttackRoundConfig roundConfig(int index, int roundCount) {
+    final phaseIndexes = switch (roundCount) {
+      2 => const [1, 4],
+      3 => const [0, 1, 4],
+      4 => const [0, 1, 3, 4],
+      _ => const [0, 1, 2, 3, 4],
+    };
+    RangeError.checkValidIndex(index, phaseIndexes, 'index');
+    return rounds[phaseIndexes[index]];
+  }
 
   static List<int> get supportedStepTargets =>
       List.unmodifiable(targets.map((target) => target.stepTarget));
@@ -134,7 +149,7 @@ abstract final class AttackConfig {
       rounds.fold(0, (total, round) => total + round.percentage);
 
   static bool get hasValidRoundPercentages =>
-      rounds.length == roundCount &&
+      rounds.length == GameConstants.maxCombatRounds &&
       (roundPercentageTotal - 1).abs() < 0.000000001;
 
   static AttackTargetConfig forStepTarget(int stepTarget) {

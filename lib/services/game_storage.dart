@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 20;
+  static const int schemaVersion = 21;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -292,6 +292,10 @@ class GameStorage {
     // yani eski kayıtta rehber açık geliyor. Sürüm yine de artırıldı
     // (Model Kuralları #2 disiplini).
     19: (state) => state,
+    // v20 -> v21: savaşın mükemmel-round serisi ve son round geri bildirimi
+    // kalıcı hâle geldi (Bölüm B). Eksik alanlar sıfır/false/×1 güvenli
+    // varsayılanlarına düştüğü için eski kaydın içeriğini değiştirmek gerekmez.
+    20: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde
