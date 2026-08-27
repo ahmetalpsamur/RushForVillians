@@ -265,7 +265,7 @@ yapmalı.
 - **AGP 9 / Gradle 9 geçişi ertelendi:** Flutter Gradle eklentisi AGP 9'un yeni
   DSL'iyle uyumsuz.
 - Android: `multiDexEnabled`, `coreLibraryDesugaring 2.1.4`,
-  `applicationId com.ahmetalpsamur.rush_for_villains`.
+  `applicationId com.heapchiStudios.rush_for_villains`.
 - Platform klasörleri yalnızca `android/` ve `ios/`.
 
 ## 5.2 ⚠️ TEST ORTAMI — testler `--no-test-assets` ile çalışır

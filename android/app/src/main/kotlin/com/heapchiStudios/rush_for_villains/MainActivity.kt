@@ -1,4 +1,4 @@
-package com.ahmetalpsamur.rush_for_villains
+package com.heapchiStudios.rush_for_villains
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
