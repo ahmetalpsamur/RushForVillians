@@ -84,11 +84,11 @@ class _AdventureScreenState extends State<AdventureScreen>
   int _victoryRound = 0;
   int _victoryCycle = 0;
   int _enemyVictoryCycle = 0;
-  bool _isFinalVictory = false;
   bool _showEnemyDeath = false;
   bool _showFrozenEnemy = false;
   bool _showDeathCongratulations = false;
   double _overlayEnemyHealth = 1;
+  int _displayedEnemyDamage = 0;
   ui.Image? _frozenDeathFrame;
   bool _showRoundTransition = false;
   int _transitionRound = 1;
@@ -172,13 +172,13 @@ class _AdventureScreenState extends State<AdventureScreen>
     _showRoundVictory = false;
     _showEnemyRoundVictory = false;
     _showRoundTransition = false;
-    _isFinalVictory = false;
     _showEnemyDeath = false;
     _showFrozenEnemy = false;
     _showDeathCongratulations = false;
     _victoryCycle = 0;
     _enemyVictoryCycle = 0;
     _overlayEnemyHealth = 1;
+    _displayedEnemyDamage = 0;
     _roundPlayerAttackAsset = null;
     _roundEnemyAttackAsset = null;
     if (adventure == null) return;
@@ -197,6 +197,9 @@ class _AdventureScreenState extends State<AdventureScreen>
 
     _pendingDamage = adventure.takePendingDamage();
     if (adventure.isEnemyDefeated) {
+      // Altın toplama tamamlandıktan sonra ilk zafer perdesi yeniden açılmaz.
+      // Bu durumun düşmansız, yalnızca ek altını gösteren ayrı sonucu var.
+      if (adventure.isGoldCollectionCompleted) return;
       // Zafer kutlaması **bir kez** oynar. Yürüyüş fazı açıldıysa ve kutlama
       // zaten gösterildiyse ekran doğrudan yürüyüş sahnesine düşer; aksi
       // hâlde oyuncu Macera sekmesine her dönüşünde aynı kutlamayla
@@ -206,7 +209,6 @@ class _AdventureScreenState extends State<AdventureScreen>
       }
       if (adventure.deathAnimationPlayed) {
         _showRoundVictory = true;
-        _isFinalVictory = true;
         _showEnemyDeath = true;
         _showDeathCongratulations = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -217,7 +219,6 @@ class _AdventureScreenState extends State<AdventureScreen>
 
       adventure.deathAnimationPlayed = true;
       _showRoundVictory = true;
-      _isFinalVictory = true;
       _showEnemyDeath = true;
       _showDeathCongratulations = true;
       _enemyAnimationTimer = Timer(
@@ -299,22 +300,30 @@ class _AdventureScreenState extends State<AdventureScreen>
     _roundAttackController.duration = playerAttackDuration;
 
     final isFinalVictory = adventure.isEnemyDefeated;
-    final finalDamage = max(1, adventure.lastPlayerDamage);
-    final healthBeforeFinalRound =
-        (finalDamage / adventure.scaledEnemyMaxHealth).clamp(0.02, 1.0);
+    final maxEnemyHealth = max(1, adventure.scaledEnemyMaxHealth);
+    final healthAfter = adventure.remainingEnemyHealth.clamp(0, maxEnemyHealth);
+    final fallbackHealthBefore = (healthAfter + adventure.lastPlayerDamage)
+        .clamp(0, maxEnemyHealth);
+    final healthBefore =
+        adventure.enemyHealthBeforeLastRound > 0
+            ? adventure.enemyHealthBeforeLastRound.clamp(0, maxEnemyHealth)
+            : fallbackHealthBefore;
+    final healthBeforeProgress = healthBefore / maxEnemyHealth;
+    final healthAfterProgress = healthAfter / maxEnemyHealth;
+    final displayedDamage = (healthBefore - healthAfter).clamp(
+      0,
+      maxEnemyHealth,
+    );
     setState(() {
       _showRoundVictory = true;
       _showEnemyRoundVictory = false;
       _victoryRound = adventure.lastResolvedRound;
       _victoryCycle = 1;
-      _isFinalVictory = isFinalVictory;
       _showEnemyDeath = false;
       _showFrozenEnemy = false;
       _showDeathCongratulations = false;
-      _overlayEnemyHealth =
-          isFinalVictory
-              ? healthBeforeFinalRound
-              : adventure.enemyHealthProgress;
+      _overlayEnemyHealth = healthBeforeProgress;
+      _displayedEnemyDamage = displayedDamage;
       _showHurt = false;
       _showAttack = false;
       _roundPlayerAttackAsset = playerAttackAsset;
@@ -327,9 +336,14 @@ class _AdventureScreenState extends State<AdventureScreen>
           setState(() => _victoryCycle = cycle);
         }
         await _roundAttackController.forward(from: 0).orCancel;
-        if (isFinalVictory && mounted) {
+        if (mounted) {
           setState(() {
-            _overlayEnemyHealth = healthBeforeFinalRound * (1 - (cycle / 2));
+            _overlayEnemyHealth =
+                ui.lerpDouble(
+                  healthBeforeProgress,
+                  healthAfterProgress,
+                  cycle / 2,
+                )!;
           });
         }
         if (cycle < 2) {
@@ -764,6 +778,8 @@ class _AdventureScreenState extends State<AdventureScreen>
             ? _buildRevivalWalk(context, adventure)
             : adventure.isPlayerDefeated
             ? _buildPlayerDefeat(context, adventure)
+            : adventure.isGoldCollectionCompleted
+            ? _buildGoldCollectionCompleted(context, adventure)
             : adventure.isEnemyDefeated && _showCongratulations
             ? _buildCongratulations(context, adventure)
             : _buildAdventure(context, adventure);
@@ -774,7 +790,9 @@ class _AdventureScreenState extends State<AdventureScreen>
       body: Stack(
         children: [
           Positioned.fill(child: content),
-          if (_showRoundVictory && adventure != null)
+          if (_showRoundVictory &&
+              adventure != null &&
+              !adventure.isGoldCollectionCompleted)
             Positioned.fill(child: _buildRoundVictoryOverlay(adventure)),
           if (_showEnemyRoundVictory && adventure != null)
             Positioned.fill(child: _buildEnemyRoundVictoryOverlay(adventure)),
@@ -881,7 +899,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                       '${adventure.victoryRounds} round · '
                       '${_formatNumber(adventure.victorySteps)} adım — '
                       'hız ödülü ×'
-                      '${adventure.speedRewardMultiplier.toStringAsFixed(1)}',
+                      '${adventure.speedRewardMultiplier.toStringAsFixed(2)}',
                       key: const ValueKey('victory-speed-bonus'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
@@ -902,7 +920,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                     ),
                   ],
                 ],
-                if (_isFinalVictory) ...[
+                if (_displayedEnemyDamage > 0) ...[
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -927,7 +945,8 @@ class _AdventureScreenState extends State<AdventureScreen>
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '${(_overlayEnemyHealth * adventure.stepGoal).round()} CAN',
+                        '${(_overlayEnemyHealth * adventure.scaledEnemyMaxHealth).round()} CAN',
+                        key: const ValueKey('animated-enemy-health-value'),
                         style: const TextStyle(
                           color: AppColors.hp,
                           fontWeight: FontWeight.w900,
@@ -1028,6 +1047,41 @@ class _AdventureScreenState extends State<AdventureScreen>
                                       blurRadius: 18,
                                     ),
                                   ],
+                                ),
+                              ),
+                            ),
+                          if (!_showEnemyDeath &&
+                              !_showFrozenEnemy &&
+                              _displayedEnemyDamage > 0)
+                            Positioned(
+                              right: 14,
+                              top: 96,
+                              child: Opacity(
+                                opacity: (1 - (attack - 0.62).abs() / 0.62)
+                                    .clamp(0.0, 1.0),
+                                child: Transform.scale(
+                                  scale: 0.88 + attack * 0.2,
+                                  child: Text(
+                                    '-$_displayedEnemyDamage CAN',
+                                    key: const ValueKey(
+                                      'animated-enemy-damage',
+                                    ),
+                                    style: const TextStyle(
+                                      color: AppColors.hp,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black,
+                                          blurRadius: 8,
+                                        ),
+                                        Shadow(
+                                          color: AppColors.hp,
+                                          blurRadius: 18,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1390,6 +1444,69 @@ class _AdventureScreenState extends State<AdventureScreen>
     );
   }
 
+  Widget _buildGoldCollectionCompleted(
+    BuildContext context,
+    AdventureQuest adventure,
+  ) {
+    return Stack(
+      key: const ValueKey('gold-collection-completed'),
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            adventure.backgroundAsset,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.none,
+          ),
+        ),
+        Positioned.fill(
+          child: ColoredBox(color: Colors.black.withValues(alpha: 0.74)),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 88),
+            child: Column(
+              children: [
+                const Spacer(),
+                Image.asset(
+                  'lib/All_Assets/coins/coin_gold_large_shine.gif',
+                  key: const ValueKey('gold-collection-large-coin'),
+                  width: 210,
+                  height: 210,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.none,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '+${adventure.walkCoinReward} EK ALTIN',
+                  key: const ValueKey('gold-collection-earned-coins'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: AppColors.streak,
+                    fontWeight: FontWeight.w900,
+                    shadows: const [
+                      Shadow(color: Colors.black, blurRadius: 10),
+                      Shadow(color: AppColors.streak, blurRadius: 28),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const ValueKey('gold-collection-choose-adventure'),
+                    onPressed: widget.onChooseNewAdventure,
+                    icon: const Icon(Icons.explore),
+                    label: const Text('YENİ MACERA SEÇ'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCongratulations(BuildContext context, AdventureQuest adventure) {
     return Center(
       child: SingleChildScrollView(
@@ -1545,6 +1662,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                     key: const ValueKey('walk-phase-scene'),
                     backgroundAsset: adventure.backgroundAsset,
                     walkAsset: widget.avatar.characterAsset,
+                    earnedCoins: adventure.walkCoinReward,
                   ),
                 ),
               ),
@@ -1647,7 +1765,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                       '${adventure.victoryRounds} round · '
                       '${_formatNumber(adventure.victorySteps)} adımda '
                       'devirdin — hız ödülü ×'
-                      '${adventure.speedRewardMultiplier.toStringAsFixed(1)}',
+                      '${adventure.speedRewardMultiplier.toStringAsFixed(2)}',
                       key: const ValueKey('walk-phase-speed-bonus'),
                     ),
                   ),
@@ -1664,8 +1782,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '+${adventure.victoryCoinReward} altın · '
+                      'Zafer +${adventure.victoryCoinReward} · '
+                      'yürüyüş +${adventure.walkCoinReward} altın · '
+                      'toplam +${adventure.totalCoinReward} altın · '
                       '+${adventure.victoryXpReward} XP',
+                      key: const ValueKey('walk-phase-reward-total'),
                     ),
                   ),
                 ],
@@ -1974,6 +2095,17 @@ class _AdventureScreenState extends State<AdventureScreen>
             icon: const Icon(Icons.refresh),
             label: const Text('Yeni Macera Seç'),
           ),
+        ] else ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const ValueKey('adventure-exit'),
+              onPressed: widget.onChooseNewAdventure,
+              icon: const Icon(Icons.logout),
+              label: const Text('Maceradan Çık'),
+            ),
+          ),
         ],
       ],
     );
@@ -2038,7 +2170,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                     child: Text(
                       adventure.perfectRoundStreak == 0
                           ? 'Mükemmel seri: — · sıradaki tavan ×${adventure.nextPerfectStreakCap.toStringAsFixed(1)}'
-                          : 'MÜKEMMEL SERİ ${adventure.perfectRoundStreak} · tavan ×${adventure.perfectStreakCap.toStringAsFixed(1)}',
+                          : 'MÜKEMMEL SERİ ${adventure.perfectRoundStreak} · tavan ×${adventure.perfectStreakCap.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2103,7 +2235,7 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Tempo ${GameConstants.stepsPerMinute} adım/dk · bu round '
+            'Bu round ${adventure.roundTargetSteps} adım · '
             '${adventure.roundDurationLabel}. Hedefi süre dolmadan bitirirsen '
             'mükemmel round ve erken bitirme bonusu kazanırsın. Kaçırırsan seri '
             'sıfırlanır; ${adventure.enemy.name} eksik oranının eğrisine göre saldırır.',
@@ -2244,11 +2376,13 @@ String _formatNumber(int value) {
 class _WalkPhaseScene extends StatefulWidget {
   final String backgroundAsset;
   final String walkAsset;
+  final int earnedCoins;
 
   const _WalkPhaseScene({
     super.key,
     required this.backgroundAsset,
     required this.walkAsset,
+    required this.earnedCoins,
   });
 
   @override
@@ -2344,6 +2478,44 @@ class _WalkPhaseSceneState extends State<_WalkPhaseScene>
                       letterSpacing: 1.6,
                       shadows: [Shadow(color: Colors.black, blurRadius: 6)],
                     ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.monetization_on,
+                        size: 18,
+                        color: AppColors.streak,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '+${widget.earnedCoins} EK ALTIN',
+                        key: const ValueKey('walk-phase-earned-coins'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -2482,8 +2654,8 @@ class _GoalSelectorButton extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '${AttackConfig.roundCountForSteps(goal)} round • '
-                      '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(goal))} toplam • '
-                      '${GameConstants.stepsPerMinute} adım/dk',
+                      '${GameConstants.combatRoundStepTarget} adım/round • '
+                      '${AdventureQuest.durationLabel(GameConstants.combatRoundDuration)}/round',
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2733,8 +2905,9 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round, '
-                            '${GameConstants.stepsPerMinute} adım/dk temposundan türetilir. '
+                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round; '
+                            'her round ${GameConstants.combatRoundStepTarget} adım ve '
+                            '${AdventureQuest.durationLabel(GameConstants.combatRoundDuration)}. '
                             'Hedefe süre dolmadan ulaşırsan mükemmel round serisi '
                             'hasarını büyütür; kaçırırsan seri kırılır ve düşman '
                             'eksik oranının eğrisine göre saldırır.',

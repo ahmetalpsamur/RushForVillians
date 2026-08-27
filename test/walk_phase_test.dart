@@ -65,10 +65,8 @@ AdventureQuest _victorious({
 
 /// Alt gezinme çubuğundaki sekmeyi bulur. Ekran başlığı da "Macera" yazdığı
 /// için düz `find.text` iki sonuç döndürüyor.
-Finder _tab(String label) => find.descendant(
-  of: find.byType(NavigationBar),
-  matching: find.text(label),
-);
+Finder _tab(String label) =>
+    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -184,10 +182,10 @@ void main() {
             victorySteps: steps,
           ).speedRewardMultiplier;
 
-      // 2000'in %20'sinde devirmek -> 1 + 0.8 = 1.8 (şartnamedeki örnek).
-      expect(multiplierAt(400), closeTo(1.8, 0.0001));
-      expect(multiplierAt(1000), closeTo(1.5, 0.0001));
-      expect(multiplierAt(1600), closeTo(1.2, 0.0001));
+      // Bonus aralığı artık dar: en erken zafer bile en fazla ×1,02.
+      expect(multiplierAt(400), closeTo(1.016, 0.0001));
+      expect(multiplierAt(1000), closeTo(1.01, 0.0001));
+      expect(multiplierAt(1600), closeTo(1.004, 0.0001));
       expect(multiplierAt(400), greaterThan(multiplierAt(1000)));
     });
 
@@ -405,6 +403,11 @@ void main() {
         1000 ~/ GameConstants.walkPhaseStepsPerCoin,
         reason: 'yürüyüş fazında 30 adım 1 coin etmeli',
       );
+      expect(
+        quest.walkCoinReward,
+        profile.coins - coinsBefore,
+        reason: 'fazda kazanılan ek altın macera özetinde izlenmeli',
+      );
     });
 
     testWidgets('faz bitince oran 50/1e döner', (tester) async {
@@ -511,6 +514,10 @@ void main() {
           (envelope['state'] as Map<String, dynamic>)['adventure']
               as Map<String, dynamic>;
       expect(adventure['walkSteps'], 1000);
+      expect(
+        adventure['walkCoinReward'],
+        1000 ~/ GameConstants.walkPhaseStepsPerCoin,
+      );
       expect(adventure['victorySteps'], 0);
       expect(envelope['schemaVersion'], GameStorage.schemaVersion);
     });
@@ -568,6 +575,17 @@ void main() {
 
       expect(quest.isAdventureCompleted, isTrue);
       expect(find.byKey(const ValueKey('walk-phase-scene')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('gold-collection-completed')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('gold-collection-large-coin')),
+        findsOneWidget,
+      );
+      expect(find.text('+33 EK ALTIN'), findsOneWidget);
+      expect(find.textContaining('XP'), findsNothing);
+      expect(find.textContaining(quest.enemy.name), findsNothing);
     });
   });
 }

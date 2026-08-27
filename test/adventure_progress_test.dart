@@ -53,19 +53,24 @@ void main() {
     Size size = const Size(390, 1400),
     bool resolveFirstRound = false,
     int perfectRoundStreak = 0,
+    VoidCallback? onChooseNewAdventure,
+    AdventureQuest? adventure,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final startedAt = GameClock.now();
-    final quest = AdventureQuest(
-      enemy: enemy,
-      stepGoal: stepGoal,
-      startingSteps: startingSteps,
-      roundStartingSteps: roundStartingSteps,
-      startedAt: startedAt,
-    )..perfectRoundStreak = perfectRoundStreak;
+    final quest =
+        adventure ??
+        AdventureQuest(
+          enemy: enemy,
+          stepGoal: stepGoal,
+          startingSteps: startingSteps,
+          roundStartingSteps: roundStartingSteps,
+          startedAt: startedAt,
+        );
+    quest.perfectRoundStreak = perfectRoundStreak;
     if (resolveFirstRound) {
       // "Düşmanın N canını aldın" mesajı artık round çözümünde oluşuyor:
       // savaş motorundan önce her adım 1 hasardı, şimdi hasar statlardan
@@ -94,7 +99,7 @@ void main() {
             ),
             onAdventureSelected: (_) {},
             onStartRevival: () {},
-            onChooseNewAdventure: () {},
+            onChooseNewAdventure: onChooseNewAdventure ?? () {},
             onAdventureUpdated: () {},
           ),
         ),
@@ -161,6 +166,33 @@ void main() {
   });
 
   group('round ilerlemesi ikincil olarak duruyor', () {
+    testWidgets('oyuncu vurunca düşen can miktarı animasyonda görünür', (
+      tester,
+    ) async {
+      final quest = AdventureQuest(enemy: enemy, stepGoal: 2000);
+      final before = quest.enemyHealth;
+      quest
+        ..enemyHealthBeforeLastRound = before
+        ..enemyHealth = before - 10
+        ..lastPlayerDamage = 10
+        ..lastResolvedRound = 1
+        ..lastRoundWon = true
+        ..roundOutcomeSerial = 1;
+
+      await pumpAdventure(
+        tester,
+        stepGoal: 2000,
+        steps: 1000,
+        adventure: quest,
+      );
+
+      expect(
+        find.byKey(const ValueKey('animated-enemy-health-value')),
+        findsOneWidget,
+      );
+      expect(find.text('-10 CAN'), findsOneWidget);
+    });
+
     testWidgets('mükemmel round serisi ve tavanı görünür', (tester) async {
       await pumpAdventure(
         tester,
@@ -169,8 +201,11 @@ void main() {
         perfectRoundStreak: 2,
       );
 
-      expect(find.text('MÜKEMMEL SERİ 2 · tavan ×1.5'), findsOneWidget);
-      expect(find.textContaining('Tempo 100 adım/dk'), findsOneWidget);
+      expect(find.text('MÜKEMMEL SERİ 2 · tavan ×1.01'), findsOneWidget);
+      expect(
+        find.textContaining('Bu round 1000 adım · 15 dakika'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('round adımı yazıyla gösteriliyor', (tester) async {
@@ -180,7 +215,7 @@ void main() {
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(find.text('Bu round: 200 / 400 adım'), findsOneWidget);
+      expect(find.text('Bu round: 200 / 1000 adım'), findsOneWidget);
     });
 
     testWidgets('round çubuğu ana çubuktan ince', (tester) async {
@@ -200,14 +235,14 @@ void main() {
     });
 
     testWidgets('round çubuğu round içi ilerlemeyi gösterir', (tester) async {
-      // İkinci roundda 200 / 400 adım → %50.
+      // İkinci roundda 200 / 1000 adım → %20.
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(barValue(tester, 'round-progress-bar'), closeTo(0.5, 0.001));
+      expect(barValue(tester, 'round-progress-bar'), closeTo(0.2, 0.001));
       // Ana bar aynı anda %60'ta: round sıfırlansa da macera ilerlemesi durmaz.
       expect(mainBarValue(tester), closeTo(0.6, 0.001));
     });
@@ -230,6 +265,25 @@ void main() {
       expect(find.text('3500 / 2000 adım'), findsOneWidget);
       expect(find.text('Adım İlerlemesi'), findsNothing);
     });
+  });
+
+  testWidgets('aktif maceranın en altında çıkış seçeneği bulunur', (
+    tester,
+  ) async {
+    var exited = false;
+    await pumpAdventure(
+      tester,
+      stepGoal: 2000,
+      steps: 200,
+      onChooseNewAdventure: () => exited = true,
+    );
+
+    final exitButton = find.byKey(const ValueKey('adventure-exit'));
+    expect(exitButton, findsOneWidget);
+    await tester.ensureVisible(exitButton);
+    await tester.tap(exitButton);
+    await tester.pump();
+    expect(exited, isTrue);
   });
 
   group('hasar mesajı savaş sahnesini örtmez', () {

@@ -9,15 +9,14 @@ class GameConstants {
 
   // --- Savaş temposu ve mükemmel round (Bölüm B) ---
 
-  /// Savaş roundlarının hedef yürüyüş temposu.
-  ///
-  /// Bütün round süreleri `adım × 60 / [stepsPerMinute]` formülünden
-  /// türetilir. Dengeleme sırasında değiştirilmesi gereken tek tempo değeri
-  /// budur; roundlara veya düşmanlara ayrı süre yazılmaz.
+  /// Arayüzde gösterilen referans yürüyüş temposu.
   static const int stepsPerMinute = 100;
 
-  /// Round sayısı türetilirken hedeflenen yaklaşık adım miktarı.
-  static const int idealStepsPerCombatRound = 250;
+  /// Eski macera düzeninde her tam roundun sabit adım hedefi.
+  static const int combatRoundStepTarget = 1000;
+
+  /// Eski macera düzeninde her round için verilen sabit süre.
+  static const Duration combatRoundDuration = Duration(minutes: 15);
 
   /// Kısa macerada bile gerilim kurmak için gereken en az round.
   static const int minCombatRounds = 2;
@@ -33,9 +32,16 @@ class GameConstants {
 
   /// Mükemmel round serisinin erişebildiği hasar çarpanları.
   ///
-  /// İlk, ikinci ve üçüncü mükemmel round sırasıyla ×1,2 / ×1,5 / ×2
+  /// İlk, ikinci ve üçüncü mükemmel round sırasıyla ×1,01 / ×1,015 / ×1,02
   /// tavanını açar; sonraki roundlar son değerde kalır.
-  static const List<double> perfectRoundStreakMultipliers = [1.2, 1.5, 2.0];
+  static const List<double> perfectRoundStreakMultipliers = [1.01, 1.015, 1.02];
+
+  /// Düşmanın yenilebileceği en erken noktanın planlanan roundlara oranı.
+  ///
+  /// Yüksek seviye ve ekipman hasarı erken zaferi hâlâ mümkün kılar, ancak
+  /// canavarı maceranın ilk birkaç vuruşunda silip yürüyüşün büyük bölümünü
+  /// atlamaya dönüştüremez.
+  static const double earliestEnemyDefeatRoundRatio = 0.60;
 
   /// Oyuncunun başlangıç / taban canı (HP).
   static const int baseHp = 5000;
@@ -163,10 +169,10 @@ class GameConstants {
   /// Zafer ödülü hız çarpanının tavanı (Bölüm A.2).
   ///
   /// Düşmanı adım taahhüdünün ne kadar erken bir noktasında devirdiysen ödül
-  /// o kadar büyür: hiç adım harcamadan devirmek teorik üst sınır (×2), tam
+  /// o kadar büyür: hiç adım harcamadan devirmek teorik üst sınır (×1,02), tam
   /// hedefte devirmek taban (×1). Tavan olmadan güçlü oyuncunun ödülü
   /// sınırsız büyürdü.
-  static const double maxVictorySpeedMultiplier = 2.0;
+  static const double maxVictorySpeedMultiplier = 1.02;
 
   /// Kaç adımın 1 XP ettiği.
   ///

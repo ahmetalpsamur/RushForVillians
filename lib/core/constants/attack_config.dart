@@ -82,9 +82,10 @@ class AttackTargetConfig {
       List.filled(roundCount, 0),
       'zeroBasedRoundIndex',
     );
-    final base = stepTarget ~/ roundCount;
-    final remainder = stepTarget % roundCount;
-    return base + (zeroBasedRoundIndex < remainder ? 1 : 0);
+    final remaining =
+        stepTarget -
+        (zeroBasedRoundIndex * GameConstants.combatRoundStepTarget);
+    return remaining.clamp(1, GameConstants.combatRoundStepTarget);
   }
 }
 
@@ -109,30 +110,28 @@ abstract final class AttackConfig {
     AttackTargetConfig(stepTarget: 10000, enemyPowerMultiplier: 2.40),
   ];
 
-  /// Toplam hedeften round sayısını türetir.
-  ///
-  /// 250 adım/round hedeflenir; iki round gerilim için alt sınır, beş round
-  /// tekrar hissini önleyen üst sınırdır. Böylece 500 → 2, 1.000 → 4;
-  /// daha uzun maceralar 5 roundda kalır.
+  /// Toplam hedeften sabit 1000 adımlık round sayısını türetir.
   static int roundCountForSteps(int stepTarget) {
     if (stepTarget <= 0) return 0;
-    return (stepTarget / GameConstants.idealStepsPerCombatRound).ceil().clamp(
-      GameConstants.minCombatRounds,
-      GameConstants.maxCombatRounds,
-    );
+    return (stepTarget / GameConstants.combatRoundStepTarget).ceil();
   }
 
-  /// Adım hedefini 100 adım/dakika temposunda gereken süreye çevirir.
+  /// Verilen adım hedefinin kaç sabit round sürdüğünü döndürür.
+  ///
+  /// Son round 1000 adımdan kısa olsa bile eski sistemde süresi 15 dakikadır.
   static Duration durationForSteps(int steps) {
     if (steps <= 0) return Duration.zero;
-    return Duration(
-      seconds: (steps * 60 / GameConstants.stepsPerMinute).ceil(),
-    );
+    return GameConstants.combatRoundDuration * roundCountForSteps(steps);
   }
 
   /// Değişken round sayısında kullanılacak fitness fazını seçer.
   static AttackRoundConfig roundConfig(int index, int roundCount) {
+    if (roundCount > rounds.length) {
+      RangeError.checkValidIndex(index, List.filled(roundCount, 0), 'index');
+      return rounds[index.clamp(0, rounds.length - 1)];
+    }
     final phaseIndexes = switch (roundCount) {
+      1 => const [4],
       2 => const [1, 4],
       3 => const [0, 1, 4],
       4 => const [0, 1, 3, 4],

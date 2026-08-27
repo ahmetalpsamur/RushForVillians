@@ -48,6 +48,7 @@ void main() {
       deathAnimationPlayed: true,
       xpAwarded: true,
       victoryCoinReward: 62,
+      walkCoinReward: 53,
       victoryXpReward: 220,
       victorySteps: 1000,
       victoryRounds: 1,
@@ -96,6 +97,40 @@ void main() {
     }
   }
 
+  Future<void> pumpGoldCollectionCompleted(
+    WidgetTester tester,
+    double width,
+  ) async {
+    tester.view.physicalSize = Size(width, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final quest = walkingQuest()..walkSteps = 4000;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: AdventureScreen(
+          adventure: quest,
+          roundSerial: 0,
+          avatar: _avatar,
+          today: DailyProgress(
+            date: GameClock.now(),
+            steps: 5000,
+            stepGoal: 5000,
+          ),
+          onAdventureSelected: (_) {},
+          onStartRevival: () {},
+          onChooseNewAdventure: () {},
+          onAdventureUpdated: () {},
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 320)),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+
   testWidgets('yürüyüş fazı savaş fazından ayrışıyor', (tester) async {
     await pumpWalkPhase(tester, 390);
 
@@ -109,8 +144,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('1.600 / 4.000 adım — kalan 2.400'), findsOneWidget);
+    expect(find.text('+53 EK ALTIN'), findsOneWidget);
     expect(
-      find.text('1 round · 1.000 adımda devirdin — hız ödülü ×1.8'),
+      find.text('Zafer +62 · yürüyüş +53 altın · toplam +115 altın · +220 XP'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('1 round · 1.000 adımda devirdin — hız ödülü ×1.02'),
       findsOneWidget,
     );
 
@@ -134,6 +174,22 @@ void main() {
     await expectLater(
       find.byType(AdventureScreen),
       matchesGoldenFile('goldens/walk_phase_390.png'),
+    );
+  });
+
+  testWidgets('golden: altın toplama tamamlandı (390 dp)', (tester) async {
+    await pumpGoldCollectionCompleted(tester, 390);
+
+    expect(find.text('+53 EK ALTIN'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('gold-collection-large-coin')),
+      findsOneWidget,
+    );
+    expect(find.textContaining(enemy.name), findsNothing);
+    expect(find.textContaining('XP'), findsNothing);
+    await expectLater(
+      find.byType(AdventureScreen),
+      matchesGoldenFile('goldens/gold_collection_completed_390.png'),
     );
   });
 }

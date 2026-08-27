@@ -56,7 +56,7 @@ const double damageVariance = 0.12;
 /// 40 şansta band tamamen yukarı kayar; tavanı bu yüzden var.
 const double luckToVarianceShift = 0.0125;
 
-/// Verilen hasarın en düşük değeri. Sıfır hasar, savaşı kilitler.
+/// Hasar tavanı uygulanmayan bir vuruşun en düşük değeri.
 const int minimumDamage = 1;
 
 /// Round tamamlama oranını düşman hasar ölçeğine çevirir.
@@ -72,7 +72,7 @@ double enemyDamageScaleForCompletion(double completion) {
 /// Mükemmel roundun erken bitirme ve seri kaynaklı hasar çarpanı.
 ///
 /// [earlyFraction] round süresinin bitiş anında kalan oranıdır (0..1).
-/// Seri, erişilebilecek tavanı ×1,2 → ×1,5 → ×2 büyütür; hedefe son anda
+/// Seri, erişilebilecek tavanı ×1,01 → ×1,015 → ×1,02 büyütür; hedefe son anda
 /// ulaşmak küçük, çok erken ulaşmak tavana yakın bonus verir.
 double perfectRoundDamageMultiplier({
   required int streak,
@@ -180,6 +180,7 @@ CombatRoundOutcome resolveCombatRound({
   required double completion,
   required int seed,
   double playerDamageMultiplier = 1,
+  int? maxPlayerDamage,
   List<ItemEffect> onHitEffects = const [],
   List<ItemEffect> onKillEffects = const [],
 }) {
@@ -291,7 +292,11 @@ CombatRoundOutcome resolveCombatRound({
 
     // 6) Savunma
     final reduced = defenderStats.damageAfterDefense(raw);
-    final damage = reduced.round().clamp(minimumDamage, 1 << 30);
+    final uncappedDamage = reduced.round().clamp(minimumDamage, 1 << 30);
+    final damage =
+        isPlayer && maxPlayerDamage != null
+            ? min(uncappedDamage, maxPlayerDamage.clamp(0, 1 << 30))
+            : uncappedDamage;
 
     if (isPlayer) {
       enemyHp -= damage;

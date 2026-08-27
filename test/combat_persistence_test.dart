@@ -172,7 +172,8 @@ void main() {
     });
 
     testWidgets('düşman canı bitince zafer ve XP verilir', (tester) async {
-      // 20 seviye üstü oyuncu 2. kademedeki düşmanı hızlı devirir.
+      // 20 seviye üstü oyuncu güçlüdür; erken zafer koruması yine de iki
+      // roundluk maceranın ilk roundda bitmesine izin vermez.
       final profile = UserProfile(avatar: _avatar, level: 40);
       final quest = questFor();
       await pumpShell(tester, profile: profile, adventure: quest);
@@ -181,6 +182,8 @@ void main() {
       final coinsBefore = profile.coins;
       final levelBefore = profile.level;
       now = now.add(quest.totalAttackDuration);
+      await addSteps(tester, 1000);
+      expect(quest.isEnemyDefeated, isFalse);
       await addSteps(tester, 1000);
       await tester.pump(const Duration(seconds: 1));
 
@@ -206,7 +209,7 @@ void main() {
         profile.coins,
         coinsBefore +
             quest.victoryCoinReward +
-            (1000 ~/ GameConstants.stepsPerCoin),
+            (2000 ~/ GameConstants.stepsPerCoin),
       );
       expect(
         profile.level > levelBefore || profile.xp > xpBefore,

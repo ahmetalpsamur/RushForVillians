@@ -34,6 +34,7 @@ void main() {
     int enemyHealth = 200,
     double completion = 1,
     double playerDamageMultiplier = 1,
+    int? maxPlayerDamage,
     int seed = 4242,
     List<ItemEffect> onHit = const [],
     List<ItemEffect> onKill = const [],
@@ -44,10 +45,34 @@ void main() {
     enemyHealth: enemyHealth,
     completion: completion,
     playerDamageMultiplier: playerDamageMultiplier,
+    maxPlayerDamage: maxPlayerDamage,
     seed: seed,
     onHitEffects: onHit,
     onKillEffects: onKill,
   );
+
+  group('erken zafer hasar tavanı', () {
+    test('oyuncu hasarı verilen tavana kadar uygulanır', () {
+      final outcome = round(
+        player: attacker.copyWith(attack: 10000),
+        maxPlayerDamage: 17,
+      );
+
+      expect(outcome.damageDealt, 17);
+      expect(outcome.enemyHealthAfter, 183);
+      expect(outcome.enemyDefeated, isFalse);
+    });
+
+    test('sıfır tavanı vuruşu can düşürmeden çözer', () {
+      final outcome = round(
+        player: attacker.copyWith(attack: 10000),
+        maxPlayerDamage: 0,
+      );
+
+      expect(outcome.damageDealt, 0);
+      expect(outcome.enemyHealthAfter, 200);
+    });
+  });
 
   group('determinizm', () {
     test('aynı tohum ve aynı girdi aynı sonucu verir', () {
@@ -114,18 +139,18 @@ void main() {
       );
     });
 
-    test('mükemmel seri tavanları ×1,2 → ×1,5 → ×2 büyür', () {
-      expect(perfectRoundDamageMultiplier(streak: 1, earlyFraction: 1), 1.2);
-      expect(perfectRoundDamageMultiplier(streak: 2, earlyFraction: 1), 1.5);
-      expect(perfectRoundDamageMultiplier(streak: 3, earlyFraction: 1), 2);
-      expect(perfectRoundDamageMultiplier(streak: 99, earlyFraction: 1), 2);
+    test('mükemmel seri tavanları ×1,01 → ×1,015 → ×1,02 büyür', () {
+      expect(perfectRoundDamageMultiplier(streak: 1, earlyFraction: 1), 1.01);
+      expect(perfectRoundDamageMultiplier(streak: 2, earlyFraction: 1), 1.015);
+      expect(perfectRoundDamageMultiplier(streak: 3, earlyFraction: 1), 1.02);
+      expect(perfectRoundDamageMultiplier(streak: 99, earlyFraction: 1), 1.02);
     });
 
     test('aynı seride daha erken bitirmek daha çok bonus hasar verir', () {
       final late = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.1);
       final early = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.9);
       expect(early, greaterThan(late));
-      expect(early, lessThanOrEqualTo(1.5));
+      expect(early, lessThanOrEqualTo(1.015));
     });
 
     test('tamamlanma oranı arttıkça oyuncunun hasarı artar', () {

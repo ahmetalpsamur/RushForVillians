@@ -1076,6 +1076,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           stepsPerCoin: GameConstants.walkPhaseStepsPerCoin,
         );
         coinsGained += walkReward.coins;
+        _adventure!.walkCoinReward += walkReward.coins;
         _profile.lastRewardedStepCount += walkReward.consumedSteps;
         pendingCoinSteps -= walkReward.consumedSteps;
       }
@@ -1475,15 +1476,32 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
-        backgroundColor: perfect ? const Color(0xFF4B3510) : AppColors.hp,
+        backgroundColor: perfect ? AppColors.surface : AppColors.hp,
+        shape:
+            perfect
+                ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.75),
+                  ),
+                )
+                : null,
         content: Row(
           children: [
             Icon(
               perfect ? Icons.local_fire_department : Icons.heart_broken,
-              color: Colors.white,
+              color: perfect ? AppColors.primary : Colors.white,
             ),
             const SizedBox(width: 10),
-            Expanded(child: Text(message)),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ],
         ),
       ),

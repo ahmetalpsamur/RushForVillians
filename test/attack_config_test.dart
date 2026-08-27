@@ -5,7 +5,7 @@ import 'package:rush_for_villains/models/combat_stats.dart';
 
 void main() {
   group('AttackConfig tek doğruluk kaynağı', () {
-    test('altı hedef süreyi tek 100 adım/dk sabitinden türetir', () {
+    test('altı hedef sabit 1000 adım ve 15 dakikalık roundlara bölünür', () {
       expect(
         AttackConfig.targets
             .map(
@@ -17,41 +17,33 @@ void main() {
             )
             .toList(),
         [
-          (500, 5, 1.00),
-          (1000, 10, 1.15),
-          (2000, 20, 1.35),
-          (3000, 30, 1.55),
-          (5000, 50, 1.85),
-          (10000, 100, 2.40),
+          (500, 15, 1.00),
+          (1000, 15, 1.15),
+          (2000, 30, 1.35),
+          (3000, 45, 1.55),
+          (5000, 75, 1.85),
+          (10000, 150, 2.40),
         ],
       );
     });
 
-    test('round sayısı 250 hedefine göre 2–5 arasında türetilir', () {
+    test('round sayısı sabit 1000 adım hedefine göre türetilir', () {
       expect(AttackConfig.rounds, hasLength(5));
       expect(AttackConfig.hasValidRoundPercentages, isTrue);
       expect(AttackConfig.roundPercentageTotal, closeTo(1, 0.000000001));
-      expect(AttackConfig.roundCountForSteps(500), 2);
-      expect(AttackConfig.roundCountForSteps(1000), 4);
-      expect(AttackConfig.roundCountForSteps(1500), 5);
-      expect(AttackConfig.roundCountForSteps(10000), 5);
+      expect(AttackConfig.roundCountForSteps(500), 1);
+      expect(AttackConfig.roundCountForSteps(1000), 1);
+      expect(AttackConfig.roundCountForSteps(1500), 2);
+      expect(AttackConfig.roundCountForSteps(10000), 10);
     });
 
     test('round adımları ve süreleri toplam hedefi eksiksiz paylaşır', () {
       final short = AttackConfig.forStepTarget(500);
-      expect(short.roundStepTargets, [250, 250]);
-      expect(short.roundDurations.map((duration) => duration.inSeconds), [
-        150,
-        150,
-      ]);
+      expect(short.roundStepTargets, [500]);
+      expect(short.roundDurations.map((duration) => duration.inMinutes), [15]);
       final medium = AttackConfig.forStepTarget(1000);
-      expect(medium.roundStepTargets, [250, 250, 250, 250]);
-      expect(medium.roundDurations.map((duration) => duration.inSeconds), [
-        150,
-        150,
-        150,
-        150,
-      ]);
+      expect(medium.roundStepTargets, [1000]);
+      expect(medium.roundDurations.map((duration) => duration.inMinutes), [15]);
       for (final target in AttackConfig.targets) {
         expect(
           target.roundStepTargets.reduce((a, b) => a + b),

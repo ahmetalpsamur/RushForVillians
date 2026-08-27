@@ -72,6 +72,7 @@ class AdventureQuest {
   bool xpAwarded;
   int victoryXpReward;
   int victoryCoinReward;
+  int walkCoinReward;
   int acknowledgedDamage;
   bool deathAnimationPlayed;
   int playerHealth;
@@ -91,6 +92,10 @@ class AdventureQuest {
   /// bugün yalnızca yürüyüş taahhüdü: round hedefini ve beklenen round
   /// sayısını belirliyor.
   int enemyHealth;
+
+  /// Son çözülen round başlamadan hemen önceki düşman canı.
+  /// Can düşüş animasyonu gerçek kaybı göstermek için bunu kullanır.
+  int enemyHealthBeforeLastRound;
 
   /// Savaş rastgeleliğinin tohumu. `0` = henüz kurulmadı.
   ///
@@ -173,11 +178,13 @@ class AdventureQuest {
     this.xpAwarded = false,
     this.victoryXpReward = 0,
     this.victoryCoinReward = 0,
+    this.walkCoinReward = 0,
     this.acknowledgedDamage = 0,
     this.deathAnimationPlayed = false,
     this.playerHealth = maxPlayerHealth,
     this.playerMaxHealth = maxPlayerHealth,
     int? enemyHealth,
+    this.enemyHealthBeforeLastRound = 0,
     this.combatSeed = 0,
     this.untouchedRounds = 0,
     int? roundStartingSteps,
@@ -235,11 +242,11 @@ class AdventureQuest {
 
   static int _roundTargetFor(int stepGoal, int round) {
     if (stepGoal <= 0) return 0;
-    final count = AttackConfig.roundCountForSteps(stepGoal);
-    final index = (round - 1).clamp(0, count - 1);
-    final base = stepGoal ~/ count;
-    final remainder = stepGoal % count;
-    return base + (index < remainder ? 1 : 0);
+    final completedRoundSteps =
+        (round - 1) * GameConstants.combatRoundStepTarget;
+    final remaining = stepGoal - completedRoundSteps;
+    if (remaining <= 0) return GameConstants.combatRoundStepTarget;
+    return remaining.clamp(1, GameConstants.combatRoundStepTarget);
   }
 
   static Duration roundDurationForSteps(int steps) =>
@@ -284,9 +291,11 @@ class AdventureQuest {
 
   AttackPhase get currentPhase => currentRoundConfig.phase;
 
-  Duration get totalAttackDuration => AttackConfig.durationForSteps(stepGoal);
+  Duration get totalAttackDuration =>
+      GameConstants.combatRoundDuration * totalRounds;
 
-  Duration get currentRoundDuration => roundDurationForSteps(roundTargetSteps);
+  Duration get currentRoundDuration =>
+      roundTargetSteps <= 0 ? Duration.zero : GameConstants.combatRoundDuration;
 
   double get enemyPowerMultiplier => 1;
 
@@ -298,6 +307,36 @@ class AdventureQuest {
   int get scaledEnemyMaxHealth => scaledEnemyStats.maxHealth.round();
 
   int get totalRounds => AttackConfig.roundCountForSteps(stepGoal);
+
+  /// Çok güçlü bir oyuncunun düşmanı yenebileceği ilk round.
+  int get earliestEnemyDefeatRound {
+    final rounds = totalRounds;
+    if (rounds <= 1) return 1;
+    return (rounds * GameConstants.earliestEnemyDefeatRoundRatio).ceil().clamp(
+      1,
+      rounds,
+    );
+  }
+
+  /// Erken roundlarda uygulanabilecek toplam hasarı kademeli açar.
+  ///
+  /// Bu tavan yalnızca aşırı hasarı keser. Normal bir vuruş kendi değerinde
+  /// kalır; eşik rounduna gelindiğinde stat, kritik ve ekipman hasarı yeniden
+  /// tamamen serbesttir.
+  int? get _maxPlayerDamageThisRound {
+    final defeatRound = earliestEnemyDefeatRound;
+    if (currentRound >= defeatRound) return null;
+    if (enemyHealth <= 1) return 0;
+
+    final maxHealth = scaledEnemyMaxHealth;
+    final damageAlreadyDealt = (maxHealth - enemyHealth).clamp(0, maxHealth);
+    final cumulativeDamageLimit =
+        (maxHealth * currentRound / defeatRound).floor();
+    return (cumulativeDamageLimit - damageAlreadyDealt).clamp(
+      0,
+      enemyHealth - 1,
+    );
+  }
 
   double get perfectStreakCap {
     if (perfectRoundStreak <= 0) return 1;
@@ -419,6 +458,7 @@ class AdventureQuest {
       if (combatSeed == 0) {
         combatSeed = fallbackCombatSeed(enemy.id, startingSteps);
       }
+      enemyHealthBeforeLastRound = enemyHealth;
       final outcome = resolveCombatRound(
         player: stats,
         enemy: scaledEnemyStats,
@@ -427,6 +467,7 @@ class AdventureQuest {
         completion: walked / roundTargetSteps,
         seed: combatSeed,
         playerDamageMultiplier: perfectMultiplier,
+        maxPlayerDamage: _maxPlayerDamageThisRound,
         onHitEffects: onHitEffects,
         onKillEffects: onKillEffects,
       );
@@ -619,11 +660,13 @@ class AdventureQuest {
     'xpAwarded': xpAwarded,
     'victoryXpReward': victoryXpReward,
     'victoryCoinReward': victoryCoinReward,
+    'walkCoinReward': walkCoinReward,
     'acknowledgedDamage': acknowledgedDamage,
     'deathAnimationPlayed': deathAnimationPlayed,
     'playerHealth': playerHealth,
     'playerMaxHealth': playerMaxHealth,
     'enemyHealth': enemyHealth,
+    'enemyHealthBeforeLastRound': enemyHealthBeforeLastRound,
     'combatSeed': combatSeed,
     'untouchedRounds': untouchedRounds,
     'roundStartingSteps': roundStartingSteps,
@@ -691,11 +734,14 @@ class AdventureQuest {
       xpAwarded: json['xpAwarded'] as bool? ?? false,
       victoryXpReward: json['victoryXpReward'] as int? ?? 0,
       victoryCoinReward: json['victoryCoinReward'] as int? ?? 0,
+      walkCoinReward: json['walkCoinReward'] as int? ?? 0,
       acknowledgedDamage: json['acknowledgedDamage'] as int? ?? 0,
       deathAnimationPlayed: json['deathAnimationPlayed'] as bool? ?? false,
       playerHealth: savedPlayerHealth,
       playerMaxHealth: json['playerMaxHealth'] as int? ?? maxPlayerHealth,
       enemyHealth: restoredEnemyHealth,
+      enemyHealthBeforeLastRound:
+          json['enemyHealthBeforeLastRound'] as int? ?? 0,
       combatSeed: json['combatSeed'] as int? ?? 0,
       untouchedRounds: json['untouchedRounds'] as int? ?? 0,
       roundStartingSteps: json['roundStartingSteps'] as int?,
@@ -855,6 +901,10 @@ class AdventureQuest {
   /// kapıları bu ayrımı gözetmeli.
   bool get isAdventureCompleted => isEnemyDefeated && walkRemainingSteps == 0;
 
+  /// Erken zaferden sonra açılan altın toplama yürüyüşü tamamlandı mı.
+  bool get isGoldCollectionCompleted =>
+      isAdventureCompleted && walkTargetSteps > 0;
+
   /// Maceranın hangi fazında olduğu. Yenilgi ve Hayat Yürüyüşü ayrı dallar.
   AdventureQuestPhase get phase {
     if (isPlayerDefeated) {
@@ -906,6 +956,9 @@ class AdventureQuest {
     final span = GameConstants.maxVictorySpeedMultiplier - 1;
     return 1 + (1 - ratio) * span;
   }
+
+  /// Zafer anındaki ödül ile yürüyüş fazında kazanılan altının toplamı.
+  int get totalCoinReward => victoryCoinReward + walkCoinReward;
 
   /// Kademe bazlı zafer altınının **tohumlu** çekilişi.
   ///
