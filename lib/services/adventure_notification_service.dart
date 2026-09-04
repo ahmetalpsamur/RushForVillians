@@ -9,6 +9,20 @@ import 'package:timezone/timezone.dart' as tz;
 import '../core/utils/game_clock.dart';
 import '../models/adventure_quest.dart';
 
+class AdventureNotificationCopy {
+  final String enemyName;
+  final List<String> reminderBodies;
+  final String channelName;
+  final String channelDescription;
+
+  const AdventureNotificationCopy({
+    required this.enemyName,
+    required this.reminderBodies,
+    required this.channelName,
+    required this.channelDescription,
+  });
+}
+
 class AdventureNotificationService {
   AdventureNotificationService._();
 
@@ -18,13 +32,6 @@ class AdventureNotificationService {
       FlutterLocalNotificationsPlugin();
   static String? _attachmentPath;
   static bool _initialized = false;
-
-  static const _messages = [
-    '{round}. round: {enemy} için {steps} adım kaldı.',
-    '{round}. round devam ediyor! Kalan {steps} adımı tamamla.',
-    'Ritmini koru! {round}. roundda {steps} adımın kaldı.',
-    '{round}. round: {steps} adım daha at ve {enemy} gücünü kaybetsin!',
-  ];
 
   static Future<void> initialize() async {
     tz_data.initializeTimeZones();
@@ -79,13 +86,13 @@ class AdventureNotificationService {
   static Future<void> scheduleAdventureReminders(
     AdventureQuest adventure,
     int currentSteps,
+    AdventureNotificationCopy copy,
   ) async {
     if (!_initialized) return;
     await cancelAdventureReminders();
     if (adventure.isBattleCompleted) return;
 
     final gifPath = await _copyAttackGif(adventure);
-    final remainingSteps = adventure.roundStepsRemaining(currentSteps);
     // `nextEnemyAttackAt` GameClock ile yazılıyor; karşılaştırma da aynı
     // kaynaktan yapılmalı, yoksa saat geriye alınmış cihazda kalan süre
     // olduğundan kısa görünür ve hiç hatırlatma planlanmaz.
@@ -94,25 +101,22 @@ class AdventureNotificationService {
     final random = Random(adventure.enemy.id.hashCode + currentSteps);
 
     for (var i = 0; i < reminders; i++) {
-      final template = _messages[random.nextInt(_messages.length)];
-      final body = template
-          .replaceAll('{enemy}', adventure.enemy.name)
-          .replaceAll('{steps}', '$remainingSteps')
-          .replaceAll('{round}', '${adventure.currentRound}');
+      final body =
+          copy.reminderBodies[random.nextInt(copy.reminderBodies.length)];
       final androidStyle =
           gifPath == null
               ? null
               : BigPictureStyleInformation(
                 FilePathAndroidBitmap(gifPath),
-                contentTitle: adventure.enemy.name,
+                contentTitle: copy.enemyName,
                 summaryText: body,
               );
 
       final details = NotificationDetails(
         android: AndroidNotificationDetails(
           'adventure_reminders',
-          'Macera Hatırlatmaları',
-          channelDescription: 'Devam eden macera ve adım hatırlatmaları',
+          copy.channelName,
+          channelDescription: copy.channelDescription,
           importance: Importance.high,
           priority: Priority.high,
           styleInformation: androidStyle,

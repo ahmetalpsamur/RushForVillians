@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n_context.dart';
+
 /// Shows a compact, circular shortcut after [controller] has moved far enough
 /// from the beginning of its scroll extent.
 class ScrollToTopButton extends StatefulWidget {
@@ -64,7 +66,7 @@ class _ScrollToTopButtonState extends State<ScrollToTopButton> {
     if (!_visible) return const SizedBox.shrink();
     return FloatingActionButton.small(
       heroTag: null,
-      tooltip: 'Başa dön',
+      tooltip: context.l10n.scrollToTop,
       shape: const CircleBorder(),
       onPressed: _scrollToTop,
       child: const Icon(Icons.keyboard_arrow_up),

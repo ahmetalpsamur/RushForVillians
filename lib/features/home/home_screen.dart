@@ -6,6 +6,8 @@ import '../../core/constants/game_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/game_day.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/adventure_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/game_title.dart';
@@ -18,6 +20,14 @@ import '../../widgets/section_card.dart';
 import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
 import '../../widgets/hero_progress_rings.dart';
+
+String _formatRemaining(BuildContext context, Duration duration) {
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  return hours > 0
+      ? context.l10n.durationHoursMinutes(hours, minutes)
+      : context.l10n.durationMinutes(minutes);
+}
 
 /// Ana panel: günün özeti (HP, seviye/XP, adım) ve diğer
 /// bölümlere hızlı erişim.
@@ -83,7 +93,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rush for Villains'),
+        title: Text(context.l10n.appTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -95,7 +105,7 @@ class HomeScreen extends StatelessWidget {
                     color: AppColors.streak,
                   ),
                   const SizedBox(width: 4),
-                  Text('${profile.streakDays} gün'),
+                  Text(context.l10n.dayCount(profile.streakDays)),
                 ],
               ),
             ),
@@ -106,7 +116,7 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           SectionCard(
-            title: 'Merhaba, ${profile.name}',
+            title: context.l10n.helloPlayer(profile.name),
             child: Column(
               children: [
                 // Takılı ünvan oyuncu adının geçtiği her yerde görünür
@@ -140,31 +150,31 @@ class HomeScreen extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           SectionCard(
-            title: 'Macera',
+            title: context.l10n.adventure,
             onTap: onOpenAdventure,
             child:
                 adventure == null
-                    ? const Row(
+                    ? Row(
                       children: [
-                        Icon(Icons.explore, color: AppColors.primary),
-                        SizedBox(width: 10),
+                        const Icon(Icons.explore, color: AppColors.primary),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            'Günlük hedefini ve düşmanını seçerek maceraya başla.',
-                          ),
+                          child: Text(context.l10n.adventureStartPrompt),
                         ),
-                        Icon(Icons.chevron_right),
+                        const Icon(Icons.chevron_right),
                       ],
                     )
                     : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${adventure!.enemy.name} seni bekliyor. Ritmini koru!',
+                          context.l10n.enemyWaiting(
+                            context.l10n.enemyName(adventure!.enemy),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         StatBar(
-                          label: 'Canavar Canı',
+                          label: context.l10n.monsterHealth,
                           icon: Icons.favorite,
                           color: AppColors.hp,
                           progress: adventure!.enemyHealthProgress,
@@ -182,24 +192,24 @@ class HomeScreen extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.casino,
-                  label: 'Günlük Çark',
+                  label: context.l10n.dailyWheel,
                   enabled: today.isWheelUnlocked,
                   // Bölüm A.6: iki kapıdan hangisi önce gelirse. Kilitli
                   // kart neden kilitli olduğunu **ikisini birden** söylemeli
                   // (Model Kuralları #4), yoksa oyuncu bir maceranın da çarkı
                   // açtığını hiç öğrenemez.
-                  disabledReason:
-                      'Çarkı açmak için bir macera tamamla (düşmanı devir) '
-                      'ya da ${GameConstants.dailyWheelUnlockSteps} adım at. '
-                      '${_wheelStepsLeft()} adım kaldı.',
+                  disabledReason: context.l10n.wheelUnlockRequirement(
+                    GameConstants.dailyWheelUnlockSteps,
+                    _wheelStepsLeft(),
+                  ),
                   // Çevrildiyse kart tıklanabilir kalır: çark ekranı neden
                   // çevrilemediğini ve kalan süreyi açıklar.
                   status:
                       profile.wheelSpunToday
-                          ? const DayResetCountdown(
-                            prefix: 'Yeni çark: ',
+                          ? DayResetCountdown(
+                            prefix: context.l10n.newWheelPrefix,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
                               color: Colors.white70,
                             ),
@@ -212,7 +222,7 @@ class HomeScreen extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.emoji_events,
-                  label: 'Ödüllerim',
+                  label: context.l10n.myRewards,
                   onTap: onOpenRewards,
                 ),
               ),
@@ -226,7 +236,7 @@ class HomeScreen extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.storefront,
-                  label: 'Mağaza',
+                  label: context.l10n.store,
                   onTap: onOpenStore,
                 ),
               ),
@@ -234,7 +244,7 @@ class HomeScreen extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.backpack,
-                  label: 'Envanter',
+                  label: context.l10n.inventory,
                   onTap: onOpenInventory,
                 ),
               ),
@@ -269,7 +279,7 @@ class _StepPermissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
-      title: 'Adım Sayacı',
+      title: context.l10n.stepCounter,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -279,10 +289,17 @@ class _StepPermissionCard extends StatelessWidget {
               const Icon(Icons.lock, size: 18, color: AppColors.streak),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  status.description,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                ),
+                child: Text(switch (status) {
+                  StepPermissionStatus.unknown =>
+                    context.l10n.permissionUnknown,
+                  StepPermissionStatus.granted =>
+                    context.l10n.permissionGranted,
+                  StepPermissionStatus.denied => context.l10n.permissionDenied,
+                  StepPermissionStatus.permanentlyDenied =>
+                    context.l10n.permissionPermanentlyDenied,
+                  StepPermissionStatus.unavailable =>
+                    context.l10n.permissionUnavailable,
+                }, style: const TextStyle(fontSize: 12, color: Colors.white70)),
               ),
             ],
           ),
@@ -293,7 +310,7 @@ class _StepPermissionCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onOpenSettings,
                 icon: const Icon(Icons.settings, size: 18),
-                label: const Text('Ayarları Aç'),
+                label: Text(context.l10n.openSettings),
               ),
             ),
           ],
@@ -325,7 +342,7 @@ class _StepSourceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final onChanged = onUseManualSourceChanged;
     return SectionCard(
-      title: 'Adım Kaynağı',
+      title: context.l10n.stepSource,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -342,8 +359,8 @@ class _StepSourceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   usingRealPedometer
-                      ? 'Pedometer (gerçek sensör)'
-                      : 'Manuel (demo kontrolleri)',
+                      ? context.l10n.realPedometer
+                      : context.l10n.manualStepSource,
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -354,9 +371,8 @@ class _StepSourceCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             usingRealPedometer
-                ? 'Adımlar cihazın sensöründen geliyor. Demo butonları '
-                    'kapalı; açmak için kaynağı manuele al.'
-                : 'Adımları buradan simüle edebilirsin.',
+                ? context.l10n.realPedometerDescription
+                : context.l10n.manualStepSourceDescription,
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
           const SizedBox(height: 12),
@@ -391,15 +407,15 @@ class _DailyEarnings extends StatelessWidget {
         _EarningRow(
           icon: Icons.monetization_on,
           color: AppColors.streak,
-          text: 'Bugün adımlarından ${today.coinsEarned} coin kazandın.',
-          rate: '${GameConstants.stepsPerCoin} adım = 1',
+          text: context.l10n.coinsEarnedToday(today.coinsEarned),
+          rate: context.l10n.stepsPerReward(GameConstants.stepsPerCoin),
         ),
         const SizedBox(height: 6),
         _EarningRow(
           icon: Icons.bolt,
           color: AppColors.xp,
-          text: 'Bugün adımlarından ${today.xpEarned} XP kazandın.',
-          rate: '${GameConstants.stepsPerXp} adım = 1',
+          text: context.l10n.xpEarnedToday(today.xpEarned),
+          rate: context.l10n.stepsPerReward(GameConstants.stepsPerXp),
         ),
       ],
     );
@@ -486,14 +502,10 @@ class _StreakCardState extends State<_StreakCard> {
     // Uyarı neyin kaybedileceğini de söylemeli: biriken savaş bonusu serinin
     // asıl değeri, gün sayısı değil.
     final streakBonus = profile.streakStatBonuses.totalBonus;
-    final bonusWarning =
-        streakBonus > 0
-            ? ' Biriken +%${StreakStatBonuses.formatRate(streakBonus)} savaş '
-                'bonusun gider.'
-            : '';
+    final bonusRate = StreakStatBonuses.formatRate(streakBonus);
 
     return SectionCard(
-      title: 'Günlük Seri',
+      title: context.l10n.dailyStreak,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -502,7 +514,7 @@ class _StreakCardState extends State<_StreakCard> {
               const Icon(Icons.local_fire_department, color: AppColors.streak),
               const SizedBox(width: 8),
               Text(
-                '${profile.streakDays} gün',
+                context.l10n.dayCount(profile.streakDays),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -520,7 +532,9 @@ class _StreakCardState extends State<_StreakCard> {
               // durum metni gerekirse kırpılır.
               Flexible(
                 child: Text(
-                  completed ? 'Bugün tamamlandı' : 'Bugün bekliyor',
+                  completed
+                      ? context.l10n.completedToday
+                      : context.l10n.pendingToday,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
@@ -531,17 +545,19 @@ class _StreakCardState extends State<_StreakCard> {
           const SizedBox(height: 8),
           Text(
             completed
-                ? 'Seri sürüyor. Yarın bir düşman devir ya da '
-                    '${GameConstants.streakStepThreshold} adım at.'
-                : 'Seriyi güvenceye almak için bir düşman devir — ya da '
-                    '$stepsLeft adım daha at.',
+                ? context.l10n.streakContinueTomorrow(
+                  GameConstants.streakStepThreshold,
+                )
+                : context.l10n.secureStreak(stepsLeft),
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
           if (nextMilestone != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Sonraki kilometre taşı: $nextMilestone gün '
-              '(${nextMilestone - profile.streakDays} gün kaldı)',
+              context.l10n.nextMilestone(
+                nextMilestone,
+                nextMilestone - profile.streakDays,
+              ),
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
@@ -557,9 +573,7 @@ class _StreakCardState extends State<_StreakCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Seri bonusu: +%${StreakStatBonuses.formatRate(streakBonus)} '
-                    'savaş statı '
-                    '(profilde stat stat görülür).',
+                    context.l10n.streakBonusSummary(bonusRate),
                     style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ),
@@ -576,8 +590,7 @@ class _StreakCardState extends State<_StreakCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${profile.streakFreezes} dondurma hakkın var. Bir gün '
-                    'kaçırırsan otomatik kullanılır.',
+                    context.l10n.streakFreezeSummary(profile.streakFreezes),
                     style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ),
@@ -596,8 +609,14 @@ class _StreakCardState extends State<_StreakCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Gün bitmesine ${GameDay.formatRemaining(remaining)} kaldı, '
-                    'serini kaybetme!$bonusWarning',
+                    streakBonus > 0
+                        ? context.l10n.streakEndingSoonWithBonus(
+                          _formatRemaining(context, remaining),
+                          bonusRate,
+                        )
+                        : context.l10n.streakEndingSoon(
+                          _formatRemaining(context, remaining),
+                        ),
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.streak,
@@ -628,7 +647,7 @@ class _StepButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: enabled ? () => onSimulateSteps(amount) : null,
-      child: Text('+$amount adım'),
+      child: Text(context.l10n.simulateSteps(amount)),
     );
   }
 }

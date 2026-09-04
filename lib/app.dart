@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'core/localization/locale_preference.dart';
 import 'core/theme/app_theme.dart';
 import 'features/character/character_creation_screen.dart';
 import 'features/root/root_shell.dart';
@@ -15,6 +17,8 @@ import 'services/character_storage.dart';
 import 'services/game_storage.dart';
 import 'services/launch_sound.dart';
 import 'services/tutorial_guide_storage.dart';
+import 'l10n/app_localizations.dart';
+import 'l10n/l10n_context.dart';
 
 class RushForVilliansApp extends StatefulWidget {
   const RushForVilliansApp({super.key});
@@ -29,6 +33,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
   AvatarProfile? _avatar;
   GameState? _gameState;
   TutorialGuideVariant? _selectedGuide;
+  LocalePreference _localePreference = LocalePreference.system;
   bool _isLoading = true;
 
   /// Kayıt okunamadıysa `true`. Bu durumda kayıt **silinmez**; kullanıcı
@@ -43,7 +48,17 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadLocalePreference());
     _initializeApp();
+  }
+
+  Future<void> _loadLocalePreference() async {
+    try {
+      final preference = await LocalePreferenceStorage.load();
+      if (mounted) setState(() => _localePreference = preference);
+    } catch (error) {
+      debugPrint('Dil tercihi okunamadı, sistem dili kullanılacak ($error)');
+    }
   }
 
   Future<void> _initializeApp() async {
@@ -102,13 +117,10 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     _storageWarningShown = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _messengerKey.currentState?.showSnackBar(
-        const SnackBar(
+        SnackBar(
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 6),
-          content: Text(
-            'Kayıtlı ilerlemene şu an ulaşılamadı. Oyun geçici bir '
-            'kayıtla açıldı; uygulamayı yeniden başlatmayı dene.',
-          ),
+          duration: const Duration(seconds: 6),
+          content: Text(context.l10n.storageUnavailable),
         ),
       );
     });
@@ -135,13 +147,33 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     setState(() => _selectedGuide = guide);
   }
 
+  Future<void> _setLocalePreference(LocalePreference preference) async {
+    setState(() => _localePreference = preference);
+    try {
+      await LocalePreferenceStorage.save(preference);
+    } catch (error) {
+      debugPrint('Dil tercihi kaydedilemedi ($error)');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Rush for Villains',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
+      locale: _localePreference.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      localeListResolutionCallback:
+          (deviceLocales, supportedLocales) =>
+              _localePreference.locale ?? resolveSystemLocale(deviceLocales),
       home:
           _isLoading
               ? const StartScreen()
@@ -155,6 +187,8 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
                 startTutorial: true,
                 initialTutorialGuide: _selectedGuide,
                 onAvatarChanged: _saveCharacter,
+                localePreference: _localePreference,
+                onLocalePreferenceChanged: _setLocalePreference,
               ),
     );
   }

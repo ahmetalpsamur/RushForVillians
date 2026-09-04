@@ -2,7 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/collection_reward.dart';
 import '../../models/reward_rarity.dart';
 import '../../services/reward_engine.dart';
@@ -48,7 +51,10 @@ class _RewardsScreenState extends State<RewardsScreen> {
         if (_ownership == _OwnershipFilter.earned && !earned) return false;
         if (_ownership == _OwnershipFilter.locked && earned) return false;
         if (_query.isNotEmpty) {
-          final haystack = '${reward.name} ${reward.requirement}'.toLowerCase();
+          final haystack =
+              '${context.l10n.collectionRewardName(reward)} '
+                      '${context.l10n.collectionRewardRequirement(reward)}'
+                  .toLowerCase();
           if (!haystack.contains(_query)) return false;
         }
         return true;
@@ -80,8 +86,10 @@ class _RewardsScreenState extends State<RewardsScreen> {
     if (!_pinned.contains(reward.id) &&
         _pinned.length >= RewardEngine.maxPinnedRewards) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vitrine en fazla 6 ödül sabitlenebilir.'),
+        SnackBar(
+          content: Text(
+            context.l10n.showcasePinLimit(RewardEngine.maxPinnedRewards),
+          ),
         ),
       );
       return;
@@ -98,9 +106,12 @@ class _RewardsScreenState extends State<RewardsScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Ödüllerim'),
-          bottom: const TabBar(
-            tabs: [Tab(text: 'Tüm Ödüller'), Tab(text: 'Vitrin')],
+          title: Text(context.l10n.myRewards),
+          bottom: TabBar(
+            tabs: [
+              Tab(text: context.l10n.allRewards),
+              Tab(text: context.l10n.showcase),
+            ],
           ),
         ),
         body: TabBarView(children: [_buildAllRewards(), _buildShowcase()]),
@@ -132,9 +143,9 @@ class _RewardsScreenState extends State<RewardsScreen> {
             ),
             SliverToBoxAdapter(child: _buildFilters()),
             if (filtered.isEmpty)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: Text('Bu filtrelerle eşleşen ödül yok.')),
+                child: Center(child: Text(context.l10n.noRewardsForFilters)),
               )
             else
               SliverPadding(
@@ -171,13 +182,13 @@ class _RewardsScreenState extends State<RewardsScreen> {
             controller: _searchController,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: 'Ödül veya kazanma şartı ara',
+              hintText: context.l10n.rewardSearchHint,
               prefixIcon: const Icon(Icons.search),
               suffixIcon:
                   _query.isEmpty
                       ? null
                       : IconButton(
-                        tooltip: 'Aramayı temizle',
+                        tooltip: context.l10n.clearSearch,
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _query = '');
@@ -193,7 +204,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
             child: Row(
               children: [
                 _FilterMenu<String>(
-                  label: 'Kategori',
+                  label: context.l10n.category,
                   value: _category,
                   entries: _categories,
                   text: _prettyCategory,
@@ -201,10 +212,10 @@ class _RewardsScreenState extends State<RewardsScreen> {
                 ),
                 const SizedBox(width: 8),
                 _FilterMenu<RewardRarity>(
-                  label: 'Nadirlik',
+                  label: context.l10n.rarity,
                   value: _rarity,
                   entries: RewardRarity.values,
-                  text: (value) => value.label,
+                  text: context.l10n.rarityName,
                   onChanged: (value) => setState(() => _rarity = value),
                 ),
                 const SizedBox(width: 8),
@@ -213,9 +224,9 @@ class _RewardsScreenState extends State<RewardsScreen> {
                     padding: const EdgeInsets.only(right: 6),
                     child: ChoiceChip(
                       label: Text(switch (filter) {
-                        _OwnershipFilter.all => 'Tümü',
-                        _OwnershipFilter.earned => 'Kazanılan',
-                        _OwnershipFilter.locked => 'Kilitli',
+                        _OwnershipFilter.all => context.l10n.filterAll,
+                        _OwnershipFilter.earned => context.l10n.filterEarned,
+                        _OwnershipFilter.locked => context.l10n.filterLocked,
                       }),
                       selected: _ownership == filter,
                       onSelected: (_) => setState(() => _ownership = filter),
@@ -232,14 +243,13 @@ class _RewardsScreenState extends State<RewardsScreen> {
   Widget _buildShowcase() {
     final earned = _earned;
     if (earned.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Text(
-            'Henüz ödül kazanmadın. İlk villain’ını yenerek veya yürüyüş '
-            'hedefini tamamlayarak koleksiyonunu başlat.',
+            context.l10n.noRewardsYet,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, height: 1.5),
+            style: const TextStyle(color: Colors.white70, height: 1.5),
           ),
         ),
       );
@@ -253,8 +263,11 @@ class _RewardsScreenState extends State<RewardsScreen> {
       key: const ValueKey('reward-showcase-scroll'),
       slivers: [
         if (pinned.isNotEmpty) ...[
-          const SliverToBoxAdapter(
-            child: _SectionTitle(title: 'Sabitlenenler', icon: Icons.push_pin),
+          SliverToBoxAdapter(
+            child: _SectionTitle(
+              title: context.l10n.pinnedRewards,
+              icon: Icons.push_pin,
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -276,8 +289,11 @@ class _RewardsScreenState extends State<RewardsScreen> {
             ),
           ),
         ],
-        const SliverToBoxAdapter(
-          child: _SectionTitle(title: 'Koleksiyon', icon: Icons.auto_awesome),
+        SliverToBoxAdapter(
+          child: _SectionTitle(
+            title: context.l10n.collection,
+            icon: Icons.auto_awesome,
+          ),
         ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 32),
@@ -301,7 +317,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Ödül detayını kapat',
+      barrierLabel: context.l10n.closeRewardDetails,
       barrierColor: Colors.black87,
       transitionDuration:
           MediaQuery.disableAnimationsOf(context)
@@ -357,7 +373,7 @@ class _RewardSummary extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '$earned / $total ödül kazanıldı',
+                      context.l10n.rewardsEarnedProgress(earned, total),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -404,8 +420,14 @@ class _RewardCard extends StatelessWidget {
       button: true,
       label:
           earned
-              ? '${reward.name}, kazanıldı'
-              : '${reward.name}, kilitli, $progress / ${reward.target}',
+              ? context.l10n.rewardEarnedSemantics(
+                context.l10n.collectionRewardName(reward),
+              )
+              : context.l10n.rewardLockedSemantics(
+                context.l10n.collectionRewardName(reward),
+                progress,
+                reward.target,
+              ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
@@ -497,7 +519,7 @@ class _RewardCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  reward.name,
+                  context.l10n.collectionRewardName(reward),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -507,7 +529,7 @@ class _RewardCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  reward.requirement,
+                  context.l10n.collectionRewardRequirement(reward),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 10, color: Colors.white60),
@@ -524,7 +546,9 @@ class _RewardCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        earned ? 'Kazanıldı' : '$progress / ${reward.target}',
+                        earned
+                            ? context.l10n.earned
+                            : '$progress / ${reward.target}',
                         style: const TextStyle(
                           fontSize: 9,
                           color: Colors.white54,
@@ -532,7 +556,7 @@ class _RewardCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      reward.rarity.label,
+                      context.l10n.rarityName(reward.rarity),
                       style: TextStyle(
                         fontSize: 9,
                         color: reward.rarity.color,
@@ -569,7 +593,10 @@ class _FilterMenu<T> extends StatelessWidget {
     onSelected: onChanged,
     itemBuilder:
         (context) => [
-          PopupMenuItem<T?>(value: null, child: Text('$label: Tümü')),
+          PopupMenuItem<T?>(
+            value: null,
+            child: Text(context.l10n.filterMenuAll(label)),
+          ),
           for (final entry in entries)
             PopupMenuItem<T?>(value: entry, child: Text(text(entry))),
         ],
@@ -629,14 +656,14 @@ class _ShowcaseCard extends StatelessWidget {
               ),
             ),
             Text(
-              reward.name,
+              context.l10n.collectionRewardName(reward),
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
             IconButton(
-              tooltip: 'Vitrinden çıkar',
+              tooltip: context.l10n.removeFromShowcase,
               onPressed: onPin,
               icon: const Icon(Icons.push_pin, color: AppColors.streak),
             ),
@@ -670,10 +697,17 @@ class _ShowcaseTile extends StatelessWidget {
         cacheWidth: 96,
         filterQuality: FilterQuality.none,
       ),
-      title: Text(reward.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text('${reward.rarity.label} • ${_date(earnedAt)}'),
+      title: Text(
+        context.l10n.collectionRewardName(reward),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${context.l10n.rarityName(reward.rarity)} • '
+        '${AppFormatters.longDate(context, earnedAt)}',
+      ),
       trailing: IconButton(
-        tooltip: 'Vitrine sabitle',
+        tooltip: context.l10n.pinToShowcase,
         onPressed: onPin,
         icon: const Icon(Icons.push_pin_outlined),
       ),
@@ -746,7 +780,7 @@ class _RewardDetail extends StatelessWidget {
                         const Icon(Icons.lock, color: Colors.white54),
                       const SizedBox(height: 8),
                       Text(
-                        reward.name,
+                        context.l10n.collectionRewardName(reward),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 27,
@@ -756,8 +790,10 @@ class _RewardDetail extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         earned
-                            ? '${reward.requirement} şartını tamamladığın için kazanıldı.'
-                            : reward.requirement,
+                            ? context.l10n.rewardEarnedForRequirement(
+                              context.l10n.collectionRewardRequirement(reward),
+                            )
+                            : context.l10n.collectionRewardRequirement(reward),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white70,
@@ -768,7 +804,10 @@ class _RewardDetail extends StatelessWidget {
                       const SizedBox(height: 18),
                       if (earned)
                         Text(
-                          '${reward.rarity.label} Ödül • ${_date(earnedAt)}',
+                          context.l10n.rewardWithDate(
+                            context.l10n.rarityName(reward.rarity),
+                            AppFormatters.longDate(context, earnedAt!),
+                          ),
                           style: TextStyle(
                             color: reward.rarity.color,
                             fontWeight: FontWeight.w800,
@@ -776,7 +815,7 @@ class _RewardDetail extends StatelessWidget {
                         )
                       else ...[
                         Text(
-                          'İlerleme: $progress / ${reward.target}',
+                          context.l10n.progressValue(progress, reward.target),
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 8),
@@ -797,7 +836,7 @@ class _RewardDetail extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: IconButton(
-                  tooltip: 'Kapat',
+                  tooltip: context.l10n.commonClose,
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, size: 28),
                 ),
@@ -811,22 +850,3 @@ class _RewardDetail extends StatelessWidget {
 }
 
 String _prettyCategory(String value) => value.replaceAll('_', ' ');
-
-String _date(DateTime? date) {
-  if (date == null) return '';
-  const months = [
-    'Ocak',
-    'Şubat',
-    'Mart',
-    'Nisan',
-    'Mayıs',
-    'Haziran',
-    'Temmuz',
-    'Ağustos',
-    'Eylül',
-    'Ekim',
-    'Kasım',
-    'Aralık',
-  ];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
-}

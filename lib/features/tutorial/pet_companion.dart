@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/pet_sayings.dart';
+import '../../core/utils/item_rules.dart' show stableSpread;
+import '../../l10n/content_localizations.dart';
+import '../../l10n/l10n_context.dart';
 import '../../models/tutorial_guide_variant.dart';
 import 'tutorial_guide.dart';
 
@@ -153,11 +156,15 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
 
   void _speak() {
     if (!mounted || !widget.enabled) return;
-    final line = PetSayings.pick(
-      widget.situation,
-      seed: _seed++,
-      avoid: _lastLine,
-    );
+    final pool = context.l10n.petPool(widget.situation);
+    final options =
+        pool.length > 1 && _lastLine != null
+            ? [
+              for (final line in pool)
+                if (line != _lastLine) line,
+            ]
+            : pool;
+    final line = options[stableSpread('pet-${_seed++}', options.length)];
     _bubbleTimer?.cancel();
     setState(() {
       _line = line;
@@ -437,11 +444,7 @@ class _PetCompanionOverlayState extends State<PetCompanionOverlay>
                       width: bubbleWidth,
                       child: _PetBubble(text: _line!),
                     ),
-                  Positioned(
-                    left: petLeft,
-                    bottom: baseline,
-                    child: child!,
-                  ),
+                  Positioned(left: petLeft, bottom: baseline, child: child!),
                 ],
               );
             },

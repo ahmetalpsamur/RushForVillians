@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/wheel_rewards.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/item.dart';
 import '../../models/game_title.dart';
 import '../../models/reward_rarity.dart';
@@ -165,7 +167,7 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
     final result = _result;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Günlük Çark')),
+      appBar: AppBar(title: Text(context.l10n.dailyWheel)),
       body: Stack(
         children: [
           Positioned.fill(
@@ -189,15 +191,15 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
                       child: Column(
                         children: [
                           if (result == null)
-                            const Text(
-                              'Bugün çarkı zaten çevirdin.',
+                            Text(
+                              context.l10n.wheelAlreadySpun,
                               textAlign: TextAlign.center,
                             ),
                           if (result == null) const SizedBox(height: 8),
-                          const DayResetCountdown(
-                            prefix: 'Yeni çark hakkına kalan süre: ',
+                          DayResetCountdown(
+                            prefix: context.l10n.wheelResetCountdownPrefix,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
                             ),
@@ -214,14 +216,15 @@ class _DailyWheelScreenState extends State<DailyWheelScreen> {
                       onPressed: _spinning ? null : _spin,
                       icon: const Icon(Icons.play_arrow),
                       label: Text(
-                        _spinning ? 'Dişliler dönüyor...' : 'Çarkı Çevir',
+                        _spinning
+                            ? context.l10n.gearsSpinning
+                            : context.l10n.spinWheel,
                       ),
                     ),
                     if (_dailyUsed) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Bu çevirme ekstra hakkından düşecek '
-                        '($_remainingExtras hak kaldı).',
+                        context.l10n.extraSpinNotice(_remainingExtras),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 12,
@@ -260,12 +263,12 @@ class _ResultCard extends StatelessWidget {
       return SectionCard(
         child: Column(
           children: [
-            const Text('Ünvan kazandın! 🎉', textAlign: TextAlign.center),
+            Text(context.l10n.titleWon, textAlign: TextAlign.center),
             const SizedBox(height: 8),
             TitleBadge(title: title),
             const SizedBox(height: 6),
             Text(
-              title.lore,
+              context.l10n.titleLore(title),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white60,
@@ -274,10 +277,10 @@ class _ResultCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Profildeki Ünvanlar ekranından takabilirsin.',
+            Text(
+              context.l10n.equipTitleFromProfile,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 11.5),
+              style: const TextStyle(color: Colors.white54, fontSize: 11.5),
             ),
           ],
         ),
@@ -285,7 +288,7 @@ class _ResultCard extends StatelessWidget {
     }
     if (reward.isCoins) {
       return Text(
-        'Kazandın: ${reward.coins} altın 🎉',
+        context.l10n.coinsWon(reward.coins),
         key: const ValueKey('wheel-coin-result'),
         textAlign: TextAlign.center,
         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -294,7 +297,7 @@ class _ResultCard extends StatelessWidget {
     final item = reward.item;
     if (item == null) {
       return Text(
-        'Kazandın: ${reward.label} 🎉',
+        context.l10n.rewardWon(context.l10n.wheelRewardName(reward)),
         textAlign: TextAlign.center,
         style: const TextStyle(fontWeight: FontWeight.bold),
       );
@@ -302,7 +305,7 @@ class _ResultCard extends StatelessWidget {
     return SectionCard(
       child: Column(
         children: [
-          const Text('Ekipman kazandın! 🎉', textAlign: TextAlign.center),
+          Text(context.l10n.equipmentWon, textAlign: TextAlign.center),
           const SizedBox(height: 8),
           Image.asset(
             item.assetPath,
@@ -317,13 +320,13 @@ class _ResultCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            item.name,
+            context.l10n.itemName(item),
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
-            item.rarity.label,
+            context.l10n.rarityName(item.rarity),
             style: TextStyle(
               color: item.rarity.color,
               fontSize: 12,
@@ -396,11 +399,16 @@ class _RewardReveal extends StatelessWidget {
               children: [
                 Text(
                   switch ((item, reward.title)) {
-                    (final Item item, _) =>
-                      '${item.rarity.label.toUpperCase()} ÖDÜL',
-                    (_, final GameTitle title) =>
-                      '${title.rarity.label.toUpperCase()} ÜNVAN',
-                    _ => reward.isCoins ? 'ALTIN KAZANDIN' : 'XP KAZANDIN',
+                    (final Item item, _) => context.l10n.rewardTier(
+                      context.l10n.rarityName(item.rarity).toUpperCase(),
+                    ),
+                    (_, final GameTitle title) => context.l10n.titleTier(
+                      context.l10n.rarityName(title.rarity).toUpperCase(),
+                    ),
+                    _ =>
+                      reward.isCoins
+                          ? context.l10n.goldWonHeader
+                          : context.l10n.xpWonHeader,
                   },
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -443,7 +451,7 @@ class _RewardReveal extends StatelessWidget {
                 Text(
                   // Ünvan dilimi XP vermiyor; eski hâlinde burada "+0 XP"
                   // yazıyordu (kullanıcı bildirimi).
-                  item?.name ?? reward.title?.name ?? reward.label,
+                  context.l10n.wheelRewardName(reward),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
@@ -454,7 +462,7 @@ class _RewardReveal extends StatelessWidget {
                 if (reward.title case final title?) ...[
                   const SizedBox(height: 8),
                   Text(
-                    title.lore,
+                    context.l10n.titleLore(title),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: glowColor.withValues(alpha: 0.95),
@@ -465,7 +473,8 @@ class _RewardReveal extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     [
-                      for (final effect in title.effects) effect.label,
+                      for (final effect in title.effects)
+                        context.l10n.itemEffectLabel(effect),
                     ].join(' · '),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -475,16 +484,19 @@ class _RewardReveal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Profildeki Ünvanlar ekranından takabilirsin.',
+                  Text(
+                    context.l10n.equipTitleFromProfile,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54, fontSize: 11.5),
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11.5,
+                    ),
                   ),
                 ],
-                if (item?.buff.label case final effect?) ...[
+                if (item case final wonItem?) ...[
                   const SizedBox(height: 8),
                   Text(
-                    effect,
+                    context.l10n.itemBuffLabels(wonItem).join(' · '),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: glowColor.withValues(alpha: 0.95),
@@ -495,9 +507,9 @@ class _RewardReveal extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 14),
-                const Text(
-                  'Ödül envanterine işlendi',
-                  style: TextStyle(
+                Text(
+                  context.l10n.rewardAddedToInventory,
+                  style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 11,
                     letterSpacing: 0.4,
@@ -571,7 +583,9 @@ class _WheelFace extends StatelessWidget {
             right: 0,
             top: 300,
             child: Text(
-              running ? 'ŞANS MEKANİZMASI ÇALIŞIYOR' : 'DİŞLİLERİ UYANDIR',
+              running
+                  ? context.l10n.chanceMechanismRunning
+                  : context.l10n.wakeTheGears,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: running ? AppColors.streak : Colors.white54,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/tutorial_guide_variant.dart';
 
 class GuideSelectionScreen extends StatefulWidget {
@@ -31,9 +33,9 @@ class _GuideSelectionScreenState extends State<GuideSelectionScreen> {
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
             child: Column(
               children: [
-                const Text(
-                  'YOL ARKADAŞINI SEÇ',
-                  style: TextStyle(
+                Text(
+                  context.l10n.chooseCompanionEyebrow,
+                  style: const TextStyle(
                     color: AppColors.streak,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -42,17 +44,17 @@ class _GuideSelectionScreenState extends State<GuideSelectionScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'İlk maceranda yanında kim yürüsün?',
+                  context.l10n.chooseCompanionTitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Seçtiğin yol arkadaşı eğitim boyunca seni yönlendirecek.',
+                Text(
+                  context.l10n.chooseCompanionDescription,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white60, height: 1.35),
+                  style: const TextStyle(color: Colors.white60, height: 1.35),
                 ),
                 const SizedBox(height: 22),
                 Expanded(
@@ -99,7 +101,7 @@ class _GuideSelectionScreenState extends State<GuideSelectionScreen> {
                             ? null
                             : () => widget.onSelected(_selected!),
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Yol Arkadaşımı Seç'),
+                    label: Text(context.l10n.chooseMyCompanion),
                   ),
                 ),
               ],
@@ -165,7 +167,7 @@ class _GuideChoiceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      guide.label,
+                      context.l10n.guideName(guide),
                       style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
@@ -173,7 +175,7 @@ class _GuideChoiceCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      guide.description,
+                      context.l10n.guideDescription(guide),
                       style: const TextStyle(
                         color: Colors.white60,
                         height: 1.3,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/game_title.dart';
 import '../models/reward_rarity.dart';
+import '../l10n/content_localizations.dart';
+import '../l10n/l10n_context.dart';
 
 /// Takılı ünvanın oyuncu adının yanında görünen rozeti (Bölüm C.2).
 ///
@@ -43,7 +45,7 @@ class TitleBadge extends StatelessWidget {
             // Esnek: uzun ünvan adı dar ekranda satırı taşırmasın.
             Flexible(
               child: Text(
-                resolved.name,
+                context.l10n.titleName(resolved),
                 key: const ValueKey('equipped-title-name'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

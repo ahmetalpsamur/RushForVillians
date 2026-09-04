@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_formatters.dart';
+import '../../l10n/l10n_context.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_day.dart';
 import '../../models/daily_progress.dart';
@@ -60,7 +62,7 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
     final canGoNext = _selectedMonth.isBefore(nowMonth);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Adım Halkaları')),
+      appBar: AppBar(title: Text(context.l10n.stepRings)),
       body: Column(
         children: [
           Container(
@@ -86,9 +88,10 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
                 ),
                 Expanded(
                   child: Text(
-                    formatLongDate(
+                    AppFormatters.monthYear(
+                      context,
                       DateTime(_selectedMonth.year, _selectedMonth.month, 1),
-                    ).replaceFirst('1 ', ''),
+                    ),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
@@ -116,7 +119,13 @@ class _StepHistoryScreenState extends State<StepHistoryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children:
-                  const ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+                  List.generate(
+                        7,
+                        (index) => AppFormatters.shortWeekday(
+                          context,
+                          DateTime(2024, 1, index + 1),
+                        ),
+                      )
                       .map(
                         (day) => Expanded(
                           child: Text(

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/title_rules.dart';
 import 'package:rush_for_villains/features/titles/titles_screen.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
 
 /// Ünvan ekranının görsel denetimi (Bölüm C.5).
 ///
@@ -36,7 +37,11 @@ void main() {
     coins: 3400,
   );
 
-  Future<void> pumpTitles(WidgetTester tester, double width) async {
+  Future<void> pumpTitles(
+    WidgetTester tester,
+    double width, {
+    Locale locale = const Locale('tr'),
+  }) async {
     tester.view.physicalSize = Size(width, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -47,6 +52,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: TitlesScreen(
           revision: revision,
           readState: buildState,
@@ -61,6 +69,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
     }
   }
+
+  testWidgets('English title UI at 390 dp', (tester) async {
+    await pumpTitles(tester, 390, locale: const Locale('en'));
+
+    expect(find.text('Equipped Title'), findsOneWidget);
+    expect(find.text('UNEQUIP TITLE'), findsOneWidget);
+    await expectLater(
+      find.byType(TitlesScreen),
+      matchesGoldenFile('goldens/titles_en_390.png'),
+    );
+  });
 
   for (final width in [320.0, 390.0]) {
     testWidgets('ünvan ekranı ${width.toInt()} dp', (tester) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/features/inventory/inventory_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
@@ -61,6 +62,7 @@ void main() {
   test('tutorial sonunda pet çağırma düğmesini anlatır', () {
     final frame = TutorialGuideFrame.forStep(
       TutorialGuideStep.farewellYourTurn,
+      AppLocalizationsTr(),
     );
     expect(
       frame.message,
@@ -412,7 +414,8 @@ void main() {
 
       // Death çevrimi boyunca hâlâ ekranda ve eğitim kapanmamış.
       await tester.pump(
-        TutorialGuideOverlay.farewellDeathHold - const Duration(milliseconds: 1),
+        TutorialGuideOverlay.farewellDeathHold -
+            const Duration(milliseconds: 1),
       );
       expect(completed, 0);
       expect(guideAsset(tester), contains('_Death_8.gif'));
@@ -458,10 +461,7 @@ void main() {
       );
       for (final guide in TutorialGuideVariant.values) {
         expect(
-          TutorialGuideAssets.forAnimation(
-            TutorialGuideAnimation.dying,
-            guide,
-          ),
+          TutorialGuideAssets.forAnimation(TutorialGuideAnimation.dying, guide),
           endsWith('_Death_8.gif'),
         );
       }

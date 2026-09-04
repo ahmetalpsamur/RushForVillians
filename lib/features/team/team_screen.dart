@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/pet_sayings.dart';
+import '../../l10n/l10n_context.dart';
 import '../../models/team.dart';
 import '../../widgets/section_card.dart';
 
@@ -23,7 +23,7 @@ class TeamScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Taverna')),
+      appBar: AppBar(title: Text(context.l10n.tavernTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -36,20 +36,26 @@ class TeamScreen extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Taverna daha açılmadı',
-                        style: TextStyle(fontWeight: FontWeight.w900),
+                        context.l10n.tavernComingSoon,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        PetSayings.tavernTeaser,
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                        context.l10n.petTavernTeaser,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Aşağıdaki takım şimdilik bir önizleme.',
-                        style: TextStyle(color: Colors.white38, fontSize: 11.5),
+                        context.l10n.tavernPreview,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11.5,
+                        ),
                       ),
                     ],
                   ),
@@ -72,8 +78,8 @@ class TeamScreen extends StatelessWidget {
                 Expanded(
                   child: Text(
                     team.isWalkingSideBySide
-                        ? 'Takım şu anda yan yana yürüyor! Bonus XP aktif.'
-                        : 'Bonus için tüm üyelerin aynı anda yürümesi gerekir.',
+                        ? context.l10n.teamWalkingBonusActive
+                        : context.l10n.teamWalkingBonusRequirement,
                   ),
                 ),
               ],
@@ -81,7 +87,7 @@ class TeamScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SectionCard(
-            title: 'Toplam Takım Adımı: ${team.totalSteps}',
+            title: context.l10n.teamTotalSteps(team.totalSteps),
             child: Column(
               children:
                   team.members
@@ -90,15 +96,25 @@ class TeamScreen extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Row(
                             children: [
-                              CircleAvatar(child: Text(m.name[0])),
+                              CircleAvatar(
+                                child: Text(
+                                  (m.name == 'Sen'
+                                      ? context.l10n.youMemberName
+                                      : m.name)[0],
+                                ),
+                              ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(m.name),
                                     Text(
-                                      '${m.steps} adım',
+                                      m.name == 'Sen'
+                                          ? context.l10n.youMemberName
+                                          : m.name,
+                                    ),
+                                    Text(
+                                      context.l10n.stepCount(m.steps),
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: Colors.white70,

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_rules.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/character_class.dart';
 import '../../models/item.dart';
@@ -82,11 +84,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
       await ItemCatalog.load();
       if (!mounted) return;
       if (classes.isEmpty) {
-        setState(
-          () =>
-              _catalogError =
-                  'All_Assets avatar klasöründe karakter bulunamadı.',
-        );
+        setState(() => _catalogError = context.l10n.characterCatalogEmpty);
         return;
       }
       final initial = widget.initialAvatar;
@@ -104,7 +102,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _catalogError = 'Karakter dosyaları yüklenemedi.');
+        setState(() => _catalogError = context.l10n.characterCatalogLoadFailed);
       }
     }
   }
@@ -158,7 +156,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
   void _next() {
     if (_step == 0 && _nameController.text.trim().length < 2) {
       HapticFeedback.heavyImpact();
-      setState(() => _nameError = 'Kahramanın adı en az 2 karakter olmalı.');
+      setState(() => _nameError = context.l10n.heroNameTooShort);
       return;
     }
     if (_step == 4 && _selectedClass == null) return;
@@ -371,20 +369,20 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
     0 => _nameStep(),
     1 => _genderStep(),
     2 => _numberStep(
-      eyebrow: 'KADERİNİN İKİNCİ SATIRI',
-      title: 'Kaç yaşındasın?',
-      subtitle: 'Yaş, kahramanının hikâyesine yön verir.',
+      eyebrow: context.l10n.fateSecondLine,
+      title: context.l10n.ageQuestion,
+      subtitle: context.l10n.ageDescription,
       value: _age,
-      suffix: 'yaş',
+      suffix: context.l10n.ageSuffix,
       min: 16,
       max: 80,
       controller: _ageController,
       onChanged: (value) => setState(() => _age = value),
     ),
     3 => _numberStep(
-      eyebrow: 'BEDENİNİ TANIMLA',
-      title: 'Kilon kaç?',
-      subtitle: 'Bu bilgi karakter profilinin bir parçası olacak.',
+      eyebrow: context.l10n.defineBody,
+      title: context.l10n.weightQuestion,
+      subtitle: context.l10n.weightDescription,
       value: _weight,
       suffix: 'kg',
       min: 40,
@@ -398,9 +396,9 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
 
   Widget _nameStep() {
     return _QuestionFrame(
-      eyebrow: 'KADERİNİN İLK SATIRI',
-      title: 'Sana nasıl hitap edelim?',
-      subtitle: 'Bu isim düşmanlarının hafızasına kazınacak.',
+      eyebrow: context.l10n.fateFirstLine,
+      title: context.l10n.nameQuestion,
+      subtitle: context.l10n.nameDescription,
       child: TextField(
         controller: _nameController,
         autofocus: widget.initialAvatar == null,
@@ -411,7 +409,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
         onChanged: (_) => setState(() => _nameError = null),
         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         decoration: InputDecoration(
-          hintText: 'Kahramanının adı',
+          hintText: context.l10n.heroNameHint,
           errorText: _nameError,
           prefixIcon: const Icon(Icons.edit_note, color: AppColors.primary),
           filled: true,
@@ -427,23 +425,23 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
   }
 
   Widget _genderStep() {
-    const options = [
-      ('Kadın', Icons.female),
-      ('Erkek', Icons.male),
-      ('Diğer', Icons.person_outline),
+    final options = [
+      ('Kadın', context.l10n.genderFemale, Icons.female),
+      ('Erkek', context.l10n.genderMale, Icons.male),
+      ('Diğer', context.l10n.genderOther, Icons.person_outline),
     ];
     return _QuestionFrame(
-      eyebrow: 'KİMLİĞİNİ BELİRLE',
-      title: 'Kahramanın kim?',
-      subtitle: 'Seni en iyi ifade eden seçeneği seç.',
+      eyebrow: context.l10n.defineIdentity,
+      title: context.l10n.identityQuestion,
+      subtitle: context.l10n.identityDescription,
       child: Column(
         children:
             options.map((option) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _NeonOption(
-                  label: option.$1,
-                  icon: option.$2,
+                  label: option.$2,
+                  icon: option.$3,
                   selected: _gender == option.$1,
                   color: AppColors.primary,
                   onTap: () {
@@ -495,17 +493,13 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
       return const Center(child: CircularProgressIndicator());
     }
     return _QuestionFrame(
-      eyebrow: 'GÜCÜNÜ SEÇ',
-      title: 'Hangi sınıfa aitsin?',
-      subtitle: 'Yürüyüşünü ve savaş yolunu birlikte seç.',
+      eyebrow: context.l10n.choosePower,
+      title: context.l10n.classQuestion,
+      subtitle: context.l10n.classDescription,
       wide: true,
       // Kilitli/edilgen kontrol sessiz kalmaz: onay verilmeden "DEVAM ET"
       // kapalı, sebebi burada yazılı.
-      hint:
-          _classConfirmed
-              ? null
-              : 'Devam etmek için bir sınıfa dokun, tanıt ekranında incele ve '
-                  '“BU SINIFI SEÇ”e bas.',
+      hint: _classConfirmed ? null : context.l10n.classSelectionHint,
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -524,7 +518,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
           final selected =
               _classConfirmed && characterClass.id == _selectedClassId;
           return _ClassTile(
-            label: characterClass.name,
+            label: context.l10n.characterClassName(characterClass.id),
             asset: characterClass.walkingAsset,
             selected: selected,
             color:
@@ -542,15 +536,17 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
     final avatar = _avatar;
     if (avatar == null) return const SizedBox.shrink();
     return _QuestionFrame(
-      eyebrow: 'KADERİN MÜHÜRLENİYOR',
-      title: '${avatar.name}, hazır mısın?',
-      subtitle: 'Seçimlerini onayla ve Rush for Villains dünyasına adım at.',
+      eyebrow: context.l10n.fateSealed,
+      title: context.l10n.heroReadyQuestion(avatar.name),
+      subtitle: context.l10n.confirmHeroDescription,
       child: Column(
         children: [
           _NeonAvatar(avatar: avatar, color: _neonColor),
           const SizedBox(height: 24),
           Text(
-            avatar.characterClassLabel.toUpperCase(),
+            context.l10n
+                .characterClassName(avatar.characterClass)
+                .toUpperCase(),
             style: TextStyle(
               color: _neonColor,
               fontSize: 18,
@@ -560,7 +556,15 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen>
           ),
           const SizedBox(height: 10),
           Text(
-            '${avatar.age} yaş  •  ${avatar.weight} kg  •  ${avatar.gender}',
+            context.l10n.profileDetails(
+              avatar.age,
+              avatar.weight,
+              switch (avatar.gender) {
+                'Kadın' => context.l10n.genderFemale,
+                'Erkek' => context.l10n.genderMale,
+                _ => context.l10n.genderOther,
+              },
+            ),
             style: const TextStyle(color: Colors.white70),
           ),
         ],
@@ -717,10 +721,10 @@ class _NumberWheel extends StatelessWidget {
             ],
           ),
         ),
-        const Text(
-          'Değeri değiştirmek için yukarı veya aşağı kaydır',
+        Text(
+          context.l10n.scrollToChangeValue,
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white38, fontSize: 12),
+          style: const TextStyle(color: Colors.white38, fontSize: 12),
         ),
         const SizedBox(height: 8),
         Row(
@@ -1092,11 +1096,13 @@ class _ClassReveal extends StatelessWidget {
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back),
                     color: Colors.white,
-                    tooltip: 'Sınıf listesine dön',
+                    tooltip: context.l10n.backToClassList,
                   ),
                   Expanded(
                     child: Text(
-                      characterClass.name.toUpperCase(),
+                      context.l10n
+                          .characterClassName(characterClass.id)
+                          .toUpperCase(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: color,
@@ -1152,9 +1158,9 @@ class _ClassReveal extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               if (equipment.isNotEmpty) ...[
-                const Text(
-                  'KULLANABİLDİĞİ EŞYA TÜRLERİ',
-                  style: TextStyle(
+                Text(
+                  context.l10n.usableItemTypes,
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -1166,7 +1172,7 @@ class _ClassReveal extends StatelessWidget {
                 const SizedBox(height: 8),
               ],
               Text(
-                '“${characterClass.selectionSlogan}”',
+                '“${context.l10n.characterClassSlogan(characterClass.id, characterClass.selectionSlogan)}”',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
@@ -1183,7 +1189,7 @@ class _ClassReveal extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onSelect,
                   icon: const Icon(Icons.auto_awesome),
-                  label: const Text('BU SINIFI SEÇ'),
+                  label: Text(context.l10n.chooseThisClass),
                   style: FilledButton.styleFrom(
                     backgroundColor: color,
                     foregroundColor: Colors.black,
@@ -1269,7 +1275,7 @@ class _RevealEquipmentItem extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            item.category.label.toUpperCase(),
+            context.l10n.itemCategoryName(item.category).toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -1394,7 +1400,7 @@ class _BottomControls extends StatelessWidget {
             IconButton.filledTonal(
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back),
-              tooltip: 'Geri',
+              tooltip: context.l10n.back,
             ),
             const SizedBox(width: 12),
           ],
@@ -1404,8 +1410,10 @@ class _BottomControls extends StatelessWidget {
               icon: Icon(last ? Icons.bolt : Icons.arrow_forward),
               label: Text(
                 last
-                    ? (editing ? 'DEĞİŞİKLİKLERİ MÜHÜRLE' : 'MACERAYA BAŞLA')
-                    : 'DEVAM ET',
+                    ? (editing
+                        ? context.l10n.sealChanges
+                        : context.l10n.startAdventureAction)
+                    : context.l10n.continueAction,
               ),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(54),
@@ -1457,7 +1465,7 @@ class _CatalogError extends StatelessWidget {
           TextButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
-            label: const Text('Tekrar dene'),
+            label: Text(context.l10n.retry),
           ),
         ],
       ),

@@ -110,7 +110,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
 | Yerel kalıcılık, şema v20 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
-| 29 adımlık eğitim + dolaşan rehber | Çoklu dil (yalnızca Türkçe) |
+| 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
 ---
 
@@ -333,6 +333,8 @@ Aynı Smart App Control kısıtı yüzünden uygulama bu makinede çalıştırı
 | `shared_preferences` | ^2.5.3 | Tüm kalıcılık |
 | `flutter_local_notifications` | ^19.5.0 | Macera hatırlatmaları |
 | `timezone` | ^0.10.1 | Bildirim zamanlaması |
+| `flutter_localizations` | Flutter SDK | Material/Cupertino yerelleştirme delegeleri |
+| `intl` | SDK'nın sabitlediği sürüm | Sayı, tarih ve saat biçimlendirme |
 | `flutter_lints` | ^5.0.0 (dev) | Analiz |
 
 State management, HTTP, serialization, mocking paketi **yok** ve
@@ -1495,6 +1497,84 @@ okunmuyor (`flutter_timezone` yok). Göreli offsetlerle çalıştığı için so
 çıkarmıyor ama **gün/saat bazlı bir bildirim eklenirse bu acil bir hataya
 dönüşür.**
 
+## 6.16 Yerelleştirme
+
+Resmî Flutter hattı kullanılıyor: `flutter_localizations` + `intl` + ARB +
+`gen_l10n`. Türkçe şablon ve varsayılan dil; İngilizce ikinci dil. ARB dosyaları
+`lib/l10n/app_tr.arb` ve `app_en.arb`, üretim ayarı `l10n.yaml` içindedir.
+İngilizce ARB'de bulunmayan anahtarın Türkçe şablon değeri üretilir; boş metin
+ya da anahtar adı kullanıcıya sızmaz.
+
+Dil tercihi profilde **Sistem / Türkçe / İngilizce** olarak seçilir ve
+`LocalePreferenceStorage` tarafından `locale_preference_v1` anahtarına yazılır.
+Bu bir oyun durumu değil uygulama tercihidir; `GameState` şemasına eklenmez ve
+migration gerektirmez (GD86). Sistem seçiminde cihazın Türkçe/İngilizce dili
+izlenir; desteklenmeyen cihaz dili Türkçeye düşer. Değişiklik kök
+`MaterialApp.locale` üzerinden yeniden başlatmadan uygulanır. iOS iki dili
+`CFBundleLocalizations` içinde ilan eder.
+
+Sayı, tarih ve saat biçimleri `core/localization/app_formatters.dart` üzerinden
+seçili locale ile üretilir. Yeni elle yazılmış binlik ayıracı, ay adı veya saat
+biçimi ekleme.
+
+**2026-09-04 Faz 2 ilerlemesi:** ana gezinme, açılış hata durumu, karakter
+oluşturma, ana sayfa, profil/adım geçmişi, taverna, mağaza, envanter/demirci,
+ünvanlar, ödül koleksiyonu, günlük çark, boss ve macera ekranlarının sabit UI
+çerçevesi ARB'ye taşındı. ARB şu an 200'den fazla anahtar ve ICU
+placeholder/plural örnekleri içeriyor. Faz 2 golden temsili `titles_en_390.png`;
+Türkçe 320/390 ünvan golden'ları da yeni yerleşimle yenilendi. Kalan Türkçe
+eşleşmelerin ana grubu Faz 3 kapsamındaki katalog/anlatı içeriği ile
+`RootShell` olay bildirimleri; macera savaşındaki birkaç durum/ölçü satırı da
+Faz 2 kapanmadan temizlenecek.
+
+**2026-09-04 Faz 3 başlangıcı:** içerik gösterimi kalıcı model alanlarını
+değiştirmeden sabit kimlik üzerinden `l10n/content_localizations.dart` ile
+çözülüyor. 20 düşmanın adı, görev anlatısı ve arketipi; 3 rehber seçeneği;
+öğreticinin 28 dolu karesi ve düğmeleri; 23 bağlamsal pet repliği; yerel
+bildirimlerin 4 gövdesi ile kanal metinleri TR/EN ARB'ye taşındı. Bildirim
+servisi artık Türkçe sabit taşımıyor: `RootShell`, arka plana geçerken seçili
+dilde hazırlanmış `AdventureNotificationCopy` veriyor. Bilinmeyen düşman
+kimlikleri modeldeki Türkçe kanonik alana güvenli biçimde düşer. Faz 3 devamında
+sınıf adları (eski kayıt kimlikleri dahil), 1.244 koleksiyon ödülünün ad/koşul
+üretimi, item/ünvan gösterimi, round süreleri ve sonuçları da aynı sabit kimlik
+katmanına alındı. Faz 3 golden temsilleri `phase3_guides_en_390.png` ve
+`phase3_rewards_en_390.png`.
+
+### Faz 0 metin envanteri
+
+| Kategori | Adet | Yer / saklama biçimi | Durum |
+|---|---:|---|---|
+| Arayüz bağlama noktaları | 512 aday (396 `Text`, 116 başlık/etiket/tooltip/hint) | 28 `features/` ve `widgets/` Dart dosyası | Faz 2 tamamlandı; Faz 3 katalog/model sızıntıları kapatıldı |
+| Sınıf seçimi | 22 güncel/eski sınıf kimliği + seçim sözü + cinsiyet etiketleri | `AvatarProfile` kanonik değerleri gösterimde `content_localizations.dart` üzerinden çözülüyor | Faz 3 tamamlandı |
+| Koleksiyon ödülleri | 1.244 görsel için 17 koşul türünden üretilen ad, açıklama ve gereksinim | Kalıcı katalog alanları değişmeden koşul türü, hedef ve villain kimliği yerelleştiriliyor | Faz 3 tamamlandı |
+| Item ad üretimi | 166 temel ad + 36 varyant sıfatı + 5 nadirlik | `data/item_definitions.dart`, `core/utils/item_rules.dart`, `models/reward_rarity.dart`; gösterimde sabit asset kimliği, nadirlik ve sıfat yerelleştiriliyor | Faz 3 tamamlandı |
+| Ünvanlar | 65 ad + 65 lore + 123 özel etki etiketi | `data/title_catalog.dart` içine gömülü katalog; adlar sabit kimlikten, lore/kilit/etkiler yapılandırılmış kaynaktan yerelleştiriliyor | Faz 3 tamamlandı |
+| Canavarlar | 20 ad + 20 görev metni + 4 arketip | `data/enemy_catalog.dart`; gösterim sabit `id` ile | Faz 3 tamamlandı |
+| Görev/macera | Round, süre, adım, savaş sonucu, ödül ve kök akış bildirimleri | `adventure_screen.dart`, `root_shell.dart`; modeldeki süre/ad alanları gösterimde locale üzerinden çözülüyor | Faz 3 tamamlandı |
+| Tutorial | 28 dolu frame mesajı + düğme etiketleri | ARB; adım enum'u yalnızca kalıcı akış kimliği | Faz 3 tamamlandı |
+| Pet diyalogları | 23 replik | ARB; bağlamsal havuz locale anında kuruluyor | Faz 3 tamamlandı |
+| Bildirimler | 4 gövde şablonu + kanal adı/açıklaması | ARB; servise hazır locale kopyası veriliyor | Faz 3 tamamlandı |
+
+### İngilizce oyun terimleri sözlüğü
+
+| Türkçe | İngilizce |
+|---|---|
+| macera | adventure |
+| seri | streak |
+| çark | wheel |
+| ünvan | title |
+| nadirlik | rarity |
+| kuşanmak | equip |
+| birleştirmek | merge |
+| yükseltmek | upgrade |
+| tur | round |
+| yürüyüş fazı | walk phase |
+| seri bonusu | streak bonus |
+| adım | step |
+| altın | gold |
+| can | health |
+| demirci | blacksmith |
+
 ---
 
 # §7 — Kalıcılık
@@ -1507,6 +1587,7 @@ dönüşür.**
 | `services/game_storage.dart` | SharedPreferences'a yazma/okuma, şema, migration |
 | `services/character_storage.dart` | Avatar (`player_avatar_v1`) |
 | `services/tutorial_guide_storage.dart` | Seçilen rehber |
+| `core/localization/locale_preference.dart` | Oyun şemasından bağımsız dil tercihi (`locale_preference_v1`) |
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
@@ -1679,7 +1760,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD84)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD87)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -1771,6 +1852,9 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD82 | Rehber `Scaffold.body` içinde yaşıyor; konumu sabit pikselden çıkmıyor | Body'nin alt kenarı zaten alt gezinme çubuğunun üst kenarı → `bottom: 0` "barın hemen üstü" demek. Ölçüm, tema sorgusu ya da 96 px tahmini gerekmiyor; jest çubuğu olan/olmayan cihazda, bar gizlendiğinde ve klavye açıldığında kendiliğinden doğru |
 | GD83 | Eğitim rehberi ekrandan yürüyerek çıkmıyor, **death** animasyonuyla veda ediyor | Çıkış artık pet'i kapatmakla aynı hissi veriyor. Süre sabit (960 ms): üç rehberin `*_Death_8.gif` dosyası da 8 kare × 120 ms, ve geçişi gerçek dosya okumasına bağlamak hem testlerde sahte saatle ilerletilemez hem asset okunamazsa eğitimi biteceği anda takardı |
 | GD84 | Savaş temposu tek sabitten **100 adım/dk**; round sayısı 250 hedefinden 2–5 arası türetiliyor; mükemmel seri ×2 tavanlı | Eski 1.000 adım/15 dk roundu ile yüzdeli config çelişiyordu; bazı UI hedefleri sprint istiyordu. 500→2 ve 1.000→4 round gerilimi korurken, 5 tavanı uzun düşmanlarda tekrar hissini engelliyor |
+| GD85 | Yerelleştirme resmî `flutter_localizations` + `intl` + ARB/`gen_l10n` hattında | Flutter SDK ile sürüm uyumlu, üçüncü parti çalışma zamanı ve ayrı anahtar üretim sistemi getirmiyor |
+| GD86 | Dil tercihi `GameState` dışında ayrı SharedPreferences anahtarında | Dil bir oyun ilerlemesi değil cihaz/uygulama tercihidir; oyun kayıt şemasını ve ilerideki Firebase zarfını gereksiz yere değiştirmemeli |
+| GD87 | Türkçe ARB şablon ve eksik çeviri yedeği; desteklenmeyen sistem dili de Türkçe | Mevcut Türkçe hiçbir şey kaybetmez; yarım İngilizce çeviride boş değer veya anahtar adı kullanıcıya görünmez |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
@@ -1790,16 +1874,18 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-`flutter test --no-test-assets` → **830 test, 7 başarısız.** Hepsi **golden**:
+2026-09-04 yerelleştirme Faz 1 sonunda `flutter test --no-test-assets` →
+**865 başarılı, 15 başarısız.** Başarısızların tamamı oturum başındaki kirli
+çalışma ağacında zaten değişmiş ekranlara ait mevcut **golden** farklarıdır;
+yerelleştirme davranış testleri (5), açılış testleri (4) ve yeni dil seçici
+golden'ları (4) geçiyor.
 
-- `character_creation_test` — tanıtım ekranı (320 dp, 800 dp)
-- `golden/pet_companion_golden_test` — ana çember pet düğmesi (açık, kapalı)
-- ve 3 tanesi daha
+- `character_creation_test` — sınıf ızgarası/tanıtım ekranı
+- mevcut `golden/` ekranları — demirci, ünvan, pet yerleşimi vb.
 
-**Muhtemel sebep kod regresyonu değil, bayat test asset paketi** (§5.2'nin
-uyarısı): `pubspec.yaml`'a `Tutorial_Guy` ve `coins` klasörleri eklendikten
-sonra paket yenilenmediyse golden'lar sahte sebeplerle kırılır. Elden geçirmeden
-önce paketi tazele, sonra farkı **PNG'ye bakarak** değerlendir.
+Test asset paketi bu oturumda normal `flutter test` ile yenilendi ve shader
+tekrar yerine kondu; kalan farklar bayat asset paketinden kaynaklanmıyor.
+Yerelleştirme dışı oldukları için golden ana görüntüleri güncellenmedi.
 
 ## Zaman güvenliği
 
@@ -1835,7 +1921,7 @@ sonra paket yenilenmediyse golden'lar sahte sebeplerle kırılır. Elden geçirm
 | # | Ne | Not |
 |---|---|---|
 | C3 | `tz.setLocalLocation(tz.UTC)` sabit | Gün/saat bazlı bildirim eklenirse **acil hataya dönüşür** |
-| C4 | Hatırlatma metinleri iki yerde kopyalanmış | `root_shell.dart:_reminderMessages` ve `adventure_notification_service.dart:_messages` |
+| C4 | *(Faz 3 ile çözüldü)* Sistem bildirim kopyası serviste sabitlenmişti | Servis artık seçili dilde hazırlanmış `AdventureNotificationCopy` alıyor |
 | C5 | `RootShell._rewards` hiç doldurulmuyor | Eski "Ödüllerim" zinciri; yerine `RewardEngine` koleksiyonu geldi |
 | C6 | `sideBySideWindowMinutes` kullanılmıyor | Takım savaşına ait ölü sabit |
 | C7 | `nextReminderAt` geçmiş bir zamanla dönerse resume'da anında hatırlatma | Tek seferlik, zararsız |

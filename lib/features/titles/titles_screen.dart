@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/title_rules.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../data/title_catalog.dart';
 import '../../models/game_title.dart';
 import '../../models/reward_rarity.dart';
@@ -97,12 +99,17 @@ class _TitlesScreenState extends State<TitlesScreen> {
   bool _matchesQuery(GameTitle title) {
     if (_query.isEmpty) return true;
     final needle = _query.toLowerCase();
-    if (title.name.toLowerCase().contains(needle)) return true;
-    if (title.lore.toLowerCase().contains(needle)) return true;
+    if (context.l10n.titleName(title).toLowerCase().contains(needle)) {
+      return true;
+    }
+    if (context.l10n.titleLore(title).toLowerCase().contains(needle)) {
+      return true;
+    }
     // Etki metninde de arıyoruz: "kritik" yazan oyuncu kritik veren
     // ünvanları görmeli.
     return title.effects.any(
-      (effect) => effect.label.toLowerCase().contains(needle),
+      (effect) =>
+          context.l10n.itemEffectLabel(effect).toLowerCase().contains(needle),
     );
   }
 
@@ -145,7 +152,7 @@ class _TitlesScreenState extends State<TitlesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ünvanlar')),
+      appBar: AppBar(title: Text(context.l10n.titles)),
       floatingActionButton: ScrollToTopButton(controller: _scrollController),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: ValueListenableBuilder<int>(
@@ -163,16 +170,15 @@ class _TitlesScreenState extends State<TitlesScreen> {
                 sliver: SliverList.list(
                   children: [
                     SectionCard(
-                      title: 'Takılı ünvan',
+                      title: context.l10n.equippedTitle,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (equipped == null)
-                            const Text(
-                              'Şu an takılı ünvanın yok. Bir ünvan tak; adının '
-                              'yanında görünsün ve etkisi açılsın.',
-                              key: ValueKey('no-equipped-title'),
-                              style: TextStyle(color: Colors.white70),
+                            Text(
+                              context.l10n.noEquippedTitle,
+                              key: const ValueKey('no-equipped-title'),
+                              style: const TextStyle(color: Colors.white70),
                             )
                           else ...[
                             Align(
@@ -181,7 +187,7 @@ class _TitlesScreenState extends State<TitlesScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              equipped.lore,
+                              context.l10n.titleLore(equipped),
                               style: const TextStyle(
                                 color: Colors.white60,
                                 fontStyle: FontStyle.italic,
@@ -193,7 +199,7 @@ class _TitlesScreenState extends State<TitlesScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: Text(
-                                  '• ${effect.label}',
+                                  '• ${context.l10n.itemEffectLabel(effect)}',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -204,16 +210,14 @@ class _TitlesScreenState extends State<TitlesScreen> {
                                 key: const ValueKey('unequip-title'),
                                 onPressed: () => widget.onEquip(null),
                                 icon: const Icon(Icons.close),
-                                label: const Text('ÜNVANI ÇIKAR'),
+                                label: Text(context.l10n.unequipTitle),
                               ),
                             ),
                           ],
                           const SizedBox(height: 8),
-                          const Text(
-                            'Aynı anda yalnızca **bir** ünvan takılır: ünvan bir '
-                            'kimlik, bir liste değil. Diğerleri sende kalır, '
-                            'istediğin zaman değiştirebilirsin.',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.singleTitleExplanation,
+                            style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 11.5,
                             ),
@@ -244,18 +248,18 @@ class _TitlesScreenState extends State<TitlesScreen> {
                       SectionCard(
                         child: Column(
                           children: [
-                            const Text(
-                              'Bu süzgeçle gösterilecek ünvan yok.',
-                              key: ValueKey('titles-empty'),
+                            Text(
+                              context.l10n.noTitlesForFilters,
+                              key: const ValueKey('titles-empty'),
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white70),
+                              style: const TextStyle(color: Colors.white70),
                             ),
                             const SizedBox(height: 8),
                             TextButton.icon(
                               key: const ValueKey('titles-clear-empty'),
                               onPressed: _clearFilters,
                               icon: const Icon(Icons.filter_alt_off),
-                              label: const Text('SÜZGEÇLERİ TEMİZLE'),
+                              label: Text(context.l10n.clearFilters),
                             ),
                           ],
                         ),
@@ -337,7 +341,7 @@ class _FilterBar extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$ownedCount / $totalCount ünvan kazanıldı',
+                  context.l10n.titlesEarnedProgress(ownedCount, totalCount),
                   key: const ValueKey('titles-progress-summary'),
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
@@ -347,7 +351,7 @@ class _FilterBar extends StatelessWidget {
                   key: const ValueKey('titles-clear-filters'),
                   onPressed: onClear,
                   icon: const Icon(Icons.filter_alt_off, size: 18),
-                  label: const Text('TEMİZLE'),
+                  label: Text(context.l10n.clear),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -374,7 +378,7 @@ class _FilterBar extends StatelessWidget {
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               isDense: true,
-              hintText: 'Ünvan, hikâye ya da etki ara…',
+              hintText: context.l10n.titleSearchHint,
               hintStyle: const TextStyle(fontSize: 13),
               prefixIcon: const Icon(Icons.search, size: 18),
               suffixIcon:
@@ -402,9 +406,9 @@ class _FilterBar extends StatelessWidget {
                 ChoiceChip(
                   key: ValueKey('titles-filter-${value.name}'),
                   label: Text(switch (value) {
-                    _TitleFilter.all => 'Tümü',
-                    _TitleFilter.owned => 'Sende',
-                    _TitleFilter.locked => 'Kilitli',
+                    _TitleFilter.all => context.l10n.filterAll,
+                    _TitleFilter.owned => context.l10n.filterOwned,
+                    _TitleFilter.locked => context.l10n.filterLocked,
                   }),
                   selected: filter == value,
                   onSelected: (_) => onFilter(value),
@@ -418,14 +422,14 @@ class _FilterBar extends StatelessWidget {
             children: [
               ChoiceChip(
                 key: const ValueKey('titles-rarity-any'),
-                label: const Text('Her nadirlik'),
+                label: Text(context.l10n.anyRarity),
                 selected: rarity == null,
                 onSelected: (_) => onRarity(null),
               ),
               for (final value in RewardRarity.values)
                 ChoiceChip(
                   key: ValueKey('titles-rarity-${value.name}'),
-                  label: Text(value.label),
+                  label: Text(context.l10n.rarityName(value)),
                   selected: rarity == value,
                   selectedColor: value.color.withValues(alpha: 0.28),
                   onSelected: (_) => onRarity(value),
@@ -441,7 +445,7 @@ class _FilterBar extends StatelessWidget {
             children: [
               ChoiceChip(
                 key: const ValueKey('titles-source-any'),
-                label: const Text('Her yol'),
+                label: Text(context.l10n.anySource),
                 selected: source == null,
                 onSelected: (_) => onSource(null),
               ),
@@ -449,10 +453,10 @@ class _FilterBar extends StatelessWidget {
                 ChoiceChip(
                   key: ValueKey('titles-source-${value.name}'),
                   label: Text(switch (value) {
-                    TitleSource.achievement => 'Başarım',
-                    TitleSource.purchase => 'Mağaza',
-                    TitleSource.wheel => 'Çark',
-                    TitleSource.milestone => 'Kilometre taşı',
+                    TitleSource.achievement => context.l10n.sourceAchievement,
+                    TitleSource.purchase => context.l10n.sourceStore,
+                    TitleSource.wheel => context.l10n.sourceWheel,
+                    TitleSource.milestone => context.l10n.sourceMilestone,
                   }),
                   selected: source == value,
                   onSelected: (_) => onSource(value),
@@ -473,10 +477,10 @@ class _FilterBar extends StatelessWidget {
                         ChoiceChip(
                           key: ValueKey('titles-sort-${value.name}'),
                           label: Text(switch (value) {
-                            _TitleSort.catalog => 'Varsayılan',
-                            _TitleSort.rarity => 'Nadirlik',
-                            _TitleSort.progress => 'Az kaldı',
-                            _TitleSort.name => 'A→Z',
+                            _TitleSort.catalog => context.l10n.sortDefault,
+                            _TitleSort.rarity => context.l10n.sortRarity,
+                            _TitleSort.progress => context.l10n.sortNearlyThere,
+                            _TitleSort.name => context.l10n.sortName,
                           }),
                           selected: sort == value,
                           onSelected: (_) => onSort(value),
@@ -491,7 +495,7 @@ class _FilterBar extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '$shownCount ünvan listede',
+            context.l10n.titlesShown(shownCount),
             key: const ValueKey('titles-shown-count'),
             style: const TextStyle(color: Colors.white38, fontSize: 11.5),
           ),
@@ -540,7 +544,7 @@ class _TitleCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    title.name,
+                    context.l10n.titleName(title),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -556,15 +560,24 @@ class _TitleCard extends StatelessWidget {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _Pill(text: title.rarity.label, color: color),
-                _Pill(text: title.sourceLabel, color: Colors.white38),
+                _Pill(
+                  text: context.l10n.rarityName(title.rarity),
+                  color: color,
+                ),
+                _Pill(
+                  text: context.l10n.titleSourceName(title.source),
+                  color: Colors.white38,
+                ),
                 if (equipped)
-                  const _Pill(text: 'TAKILI', color: AppColors.primary),
+                  _Pill(
+                    text: context.l10n.equippedBadge,
+                    color: AppColors.primary,
+                  ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
-              title.lore,
+              context.l10n.titleLore(title),
               style: const TextStyle(
                 color: Colors.white60,
                 fontStyle: FontStyle.italic,
@@ -576,7 +589,7 @@ class _TitleCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
-                  '• ${effect.label}',
+                  '• ${context.l10n.itemEffectLabel(effect)}',
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -592,7 +605,7 @@ class _TitleCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      title.unlockHint,
+                      context.l10n.titleUnlockRequirement(title),
                       style: const TextStyle(
                         color: Colors.white54,
                         fontSize: 11.5,
@@ -612,7 +625,7 @@ class _TitleCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${(ratio * 100).round()}% tamamlandı',
+                  context.l10n.completionPercent((ratio * 100).round()),
                   style: const TextStyle(color: Colors.white38, fontSize: 11),
                 ),
               ],
@@ -625,7 +638,7 @@ class _TitleCard extends StatelessWidget {
                   key: ValueKey('equip-title-${title.id}'),
                   onPressed: onEquip,
                   icon: const Icon(Icons.military_tech),
-                  label: const Text('TAK'),
+                  label: Text(context.l10n.equipAction),
                 ),
               ),
             ],

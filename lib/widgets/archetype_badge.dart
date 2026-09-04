@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/item.dart';
+import '../l10n/content_localizations.dart';
+import '../l10n/l10n_context.dart';
 
 /// Item'ın **karakterini** gösteren küçük rozet: Vurucu / Muhafız / Düellocu /
 /// Çevik.
@@ -59,7 +61,7 @@ class ArchetypeBadge extends StatelessWidget {
             // kartının taşma testleri altı ekran genişliğinde bunu bağlıyor.
             Flexible(
               child: Text(
-                archetype.label,
+                context.l10n.itemArchetypeName(archetype),
                 maxLines: 1,
                 softWrap: false,
                 overflow: TextOverflow.fade,

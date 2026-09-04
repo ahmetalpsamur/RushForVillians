@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/localization/app_formatters.dart';
 import '../core/theme/app_theme.dart';
+import '../l10n/l10n_context.dart';
 import '../models/daily_step_record.dart';
 
 class DailyStepRing extends StatelessWidget {
@@ -44,7 +46,7 @@ class DailyStepRing extends StatelessWidget {
               ),
               if (size >= 70)
                 Text(
-                  _formatNumber(record.steps),
+                  AppFormatters.integer(context, record.steps),
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: size * 0.12,
@@ -150,17 +152,21 @@ Future<void> showDailyStepDetails(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                formatLongDate(record.date),
+                AppFormatters.longDate(context, record.date),
                 textAlign: TextAlign.center,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 20),
-              DailyStepRing(record: record, size: 210, centerLabel: 'ADIM'),
+              DailyStepRing(
+                record: record,
+                size: 210,
+                centerLabel: context.l10n.stepsRingLabel,
+              ),
               const SizedBox(height: 16),
               Text(
-                '${_formatNumber(record.steps)} adım attın',
+                context.l10n.stepsTaken(record.steps),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w900,
@@ -168,8 +174,8 @@ Future<void> showDailyStepDetails(
               ),
               const SizedBox(height: 6),
               Text(
-                'Günlük hedef: ${_formatNumber(record.stepGoal)} adım'
-                '${completedLaps > 0 ? ' • $completedLaps tur' : ''}',
+                '${context.l10n.dailyGoalSteps(record.stepGoal)}'
+                '${completedLaps > 0 ? ' • ${context.l10n.completedRounds(completedLaps)}' : ''}',
                 style: const TextStyle(color: Colors.white60),
               ),
               const SizedBox(height: 20),
@@ -177,7 +183,7 @@ Future<void> showDailyStepDetails(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Kapat'),
+                  child: Text(context.l10n.commonClose),
                 ),
               ),
             ],
@@ -186,35 +192,4 @@ Future<void> showDailyStepDetails(
       );
     },
   );
-}
-
-String formatLongDate(DateTime date) {
-  const months = [
-    'Ocak',
-    'Şubat',
-    'Mart',
-    'Nisan',
-    'Mayıs',
-    'Haziran',
-    'Temmuz',
-    'Ağustos',
-    'Eylül',
-    'Ekim',
-    'Kasım',
-    'Aralık',
-  ];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
-}
-
-String shortWeekday(DateTime date) =>
-    const ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'][date.weekday - 1];
-
-String _formatNumber(int value) {
-  final digits = value.toString();
-  final output = StringBuffer();
-  for (var index = 0; index < digits.length; index++) {
-    if (index > 0 && (digits.length - index) % 3 == 0) output.write('.');
-    output.write(digits[index]);
-  }
-  return output.toString();
 }

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_context.dart';
 import '../../models/tutorial_guide_variant.dart';
 
 /// Tutorial karakterinin uygulama genelindeki tek animasyon dili.
@@ -135,189 +137,185 @@ class TutorialGuideFrame {
     this.showComingSoon = false,
   });
 
-  factory TutorialGuideFrame.forStep(TutorialGuideStep step) => switch (step) {
-    TutorialGuideStep.welcome => const TutorialGuideFrame(
-      message: 'Selam! Maceranda yanında olacağım. Hazırsan başlayalım.',
+  factory TutorialGuideFrame.forStep(
+    TutorialGuideStep step,
+    AppLocalizations l10n,
+  ) => switch (step) {
+    TutorialGuideStep.welcome => TutorialGuideFrame(
+      message: l10n.tutorialWelcome,
       animation: TutorialGuideAnimation.talking,
       alignment: Alignment(-0.68, 0.55),
-      primaryLabel: 'Başlayalım',
+      primaryLabel: l10n.tutorialBegin,
     ),
-    TutorialGuideStep.adventurePrompt => const TutorialGuideFrame(
-      message: 'Gel, ilk maceranı seçelim.',
+    TutorialGuideStep.adventurePrompt => TutorialGuideFrame(
+      message: l10n.tutorialAdventurePrompt,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.adventureTab,
       alignment: Alignment(-0.35, 0.35),
     ),
-    TutorialGuideStep.enemyChoice => const TutorialGuideFrame(
-      message: 'İlk rakibini seç. Acele etme, burada seni bekliyorum.',
+    TutorialGuideStep.enemyChoice => TutorialGuideFrame(
+      message: l10n.tutorialEnemyChoice,
       animation: TutorialGuideAnimation.idle,
       target: TutorialGuideTarget.enemyList,
       alignment: Alignment(-0.68, -0.68),
     ),
-    TutorialGuideStep.enemySelected => const TutorialGuideFrame(
-      message:
-          'İyi seçim! İlk maceranda senin yerine ben yürürüm. Sen vuruşumu izle.',
+    TutorialGuideStep.enemySelected => TutorialGuideFrame(
+      message: l10n.tutorialEnemySelected,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(-0.65, 0.48),
-      primaryLabel: 'Macerayı başlat',
+      primaryLabel: l10n.tutorialStartAdventure,
     ),
-    TutorialGuideStep.combatDemo => const TutorialGuideFrame(
-      message:
-          'Bu ilk savaş benden! Adımlarını ve vuruşlarını senin için tamamlıyorum.',
+    TutorialGuideStep.combatDemo => TutorialGuideFrame(
+      message: l10n.tutorialCombatDemo,
       animation: TutorialGuideAnimation.attacking,
       target: TutorialGuideTarget.combatArea,
       alignment: Alignment(-0.65, 0.5),
     ),
-    TutorialGuideStep.combatWaiting => const TutorialGuideFrame(
-      message:
-          'Şimdi sıra sende. Adımlarını tamamla; savaşı burada izleyeceğim.',
+    TutorialGuideStep.combatWaiting => TutorialGuideFrame(
+      message: l10n.tutorialCombatWaiting,
       animation: TutorialGuideAnimation.idle,
       target: TutorialGuideTarget.combatArea,
       alignment: Alignment(-0.7, 0.55),
     ),
-    TutorialGuideStep.enemyReaction => const TutorialGuideFrame(
-      message: 'Gördün mü? Düşmanlar da karşılık verir.',
+    TutorialGuideStep.enemyReaction => TutorialGuideFrame(
+      message: l10n.tutorialEnemyReaction,
       animation: TutorialGuideAnimation.reacting,
       target: TutorialGuideTarget.combatArea,
       alignment: Alignment(-0.65, 0.5),
-      primaryLabel: 'Anladım',
+      primaryLabel: l10n.tutorialUnderstood,
     ),
-    TutorialGuideStep.victoryCelebration => const TutorialGuideFrame(
-      message: 'İşte bu! İlk zaferin.',
+    TutorialGuideStep.victoryCelebration => TutorialGuideFrame(
+      message: l10n.tutorialVictoryCelebration,
       animation: TutorialGuideAnimation.celebrating,
       target: TutorialGuideTarget.rewardArea,
       alignment: Alignment(-0.65, 0.42),
-      primaryLabel: 'Ödüllere bak',
+      primaryLabel: l10n.tutorialViewRewards,
     ),
-    TutorialGuideStep.rewardCoins => const TutorialGuideFrame(
-      message: 'Düşmanları yenerek rastgele altın kazanırsın.',
+    TutorialGuideStep.rewardCoins => TutorialGuideFrame(
+      message: l10n.tutorialRewardCoins,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.rewardArea,
       alignment: Alignment(-0.65, 0.42),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.rewardXp => const TutorialGuideFrame(
-      message: 'Deneyim de seni seviye seviye güçlendirir.',
+    TutorialGuideStep.rewardXp => TutorialGuideFrame(
+      message: l10n.tutorialRewardXp,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.rewardArea,
       alignment: Alignment(-0.65, 0.42),
-      primaryLabel: 'Mağazaya git',
+      primaryLabel: l10n.tutorialGoToStore,
     ),
-    TutorialGuideStep.shopPrompt => const TutorialGuideFrame(
-      message: 'Şimdi altınını güce çevirelim. Mağaza burada.',
+    TutorialGuideStep.shopPrompt => TutorialGuideFrame(
+      message: l10n.tutorialShopPrompt,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.shopTab,
       alignment: Alignment(0.05, 0.35),
     ),
-    TutorialGuideStep.shopWaiting => const TutorialGuideFrame(
-      message: 'Eğitim altınınla gösterdiğim ilk silahı satın al.',
+    TutorialGuideStep.shopWaiting => TutorialGuideFrame(
+      message: l10n.tutorialShopWaiting,
       animation: TutorialGuideAnimation.idle,
       target: TutorialGuideTarget.shopItem,
       alignment: Alignment(-0.62, -0.72),
     ),
-    TutorialGuideStep.itemBought => const TutorialGuideFrame(
-      message: 'İşte şimdi güçleniyoruz!',
+    TutorialGuideStep.itemBought => TutorialGuideFrame(
+      message: l10n.tutorialItemBought,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(-0.65, 0.48),
-      primaryLabel: 'Envanteri aç',
+      primaryLabel: l10n.tutorialOpenInventory,
     ),
-    TutorialGuideStep.equipWaiting => const TutorialGuideFrame(
-      message: 'Yeni eşyanı bul ve Kuşan düğmesine dokun.',
+    TutorialGuideStep.equipWaiting => TutorialGuideFrame(
+      message: l10n.tutorialEquipWaiting,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.inventoryItem,
       alignment: Alignment(0.62, -0.72),
     ),
-    TutorialGuideStep.itemEquipped => const TutorialGuideFrame(
-      message: 'Çok daha iyi!',
+    TutorialGuideStep.itemEquipped => TutorialGuideFrame(
+      message: l10n.tutorialItemEquipped,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(-0.65, 0.5),
-      primaryLabel: 'Çarka git',
+      primaryLabel: l10n.tutorialGoToWheel,
     ),
-    TutorialGuideStep.blacksmithPrompt => const TutorialGuideFrame(
-      message: 'Biraz daha güç lazım. Demirciye gidelim.',
+    TutorialGuideStep.blacksmithPrompt => TutorialGuideFrame(
+      message: l10n.tutorialBlacksmithPrompt,
       animation: TutorialGuideAnimation.walking,
       alignment: Alignment(-0.65, 0.5),
-      primaryLabel: 'Demirciyi aç',
+      primaryLabel: l10n.tutorialOpenBlacksmith,
     ),
-    TutorialGuideStep.upgradeWaiting => const TutorialGuideFrame(
-      message: 'Yükselt düğmesi eşyanın seviyesini artırır.',
+    TutorialGuideStep.upgradeWaiting => TutorialGuideFrame(
+      message: l10n.tutorialUpgradeWaiting,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.upgradeButton,
       alignment: Alignment(0.65, 0.48),
     ),
-    TutorialGuideStep.upgradeCompleted => const TutorialGuideFrame(
-      message: 'Şimdi oldu! Eşyan artık çok daha güçlü.',
+    TutorialGuideStep.upgradeCompleted => TutorialGuideFrame(
+      message: l10n.tutorialUpgradeCompleted,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(-0.65, 0.5),
-      primaryLabel: 'Çarka geç',
+      primaryLabel: l10n.tutorialGoToWheel,
     ),
-    TutorialGuideStep.wheelPrompt => const TutorialGuideFrame(
-      message: 'Son durak: Günlük Çark. Şansını deneyelim.',
+    TutorialGuideStep.wheelPrompt => TutorialGuideFrame(
+      message: l10n.tutorialWheelPrompt,
       animation: TutorialGuideAnimation.walking,
       alignment: Alignment(-0.65, 0.5),
-      primaryLabel: 'Çarkı aç',
+      primaryLabel: l10n.tutorialOpenWheel,
     ),
-    TutorialGuideStep.wheelWaiting => const TutorialGuideFrame(
-      message: 'Çevir ve sonucu birlikte izleyelim.',
+    TutorialGuideStep.wheelWaiting => TutorialGuideFrame(
+      message: l10n.tutorialWheelWaiting,
       animation: TutorialGuideAnimation.idle,
       target: TutorialGuideTarget.wheel,
       alignment: Alignment(0.68, 0.38),
     ),
-    TutorialGuideStep.wheelReward => const TutorialGuideFrame(
-      message: 'Şans bugün senden yana!',
+    TutorialGuideStep.wheelReward => TutorialGuideFrame(
+      message: l10n.tutorialWheelReward,
       animation: TutorialGuideAnimation.celebrating,
       target: TutorialGuideTarget.wheelReward,
       alignment: Alignment(-0.65, -0.72),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.finalReady => const TutorialGuideFrame(
-      message: 'Artık hazırsın.',
+    TutorialGuideStep.finalReady => TutorialGuideFrame(
+      message: l10n.tutorialFinalReady,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(-0.62, 0.2),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.finalMotto => const TutorialGuideFrame(
-      message: 'Yürü. Güçlen. Düşmanlarını yen.',
+    TutorialGuideStep.finalMotto => TutorialGuideFrame(
+      message: l10n.tutorialFinalMotto,
       animation: TutorialGuideAnimation.talking,
       alignment: Alignment(-0.62, 0.2),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.onlineTeaser => const TutorialGuideFrame(
-      message:
-          'Ama bu daha başlangıç... Yakında Online Maceralar da burada olacak.',
+    TutorialGuideStep.onlineTeaser => TutorialGuideFrame(
+      message: l10n.tutorialOnlineTeaser,
       animation: TutorialGuideAnimation.pointing,
       alignment: Alignment(-0.62, 0.1),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
       showComingSoon: true,
     ),
-    TutorialGuideStep.ratingRequest => const TutorialGuideFrame(
-      message:
-          'Ben gitmeden önce küçük bir ricam var. Maceranı sevdiysen bizi değerlendirmeyi unutma!',
+    TutorialGuideStep.ratingRequest => TutorialGuideFrame(
+      message: l10n.tutorialRatingRequest,
       animation: TutorialGuideAnimation.talking,
       alignment: Alignment(-0.62, 0.15),
-      primaryLabel: 'Sonra',
-      secondaryLabel: 'Değerlendir',
+      primaryLabel: l10n.tutorialLater,
+      secondaryLabel: l10n.tutorialRate,
     ),
-    TutorialGuideStep.farewellWorkDone => const TutorialGuideFrame(
-      message: 'Benim işim burada bitti.',
+    TutorialGuideStep.farewellWorkDone => TutorialGuideFrame(
+      message: l10n.tutorialFarewellWorkDone,
       animation: TutorialGuideAnimation.talking,
       alignment: Alignment(-0.55, 0.18),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.farewellYourTurn => const TutorialGuideFrame(
-      message:
-          'Artık buralar sana emanet. Seninle dövüşmemi istersen ana '
-          'sayfadaki adım çemberinin sol altındaki pet butonuna basabilirsin.',
+    TutorialGuideStep.farewellYourTurn => TutorialGuideFrame(
+      message: l10n.tutorialFarewellYourTurn,
       animation: TutorialGuideAnimation.pointing,
       target: TutorialGuideTarget.petToggle,
       alignment: Alignment(-0.35, 0.18),
-      primaryLabel: 'Devam',
+      primaryLabel: l10n.tutorialContinue,
     ),
-    TutorialGuideStep.farewell => const TutorialGuideFrame(
-      message: 'Şimdilik gidiyorum. Beni çağırırsan yine yanında olacağım!',
+    TutorialGuideStep.farewell => TutorialGuideFrame(
+      message: l10n.tutorialFarewell,
       animation: TutorialGuideAnimation.celebrating,
       alignment: Alignment(0.05, 0.18),
-      primaryLabel: 'Eğitimi Bitir',
+      primaryLabel: l10n.tutorialFinish,
     ),
     // Rehber ekrandan **yürüyerek çıkmıyor**, bulunduğu yerde death
     // animasyonunu oynatıp soluyor (bkz. GD83). Hizalama vedadakiyle aynı:
@@ -421,7 +419,7 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
       valueListenable: widget.step,
       builder: (context, step, _) {
         if (step == TutorialGuideStep.completed) return const SizedBox.shrink();
-        final frame = TutorialGuideFrame.forStep(step);
+        final frame = TutorialGuideFrame.forStep(step, context.l10n);
         _prepareFrame(step, frame);
         return LayoutBuilder(
           builder: (context, constraints) {

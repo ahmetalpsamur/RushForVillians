@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n_context.dart';
+
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
 
@@ -12,7 +14,7 @@ class StartScreen extends StatelessWidget {
       color: backgroundColor,
       child: Semantics(
         image: true,
-        label: 'Heapchi Studios açılış ekranı',
+        label: context.l10n.studioSplashSemantics,
         child: const SizedBox.expand(
           child: Image(
             image: AssetImage(assetPath),

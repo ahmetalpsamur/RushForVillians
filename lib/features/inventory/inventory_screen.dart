@@ -5,7 +5,10 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/game_constants.dart';
+import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../core/utils/base_combat_stats.dart';
 import '../../core/utils/effective_stats.dart';
 import '../../core/utils/equipped_buffs.dart';
@@ -245,21 +248,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder:
           (dialogContext) => AlertDialog(
             backgroundColor: AppColors.surface,
-            title: const Text('Item satılsın mı?'),
+            title: Text(context.l10n.sellItemQuestion),
             content: Text(
-              '${item.name}${entry.level > 1 ? ' (Sv. ${entry.level})' : ''} '
-              'envanterinden çıkacak ve +$value coin kazanacaksın. '
-              'Bu işlem geri alınamaz; itemi tekrar istersen ${item.cost} '
-              'coin ödemen gerekir ve yükseltmelerini baştan yapman gerekir.',
+              context.l10n.sellItemWarning(
+                context.l10n.itemName(item),
+                entry.level > 1
+                    ? ' (${context.l10n.levelShort(entry.level)})'
+                    : '',
+                value,
+                item.cost,
+              ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Vazgeç'),
+                child: Text(context.l10n.cancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text('Sat (+$value)'),
+                child: Text(context.l10n.sellWithValue(value)),
               ),
             ],
           ),
@@ -293,7 +300,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Envanter'),
+            title: Text(context.l10n.inventory),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 16),
@@ -340,20 +347,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     onTapEmpty: (category) {
                       setState(() => _categoryFilter = category);
                       _notify(
-                        '${category.label} slotu boş. Aşağıdan bir item seç.',
+                        context.l10n.emptySlotPrompt(
+                          context.l10n.itemCategoryName(category),
+                        ),
                       );
                     },
                   ),
                 ),
               ),
               if (state.entries.isEmpty)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                     child: Text(
-                      'Henüz item\'in yok. Mağazadan ekipman alabilir ya da '
-                      'günlük çarkı çevirebilirsin.',
-                      style: TextStyle(color: Colors.white70),
+                      context.l10n.noItemsOwned,
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ),
                 )
@@ -366,21 +374,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
                         _FilterChip(
-                          label: 'Tümü',
+                          label: context.l10n.filterAll,
                           selected: _categoryFilter == null,
                           onSelected:
                               () => setState(() => _categoryFilter = null),
                         ),
                         for (final category in categories)
                           _FilterChip(
-                            label: category.label,
+                            label: context.l10n.itemCategoryName(category),
                             selected: _categoryFilter == category,
                             onSelected:
                                 () =>
                                     setState(() => _categoryFilter = category),
                           ),
                         _FilterChip(
-                          label: 'Kuşanabildiklerim',
+                          label: context.l10n.usableOnly,
                           selected: _onlyUsable,
                           onSelected:
                               () => setState(() => _onlyUsable = !_onlyUsable),
@@ -390,12 +398,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
                 if (visible.isEmpty)
-                  const SliverToBoxAdapter(
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                       child: Text(
-                        'Bu süzgeçle gösterilecek item yok.',
-                        style: TextStyle(color: Colors.white70),
+                        context.l10n.noInventoryItemsForFilters,
+                        style: const TextStyle(color: Colors.white70),
                       ),
                     ),
                   )
@@ -445,7 +453,7 @@ class _TutorialInventoryScaffold extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Envanter'),
+        title: Text(context.l10n.inventory),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -468,7 +476,7 @@ class _TutorialInventoryScaffold extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         child:
             entry == null
-                ? const Center(child: Text('Eğitim silahı bulunamadı.'))
+                ? Center(child: Text(context.l10n.tutorialWeaponMissing))
                 : _TutorialEquipCard(
                   entry: entry!,
                   onEquip: () => onEquip(entry!.instanceId),
@@ -490,7 +498,7 @@ class _TutorialEquipCard extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: SectionCard(
-        title: 'İlk silahın',
+        title: context.l10n.firstWeaponTitle,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -510,7 +518,7 @@ class _TutorialEquipCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              item.name,
+              context.l10n.itemName(item),
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
@@ -524,12 +532,15 @@ class _TutorialEquipCard extends StatelessWidget {
               children: [
                 RarityBadge(rarity: item.rarity),
                 ArchetypeBadge(archetype: item.archetype),
-                _Tag(text: item.category.label, color: AppColors.primary),
+                _Tag(
+                  text: context.l10n.itemCategoryName(item.category),
+                  color: AppColors.primary,
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              item.buff.labels.join(' · '),
+              context.l10n.itemBuffLabels(item).join(' · '),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -540,7 +551,11 @@ class _TutorialEquipCard extends StatelessWidget {
               key: TutorialGuideTargetKeys.inventoryItem,
               onPressed: entry.equipped ? null : onEquip,
               icon: Icon(entry.equipped ? Icons.check : Icons.shield_outlined),
-              label: Text(entry.equipped ? 'Kuşanıldı' : 'Kuşan'),
+              label: Text(
+                entry.equipped
+                    ? context.l10n.equippedAction
+                    : context.l10n.equip,
+              ),
             ),
           ],
         ),
@@ -607,14 +622,17 @@ class _EquipmentShowcaseState extends State<_EquipmentShowcase> {
                   ),
                 ),
                 if (equipped.isEmpty)
-                  const Positioned(
+                  Positioned(
                     left: 0,
                     right: 0,
                     bottom: 8,
                     child: Text(
-                      'Henüz kuşanılmış eşya yok',
+                      context.l10n.noEquippedItems,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 for (var index = 0; index < equipped.length; index++)
@@ -684,7 +702,7 @@ class _FloatingEquipment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effect = item.buff.labels.join('\n');
+    final effect = context.l10n.itemBuffLabels(item).join('\n');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -693,7 +711,7 @@ class _FloatingEquipment extends StatelessWidget {
           child: Center(
             child: Text(
               key: ValueKey('equipped-effect-${item.id}'),
-              effect.isEmpty ? 'Etki yok' : effect,
+              effect.isEmpty ? context.l10n.noEffect : effect,
               maxLines: 3,
               overflow: TextOverflow.fade,
               textAlign: TextAlign.center,
@@ -777,54 +795,64 @@ class CharacterPowerPanel extends StatelessWidget {
       streak: streakBonuses,
     );
     return SectionCard(
-      title: 'Karakter Gücü',
+      title: context.l10n.characterPower,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$equippedCount / $slotCount slot dolu',
+            context.l10n.filledSlots(equippedCount, slotCount),
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 10),
-          const _StatHeader(),
+          _StatHeader(
+            columns: [
+              context.l10n.columnBase,
+              context.l10n.columnEquipment,
+              context.l10n.columnTotal,
+            ],
+          ),
           _StatRow(
-            label: 'Adım parası',
-            base: '×1,00',
+            label: context.l10n.buffStepCoins,
+            base: '×${AppFormatters.decimal(context, 1, digits: 2)}',
             bonus: _rate(buffs.stepCoinBonus),
-            total: '×${_multiplier(buffs.stepCoinMultiplier)}',
+            total:
+                '×${AppFormatters.decimal(context, buffs.stepCoinMultiplier, digits: 2)}',
           ),
           _StatRow(
-            label: 'Adım XP',
-            base: '×1,00',
+            label: context.l10n.buffStepXp,
+            base: '×${AppFormatters.decimal(context, 1, digits: 2)}',
             bonus: _rate(buffs.stepXpBonus),
-            total: '×${_multiplier(buffs.stepXpMultiplier)}',
+            total:
+                '×${AppFormatters.decimal(context, buffs.stepXpMultiplier, digits: 2)}',
           ),
           _StatRow(
-            label: 'Çark XP',
-            base: '×1,00',
+            label: context.l10n.buffWheelXp,
+            base: '×${AppFormatters.decimal(context, 1, digits: 2)}',
             bonus: _rate(buffs.wheelXpBonus),
-            total: '×${_multiplier(buffs.wheelXpMultiplier)}',
+            total:
+                '×${AppFormatters.decimal(context, buffs.wheelXpMultiplier, digits: 2)}',
           ),
           _StatRow(
-            label: 'Düşman XP',
-            base: '×1,00',
+            label: context.l10n.buffEnemyXp,
+            base: '×${AppFormatters.decimal(context, 1, digits: 2)}',
             bonus: _rate(buffs.enemyXpBonus),
-            total: '×${_multiplier(buffs.enemyXpMultiplier)}',
+            total:
+                '×${AppFormatters.decimal(context, buffs.enemyXpMultiplier, digits: 2)}',
           ),
           _StatRow(
-            label: 'Dondurma stoğu',
+            label: context.l10n.buffFreezeStock(0).replaceAll(' +0', ''),
             base: '${GameConstants.maxStreakFreezes}',
             bonus: _flat(buffs.streakFreezeCapBonus),
             total: '${buffs.streakFreezeCap}',
           ),
           _StatRow(
-            label: 'Çark hakkı stoğu',
+            label: context.l10n.buffWheelStock(0).replaceAll(' +0', ''),
             base: '${GameConstants.maxExtraWheelSpins}',
             bonus: _flat(buffs.wheelSpinCapBonus),
             total: '${buffs.wheelSpinCap}',
           ),
           _StatRow(
-            label: 'Seri eşiği',
+            label: context.l10n.buffStreakThreshold(0).replaceAll(' -0', ''),
             base: '${GameConstants.streakStepThreshold}',
             bonus:
                 buffs.streakStepRelief == 0
@@ -835,37 +863,42 @@ class CharacterPowerPanel extends StatelessWidget {
           ),
           _StreakBonusSection(bonuses: streakBonuses, streakDays: streakDays),
           const SizedBox(height: 14),
-          const Text(
-            'Savaş İstatistikleri',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          Text(
+            context.l10n.combatStats,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           const SizedBox(height: 2),
-          const Text(
-            'Maceradaki savaşta kullanılır: taban seviyeden, bonus ekipman '
-            've seriden gelir.',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
+          Text(
+            context.l10n.combatStatsDescription,
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
           const SizedBox(height: 6),
-          const _StatHeader(columns: ['TABAN', 'BONUS', 'TOPLAM']),
+          _StatHeader(
+            columns: [
+              context.l10n.columnBase,
+              context.l10n.columnBonus,
+              context.l10n.columnTotal,
+            ],
+          ),
           for (final stat in combatStatOrder)
             _StatRow(
-              label: _capitalize(stat.label),
+              label: _capitalize(context.l10n.itemStatName(stat)),
               base: _combatValue(stat, baseStats.statFor(stat)),
               bonus: _combatBonus(buffs, stat),
               total: _combatValue(stat, totalStats.statFor(stat)),
             ),
           if (buffs.conditionalEffects.isNotEmpty) ...[
             const SizedBox(height: 14),
-            const Text(
-              'Koşullu Etkiler',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            Text(
+              context.l10n.conditionalEffects,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             const SizedBox(height: 4),
             for (final effect in buffs.conditionalEffects)
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
-                  '• ${effect.label}',
+                  '• ${context.l10n.itemEffectLabel(effect)}',
                   style: const TextStyle(fontSize: 11.5, color: AppColors.xp),
                 ),
               ),
@@ -894,9 +927,6 @@ class CharacterPowerPanel extends StatelessWidget {
       value == 0 ? '—' : '+%${ItemEffect.formatPercent(value)}';
 
   static String _flat(int value) => value == 0 ? '—' : '+$value';
-
-  static String _multiplier(double value) =>
-      value.toStringAsFixed(2).replaceAll('.', ',');
 
   static String _combatBonus(EquippedBuffs buffs, ItemStat stat) {
     final flat = buffs.flatBonusFor(stat);
@@ -931,8 +961,7 @@ class _StreakBonusSection extends StatelessWidget {
     final total = StreakStatBonuses.formatRate(bonuses.totalBonus);
     // Bir sonraki günün kazancı: oyuncunun bugün baktığında görmesi gereken
     // sayı "yarın ne kazanacağım".
-    final nextGain =
-        StreakStatBonuses.tenthsForDay(streakDays + 1) / 1000;
+    final nextGain = StreakStatBonuses.tenthsForDay(streakDays + 1) / 1000;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -945,30 +974,34 @@ class _StreakBonusSection extends StatelessWidget {
               color: AppColors.streak,
             ),
             const SizedBox(width: 4),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Seri Bonusu',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                context.l10n.streakBonus,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ),
             Text(
-              'toplam +%$total',
+              context.l10n.streakBonusTotal(total),
               style: const TextStyle(fontSize: 11.5, color: AppColors.streak),
             ),
           ],
         ),
         const SizedBox(height: 2),
         Text(
-          '$streakDays günlük serin savaş statlarını büyüttü. '
-          'Seri kırılırsa tamamı gider.',
+          context.l10n.streakCombatGrowth(streakDays),
           style: const TextStyle(color: Colors.white54, fontSize: 11),
         ),
         const SizedBox(height: 2),
         Text(
-          'Şu an: gün başına +%${StreakStatBonuses.formatRate(nextGain)}. '
-          'Kazanç her ${GameConstants.streakBonusTierLength} günde bir azalır, '
-          '${GameConstants.streakBonusTierLength * GameConstants.streakBonusTierTenths.length}. '
-          'günden sonra başa döner.',
+          context.l10n.streakCurrentRate(
+            StreakStatBonuses.formatRate(nextGain),
+            GameConstants.streakBonusTierLength,
+            GameConstants.streakBonusTierLength *
+                GameConstants.streakBonusTierTenths.length,
+          ),
           key: const ValueKey('streak-bonus-current-rate'),
           style: const TextStyle(color: AppColors.streak, fontSize: 11),
         ),
@@ -976,11 +1009,19 @@ class _StreakBonusSection extends StatelessWidget {
         // Bölümün kendi sütun başlıkları: üstteki tabloda "EKİPMAN" yazan
         // sütun burada seri gününü taşıyor, aynı başlığı kullanmak yanıltıcı
         // olurdu.
-        const _StatHeader(columns: ['BONUS', 'PAY', 'DURUM']),
+        _StatHeader(
+          columns: [
+            context.l10n.columnBonus,
+            context.l10n.columnShare,
+            context.l10n.columnStatus,
+          ],
+        ),
         for (final stat in StreakStatBonuses.pool)
           if (bonuses.tenthsFor(stat) > 0)
             _StatRow(
-              label: CharacterPowerPanel._capitalize(stat.label),
+              label: CharacterPowerPanel._capitalize(
+                context.l10n.itemStatName(stat),
+              ),
               base: '+%${StreakStatBonuses.formatRate(bonuses.bonusFor(stat))}',
               bonus:
                   bonuses.totalTenths == 0
@@ -999,7 +1040,7 @@ class _StatHeader extends StatelessWidget {
   /// sütunların anlamı farklıdır, o yüzden başlıklar dışarıdan verilebilir.
   final List<String> columns;
 
-  const _StatHeader({this.columns = const ['TABAN', 'EKİPMAN', 'TOPLAM']});
+  const _StatHeader({required this.columns});
 
   @override
   Widget build(BuildContext context) {
@@ -1120,7 +1161,7 @@ class _SlotBoard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
-      title: 'Kuşanılanlar',
+      title: context.l10n.equippedItems,
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
@@ -1197,14 +1238,14 @@ class _SlotTile extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              category.label,
+              context.l10n.itemCategoryName(category),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 9.5, color: Colors.white38),
             ),
             Text(
-              equipped?.name ?? 'Boş',
+              equipped?.name ?? context.l10n.empty,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -1285,7 +1326,7 @@ class _InventoryRow extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.name,
+                            context.l10n.itemName(item),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1295,10 +1336,13 @@ class _InventoryRow extends StatelessWidget {
                           ),
                         ),
                         if (equipped)
-                          const _Tag(text: 'Kuşanılı', color: AppColors.xp)
+                          _Tag(
+                            text: context.l10n.equippedTag,
+                            color: AppColors.xp,
+                          )
                         else if (locked)
                           _Tag(
-                            text: 'Sv. ${item.requiredLevel}',
+                            text: context.l10n.levelShort(item.requiredLevel),
                             color: AppColors.streak,
                           ),
                       ],
@@ -1314,11 +1358,11 @@ class _InventoryRow extends StatelessWidget {
                         // Eşya seviyesi: yükseltilmiş bir eşya listede
                         // hemen ayırt edilebilmeli.
                         _Tag(
-                          text: 'Sv. ${entry.level}',
+                          text: context.l10n.levelShort(entry.level),
                           color: AppColors.primary,
                         ),
                         Text(
-                          item.category.label,
+                          context.l10n.itemCategoryName(item.category),
                           style: const TextStyle(
                             fontSize: 10.5,
                             color: Colors.white38,
@@ -1328,7 +1372,7 @@ class _InventoryRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item.buff.labels.take(2).join(' · '),
+                      context.l10n.itemBuffLabels(item).take(2).join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1399,11 +1443,13 @@ class _ItemSheet extends StatelessWidget {
   ///
   /// Kilidin tek kaynağı [Item.isUnlockedAt]; burada ikinci bir seviye
   /// mantığı yok, yalnızca aynı kontrolün kullanıcıya çevirisi var.
-  String? get _blockedReason {
+  String? _blockedReason(BuildContext context) {
     if (entry.equipped) return null;
     if (!item.isUnlockedAt(state.profile.level)) {
-      return '${item.requiredLevel}. seviye gerekiyor. Şu an '
-          '${state.profile.level}. seviyedesin.';
+      return context.l10n.levelRequirement(
+        item.requiredLevel,
+        state.profile.level,
+      );
     }
     return null;
   }
@@ -1422,7 +1468,13 @@ class _ItemSheet extends StatelessWidget {
         equipped
             ? ItemComparison.none
             : compareItems(candidate: item, current: current);
-    final reason = _blockedReason;
+    final gainedConditions = item.buff.effects
+        .where((effect) => comparison.gainedConditions.contains(effect.label))
+        .map(context.l10n.itemEffectLabel);
+    final lostConditions = (current?.buff.effects ?? const <ItemEffect>[])
+        .where((effect) => comparison.lostConditions.contains(effect.label))
+        .map(context.l10n.itemEffectLabel);
+    final reason = _blockedReason(context);
     final sellValue = sellValueFor(item.cost);
 
     return SafeArea(
@@ -1453,7 +1505,7 @@ class _ItemSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item.name,
+                          context.l10n.itemName(item),
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 17,
@@ -1468,8 +1520,8 @@ class _ItemSheet extends StatelessWidget {
                             RarityBadge(rarity: item.rarity),
                             ArchetypeBadge(archetype: item.archetype),
                             Text(
-                              '${item.category.label} · Sv. '
-                              '${item.requiredLevel}',
+                              '${context.l10n.itemCategoryName(item.category)} · '
+                              '${context.l10n.levelShort(item.requiredLevel)}',
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: Colors.white54,
@@ -1482,8 +1534,8 @@ class _ItemSheet extends StatelessWidget {
                         // nadirlikteki iki eşya arasındaki tercihi bu cümle
                         // anlaşılır kılıyor.
                         Text(
-                          '${item.archetype.label} — '
-                          '${item.archetype.description}',
+                          '${context.l10n.itemArchetypeName(item.archetype)} — '
+                          '${context.l10n.itemArchetypeDetails(item.archetype)}',
                           style: TextStyle(
                             fontSize: 11,
                             color: ArchetypeBadge.colorFor(item.archetype),
@@ -1494,10 +1546,10 @@ class _ItemSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              if (item.lore case final lore?) ...[
+              if (item.lore != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  lore,
+                  context.l10n.itemLore(item),
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.35,
@@ -1507,9 +1559,12 @@ class _ItemSheet extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              const Text(
-                'Etkiler',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              Text(
+                context.l10n.effects,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 4),
               for (final effect in item.buff.effects)
@@ -1528,7 +1583,7 @@ class _ItemSheet extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          effect.label,
+                          context.l10n.itemEffectLabel(effect),
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.25,
@@ -1543,20 +1598,26 @@ class _ItemSheet extends StatelessWidget {
                   ),
                 ),
               if (item.buff.combatEffects.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    'Soluk satırlar savaş istatistikleri; savaş sistemiyle '
-                    'birlikte etkinleşecek.',
-                    style: TextStyle(fontSize: 10.5, color: Colors.white38),
+                    context.l10n.dormantCombatEffects,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Colors.white38,
+                    ),
                   ),
                 ),
               if (!equipped) ...[
                 const SizedBox(height: 14),
                 Text(
                   current == null
-                      ? '${item.category.label} slotu boş — kuşanınca:'
-                      : '${current.name} yerine kuşanınca:',
+                      ? context.l10n.equipIntoEmptySlot(
+                        context.l10n.itemCategoryName(item.category),
+                      )
+                      : context.l10n.replaceEquippedItem(
+                        context.l10n.itemName(current),
+                      ),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -1564,9 +1625,9 @@ class _ItemSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 if (comparison.isEmpty)
-                  const Text(
-                    'Sayısal olarak fark yok.',
-                    style: TextStyle(fontSize: 12, color: Colors.white54),
+                  Text(
+                    context.l10n.noNumericDifference,
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
                   )
                 else ...[
                   Wrap(
@@ -1575,7 +1636,7 @@ class _ItemSheet extends StatelessWidget {
                     children: [
                       for (final delta in comparison.ordered)
                         Text(
-                          delta.label,
+                          context.l10n.itemStatDeltaLabel(delta),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
@@ -1585,7 +1646,7 @@ class _ItemSheet extends StatelessWidget {
                         ),
                     ],
                   ),
-                  for (final line in comparison.gainedConditions)
+                  for (final line in gainedConditions)
                     Text(
                       '+ $line',
                       style: const TextStyle(
@@ -1593,7 +1654,7 @@ class _ItemSheet extends StatelessWidget {
                         color: AppColors.xp,
                       ),
                     ),
-                  for (final line in comparison.lostConditions)
+                  for (final line in lostConditions)
                     Text(
                       '- $line',
                       style: const TextStyle(
@@ -1638,12 +1699,12 @@ class _ItemSheet extends StatelessWidget {
                             ? OutlinedButton.icon(
                               onPressed: onUnequip,
                               icon: const Icon(Icons.remove_circle_outline),
-                              label: const Text('Çıkar'),
+                              label: Text(context.l10n.unequip),
                             )
                             : FilledButton.icon(
                               onPressed: reason == null ? onEquip : null,
                               icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('Kuşan'),
+                              label: Text(context.l10n.equip),
                             ),
                   ),
                   const SizedBox(width: 10),
@@ -1651,7 +1712,7 @@ class _ItemSheet extends StatelessWidget {
                     onPressed: onSell,
                     icon: const Icon(Icons.sell_outlined),
                     label: Text(
-                      'Sat +$sellValue',
+                      context.l10n.sellValue(sellValue),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1711,7 +1772,7 @@ class _UpgradePanel extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Demirci — Sv. ${entry.level} / ${quote.rarityCap}',
+                  context.l10n.blacksmithLevel(entry.level, quote.rarityCap),
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
@@ -1722,14 +1783,16 @@ class _UpgradePanel extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Yükseltmek yalnızca savaş istatistiklerini büyütür; '
-            'ekonomi bonusları sabit kalır.',
+            context.l10n.upgradeCombatOnly,
             style: const TextStyle(fontSize: 10.5, color: Colors.white38),
           ),
           if (preview.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Sv. ${quote.nextLevel}: ${preview.join(' · ')}',
+              context.l10n.nextLevelPreview(
+                quote.nextLevel,
+                preview.join(' · '),
+              ),
               style: const TextStyle(fontSize: 12, color: AppColors.xp),
             ),
           ],
@@ -1766,8 +1829,8 @@ class _UpgradePanel extends StatelessWidget {
               // hatası veriyor. Kırpma bu yüzden doğrudan `Text` üzerinde.
               label: Text(
                 quote.canUpgrade
-                    ? 'Sv. ${quote.nextLevel}\'e yükselt — ${quote.cost} coin'
-                    : 'Yükseltilemiyor',
+                    ? context.l10n.upgradeToLevel(quote.nextLevel, quote.cost)
+                    : context.l10n.cannotUpgrade,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

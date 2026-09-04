@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/game_constants.dart';
+import '../../core/localization/locale_preference.dart';
+import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/effective_stats.dart';
@@ -19,6 +21,8 @@ import '../../core/utils/streak_bonus.dart';
 import '../../core/utils/title_rules.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../data/mock_data.dart';
 import '../../data/pet_sayings.dart';
 import '../../data/reward_catalog.dart';
@@ -84,6 +88,8 @@ class RootShell extends StatefulWidget {
   /// Store review entegrasyonu eklendiğinde bağlanacak isteğe bağlı çıkış.
   final VoidCallback? onRequestReview;
   final TutorialGuideVariant? initialTutorialGuide;
+  final LocalePreference localePreference;
+  final ValueChanged<LocalePreference> onLocalePreferenceChanged;
 
   const RootShell({
     super.key,
@@ -93,6 +99,8 @@ class RootShell extends StatefulWidget {
     this.startTutorial = false,
     this.onRequestReview,
     this.initialTutorialGuide,
+    this.localePreference = LocalePreference.system,
+    this.onLocalePreferenceChanged = ignoreLocalePreference,
   });
 
   @override
@@ -166,13 +174,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// "2x XP" yükseltmesinin kimliği ([MockData.storeItems]).
   static const _xpBoostItemId = 'boost_double_xp';
   static const _reincarnationPotionId = 'reincarnation_potion';
-
-  static const _reminderMessages = [
-    '{round}. round: {enemy} için {steps} adım kaldı.',
-    '{round}. round devam ediyor! {steps} adım daha atmalısın.',
-    'Ritmini kaybetme; {round}. roundda kalan adım: {steps}.',
-    '{round}. round: {enemy} gücünü koruyor, {steps} adım kaldı.',
-  ];
 
   @override
   void initState() {
@@ -374,7 +375,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _persist();
     final title = TitleCatalog.byId(id);
     _showStoreNotice(
-      title == null ? 'Ünvanın çıkarıldı.' : '"${title.name}" ünvanını taktın.',
+      title == null
+          ? context.l10n.titleUnequippedNotice
+          : context.l10n.titleEquippedNotice(context.l10n.titleName(title)),
     );
   }
 
@@ -385,11 +388,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _purchaseTitle(GameTitle title) {
     if (title.source != TitleSource.purchase) return;
     if (_profile.ownsTitle(title.id)) {
-      _showStoreNotice('"${title.name}" ünvanı zaten sende.');
+      _showStoreNotice(
+        context.l10n.titleOwnedNotice(context.l10n.titleName(title)),
+      );
       return;
     }
     if (_profile.coins < title.cost) {
-      _showStoreNotice('${title.cost - _profile.coins} altın daha gerekiyor.');
+      _showStoreNotice(
+        context.l10n.coinsStillNeeded(title.cost - _profile.coins),
+      );
       return;
     }
     setState(() {
@@ -397,13 +404,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _profile.grantTitle(title.id);
     });
     _persist();
-    _showStoreNotice('"${title.name}" ünvanı alındı. Profilden takabilirsin.');
+    _showStoreNotice(
+      context.l10n.titlePurchasedNotice(context.l10n.titleName(title)),
+    );
   }
 
   /// Kazanılan ünvanları kullanıcıya duyurur.
   void _showTitlesEarned(List<GameTitle> titles) {
     if (titles.isEmpty) return;
-    final names = titles.map((title) => '"${title.name}"').join(', ');
+    final names = titles
+        .map((title) => '“${context.l10n.titleName(title)}”')
+        .join(', ');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -415,8 +426,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             Expanded(
               child: Text(
                 titles.length == 1
-                    ? 'Yeni ünvan: $names — profilden takabilirsin.'
-                    : 'Yeni ünvanlar: $names',
+                    ? context.l10n.newTitleNotice(names)
+                    : context.l10n.newTitlesNotice(names),
               ),
             ),
           ],
@@ -637,8 +648,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         if (!mounted) return;
         final message =
             unlocked.length == 1
-                ? 'Yeni ödül: ${unlocked.single.name}'
-                : '${unlocked.length} yeni ödül koleksiyonuna eklendi!';
+                ? context.l10n.newRewardNotice(
+                  context.l10n.collectionRewardName(unlocked.single),
+                )
+                : context.l10n.newRewardsNotice(unlocked.length);
         _showRewardNotice(message);
       });
     }
@@ -762,10 +775,32 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           AdventureNotificationService.scheduleAdventureReminders(
             adventure,
             _today.steps,
+            _notificationCopy(adventure),
           ),
         );
       }
     }
+  }
+
+  AdventureNotificationCopy _notificationCopy(AdventureQuest adventure) {
+    final l10n = context.l10n;
+    final enemyName = l10n.enemyName(adventure.enemy);
+    final steps = AppFormatters.integer(
+      context,
+      adventure.roundStepsRemaining(_today.steps),
+    );
+    final round = adventure.currentRound;
+    return AdventureNotificationCopy(
+      enemyName: enemyName,
+      reminderBodies: [
+        l10n.adventureReminder1(round, steps, enemyName),
+        l10n.adventureReminder2(round, steps),
+        l10n.adventureReminder3(round, steps),
+        l10n.adventureReminder4(round, steps, enemyName),
+      ],
+      channelName: l10n.adventureReminderChannel,
+      channelDescription: l10n.adventureReminderChannelDescription,
+    );
   }
 
   @override
@@ -851,7 +886,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'SEVİYE ${event.newLevel}!',
+                      context.l10n.levelUpUpper(event.newLevel),
                       style: const TextStyle(
                         color: AppColors.xp,
                         fontWeight: FontWeight.w900,
@@ -861,10 +896,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                     ),
                     Text(
                       gained > 1
-                          ? '$gained seviye birden atladın. Adımların '
-                              'karşılığını veriyor!'
-                          : 'Yürümeye devam et, sıradaki seviye '
-                              '${_profile.xpToNextLevel} XP.',
+                          ? context.l10n.levelsGainedNotice(gained)
+                          : context.l10n.nextLevelEncouragement,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.white70,
@@ -1212,14 +1245,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _showPerfectRoundFeedback(result);
     }
     if (revivalCompleted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hayat Yürüyüşü tamamlandı. Yeniden doğdun! Bu 500 adım XP '
-            'kazandırmadı.',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.revivalDoneNotice)));
     }
     if (roundResult != null) _persist();
   }
@@ -1227,9 +1255,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _selectAdventure(AdventureQuest adventure) {
     final current = _adventure;
     if (current?.isPlayerDefeated == true && !current!.revivalCompleted) {
-      _showStoreNotice(
-        'Yeni bir macera için önce 500 adımlık Hayat Yürüyüşünü tamamla.',
-      );
+      _showStoreNotice(context.l10n.revivalRequiredNotice);
       return;
     }
     setState(() {
@@ -1280,8 +1306,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final adventure = _adventure;
     if (adventure?.isPlayerDefeated == true && !adventure!.revivalCompleted) {
       _showStoreNotice(
-        'Maceralara dönmek için Hayat Yürüyüşünde '
-        '${adventure.revivalRemainingSteps} adım daha atmalısın.',
+        context.l10n.revivalRemainingNotice(adventure.revivalRemainingSteps),
       );
       return;
     }
@@ -1350,8 +1375,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Serin korundu, 1 dondurma hakkı kullanıldı. '
-                '${left > 0 ? "Kalan hak: $left." : "Hakkın kalmadı."}',
+                context.l10n.streakFreezeUsedNotice(
+                  left > 0
+                      ? context.l10n.freezeRemaining(left)
+                      : context.l10n.noFreezesRemaining,
+                ),
               ),
             ),
           ],
@@ -1366,9 +1394,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _showStreakMilestone(int days, {required bool freezeGranted}) {
     final message =
         freezeGranted
-            ? '$days günlük seri! Kilometre taşı ödülün: 1 dondurma hakkı.'
-            : '$days günlük seri! Kilometre taşına ulaştın '
-                '(dondurma stoğun zaten dolu).';
+            ? context.l10n.streakMilestoneFreeze(days)
+            : context.l10n.streakMilestoneStockFull(days);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -1392,14 +1419,18 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _showStreakStatBonus(StreakBonusDraw draw) {
     final total = _profile.streakStatBonuses.bonusFor(draw.stat);
     final buffer = StringBuffer(
-      '${_profile.streakDays}. gün: +%${StreakStatBonuses.formatRate(draw.grantedBonus)} '
-      '${draw.stat.label} '
-      '(seriden toplam +%${StreakStatBonuses.formatRate(total)})',
+      context.l10n.streakStatBonusNotice(
+        _profile.streakDays,
+        StreakStatBonuses.formatRate(draw.grantedBonus),
+        context.l10n.itemStatName(draw.stat),
+        StreakStatBonuses.formatRate(total),
+      ),
     );
     if (draw.cycleRestarted) {
       buffer.write(
-        ' · Döngü başa döndü! Gün başına kazanç yeniden '
-        '+%${StreakStatBonuses.formatRate(draw.grantedBonus)}.',
+        context.l10n.streakCycleRestarted(
+          StreakStatBonuses.formatRate(draw.grantedBonus),
+        ),
       );
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1431,9 +1462,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Serin kırıldı. Biriktirdiğin '
-                '+%${StreakStatBonuses.formatRate(lostBonus)} savaş bonusu '
-                'sıfırlandı.',
+                context.l10n.streakBonusLostNotice(
+                  StreakStatBonuses.formatRate(lostBonus),
+                ),
               ),
             ),
           ],
@@ -1453,7 +1484,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '${adventure.enemy.name} saldırdı! $damage can kaybettin.',
+                context.l10n.enemyAttackNotice(
+                  context.l10n.enemyName(adventure.enemy),
+                  damage,
+                ),
               ),
             ),
           ],
@@ -1469,9 +1503,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final perfect = result.perfect;
     final message =
         perfect
-            ? 'Mükemmel round! Seri ${result.perfectStreak} · '
-                'hasar ×${result.perfectDamageMultiplier.toStringAsFixed(2)}'
-            : 'Mükemmel round serin kırıldı. Çarpan ×1’e döndü.';
+            ? context.l10n.perfectRoundNotice(
+              result.perfectStreak,
+              AppFormatters.decimal(
+                context,
+                result.perfectDamageMultiplier,
+                digits: 2,
+              ),
+            )
+            : context.l10n.perfectRoundBrokenNotice;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -1509,12 +1549,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   void _showAdventureReminder(AdventureQuest adventure) {
-    final template =
-        _reminderMessages[_random.nextInt(_reminderMessages.length)];
-    final message = template
-        .replaceAll('{enemy}', adventure.enemy.name)
-        .replaceAll('{steps}', '${adventure.roundStepsRemaining(_today.steps)}')
-        .replaceAll('{round}', '${adventure.currentRound}');
+    final message =
+        _notificationCopy(adventure).reminderBodies[_random.nextInt(4)];
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -1595,22 +1631,20 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         // Stok tavanı kuşanılan ekipmanla büyüyebilir.
         if (_profile.grantStreakFreeze(1, _buffs.streakFreezeCap) == 0) {
           _showStoreNotice(
-            'Dondurma hakkı stoğun dolu '
-            '(${_buffs.streakFreezeCap}). Para harcanmadı.',
+            context.l10n.freezeStockFullNotice(_buffs.streakFreezeCap),
           );
           return;
         }
       case _extraWheelSpinItemId:
         if (_profile.grantExtraWheelSpin(1, _buffs.wheelSpinCap) == 0) {
           _showStoreNotice(
-            'Ekstra çark hakkı stoğun dolu '
-            '(${_buffs.wheelSpinCap}). Para harcanmadı.',
+            context.l10n.wheelStockFullNotice(_buffs.wheelSpinCap),
           );
           return;
         }
       case _xpBoostItemId:
         if (!_profile.activateXpBoost(GameClock.now())) {
-          _showStoreNotice('2x XP zaten etkin. Para harcanmadı.');
+          _showStoreNotice(context.l10n.doubleXpAlreadyActiveNotice);
           return;
         }
     }
@@ -1623,7 +1657,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (_tutorialStep.value == TutorialGuideStep.shopWaiting) {
       _setTutorialStep(TutorialGuideStep.itemBought);
     }
-    _showStoreNotice('${item.name} satın alındı!');
+    _showStoreNotice(
+      context.l10n.itemPurchasedNotice(context.l10n.storeUpgradeName(item)),
+    );
   }
 
   /// Ekipman satın alır. Seviye kilidi (#10/#11) ve para kontrolü burada da
@@ -1652,8 +1688,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
     _showStoreNotice(
       count == 1
-          ? '${item.name} satın alındı!'
-          : '${item.name} satın alındı. Artık $count adet.',
+          ? context.l10n.itemPurchasedNotice(context.l10n.itemName(item))
+          : context.l10n.itemPurchasedCountNotice(
+            context.l10n.itemName(item),
+            count,
+          ),
     );
   }
 
@@ -1668,23 +1707,28 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _equipItem(int instanceId) {
     final instance = _profile.instanceById(instanceId);
     if (instance == null) {
-      _showStoreNotice('Bu eşya envanterinde yok.');
+      _showStoreNotice(context.l10n.itemMissingNotice);
       return;
     }
     final item = _resolveInstance(instance);
     if (item == null) {
-      _showStoreNotice('Bu eşya artık katalogda yok.');
+      _showStoreNotice(context.l10n.itemCatalogMissingNotice);
       return;
     }
     if (!item.isUnlockedAt(_profile.level)) {
       _showStoreNotice(
-        '${item.name} için ${item.requiredLevel}. seviye gerekiyor. '
-        'Şu an ${_profile.level}. seviyedesin.',
+        context.l10n.itemLevelNeeded(
+          context.l10n.itemName(item),
+          item.requiredLevel,
+          _profile.level,
+        ),
       );
       return;
     }
     if (!item.isUsableBy(_profile.avatar.characterClass)) {
-      _showStoreNotice('${item.name} senin sınıfın için değil.');
+      _showStoreNotice(
+        context.l10n.itemWrongClassNotice(context.l10n.itemName(item)),
+      );
       return;
     }
     if (instance.equipped) return;
@@ -1695,7 +1739,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     for (final other in _profile.equippedInstances) {
       final resolved = _resolveInstance(other);
       if (resolved != null && resolved.category == item.category) {
-        replacedName = resolved.name;
+        replacedName = context.l10n.itemName(resolved);
         _profile.updateInstance(other.instanceId, equipped: false);
       }
     }
@@ -1708,8 +1752,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     _showStoreNotice(
       replacedName == null
-          ? '${item.name} kuşanıldı.'
-          : '${item.name} kuşanıldı, $replacedName çıkarıldı.',
+          ? context.l10n.itemEquippedNotice(context.l10n.itemName(item))
+          : context.l10n.itemEquippedReplacedNotice(
+            context.l10n.itemName(item),
+            replacedName,
+          ),
     );
   }
 
@@ -1725,11 +1772,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
     if (target == null) return;
 
-    final name = _resolveInstance(target)?.name ?? 'Item';
+    final resolvedTarget = _resolveInstance(target);
+    final name =
+        resolvedTarget == null ? 'Item' : context.l10n.itemName(resolvedTarget);
     _profile.updateInstance(target.instanceId, equipped: false);
     setState(_refreshEquipment);
     _persist();
-    _showStoreNotice('$name çıkarıldı.');
+    _showStoreNotice(context.l10n.itemRemovedNotice(name));
   }
 
   /// Bir eşya örneğini bir seviye yükseltir (demirci).
@@ -1739,12 +1788,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _upgradeItem(int instanceId) {
     final instance = _profile.instanceById(instanceId);
     if (instance == null) {
-      _showStoreNotice('Bu eşya envanterinde yok.');
+      _showStoreNotice(context.l10n.itemMissingNotice);
       return;
     }
     final resolved = _resolveInstance(instance);
     if (resolved == null) {
-      _showStoreNotice('Bu eşya artık katalogda yok.');
+      _showStoreNotice(context.l10n.itemCatalogMissingNotice);
       return;
     }
 
@@ -1757,7 +1806,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (!quote.canUpgrade) {
       final rarity = instance.effectiveRarity(resolved.rarity);
       _showStoreNotice(
-        quote.reason(rarity, _profile.level) ?? 'Şu an yükseltilemiyor.',
+        quote.canUpgrade
+            ? context.l10n.cannotUpgradeNow
+            : context.l10n.upgradeBlockReason(quote, rarity, _profile.level),
       );
       return;
     }
@@ -1773,7 +1824,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _setTutorialStep(TutorialGuideStep.upgradeCompleted);
     }
     _showStoreNotice(
-      '${resolved.name} Sv. ${quote.nextLevel} oldu. -${quote.cost} coin.',
+      context.l10n.itemUpgradedNotice(
+        context.l10n.itemName(resolved),
+        quote.nextLevel,
+        quote.cost,
+      ),
     );
   }
 
@@ -1793,7 +1848,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     final resolved = _resolveInstance(group.first);
     if (resolved == null) {
-      _showStoreNotice('Bu eşya artık katalogda yok.');
+      _showStoreNotice(context.l10n.itemCatalogMissingNotice);
       return;
     }
 
@@ -1804,7 +1859,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       coins: _profile.coins,
     );
     if (!quote.canMerge) {
-      _showStoreNotice(quote.reason(rarity) ?? 'Şu an birleştirilemiyor.');
+      _showStoreNotice(
+        quote.canMerge
+            ? context.l10n.cannotMergeNow
+            : context.l10n.mergeBlockReason(quote, rarity),
+      );
       return;
     }
     final target = quote.target;
@@ -1827,10 +1886,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     _showStoreNotice(
       unequipped
-          ? '${resolved.name} çıkarıldı ve ${quote.requiredCount} adet '
-              'birleştirildi: artık ${target.label}, Sv. 1.'
-          : '${quote.requiredCount} adet ${resolved.name} birleştirildi: '
-              'artık ${target.label}, Sv. 1.',
+          ? context.l10n.mergeCompletedUnequippedNotice(
+            context.l10n.itemName(resolved),
+            quote.requiredCount,
+            context.l10n.rarityName(target),
+          )
+          : context.l10n.mergeCompletedNotice(
+            quote.requiredCount,
+            context.l10n.itemName(resolved),
+            context.l10n.rarityName(target),
+          ),
     );
     _showTitlesEarned(earnedTitles);
   }
@@ -1872,8 +1937,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     _showStoreNotice(
       wasEquipped
-          ? '${item.name} çıkarılıp satıldı. +$value coin.'
-          : '${item.name} satıldı. +$value coin.',
+          ? context.l10n.itemRemovedSoldNotice(
+            context.l10n.itemName(item),
+            value,
+          )
+          : context.l10n.itemSoldNotice(context.l10n.itemName(item), value),
     );
   }
 
@@ -2147,9 +2215,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   void _editCharacter() {
     if (!_profile.ownedUpgradeIds.contains(_reincarnationPotionId)) {
-      _showStoreNotice(
-        'Karakterini değiştirmek için Reenkarnasyon İksiri gerekli.',
-      );
+      _showStoreNotice(context.l10n.reincarnationNeededNotice);
       return;
     }
     _push(
@@ -2165,7 +2231,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           widget.onAvatarChanged(avatar);
           _persist();
           Navigator.of(context).pop();
-          _showStoreNotice('Reenkarnasyon tamamlandı. İksir tüketildi.');
+          _showStoreNotice(context.l10n.reincarnationCompleteNotice);
         },
       ),
     );
@@ -2277,6 +2343,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onEditCharacter: _editCharacter,
         onOpenInventory: _openInventory,
         onOpenBlacksmith: _openBlacksmith,
+        localePreference: widget.localePreference,
+        onLocalePreferenceChanged: widget.onLocalePreferenceChanged,
       ),
     ];
 
@@ -2311,18 +2379,27 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tabIndex,
             onDestinationSelected: _selectTab,
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-              NavigationDestination(icon: Icon(Icons.explore), label: 'Macera'),
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.storefront),
-                label: 'Mağaza',
+                icon: const Icon(Icons.home),
+                label: context.l10n.home,
               ),
               NavigationDestination(
-                icon: Icon(Icons.sports_bar),
-                label: 'Taverna',
+                icon: const Icon(Icons.explore),
+                label: context.l10n.adventure,
               ),
-              NavigationDestination(icon: Icon(Icons.person), label: 'Profil'),
+              NavigationDestination(
+                icon: const Icon(Icons.storefront),
+                label: context.l10n.store,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.sports_bar),
+                label: context.l10n.tavernTitle,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.person),
+                label: context.l10n.profile,
+              ),
             ],
           ),
         ),

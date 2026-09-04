@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/reward_rarity.dart';
 import '../../models/game_title.dart';
 import '../../models/item.dart';
@@ -173,10 +175,10 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
   /// Kimlikler [MockData.storeItems] ile aynı; tüketim tarafı da aynı
   /// kimliklere bakıyor ([RootShell] `_purchase`).
   String? _stockLabel(XpStoreItem item) => switch (item.id) {
-    'upgrade_streak_freeze' => 'Elinde ${widget.streakFreezes} hak var',
-    'wheel_extra_spin' => 'Elinde ${widget.extraWheelSpins} hak var',
+    'upgrade_streak_freeze' => context.l10n.stockRights(widget.streakFreezes),
+    'wheel_extra_spin' => context.l10n.stockRights(widget.extraWheelSpins),
     'boost_double_xp' =>
-      widget.xpBoostActive ? 'Şu an etkin — gün sonuna kadar' : null,
+      widget.xpBoostActive ? context.l10n.activeUntilEndOfDay : null,
     _ => null,
   };
 
@@ -206,7 +208,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mağaza'),
+        title: Text(context.l10n.store),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -278,7 +280,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                 _hasTitleShop
                     ? SectionCard(
                       key: const ValueKey('store-titles-section'),
-                      title: 'Ünvan Mağazası',
+                      title: context.l10n.titleStore,
                       child: _TitleShop(
                         titles: widget.titles,
                         coins: widget.coins,
@@ -287,11 +289,11 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                         onBlocked: _explain,
                       ),
                     )
-                    : const SectionCard(
-                      title: 'Ünvan Mağazası',
+                    : SectionCard(
+                      title: context.l10n.titleStore,
                       child: Text(
-                        'Şu anda mağazada satılık ünvan bulunmuyor.',
-                        style: TextStyle(color: Colors.white70),
+                        context.l10n.noTitlesForSale,
+                        style: const TextStyle(color: Colors.white70),
                       ),
                     ),
           ),
@@ -318,9 +320,9 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'İLK SİLAHIN',
-                    style: TextStyle(
+                  Text(
+                    context.l10n.firstWeapon,
+                    style: const TextStyle(
                       color: AppColors.streak,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -328,9 +330,9 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Yol arkadaşın bu silahı senin için seçti.',
-                    style: TextStyle(color: Colors.white60),
+                  Text(
+                    context.l10n.companionChoseWeapon,
+                    style: const TextStyle(color: Colors.white60),
                   ),
                   const SizedBox(height: 14),
                   KeyedSubtree(
@@ -356,7 +358,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             sliver: SliverToBoxAdapter(
               child: SectionCard(
-                title: 'Yükseltmeler',
+                title: context.l10n.upgrades,
                 child: Column(
                   children: [
                     for (final item in widget.items)
@@ -380,7 +382,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Ekipman',
+                      context.l10n.equipment,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -398,12 +400,12 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
             ),
           ),
           if (widget.equipment.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Text(
-                  'Sınıfın için ekipman bulunamadı.',
-                  style: TextStyle(color: Colors.white70),
+                  context.l10n.noClassEquipment,
+                  style: const TextStyle(color: Colors.white70),
                 ),
               ),
             )
@@ -416,13 +418,13 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     _FilterChip(
-                      label: 'Tümü',
+                      label: context.l10n.filterAll,
                       selected: _categoryFilter == null,
                       onSelected: () => setState(() => _categoryFilter = null),
                     ),
                     for (final category in categories)
                       _FilterChip(
-                        label: category.label,
+                        label: context.l10n.itemCategoryName(category),
                         selected: _categoryFilter == category,
                         onSelected:
                             () => setState(() => _categoryFilter = category),
@@ -438,7 +440,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        '${equipment.length} ekipman',
+                        context.l10n.equipmentCount(equipment.length),
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 12,
@@ -446,7 +448,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       ),
                     ),
                     FilterChip(
-                      label: const Text('Alabileceklerim'),
+                      label: Text(context.l10n.affordableOnly),
                       selected: _onlyAffordable,
                       onSelected:
                           (value) => setState(() => _onlyAffordable = value),
@@ -456,13 +458,12 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
               ),
             ),
             if (equipment.isEmpty)
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                   child: Text(
-                    'Bu süzgeçle gösterilecek ekipman yok. '
-                    'Yürümeye devam et; seviyen yükseldikçe yenileri açılır.',
-                    style: TextStyle(color: Colors.white70),
+                    context.l10n.noEquipmentForFilters,
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ),
               )
@@ -553,7 +554,12 @@ class _StorePageSwitcher extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(children: [tab('Ünvan Mağazası', 0), tab('Macera Mağazası', 1)]),
+          Row(
+            children: [
+              tab(context.l10n.titleStore, 0),
+              tab(context.l10n.adventureStore, 1),
+            ],
+          ),
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
@@ -661,15 +667,17 @@ class _TitleShopState extends State<_TitleShop> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ünvan bir kimlik: adının yanında görünür ve kendine has bir etki '
-          'taşır. Aynı anda yalnızca birini takarsın; hepsi sende kalır.',
-          style: TextStyle(color: Colors.white70, fontSize: 12),
+        Text(
+          context.l10n.titleStoreExplanation,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
         const SizedBox(height: 6),
         Text(
-          '$owned / ${widget.titles.length} ünvan sende · '
-          '${visible.length} tanesi listede',
+          context.l10n.titleStoreSummary(
+            owned,
+            widget.titles.length,
+            visible.length,
+          ),
           key: const ValueKey('store-titles-summary'),
           style: const TextStyle(color: Colors.white38, fontSize: 11.5),
         ),
@@ -680,14 +688,14 @@ class _TitleShopState extends State<_TitleShop> {
           children: [
             FilterChip(
               key: const ValueKey('store-title-rarity-all'),
-              label: const Text('Tümü'),
+              label: Text(context.l10n.filterAll),
               selected: _rarity == null,
               onSelected: (_) => setState(() => _rarity = null),
             ),
             for (final rarity in RewardRarity.values)
               FilterChip(
                 key: ValueKey('store-title-rarity-${rarity.name}'),
-                label: Text(rarity.label),
+                label: Text(context.l10n.rarityName(rarity)),
                 selected: _rarity == rarity,
                 selectedColor: rarity.color.withValues(alpha: 0.30),
                 onSelected:
@@ -703,14 +711,14 @@ class _TitleShopState extends State<_TitleShop> {
           children: [
             FilterChip(
               key: const ValueKey('store-title-affordable'),
-              label: const Text('Alabileceklerim'),
+              label: Text(context.l10n.affordableOnly),
               selected: _affordableOnly,
               onSelected:
                   (selected) => setState(() => _affordableOnly = selected),
             ),
             FilterChip(
               key: const ValueKey('store-title-hide-owned'),
-              label: const Text('Sendekileri gizle'),
+              label: Text(context.l10n.hideOwned),
               selected: _hideOwned,
               onSelected: (selected) => setState(() => _hideOwned = selected),
             ),
@@ -718,13 +726,12 @@ class _TitleShopState extends State<_TitleShop> {
         ),
         const SizedBox(height: 12),
         if (visible.isEmpty)
-          const Padding(
+          Padding(
             key: ValueKey('store-titles-empty'),
-            padding: EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              'Bu süzgeçle gösterilecek ünvan yok. Süzgeci gevşet ya da biraz '
-              'daha altın biriktir.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              context.l10n.noStoreTitlesForFilters,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
             ),
           )
         else
@@ -762,8 +769,8 @@ class _TitleRow extends StatelessWidget {
     final buyable = !owned && affordable;
     final reason =
         owned
-            ? '"${title.name}" ünvanı zaten sende. Profilden takabilirsin.'
-            : '${title.cost - coins} altın daha gerekiyor.';
+            ? context.l10n.titleAlreadyOwned(context.l10n.titleName(title))
+            : context.l10n.moreGoldNeeded(title.cost - coins);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -776,7 +783,7 @@ class _TitleRow extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            title.lore,
+            context.l10n.titleLore(title),
             style: const TextStyle(
               color: Colors.white60,
               fontStyle: FontStyle.italic,
@@ -785,7 +792,10 @@ class _TitleRow extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           for (final effect in title.effects)
-            Text('• ${effect.label}', style: const TextStyle(fontSize: 11.5)),
+            Text(
+              '• ${context.l10n.itemEffectLabel(effect)}',
+              style: const TextStyle(fontSize: 11.5),
+            ),
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
@@ -798,7 +808,9 @@ class _TitleRow extends StatelessWidget {
                 onPressed: buyable ? onPurchase : null,
                 icon: Icon(owned ? Icons.check : Icons.monetization_on),
                 label: Text(
-                  owned ? 'SENDE' : '${title.cost} ALTIN',
+                  owned
+                      ? context.l10n.ownedUpper
+                      : context.l10n.goldPrice(title.cost),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -850,12 +862,12 @@ class _UpgradeRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
+                  context.l10n.storeUpgradeName(item),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.description,
+                  context.l10n.storeUpgradeDescription(item),
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
                 if (stockLabel != null) ...[
@@ -876,14 +888,18 @@ class _UpgradeRow extends StatelessWidget {
           _PriceButton(
             cost: item.cost,
             enabled: enabled,
-            ownedLabel: alreadyOwned ? 'Sahipsin' : null,
+            ownedLabel: alreadyOwned ? context.l10n.owned : null,
             onPressed: onPurchase,
             onBlocked:
                 () => onBlocked(
                   alreadyOwned
-                      ? '${item.name} zaten sende.'
-                      : '${item.name} için ${item.cost - coins} coin daha '
-                          'gerekiyor.',
+                      ? context.l10n.itemAlreadyOwned(
+                        context.l10n.storeUpgradeName(item),
+                      )
+                      : context.l10n.itemCoinsNeeded(
+                        context.l10n.storeUpgradeName(item),
+                        item.cost - coins,
+                      ),
                 ),
           ),
         ],
@@ -920,27 +936,36 @@ class _EquipmentCard extends StatelessWidget {
   /// İki bilgi: nadirliğin izin verdiği en yüksek eşya seviyesi ve bir üst
   /// nadirliğe çıkmak için gereken adet. Gereken adet nadirliğe göre
   /// değiştiği için sayı tablodan okunuyor, sabit yazılmıyor.
-  String get _investmentLine {
+  String _investmentLine(BuildContext context) {
     final cap = itemLevelCap(item.rarity);
     final needed = mergeCountFor(item.rarity);
     final target = nextRarity(item.rarity);
     if (needed == null || target == null) {
-      return 'Yükseltilebilir · Maks Sv. $cap · en üst nadirlik';
+      return context.l10n.maxRarityInvestment(cap);
     }
-    return 'Yükseltilebilir · Maks Sv. $cap · $needed tanesini '
-        'birleştirince ${target.label} olur';
+    return context.l10n.mergeInvestment(
+      cap,
+      needed,
+      context.l10n.rarityName(target),
+    );
   }
 
   /// Kart neden alınamıyor? `null` ise alınabilir.
   ///
   /// Sahiplik burada **yok**: aynı eşya birden fazla kez alınabilir.
-  String? get _blockedReason {
+  String? _blockedReason(BuildContext context) {
     if (!item.isUnlockedAt(level)) {
-      return '${item.name} için ${item.requiredLevel}. seviye gerekiyor. '
-          'Şu an $level. seviyedesin.';
+      return context.l10n.itemLevelNeeded(
+        context.l10n.itemName(item),
+        item.requiredLevel,
+        level,
+      );
     }
     if (coins < item.cost) {
-      return '${item.name} için ${item.cost - coins} coin daha gerekiyor.';
+      return context.l10n.itemCoinsNeeded(
+        context.l10n.itemName(item),
+        item.cost - coins,
+      );
     }
     return null;
   }
@@ -948,8 +973,8 @@ class _EquipmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = !item.isUnlockedAt(level);
-    final reason = _blockedReason;
-    final buffLabels = item.buff.labels;
+    final reason = _blockedReason(context);
+    final buffLabels = context.l10n.itemBuffLabels(item);
 
     return Opacity(
       opacity: locked ? 0.55 : 1,
@@ -992,7 +1017,7 @@ class _EquipmentCard extends StatelessWidget {
                       top: 0,
                       right: 0,
                       child: Text(
-                        'Sv. ${item.requiredLevel}',
+                        context.l10n.levelShort(item.requiredLevel),
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.streak,
@@ -1007,7 +1032,7 @@ class _EquipmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              item.name,
+              context.l10n.itemName(item),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -1037,7 +1062,7 @@ class _EquipmentCard extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '$ownedCount adet',
+                      context.l10n.ownedCount(ownedCount),
                       style: const TextStyle(
                         color: AppColors.xp,
                         fontSize: 10.5,
@@ -1048,10 +1073,10 @@ class _EquipmentCard extends StatelessWidget {
               ],
             ),
             // İmzalı itemlerin kural cümlesi: item'ın karakterini bu taşıyor.
-            if (item.lore case final lore?) ...[
+            if (item.lore != null) ...[
               const SizedBox(height: 4),
               Text(
-                lore,
+                context.l10n.itemLore(item),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1083,7 +1108,7 @@ class _EquipmentCard extends StatelessWidget {
             // nereye kadar yükselir ve kaç tanesi bir üst nadirliğe çıkar.
             const SizedBox(height: 6),
             Text(
-              _investmentLine,
+              _investmentLine(context),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

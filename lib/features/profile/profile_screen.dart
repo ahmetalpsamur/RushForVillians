@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_formatters.dart';
+import '../../core/localization/locale_preference.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_day.dart';
 import '../../models/adventure_quest.dart';
@@ -9,8 +11,11 @@ import '../../models/daily_step_record.dart';
 import '../../models/item.dart';
 import '../../models/game_title.dart';
 import '../../models/user_profile.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/daily_step_ring.dart';
+import '../../widgets/language_selector_card.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
@@ -45,6 +50,8 @@ class ProfileScreen extends StatelessWidget {
 
   /// Kazanılmış ünvan sayısı; "Ünvanlar" kartındaki özet satırı.
   final int ownedTitleCount;
+  final LocalePreference localePreference;
+  final ValueChanged<LocalePreference> onLocalePreferenceChanged;
 
   const ProfileScreen({
     super.key,
@@ -61,6 +68,8 @@ class ProfileScreen extends StatelessWidget {
     this.equippedItems = const [],
     this.buffs = EquippedBuffs.none,
     this.adventure,
+    this.localePreference = LocalePreference.system,
+    this.onLocalePreferenceChanged = ignoreLocalePreference,
   });
 
   List<DailyStepRecord> get _recentRecords {
@@ -83,18 +92,24 @@ class ProfileScreen extends StatelessWidget {
   }
 
   /// Kuşanmanın tek satırlık özeti. Ayrıntı envanterdeki karakter panelinde.
-  static String _buffSummary(EquippedBuffs buffs) {
+  static String _buffSummary(BuildContext context, EquippedBuffs buffs) {
     String rate(String label, double value) =>
-        '$label +%${(value * 100).round()}';
+        context.l10n.buffRate(label, (value * 100).round());
     final parts = <String>[
-      if (buffs.stepCoinBonus > 0) rate('adım parası', buffs.stepCoinBonus),
-      if (buffs.stepXpBonus > 0) rate('adım XP', buffs.stepXpBonus),
-      if (buffs.wheelXpBonus > 0) rate('çark XP', buffs.wheelXpBonus),
-      if (buffs.enemyXpBonus > 0) rate('düşman XP', buffs.enemyXpBonus),
+      if (buffs.stepCoinBonus > 0)
+        rate(context.l10n.buffStepCoins, buffs.stepCoinBonus),
+      if (buffs.stepXpBonus > 0)
+        rate(context.l10n.buffStepXp, buffs.stepXpBonus),
+      if (buffs.wheelXpBonus > 0)
+        rate(context.l10n.buffWheelXp, buffs.wheelXpBonus),
+      if (buffs.enemyXpBonus > 0)
+        rate(context.l10n.buffEnemyXp, buffs.enemyXpBonus),
       if (buffs.streakFreezeCapBonus > 0)
-        'dondurma stoğu +${buffs.streakFreezeCapBonus}',
-      if (buffs.wheelSpinCapBonus > 0) 'çark stoğu +${buffs.wheelSpinCapBonus}',
-      if (buffs.streakStepRelief > 0) 'seri eşiği -${buffs.streakStepRelief}',
+        context.l10n.buffFreezeStock(buffs.streakFreezeCapBonus),
+      if (buffs.wheelSpinCapBonus > 0)
+        context.l10n.buffWheelStock(buffs.wheelSpinCapBonus),
+      if (buffs.streakStepRelief > 0)
+        context.l10n.buffStreakThreshold(buffs.streakStepRelief),
     ];
     return parts.join(' · ');
   }
@@ -102,7 +117,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: Text(context.l10n.profile)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -137,15 +152,23 @@ class ProfileScreen extends StatelessWidget {
                     TitleBadge(title: equippedTitle),
                   ],
                   const SizedBox(height: 2),
-                  Text('Seviye ${profile.level}'),
+                  Text(context.l10n.levelNumber(profile.level)),
                   const SizedBox(height: 8),
                   Chip(
                     avatar: const Icon(Icons.auto_awesome, size: 18),
-                    label: Text(profile.avatar.characterClassLabel),
+                    label: Text(
+                      context.l10n.characterClassName(
+                        profile.avatar.characterClass,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${profile.avatar.age} yaş • ${profile.avatar.weight} kg • ${profile.avatar.gender}',
+                    context.l10n.profileDetails(
+                      profile.avatar.age,
+                      profile.avatar.weight,
+                      context.l10n.genderName(profile.avatar.gender),
+                    ),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70),
                   ),
@@ -155,8 +178,8 @@ class ProfileScreen extends StatelessWidget {
                     icon: const Icon(Icons.science),
                     label: Text(
                       canEditCharacter
-                          ? 'Reenkarnasyon İksirini Kullan'
-                          : 'Reenkarnasyon İksiri Gerekli',
+                          ? context.l10n.useReincarnationPotion
+                          : context.l10n.reincarnationPotionRequired,
                     ),
                   ),
                 ],
@@ -164,22 +187,29 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          LanguageSelectorCard(
+            value: localePreference,
+            onChanged: onLocalePreferenceChanged,
+          ),
+          const SizedBox(height: 12),
           SectionCard(
-            title: 'Ekipman',
+            title: context.l10n.equipment,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   equippedItems.isEmpty
-                      ? 'Hiçbir şey kuşanmadın.'
-                      : '${equippedItems.length} item kuşanılı: '
-                          '${equippedItems.map((item) => item.name).join(', ')}',
+                      ? context.l10n.nothingEquipped
+                      : context.l10n.equippedItemsSummary(
+                        equippedItems.length,
+                        equippedItems.map(context.l10n.itemName).join(', '),
+                      ),
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 if (!buffs.isEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
-                    _buffSummary(buffs),
+                    _buffSummary(context, buffs),
                     style: const TextStyle(color: AppColors.xp, fontSize: 12),
                   ),
                 ],
@@ -189,7 +219,7 @@ class ProfileScreen extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onOpenInventory,
                     icon: const Icon(Icons.backpack),
-                    label: const Text('Envanteri Aç'),
+                    label: Text(context.l10n.openInventory),
                   ),
                 ),
               ],
@@ -222,17 +252,22 @@ class ProfileScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Ünvanlar',
-                              style: TextStyle(fontWeight: FontWeight.w900),
+                            Text(
+                              context.l10n.titles,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               equippedTitle == null
-                                  ? '$ownedTitleCount ünvan kazandın. Birini '
-                                      'tak, adının yanında görünsün.'
-                                  : 'Takılı: ${equippedTitle!.name} · '
-                                      '$ownedTitleCount ünvan kazandın.',
+                                  ? context.l10n.earnedTitlesPrompt(
+                                    ownedTitleCount,
+                                  )
+                                  : context.l10n.equippedTitleSummary(
+                                    equippedTitle!.name,
+                                    ownedTitleCount,
+                                  ),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -256,27 +291,32 @@ class ProfileScreen extends StatelessWidget {
                 key: const ValueKey('profile-blacksmith-entry'),
                 onTap: onOpenBlacksmith,
                 borderRadius: BorderRadius.circular(14),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      const CircleAvatar(
                         backgroundColor: Colors.white10,
                         child: Icon(Icons.hardware, color: AppColors.streak),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Demirci',
-                              style: TextStyle(fontWeight: FontWeight.w900),
+                              context.l10n.blacksmith,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Silahlarını birleştir, gücüne güç kat.',
-                              style: TextStyle(
+                              context.l10n.blacksmithProfileDescription,
+                              style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
                               ),
@@ -284,7 +324,7 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: Colors.white54),
+                      const Icon(Icons.chevron_right, color: Colors.white54),
                     ],
                   ),
                 ),
@@ -293,7 +333,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SectionCard(
-            title: 'Son 3 Gün',
+            title: context.l10n.lastThreeDays,
             child: SizedBox(
               width: double.infinity,
               child: Column(
@@ -307,13 +347,19 @@ class ProfileScreen extends StatelessWidget {
                               DailyStepRing(
                                 record: record,
                                 size: 76,
-                                centerLabel: shortWeekday(record.date),
+                                centerLabel: AppFormatters.shortWeekday(
+                                  context,
+                                  record.date,
+                                ),
                                 onTap:
                                     () => showDailyStepDetails(context, record),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${record.date.day}.${record.date.month.toString().padLeft(2, '0')}',
+                                AppFormatters.shortDayMonth(
+                                  context,
+                                  record.date,
+                                ),
                                 style: const TextStyle(
                                   color: Colors.white54,
                                   fontSize: 12,
@@ -340,7 +386,7 @@ class ProfileScreen extends StatelessWidget {
                         );
                       },
                       icon: const Icon(Icons.calendar_month),
-                      label: const Text('Bütün adım halkalarını gör'),
+                      label: Text(context.l10n.viewAllStepRings),
                     ),
                   ),
                 ],
@@ -349,12 +395,12 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SectionCard(
-            title: 'İstatistikler',
+            title: context.l10n.statistics,
             child: Column(
               children: [
                 if (adventure != null) ...[
                   StatBar(
-                    label: 'Savaş Canı',
+                    label: context.l10n.combatHealth,
                     icon: Icons.favorite,
                     color: AppColors.hp,
                     progress:
@@ -366,9 +412,9 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                 ] else ...[
-                  const Text(
-                    'Savaş canı yalnızca macera sırasında takip edilir.',
-                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  Text(
+                    context.l10n.combatHealthAdventureOnly,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -405,10 +451,10 @@ class ProfileScreen extends StatelessWidget {
                 Icons.local_fire_department,
                 color: AppColors.streak,
               ),
-              title: const Text('Günlük Streak'),
-              subtitle: Text('En uzun seri: ${profile.longestStreak} gün'),
+              title: Text(context.l10n.dailyStreakProfile),
+              subtitle: Text(context.l10n.longestStreak(profile.longestStreak)),
               trailing: Text(
-                '${profile.streakDays} gün',
+                context.l10n.dayCount(profile.streakDays),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -419,7 +465,7 @@ class ProfileScreen extends StatelessWidget {
                 Icons.monetization_on,
                 color: AppColors.streak,
               ),
-              title: const Text('Coin'),
+              title: Text(context.l10n.coin),
               trailing: Text(
                 '${profile.coins}',
                 style: const TextStyle(fontWeight: FontWeight.bold),

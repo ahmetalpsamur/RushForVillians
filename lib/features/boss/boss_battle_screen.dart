@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/reward_calculator.dart';
+import '../../l10n/l10n_context.dart';
 import '../../models/boss_quest.dart';
 import '../../models/daily_progress.dart';
 import '../../models/reward.dart';
@@ -30,8 +31,8 @@ class BossBattleScreen extends StatelessWidget {
     );
     return Reward(
       id: 'dragon_${DateTime.now().millisecondsSinceEpoch}',
-      name: '${dragon.name} Ganimeti',
-      description: 'Ejderhayı yenerek kazanılan ödül.',
+      name: context.l10n.dragonLoot(context.l10n.shadowDragonName),
+      description: context.l10n.dragonLootDescription,
       rarity: rarity,
       icon: Icons.diamond,
       earnedAt: DateTime.now(),
@@ -45,7 +46,7 @@ class BossBattleScreen extends StatelessWidget {
       context: context,
       builder:
           (_) => AlertDialog(
-            title: const Text('Ejderha Yenildi! 🐉'),
+            title: Text(context.l10n.dragonDefeatedCelebration),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +59,7 @@ class BossBattleScreen extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Harika!'),
+                child: Text(context.l10n.great),
               ),
             ],
           ),
@@ -72,7 +73,7 @@ class BossBattleScreen extends StatelessWidget {
       dragon.requiredSteps,
     );
     return Scaffold(
-      appBar: AppBar(title: Text(dragon.name)),
+      appBar: AppBar(title: Text(context.l10n.shadowDragonName)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -87,23 +88,25 @@ class BossBattleScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  dragon.description,
+                  context.l10n.shadowDragonDescription,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
                 StatBar(
-                  label: 'Ejderha Canı (adım ile azalır)',
+                  label: context.l10n.dragonHealthSteps,
                   icon: Icons.favorite_border,
                   color: AppColors.hp,
                   progress: 1 - dragon.progress,
-                  valueText:
-                      '${dragon.currentSteps} / ${dragon.requiredSteps} adım',
+                  valueText: context.l10n.dragonStepsProgress(
+                    dragon.currentSteps,
+                    dragon.requiredSteps,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   dragon.isDefeated
-                      ? 'Ejderha yenildi!'
-                      : '$remaining adım daha kaldı.',
+                      ? context.l10n.dragonDefeated
+                      : context.l10n.stepsRemaining(remaining),
                   style: const TextStyle(color: Colors.white70),
                 ),
               ],
@@ -111,20 +114,29 @@ class BossBattleScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           SectionCard(
-            title: 'Ödül Nadirliği Nasıl Belirlenir?',
-            child: const Column(
+            title: context.l10n.rewardRarityExplanation,
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RarityRow(rarity: RewardRarity.common, hint: '< %75 hedef'),
+                _RarityRow(
+                  rarity: RewardRarity.common,
+                  hint: context.l10n.rarityBelow75,
+                ),
                 _RarityRow(
                   rarity: RewardRarity.uncommon,
-                  hint: '%75 - %99 hedef',
+                  hint: context.l10n.rarity75To99,
                 ),
-                _RarityRow(rarity: RewardRarity.rare, hint: 'Hedefi tuttur'),
-                _RarityRow(rarity: RewardRarity.epic, hint: 'Hedefin %125\'i'),
+                _RarityRow(
+                  rarity: RewardRarity.rare,
+                  hint: context.l10n.rarityMeetGoal,
+                ),
+                _RarityRow(
+                  rarity: RewardRarity.epic,
+                  hint: context.l10n.rarity125,
+                ),
                 _RarityRow(
                   rarity: RewardRarity.legendary,
-                  hint: 'Hedefin %150\'si',
+                  hint: context.l10n.rarity150,
                 ),
               ],
             ),
@@ -137,7 +149,9 @@ class BossBattleScreen extends StatelessWidget {
                     : null,
             icon: const Icon(Icons.card_giftcard),
             label: Text(
-              dragon.rewardClaimed ? 'Ödül Alındı' : 'Ödülü Talep Et',
+              dragon.rewardClaimed
+                  ? context.l10n.rewardClaimed
+                  : context.l10n.claimReward,
             ),
           ),
         ],

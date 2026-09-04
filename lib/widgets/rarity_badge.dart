@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/reward_rarity.dart';
+import '../l10n/content_localizations.dart';
+import '../l10n/l10n_context.dart';
 
 /// Ödül nadirliğini renkli bir rozet olarak gösterir.
 class RarityBadge extends StatelessWidget {
@@ -18,7 +20,7 @@ class RarityBadge extends StatelessWidget {
         border: Border.all(color: rarity.color),
       ),
       child: Text(
-        rarity.label,
+        context.l10n.rarityName(rarity),
         style: TextStyle(
           color: rarity.color,
           fontSize: 12,

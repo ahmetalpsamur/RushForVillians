@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../models/item.dart';
 import '../../models/owned_item.dart';
 import '../../models/reward_rarity.dart';
@@ -80,7 +82,7 @@ class BlacksmithScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Demirci'),
+            title: Text(context.l10n.blacksmith),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 16),
@@ -104,13 +106,11 @@ class BlacksmithScreen extends StatelessWidget {
           ),
           body:
               groups.isEmpty
-                  ? const Padding(
-                    padding: EdgeInsets.all(24),
+                  ? Padding(
+                    padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Örs boş. Mağazadan ekipman aldığında burada '
-                      'yükseltebilir, aynı eşyadan birkaç adet biriktirince '
-                      'birleştirebilirsin.',
-                      style: TextStyle(color: Colors.white70),
+                      context.l10n.emptyForge,
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   )
                   : ListView.builder(
@@ -194,39 +194,48 @@ class _ForgeCard extends StatelessWidget {
       builder:
           (dialogContext) => AlertDialog(
             backgroundColor: AppColors.surface,
-            title: const Text('Birleştirilsin mi?'),
+            title: Text(context.l10n.mergeQuestion),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${quote.requiredCount} adet ${group.item.name} '
-                  've ${quote.cost} coin harcanacak.',
+                  context.l10n.mergeCostWarning(
+                    quote.requiredCount,
+                    context.l10n.itemName(group.item),
+                    quote.cost,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Karşılığında 1 adet ${target.label} '
-                  '${group.item.name} alacaksın — Sv. 1, nadirlik tavanı '
-                  '${itemLevelCap(target)}.',
+                  context.l10n.mergeResult(
+                    context.l10n.rarityName(target),
+                    context.l10n.itemName(group.item),
+                    itemLevelCap(target),
+                  ),
                   style: const TextStyle(color: AppColors.xp),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Harcanan eşyaların seviyeleri: '
-                  '${_consumedLevels(quote).join(', ')}.',
+                  context.l10n.consumedItemLevels(
+                    _consumedLevels(context, quote).join(', '),
+                  ),
                   style: const TextStyle(fontSize: 12, color: Colors.white54),
                 ),
                 if (quote.consumesEquipped) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'Kuşanılı bir adet harcanacak; önce çıkarılacak.',
-                    style: TextStyle(fontSize: 12, color: AppColors.streak),
+                  Text(
+                    context.l10n.equippedItemConsumed,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.streak,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 8),
-                const Text(
-                  'Bu işlem geri alınamaz.',
-                  style: TextStyle(
+                Text(
+                  context.l10n.irreversibleAction,
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppColors.accent,
@@ -237,11 +246,11 @@ class _ForgeCard extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Vazgeç'),
+                child: Text(context.l10n.cancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Birleştir'),
+                child: Text(context.l10n.merge),
               ),
             ],
           ),
@@ -250,11 +259,14 @@ class _ForgeCard extends StatelessWidget {
     if (confirmed ?? false) onMerge(group.item.id, group.rarity);
   }
 
-  List<String> _consumedLevels(MergeQuote quote) {
+  List<String> _consumedLevels(BuildContext context, MergeQuote quote) {
     final byId = {
       for (final entry in group.entries) entry.instanceId: entry.level,
     };
-    return [for (final id in quote.consumedInstanceIds) 'Sv. ${byId[id] ?? 1}'];
+    return [
+      for (final id in quote.consumedInstanceIds)
+        context.l10n.levelShort(byId[id] ?? 1),
+    ];
   }
 
   @override
@@ -273,8 +285,18 @@ class _ForgeCard extends StatelessWidget {
       group: group.instances,
       coins: coins,
     );
-    final upgradeReason = upgrade.reason(group.rarity, playerLevel);
-    final mergeReason = merge.reason(group.rarity);
+    final upgradeReason =
+        upgrade.canUpgrade
+            ? null
+            : context.l10n.upgradeBlockReason(
+              upgrade,
+              group.rarity,
+              playerLevel,
+            );
+    final mergeReason =
+        merge.canMerge
+            ? null
+            : context.l10n.mergeBlockReason(merge, group.rarity);
 
     return SectionCard(
       child: Column(
@@ -303,7 +325,7 @@ class _ForgeCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.name,
+                      context.l10n.itemName(item),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -320,7 +342,7 @@ class _ForgeCard extends StatelessWidget {
                         RarityBadge(rarity: group.rarity),
                         ArchetypeBadge(archetype: item.archetype),
                         Text(
-                          '${group.count} adet',
+                          context.l10n.ownedCount(group.count),
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.white54,
@@ -337,9 +359,11 @@ class _ForgeCard extends StatelessWidget {
           const SizedBox(height: 10),
           _ForgeAction(
             icon: Icons.upgrade,
-            title:
-                'Yükselt — Sv. ${best.level} / ${upgrade.rarityCap}'
-                '${group.count > 1 ? ' (en gelişmiş adet)' : ''}',
+            title: context.l10n.upgradeBestItem(
+              best.level,
+              upgrade.rarityCap,
+              group.count > 1 ? context.l10n.mostAdvancedSuffix : '',
+            ),
             detail:
                 upgrade.canUpgrade
                     ? compareLevels(
@@ -351,37 +375,46 @@ class _ForgeCard extends StatelessWidget {
             reason: upgradeReason,
             actionLabel:
                 upgrade.canUpgrade
-                    ? 'Sv. ${upgrade.nextLevel} — ${upgrade.cost} coin'
-                    : 'Yükseltilemiyor',
+                    ? context.l10n.upgradeToLevel(
+                      upgrade.nextLevel,
+                      upgrade.cost,
+                    )
+                    : context.l10n.cannotUpgrade,
             enabled: upgrade.canUpgrade,
             onPressed: () => onUpgrade(best.instanceId),
             onBlocked:
-                () =>
-                    _notify(context, upgradeReason ?? 'Şu an yükseltilemiyor.'),
+                () => _notify(
+                  context,
+                  upgradeReason ?? context.l10n.cannotUpgradeNow,
+                ),
           ),
           const SizedBox(height: 8),
           _ForgeAction(
             icon: Icons.merge_type,
             title:
                 merge.target == null
-                    ? 'Birleştirme — en üst nadirlik'
-                    : 'Birleştirme — ${group.count}/${merge.requiredCount} '
-                        'adet → ${merge.target!.label}',
+                    ? context.l10n.mergeHighestRarity
+                    : context.l10n.mergeProgressTitle(
+                      group.count,
+                      merge.requiredCount,
+                      context.l10n.rarityName(merge.target!),
+                    ),
             detail:
                 merge.canMerge
-                    ? 'Sonuç Sv. 1\'e döner, nadirlik tavanı '
-                        '${itemLevelCap(merge.target!)} olur'
+                    ? context.l10n.mergeResetDetail(itemLevelCap(merge.target!))
                     : null,
             reason: mergeReason,
             actionLabel:
                 merge.canMerge
-                    ? 'Birleştir — ${merge.cost} coin'
-                    : 'Birleştirilemiyor',
+                    ? context.l10n.mergeWithCost(merge.cost)
+                    : context.l10n.cannotMerge,
             enabled: merge.canMerge,
             onPressed: () => _confirmMerge(context, merge),
             onBlocked:
-                () =>
-                    _notify(context, mergeReason ?? 'Şu an birleştirilemiyor.'),
+                () => _notify(
+                  context,
+                  mergeReason ?? context.l10n.cannotMergeNow,
+                ),
           ),
         ],
       ),

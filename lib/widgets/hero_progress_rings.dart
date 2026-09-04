@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/game_constants.dart';
 import '../core/theme/app_theme.dart';
+import '../core/localization/app_formatters.dart';
+import '../l10n/l10n_context.dart';
+import '../l10n/content_localizations.dart';
 import '../models/adventure_quest.dart';
 import '../models/daily_progress.dart';
 import '../models/tutorial_guide_variant.dart';
@@ -106,7 +109,7 @@ class HeroProgressRings extends StatelessWidget {
                               ],
                             ),
                             child: Text(
-                              '$completedLaps TUR',
+                              context.l10n.roundBadge(completedLaps),
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 11,
@@ -141,7 +144,7 @@ class HeroProgressRings extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Text(
-          profile.avatar.characterClassLabel,
+          context.l10n.characterClassName(profile.avatar.characterClass),
           style: const TextStyle(
             color: AppColors.primary,
             fontWeight: FontWeight.w900,
@@ -151,7 +154,7 @@ class HeroProgressRings extends StatelessWidget {
         const SizedBox(height: 22),
         if (adventure != null) ...[
           StatBar(
-            label: 'Savaş Canı',
+            label: context.l10n.combatHealth,
             icon: Icons.favorite,
             color: AppColors.hp,
             progress: adventure!.playerHealthProgress,
@@ -162,7 +165,7 @@ class HeroProgressRings extends StatelessWidget {
           const SizedBox(height: 14),
         ],
         StatBar(
-          label: 'Seviye ${profile.level}',
+          label: context.l10n.levelNumber(profile.level),
           icon: Icons.bolt,
           color: AppColors.xp,
           progress: profile.xpProgress,
@@ -181,7 +184,7 @@ class _StepProgressLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kilometers = today.steps / GameConstants.stepsPerKilometer;
-    final distance = kilometers.toStringAsFixed(1).replaceAll('.', ',');
+    final distance = AppFormatters.decimal(context, kilometers, digits: 1);
     return Container(
       key: const ValueKey('home-step-progress-label'),
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
@@ -197,7 +200,7 @@ class _StepProgressLabel extends StatelessWidget {
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              '${today.steps} / ${today.stepGoal} adım ($distance km)',
+              context.l10n.stepProgress(today.steps, today.stepGoal, distance),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -227,9 +230,9 @@ class _PetToggleButton extends StatelessWidget {
       key: TutorialGuideTargetKeys.petToggle,
       button: true,
       toggled: enabled,
-      label: enabled ? 'Peti kapat' : 'Peti çağır',
+      label: enabled ? context.l10n.dismissPet : context.l10n.summonPet,
       child: Tooltip(
-        message: enabled ? 'Peti kapat' : 'Peti çağır',
+        message: enabled ? context.l10n.dismissPet : context.l10n.summonPet,
         child: GestureDetector(
           key: const ValueKey('home-pet-toggle'),
           behavior: HitTestBehavior.opaque,

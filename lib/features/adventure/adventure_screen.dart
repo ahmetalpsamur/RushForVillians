@@ -7,8 +7,11 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/attack_config.dart';
 import '../../core/constants/game_constants.dart';
+import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/game_clock.dart';
+import '../../l10n/l10n_context.dart';
+import '../../l10n/content_localizations.dart';
 import '../../core/utils/gif_timing.dart';
 import '../../data/enemy_catalog.dart';
 import '../../models/adventure_quest.dart';
@@ -575,15 +578,18 @@ class _AdventureScreenState extends State<AdventureScreen>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'GÜNLÜK HEDEFİNİ SEÇ',
+                        context.l10n.chooseDailyGoal,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.4,
                         ),
                       ),
-                      const Text(
-                        '500 adımlık aralıklarla yukarı veya aşağı kaydır',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      Text(
+                        context.l10n.goalPickerHint,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Expanded(
@@ -650,7 +656,12 @@ class _AdventureScreenState extends State<AdventureScreen>
                                                   : null,
                                         ),
                                         child: Text(
-                                          '${_formatNumber(goal)} adım',
+                                          context.l10n.stepsLabel(
+                                            AppFormatters.integer(
+                                              context,
+                                              goal,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     );
@@ -695,7 +706,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                         child: FilledButton.icon(
                           onPressed: () => Navigator.pop(context, draftGoal),
                           icon: const Icon(Icons.check_circle_outline),
-                          label: Text('${_formatNumber(draftGoal)} ADIMI SEÇ'),
+                          label: Text(
+                            context.l10n.selectStepGoal(
+                              AppFormatters.integer(context, draftGoal),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -784,7 +799,7 @@ class _AdventureScreenState extends State<AdventureScreen>
             ? _buildCongratulations(context, adventure)
             : _buildAdventure(context, adventure);
     return Scaffold(
-      appBar: AppBar(title: const Text('Macera')),
+      appBar: AppBar(title: Text(context.l10n.adventure)),
       floatingActionButton: ScrollToTopButton(controller: _scrollController),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: Stack(
@@ -821,7 +836,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               children: [
                 const Spacer(),
                 Text(
-                  '$_victoryRound. ROUND',
+                  context.l10n.roundNumberUpper(_victoryRound),
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontSize: 15,
@@ -831,7 +846,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _showDeathCongratulations ? 'ZAFER!' : 'ROUND SENİN!',
+                  _showDeathCongratulations
+                      ? context.l10n.victoryUpper
+                      : context.l10n.roundYoursUpper,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     color: Colors.white,
@@ -844,8 +861,10 @@ class _AdventureScreenState extends State<AdventureScreen>
                 const SizedBox(height: 14),
                 Text(
                   _showDeathCongratulations
-                      ? '${adventure.enemy.name} yenildi!'
-                      : 'Round hedefini süresi dolmadan tamamladın',
+                      ? context.l10n.enemyDefeatedNamed(
+                        context.l10n.enemyName(adventure.enemy),
+                      )
+                      : context.l10n.roundCompletedEarly,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white60),
                 ),
@@ -861,7 +880,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                     child: Column(
                       children: [
                         Text(
-                          '+${adventure.victoryCoinReward} ALTIN',
+                          context.l10n.wheelCoinsLabel(
+                            adventure.victoryCoinReward,
+                          ),
                           key: const ValueKey('victory-coin-reward'),
                           style: const TextStyle(
                             color: AppColors.streak,
@@ -896,10 +917,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                   if (adventure.speedRewardMultiplier > 1.001) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '${adventure.victoryRounds} round · '
-                      '${_formatNumber(adventure.victorySteps)} adım — '
-                      'hız ödülü ×'
-                      '${adventure.speedRewardMultiplier.toStringAsFixed(2)}',
+                      context.l10n.speedRewardSummary(
+                        adventure.victoryRounds,
+                        AppFormatters.integer(context, adventure.victorySteps),
+                        adventure.speedRewardMultiplier.toStringAsFixed(2),
+                      ),
                       key: const ValueKey('victory-speed-bonus'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
@@ -911,9 +933,13 @@ class _AdventureScreenState extends State<AdventureScreen>
                   if (adventure.isWalkPhaseActive) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Macera bitmedi: ${_formatNumber(adventure.walkRemainingSteps)} '
-                      'adımlık yürüyüş fazı kaldı. Bu fazda '
-                      '${GameConstants.walkPhaseStepsPerCoin} adım = 1 altın.',
+                      context.l10n.walkPhaseRemainingNotice(
+                        AppFormatters.integer(
+                          context,
+                          adventure.walkRemainingSteps,
+                        ),
+                        GameConstants.walkPhaseStepsPerCoin,
+                      ),
                       key: const ValueKey('victory-walk-phase-note'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white70),
@@ -945,7 +971,16 @@ class _AdventureScreenState extends State<AdventureScreen>
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '${(_overlayEnemyHealth * adventure.scaledEnemyMaxHealth).round()} CAN',
+                        context.l10n
+                            .healthValue(
+                              AppFormatters.integer(
+                                context,
+                                (_overlayEnemyHealth *
+                                        adventure.scaledEnemyMaxHealth)
+                                    .round(),
+                              ),
+                            )
+                            .toUpperCase(),
                         key: const ValueKey('animated-enemy-health-value'),
                         style: const TextStyle(
                           color: AppColors.hp,
@@ -1028,14 +1063,14 @@ class _AdventureScreenState extends State<AdventureScreen>
                               !_showFrozenEnemy &&
                               attack > 0.38 &&
                               attack < 0.9)
-                            const Positioned(
+                            Positioned(
                               left: 0,
                               right: 0,
                               top: 62,
                               child: Text(
-                                'VURUŞ!',
+                                context.l10n.hitUpper,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: AppColors.streak,
                                   fontSize: 24,
                                   fontWeight: FontWeight.w900,
@@ -1062,7 +1097,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                                 child: Transform.scale(
                                   scale: 0.88 + attack * 0.2,
                                   child: Text(
-                                    '-$_displayedEnemyDamage CAN',
+                                    context.l10n.healthDamageUpper(
+                                      _displayedEnemyDamage,
+                                    ),
                                     key: const ValueKey(
                                       'animated-enemy-damage',
                                     ),
@@ -1106,20 +1143,20 @@ class _AdventureScreenState extends State<AdventureScreen>
                                   () =>
                                       setState(() => _showRoundVictory = false),
                               icon: const Icon(Icons.directions_walk),
-                              label: const Text('YÜRÜYÜŞE DEVAM ET'),
+                              label: Text(context.l10n.continueWalkingUpper),
                             )
                             : FilledButton.icon(
                               key: const ValueKey('victory-choose-adventure'),
                               onPressed: widget.onChooseNewAdventure,
                               icon: const Icon(Icons.explore),
-                              label: const Text('YENİ MACERA SEÇ'),
+                              label: Text(context.l10n.chooseNewAdventureUpper),
                             ),
                   )
                 else ...[
                   Text(
                     _showEnemyDeath
-                        ? 'Son darbe!'
-                        : 'Saldırı $_victoryCycle / 2',
+                        ? context.l10n.finalBlow
+                        : context.l10n.attackSequence(_victoryCycle, 2),
                     style: const TextStyle(
                       color: Colors.white38,
                       fontWeight: FontWeight.w700,
@@ -1161,7 +1198,7 @@ class _AdventureScreenState extends State<AdventureScreen>
             children: [
               const Spacer(),
               Text(
-                '$_victoryRound. ROUND',
+                context.l10n.roundNumberUpper(_victoryRound),
                 style: const TextStyle(
                   color: AppColors.hp,
                   fontSize: 15,
@@ -1171,7 +1208,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'ROUND CANAVARIN!',
+                context.l10n.enemyRoundUpper,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   color: Colors.white,
@@ -1181,7 +1218,9 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 14),
               Text(
-                '${adventure.enemy.name}, süre dolunca saldırdı',
+                context.l10n.enemyAttackedAfterTimeout(
+                  context.l10n.enemyName(adventure.enemy),
+                ),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white60),
               ),
@@ -1201,7 +1240,14 @@ class _AdventureScreenState extends State<AdventureScreen>
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    '${adventure.playerHealth} CAN',
+                    context.l10n
+                        .healthValue(
+                          AppFormatters.integer(
+                            context,
+                            adventure.playerHealth,
+                          ),
+                        )
+                        .toUpperCase(),
                     style: const TextStyle(
                       color: AppColors.hp,
                       fontWeight: FontWeight.w900,
@@ -1257,7 +1303,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                             right: 0,
                             top: 62,
                             child: Text(
-                              '-${adventure.lastEnemyDamage} CAN',
+                              context.l10n.healthDamageUpper(
+                                adventure.lastEnemyDamage,
+                              ),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: AppColors.hp,
@@ -1278,8 +1326,11 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const Spacer(),
               Text(
-                '${adventure.enemy.name} saldırıyor • '
-                '$_enemyVictoryCycle / 2',
+                context.l10n.enemyAttackingCycle(
+                  context.l10n.enemyName(adventure.enemy),
+                  _enemyVictoryCycle,
+                  2,
+                ),
                 style: const TextStyle(
                   color: Colors.white38,
                   fontWeight: FontWeight.w700,
@@ -1306,25 +1357,24 @@ class _AdventureScreenState extends State<AdventureScreen>
               const Icon(Icons.heart_broken, color: AppColors.hp, size: 76),
               const SizedBox(height: 16),
               Text(
-                'Dinlenme zamanı',
+                context.l10n.restTime,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                '${adventure.enemy.name} karşısında canın tükendi. Yeni '
-                'maceralara açılmak için 500 adımlık Hayat Yürüyüşünü '
-                'tamamlamalısın.',
+                context.l10n.revivalIntro(
+                  context.l10n.enemyName(adventure.enemy),
+                ),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Bu özel yürüyüş boyunca XP kazanılmaz; yürümeye devam '
-                'ettiğinde yeniden doğarsın.',
+              Text(
+                context.l10n.revivalNoXp,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.streak, fontSize: 12),
+                style: const TextStyle(color: AppColors.streak, fontSize: 12),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -1333,7 +1383,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                   key: const ValueKey('start-revival-walk'),
                   onPressed: widget.onStartRevival,
                   icon: const Icon(Icons.directions_walk),
-                  label: const Text('Hayat Yürüyüşüne Çık'),
+                  label: Text(context.l10n.startLifeWalk),
                 ),
               ),
             ],
@@ -1360,17 +1410,16 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'Hayat Yürüyüşü',
+                context.l10n.lifeWalk,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Durma; yeniden doğmak için düşük tempoda yürümeye devam et. '
-                'Bu 500 adım XP kazandırmaz.',
+              Text(
+                context.l10n.lifeWalkDescription,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 20),
               LinearProgressIndicator(
@@ -1382,13 +1431,18 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                '${adventure.revivalSteps} / '
-                '${AdventureQuest.revivalStepTarget} adım',
+                context.l10n.dailyStepProgressValue(
+                  AppFormatters.integer(context, adventure.revivalSteps),
+                  AppFormatters.integer(
+                    context,
+                    AdventureQuest.revivalStepTarget,
+                  ),
+                ),
                 style: const TextStyle(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 4),
               Text(
-                '${adventure.revivalRemainingSteps} adım kaldı',
+                context.l10n.stepsRemaining(adventure.revivalRemainingSteps),
                 style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ],
@@ -1414,18 +1468,17 @@ class _AdventureScreenState extends State<AdventureScreen>
               const Icon(Icons.favorite, color: AppColors.hp, size: 82),
               const SizedBox(height: 16),
               Text(
-                'Yeniden doğdun!',
+                context.l10n.revived,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: AppColors.streak,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Hayat Yürüyüşünü tamamladın. Bu yürüyüş XP vermedi; şimdi '
-                'yeniden maceraya açılabilirsin.',
+              Text(
+                context.l10n.revivalCompleted,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -1434,7 +1487,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                   key: const ValueKey('acknowledge-revival'),
                   onPressed: widget.onChooseNewAdventure,
                   icon: const Icon(Icons.explore),
-                  label: const Text('Maceralara Dön'),
+                  label: Text(context.l10n.backToAdventures),
                 ),
               ),
             ],
@@ -1477,7 +1530,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  '+${adventure.walkCoinReward} EK ALTIN',
+                  context.l10n.extraGold(adventure.walkCoinReward),
                   key: const ValueKey('gold-collection-earned-coins'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
@@ -1496,7 +1549,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                     key: const ValueKey('gold-collection-choose-adventure'),
                     onPressed: widget.onChooseNewAdventure,
                     icon: const Icon(Icons.explore),
-                    label: const Text('YENİ MACERA SEÇ'),
+                    label: Text(context.l10n.chooseNewAdventureUpper),
                   ),
                 ),
               ],
@@ -1529,7 +1582,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               const Icon(Icons.emoji_events, color: AppColors.xp, size: 82),
               const SizedBox(height: 16),
               Text(
-                'Tebrikler!',
+                context.l10n.congratulations,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: AppColors.xp,
                   fontWeight: FontWeight.w900,
@@ -1537,7 +1590,9 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                '${adventure.enemy.name} yenildi!',
+                context.l10n.enemyDefeatedNamed(
+                  context.l10n.enemyName(adventure.enemy),
+                ),
                 textAlign: TextAlign.center,
                 style: Theme.of(
                   context,
@@ -1545,8 +1600,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                '${adventure.enemy.xpReward} XP kazandın. Yeni bir macera '
-                'seni bekliyor.',
+                context.l10n.xpWonNextAdventure(adventure.enemy.xpReward),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70),
               ),
@@ -1556,7 +1610,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                 child: FilledButton.icon(
                   onPressed: widget.onChooseNewAdventure,
                   icon: const Icon(Icons.explore),
-                  label: const Text('Yeni Macera Seç'),
+                  label: Text(context.l10n.chooseNewAdventure),
                 ),
               ),
             ],
@@ -1579,21 +1633,21 @@ class _AdventureScreenState extends State<AdventureScreen>
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
         Text(
-          'Bugünkü maceranı seç',
+          context.l10n.chooseTodaysAdventure,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Hedefini belirle, meydan okuyabileceğin düşmanı seç ve yürüyüşe başla.',
-          style: TextStyle(color: Colors.white70),
+        Text(
+          context.l10n.adventureSelectionDescription,
+          style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 16),
         _GoalSelectorButton(goal: _stepGoal, onTap: _showGoalPicker),
         const SizedBox(height: 16),
         Text(
-          'Düşmanını seç',
+          context.l10n.chooseEnemy,
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -1627,12 +1681,12 @@ class _AdventureScreenState extends State<AdventureScreen>
             ),
           );
         }),
-        const Padding(
-          padding: EdgeInsets.only(top: 2, bottom: 16),
+        Padding(
+          padding: const EdgeInsets.only(top: 2, bottom: 16),
           child: Text(
-            'Düşmanın ayrıntılarını görmek ve macerayı başlatmak için karta dokun.',
+            context.l10n.tapEnemyForDetails,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white38, fontSize: 12),
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
           ),
         ),
       ],
@@ -1668,7 +1722,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'Zafer senin',
+                context.l10n.victoryIsYours,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -1676,7 +1730,9 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 4),
               Text(
-                '${adventure.enemy.name} devrildi. Yolun geri kalanı senin.',
+                context.l10n.enemyFelledRoadYours(
+                  context.l10n.enemyName(adventure.enemy),
+                ),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70),
               ),
@@ -1685,7 +1741,7 @@ class _AdventureScreenState extends State<AdventureScreen>
         ),
         const SizedBox(height: 12),
         SectionCard(
-          title: AdventureQuestPhase.walk.label,
+          title: context.l10n.adventurePhaseName(AdventureQuestPhase.walk),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1699,8 +1755,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Yürüyüş fazı · '
-                      '${GameConstants.walkPhaseStepsPerCoin} adım = 1 altın',
+                      context.l10n.walkPhaseRate(
+                        GameConstants.walkPhaseStepsPerCoin,
+                      ),
                       key: const ValueKey('walk-phase-rate'),
                       style: const TextStyle(
                         color: AppColors.streak,
@@ -1729,9 +1786,17 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '${_formatNumber(adventure.walkSteps)} / '
-                      '${_formatNumber(adventure.walkTargetSteps)} adım — '
-                      'kalan ${_formatNumber(adventure.walkRemainingSteps)}',
+                      context.l10n.walkProgressRemaining(
+                        AppFormatters.integer(context, adventure.walkSteps),
+                        AppFormatters.integer(
+                          context,
+                          adventure.walkTargetSteps,
+                        ),
+                        AppFormatters.integer(
+                          context,
+                          adventure.walkRemainingSteps,
+                        ),
+                      ),
                       key: const ValueKey('walk-phase-remaining'),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
@@ -1740,11 +1805,10 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                'Macera adım taahhüdün dolunca biter. O ana kadar attığın her '
-                'adım normalden değerli: oran ${GameConstants.stepsPerCoin} '
-                'yerine ${GameConstants.walkPhaseStepsPerCoin}. Faz bitince '
-                'oran ${GameConstants.stepsPerCoin} adım = 1 altına döner. '
-                'XP oranı değişmez.',
+                context.l10n.walkPhaseExplanation(
+                  GameConstants.stepsPerCoin,
+                  GameConstants.walkPhaseStepsPerCoin,
+                ),
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
@@ -1752,7 +1816,7 @@ class _AdventureScreenState extends State<AdventureScreen>
         ),
         const SizedBox(height: 12),
         SectionCard(
-          title: 'Zafer özeti',
+          title: context.l10n.victorySummary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1762,10 +1826,15 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${adventure.victoryRounds} round · '
-                      '${_formatNumber(adventure.victorySteps)} adımda '
-                      'devirdin — hız ödülü ×'
-                      '${adventure.speedRewardMultiplier.toStringAsFixed(2)}',
+                      context.l10n.speedRewardSummary(
+                        adventure.victoryRounds,
+                        AppFormatters.integer(context, adventure.victorySteps),
+                        AppFormatters.decimal(
+                          context,
+                          adventure.speedRewardMultiplier,
+                          digits: 2,
+                        ),
+                      ),
                       key: const ValueKey('walk-phase-speed-bonus'),
                     ),
                   ),
@@ -1782,10 +1851,24 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Zafer +${adventure.victoryCoinReward} · '
-                      'yürüyüş +${adventure.walkCoinReward} altın · '
-                      'toplam +${adventure.totalCoinReward} altın · '
-                      '+${adventure.victoryXpReward} XP',
+                      context.l10n.walkRewardBreakdown(
+                        AppFormatters.integer(
+                          context,
+                          adventure.victoryCoinReward,
+                        ),
+                        AppFormatters.integer(
+                          context,
+                          adventure.walkCoinReward,
+                        ),
+                        AppFormatters.integer(
+                          context,
+                          adventure.totalCoinReward,
+                        ),
+                        AppFormatters.integer(
+                          context,
+                          adventure.victoryXpReward,
+                        ),
+                      ),
                       key: const ValueKey('walk-phase-reward-total'),
                     ),
                   ),
@@ -1800,11 +1883,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                     size: 18,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Serin ve çark hakkın bu zaferle güvence altında.',
-                    ),
-                  ),
+                  Expanded(child: Text(context.l10n.streakAndWheelSecured)),
                 ],
               ),
             ],
@@ -1817,14 +1896,14 @@ class _AdventureScreenState extends State<AdventureScreen>
             key: const ValueKey('walk-phase-abandon'),
             onPressed: widget.onChooseNewAdventure,
             icon: const Icon(Icons.explore),
-            label: const Text('YÜRÜYÜŞÜ BIRAK, YENİ MACERA SEÇ'),
+            label: Text(context.l10n.abandonWalkUpper),
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Bırakırsan bonuslu oran biter; zafer ödülün sende kalır.',
+        Text(
+          context.l10n.abandonWalkWarning,
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white38, fontSize: 12),
+          style: const TextStyle(color: Colors.white38, fontSize: 12),
         ),
       ],
     );
@@ -1954,7 +2033,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                       vertical: 3,
                                     ),
                                     child: Text(
-                                      'Düşmanın $_pendingDamage canını aldın!',
+                                      context.l10n.damageDealt(_pendingDamage),
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -1984,7 +2063,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                               child: FadeTransition(
                                 opacity: _damageMessageOpacity,
                                 child: Text(
-                                  '-$_playerDamage CAN',
+                                  context.l10n.healthDamageUpper(_playerDamage),
                                   textAlign: TextAlign.center,
                                   style: Theme.of(
                                     context,
@@ -2009,7 +2088,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                adventure.enemy.name,
+                context.l10n.enemyName(adventure.enemy),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -2017,7 +2096,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 4),
               Text(
-                defeated ? 'Yenildi' : 'Seni bekliyor',
+                defeated ? context.l10n.defeated : context.l10n.waitingForYou,
                 style: TextStyle(
                   color: defeated ? AppColors.xp : AppColors.streak,
                   fontWeight: FontWeight.w600,
@@ -2030,22 +2109,28 @@ class _AdventureScreenState extends State<AdventureScreen>
         _buildCountdownCard(context, adventure),
         const SizedBox(height: 12),
         SectionCard(
-          title: defeated ? 'Zafer senin!' : 'Görev mesajın',
+          title:
+              defeated
+                  ? context.l10n.victoryIsYours
+                  : context.l10n.missionMessage,
           child: Text(
             defeated
-                ? '${adventure.enemy.name} yenildi. ${adventure.enemy.xpReward} XP kazandın; bu zaferi adım adım hak ettin!'
-                : adventure.enemy.questText,
+                ? context.l10n.victoryMissionMessage(
+                  context.l10n.enemyName(adventure.enemy),
+                  adventure.enemy.xpReward,
+                )
+                : context.l10n.enemyQuest(adventure.enemy),
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ),
         const SizedBox(height: 12),
         SectionCard(
-          title: 'Macera durumu',
+          title: context.l10n.adventureStatus,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               StatBar(
-                label: 'Canavar Canı',
+                label: context.l10n.monsterHealth,
                 icon: Icons.favorite,
                 color: AppColors.hp,
                 progress: adventure.enemyHealthProgress,
@@ -2053,7 +2138,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 14),
               StatBar(
-                label: 'Senin Canın',
+                label: context.l10n.yourHealth,
                 icon: Icons.shield,
                 color: AppColors.xp,
                 progress: adventure.playerHealthProgress,
@@ -2067,12 +2152,14 @@ class _AdventureScreenState extends State<AdventureScreen>
               // macera başlamadan önce atılan adımlar yüzünden hemen üstteki
               // "Canavar Canı" barıyla çelişiyordu.
               StatBar(
-                label: 'Günlük Adım',
+                label: context.l10n.dailySteps,
                 icon: Icons.calendar_today,
                 color: AppColors.primary,
                 progress: widget.today.stepProgress,
-                valueText:
-                    '${widget.today.steps} / ${widget.today.stepGoal} adım',
+                valueText: context.l10n.dailyStepProgressValue(
+                  AppFormatters.integer(context, widget.today.steps),
+                  AppFormatters.integer(context, widget.today.stepGoal),
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -2081,7 +2168,9 @@ class _AdventureScreenState extends State<AdventureScreen>
                   const SizedBox(width: 8),
                   // Esnek: dar ekranda satır taşmasın, yazı sarsın.
                   Expanded(
-                    child: Text('Zafer ödülü: ${adventure.enemy.xpReward} XP'),
+                    child: Text(
+                      context.l10n.victoryRewardXp(adventure.enemy.xpReward),
+                    ),
                   ),
                 ],
               ),
@@ -2093,7 +2182,7 @@ class _AdventureScreenState extends State<AdventureScreen>
           OutlinedButton.icon(
             onPressed: widget.onChooseNewAdventure,
             icon: const Icon(Icons.refresh),
-            label: const Text('Yeni Macera Seç'),
+            label: Text(context.l10n.chooseNewAdventure),
           ),
         ] else ...[
           const SizedBox(height: 12),
@@ -2103,7 +2192,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               key: const ValueKey('adventure-exit'),
               onPressed: widget.onChooseNewAdventure,
               icon: const Icon(Icons.logout),
-              label: const Text('Maceradan Çık'),
+              label: Text(context.l10n.leaveAdventure),
             ),
           ),
         ],
@@ -2126,7 +2215,10 @@ class _AdventureScreenState extends State<AdventureScreen>
         .toString()
         .padLeft(2, '0');
     final countdownCard = SectionCard(
-      title: 'Round ${adventure.currentRound}/${adventure.totalRounds}',
+      title: context.l10n.roundProgress(
+        adventure.currentRound,
+        adventure.totalRounds,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2169,8 +2261,20 @@ class _AdventureScreenState extends State<AdventureScreen>
                   Expanded(
                     child: Text(
                       adventure.perfectRoundStreak == 0
-                          ? 'Mükemmel seri: — · sıradaki tavan ×${adventure.nextPerfectStreakCap.toStringAsFixed(1)}'
-                          : 'MÜKEMMEL SERİ ${adventure.perfectRoundStreak} · tavan ×${adventure.perfectStreakCap.toStringAsFixed(2)}',
+                          ? context.l10n.perfectStreakNextCap(
+                            AppFormatters.decimal(
+                              context,
+                              adventure.nextPerfectStreakCap,
+                            ),
+                          )
+                          : context.l10n.perfectStreakCap(
+                            adventure.perfectRoundStreak,
+                            AppFormatters.decimal(
+                              context,
+                              adventure.perfectStreakCap,
+                              digits: 2,
+                            ),
+                          ),
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2208,7 +2312,10 @@ class _AdventureScreenState extends State<AdventureScreen>
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '$questSteps / ${adventure.stepGoal} adım — macera ilerlemesi',
+                  context.l10n.adventureProgressValue(
+                    AppFormatters.integer(context, questSteps),
+                    AppFormatters.integer(context, adventure.stepGoal),
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -2230,15 +2337,19 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
           const SizedBox(height: 5),
           Text(
-            'Bu round: $roundSteps / ${adventure.roundTargetSteps} adım',
+            context.l10n.thisRoundSteps(
+              AppFormatters.integer(context, roundSteps),
+              AppFormatters.integer(context, adventure.roundTargetSteps),
+            ),
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 8),
           Text(
-            'Bu round ${adventure.roundTargetSteps} adım · '
-            '${adventure.roundDurationLabel}. Hedefi süre dolmadan bitirirsen '
-            'mükemmel round ve erken bitirme bonusu kazanırsın. Kaçırırsan seri '
-            'sıfırlanır; ${adventure.enemy.name} eksik oranının eğrisine göre saldırır.',
+            context.l10n.roundRules(
+              AppFormatters.integer(context, adventure.roundTargetSteps),
+              context.l10n.adventureDuration(adventure.currentRoundDuration),
+              context.l10n.enemyName(adventure.enemy),
+            ),
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
@@ -2289,7 +2400,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '$_transitionRound. ROUND',
+                            context.l10n.roundNumberUpper(_transitionRound),
                             textAlign: TextAlign.center,
                             style: Theme.of(
                               context,
@@ -2307,10 +2418,12 @@ class _AdventureScreenState extends State<AdventureScreen>
                           ),
                           Text(
                             widget.adventure?.lastPerfectStreakBroken == true
-                                ? 'SERİ KIRILDI · ×1.0'
+                                ? context.l10n.streakBrokenUpper
                                 : widget.adventure?.lastRoundPerfect == true
-                                ? 'MÜKEMMEL · SERİ ${widget.adventure!.perfectRoundStreak}'
-                                : 'YENİ ROUND BAŞLADI',
+                                ? context.l10n.perfectStreakUpper(
+                                  widget.adventure!.perfectRoundStreak,
+                                )
+                                : context.l10n.newRoundStartedUpper,
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontSize: 14,
@@ -2347,16 +2460,6 @@ class _AdventureScreenState extends State<AdventureScreen>
       },
     );
   }
-}
-
-String _formatNumber(int value) {
-  final digits = value.toString();
-  final output = StringBuffer();
-  for (var index = 0; index < digits.length; index++) {
-    if (index > 0 && (digits.length - index) % 3 == 0) output.write('.');
-    output.write(digits[index]);
-  }
-  return output.toString();
 }
 
 /// Yürüyüş fazının sahnesi (Bölüm A.4).
@@ -2466,13 +2569,16 @@ class _WalkPhaseSceneState extends State<_WalkPhaseScene>
                   color: Colors.black.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   child: Text(
-                    'YÜRÜYÜŞ FAZI',
-                    key: ValueKey('walk-phase-banner'),
+                    context.l10n.walkingPhaseUpper,
+                    key: const ValueKey('walk-phase-banner'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.streak,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.6,
@@ -2508,7 +2614,7 @@ class _WalkPhaseSceneState extends State<_WalkPhaseScene>
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '+${widget.earnedCoins} EK ALTIN',
+                        context.l10n.extraGold(widget.earnedCoins),
                         key: const ValueKey('walk-phase-earned-coins'),
                         style: const TextStyle(
                           color: Colors.white,
@@ -2629,9 +2735,9 @@ class _GoalSelectorButton extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'HEDEF SEÇ',
-                      style: TextStyle(
+                    Text(
+                      context.l10n.chooseGoalUpper,
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -2640,7 +2746,9 @@ class _GoalSelectorButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${_formatNumber(goal)} adım',
+                      context.l10n.stepsLabel(
+                        AppFormatters.integer(context, goal),
+                      ),
                       style: Theme.of(
                         context,
                       ).textTheme.headlineMedium?.copyWith(
@@ -2653,9 +2761,16 @@ class _GoalSelectorButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${AttackConfig.roundCountForSteps(goal)} round • '
-                      '${GameConstants.combatRoundStepTarget} adım/round • '
-                      '${AdventureQuest.durationLabel(GameConstants.combatRoundDuration)}/round',
+                      context.l10n.roundGoalSummary(
+                        AttackConfig.roundCountForSteps(goal),
+                        AppFormatters.integer(
+                          context,
+                          GameConstants.combatRoundStepTarget,
+                        ),
+                        context.l10n.adventureDuration(
+                          GameConstants.combatRoundDuration,
+                        ),
+                      ),
                       style: const TextStyle(
                         color: AppColors.streak,
                         fontSize: 12,
@@ -2663,9 +2778,12 @@ class _GoalSelectorButton extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Değiştirmek için dokun',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    Text(
+                      context.l10n.tapToChange,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -2733,12 +2851,12 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                   IconButton(
                     onPressed: () => Navigator.pop(context, false),
                     icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Geri',
+                    tooltip: context.l10n.back,
                   ),
                   const Spacer(),
-                  const Text(
-                    'DÜŞMAN KARŞILAŞMASI',
-                    style: TextStyle(
+                  Text(
+                    context.l10n.enemyEncounterUpper,
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -2805,7 +2923,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                       ),
                     ),
                     Text(
-                      enemy.name,
+                      context.l10n.enemyName(enemy),
                       textAlign: TextAlign.center,
                       style: Theme.of(
                         context,
@@ -2825,39 +2943,57 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                       children: [
                         _EnemyInfoChip(
                           icon: Icons.directions_walk,
-                          label: '${_formatNumber(widget.selectedGoal)} adım',
+                          label: context.l10n.stepsLabel(
+                            AppFormatters.integer(context, widget.selectedGoal),
+                          ),
                           color: AppColors.primary,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.auto_awesome,
-                          label: '${_formatNumber(enemy.xpReward)} XP',
+                          label:
+                              '${AppFormatters.integer(context, enemy.xpReward)} XP',
                           color: AppColors.xp,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.favorite,
-                          label:
-                              '${_formatNumber(scaledStats.maxHealth.round())} can',
+                          label: context.l10n.healthValue(
+                            AppFormatters.integer(
+                              context,
+                              scaledStats.maxHealth.round(),
+                            ),
+                          ),
                           color: AppColors.hp,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.flash_on,
-                          label: '${scaledStats.attack.round()} saldırı',
+                          label: context.l10n.attackStat(
+                            scaledStats.attack.round(),
+                          ),
                           color: AppColors.accent,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.timer_outlined,
-                          label:
-                              '${AdventureQuest.durationLabel(AttackConfig.durationForSteps(widget.selectedGoal))} toplam',
+                          label: context.l10n.totalDuration(
+                            context.l10n.adventureDuration(
+                              AttackConfig.durationForSteps(
+                                widget.selectedGoal,
+                              ),
+                            ),
+                          ),
                           color: AppColors.streak,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.shield_moon,
-                          label: '${enemy.stats.defense.round()} savunma',
+                          label: context.l10n.defenseStat(
+                            enemy.stats.defense.round(),
+                          ),
                           color: AppColors.primary,
                         ),
                         _EnemyInfoChip(
                           icon: Icons.speed,
-                          label: enemy.archetype.label,
+                          label: context.l10n.enemyArchetypeName(
+                            enemy.archetype,
+                          ),
                           color: AppColors.streak,
                         ),
                       ],
@@ -2874,9 +3010,9 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'DÜŞMAN HAKKINDA',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.enemyAboutUpper,
+                            style: const TextStyle(
                               color: AppColors.streak,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -2885,7 +3021,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            enemy.questText,
+                            context.l10n.enemyQuest(enemy),
                             style: const TextStyle(
                               color: Colors.white70,
                               height: 1.45,
@@ -2895,7 +3031,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           // Arketip savaşta gerçekten fark yaratıyor; oyuncu
                           // neyle karşılaştığını önceden bilmeli.
                           Text(
-                            enemy.archetype.description,
+                            context.l10n.enemyArchetypeDetails(enemy.archetype),
                             style: const TextStyle(
                               color: AppColors.streak,
                               fontStyle: FontStyle.italic,
@@ -2905,12 +3041,15 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            '${AttackConfig.roundCountForSteps(widget.selectedGoal)} round; '
-                            'her round ${GameConstants.combatRoundStepTarget} adım ve '
-                            '${AdventureQuest.durationLabel(GameConstants.combatRoundDuration)}. '
-                            'Hedefe süre dolmadan ulaşırsan mükemmel round serisi '
-                            'hasarını büyütür; kaçırırsan seri kırılır ve düşman '
-                            'eksik oranının eğrisine göre saldırır.',
+                            context.l10n.enemyCombatExplanation(
+                              AttackConfig.roundCountForSteps(
+                                widget.selectedGoal,
+                              ),
+                              GameConstants.combatRoundStepTarget,
+                              context.l10n.adventureDuration(
+                                GameConstants.combatRoundDuration,
+                              ),
+                            ),
                             style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 12,
@@ -2934,7 +3073,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                       child: OutlinedButton.icon(
                         onPressed: () => Navigator.pop(context, false),
                         icon: const Icon(Icons.arrow_back),
-                        label: const Text('Geri'),
+                        label: Text(context.l10n.back),
                       ),
                     ),
                   ),
@@ -2949,7 +3088,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                           Navigator.pop(context, true);
                         },
                         icon: const Icon(Icons.explore),
-                        label: const Text('Maceraya Başla'),
+                        label: Text(context.l10n.startAdventure),
                       ),
                     ),
                   ),
@@ -3046,7 +3185,7 @@ class _EnemyChoiceCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        enemy.name,
+                        context.l10n.enemyName(enemy),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
@@ -3064,7 +3203,7 @@ class _EnemyChoiceCard extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          '${_formatNumber(enemy.xpReward)} XP',
+                          '${AppFormatters.integer(context, enemy.xpReward)} XP',
                           style: const TextStyle(
                             color: AppColors.xp,
                             fontWeight: FontWeight.w900,
@@ -3074,8 +3213,13 @@ class _EnemyChoiceCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         unlocked
-                            ? 'Bu hedef için uygun'
-                            : '${_formatNumber(enemy.minimumDailySteps)} adımda açılır',
+                            ? context.l10n.goalSuitable
+                            : context.l10n.unlocksAtSteps(
+                              AppFormatters.integer(
+                                context,
+                                enemy.minimumDailySteps,
+                              ),
+                            ),
                         style: TextStyle(
                           color: unlocked ? AppColors.xp : Colors.white60,
                           fontSize: 12,
