@@ -19,6 +19,7 @@ void main() {
 
   test('cihaz dili İngilizceyi algılar, desteklenmeyende Türkçeye düşer', () {
     expect(resolveSystemLocale(const [Locale('en', 'US')]), const Locale('en'));
+    expect(resolveSystemLocale(const [Locale('en', 'TR')]), const Locale('tr'));
     expect(resolveSystemLocale(const [Locale('de', 'DE')]), const Locale('tr'));
   });
 

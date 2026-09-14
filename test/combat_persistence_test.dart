@@ -6,6 +6,8 @@ import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
+import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -87,8 +89,14 @@ void main() {
   }
 
   Future<void> addSteps(WidgetTester tester, int amount) async {
-    await tester.ensureVisible(find.text('+$amount adım'));
-    await tester.tap(find.text('+$amount adım'));
+    final adventureScreen = find.byType(AdventureScreen);
+    if (adventureScreen.evaluate().isNotEmpty) {
+      tester.widget<AdventureScreen>(adventureScreen).onSimulateSteps!(amount);
+    } else {
+      tester
+          .widget<HomeScreen>(find.byType(HomeScreen))
+          .onSimulateSteps(amount);
+    }
     await tester.pump();
     await tester.pump();
   }
@@ -160,20 +168,13 @@ void main() {
       now = quest.nextEnemyAttackAt;
       await addSteps(tester, 1000);
 
-      expect(
-        quest.enemyHealth,
-        lessThan(quest.scaledEnemyMaxHealth),
-        reason: 'tam round düşmana hasar vermeli',
-      );
-      // Tam tamamlanan round hasar aldırmaz. (Can tavanı açılışta büyümüş
-      // olabilir; bedava iyileşme yok, bu yüzden "değişmedi" ölçülüyor.)
+      expect(quest.enemyHealth, lessThan(quest.scaledEnemyMaxHealth));
       expect(quest.playerHealth, healthBefore);
       expect(quest.lastPlayerDamage, greaterThan(0));
     });
 
     testWidgets('düşman canı bitince zafer ve XP verilir', (tester) async {
-      // 20 seviye üstü oyuncu güçlüdür; erken zafer koruması yine de iki
-      // roundluk maceranın ilk roundda bitmesine izin vermez.
+      // İki raundluk macera her 1.000 adımda ayrı savaş açar.
       final profile = UserProfile(avatar: _avatar, level: 40);
       final quest = questFor();
       await pumpShell(tester, profile: profile, adventure: quest);

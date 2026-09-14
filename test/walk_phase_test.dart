@@ -7,6 +7,8 @@ import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/coin_calculator.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
+import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -62,11 +64,6 @@ AdventureQuest _victorious({
   quest.xpAwarded = alreadyRewarded;
   return quest;
 }
-
-/// Alt gezinme çubuğundaki sekmeyi bulur. Ekran başlığı da "Macera" yazdığı
-/// için düz `find.text` iki sonuç döndürüyor.
-Finder _tab(String label) =>
-    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -374,8 +371,16 @@ void main() {
     }
 
     Future<void> addSteps(WidgetTester tester, int amount) async {
-      await tester.ensureVisible(find.text('+$amount adım'));
-      await tester.tap(find.text('+$amount adım'));
+      final adventureScreen = find.byType(AdventureScreen);
+      if (adventureScreen.evaluate().isNotEmpty) {
+        tester.widget<AdventureScreen>(adventureScreen).onSimulateSteps!(
+          amount,
+        );
+      } else {
+        tester
+            .widget<HomeScreen>(find.byType(HomeScreen))
+            .onSimulateSteps(amount);
+      }
       await tester.pump();
       await tester.pump();
     }
@@ -533,11 +538,9 @@ void main() {
         profile: UserProfile(avatar: _avatar, level: 4),
         adventure: quest,
       );
-      await tester.tap(_tab('Macera'));
-      await tester.pump();
-      await tester.pump();
-
       expect(find.byKey(const ValueKey('walk-phase-scene')), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(HomeScreen), findsNothing);
       expect(find.byKey(const ValueKey('walk-phase-banner')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('walk-phase-progress-bar')),
@@ -569,9 +572,6 @@ void main() {
         adventure: quest,
       );
       await addSteps(tester, 1000);
-      await tester.tap(_tab('Macera'));
-      await tester.pump();
-      await tester.pump();
 
       expect(quest.isAdventureCompleted, isTrue);
       expect(find.byKey(const ValueKey('walk-phase-scene')), findsNothing);

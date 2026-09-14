@@ -1,5 +1,6 @@
 import '../core/constants/attack_config.dart';
 import '../core/constants/game_constants.dart';
+import '../core/constants/timed_combat_config.dart';
 import '../core/utils/base_combat_stats.dart';
 import '../core/utils/combat_engine.dart';
 import '../core/utils/enemy_stats.dart';
@@ -68,6 +69,17 @@ class AdventureQuest {
   /// Macera ilerlemesi bu değerin üstünden hesaplanır ([questSteps]); böylece
   /// macera başlatmak için günün adımlarını sıfırlamak gerekmez.
   final int startingSteps;
+
+  /// Safety confirmation sonrası maceranın gerçekten başladığı an.
+  final DateTime adventureStartedAt;
+
+  /// Toplam adım hedefinin ilk kez tamamlandığı an. Savaş ekranını daha sonra
+  /// açmak bu damgayı ve dolayısıyla alınacak hasarı değiştirmez.
+  DateTime? stepTargetCompletedAt;
+
+  /// Accepted steps from earlier game days keep pending rounds across reset.
+  int carriedSteps;
+  int notifiedReadyRound;
 
   bool xpAwarded;
   int victoryXpReward;
@@ -175,6 +187,8 @@ class AdventureQuest {
     required this.stepGoal,
     this.backgroundAsset = defaultBackgroundAsset,
     this.startingSteps = 0,
+    this.carriedSteps = 0,
+    this.notifiedReadyRound = 0,
     this.xpAwarded = false,
     this.victoryXpReward = 0,
     this.victoryCoinReward = 0,
@@ -209,7 +223,10 @@ class AdventureQuest {
     this.victoryRounds = 0,
     int walkSteps = 0,
     DateTime? startedAt,
+    DateTime? adventureStartedAt,
+    this.stepTargetCompletedAt,
   }) : roundStartingSteps = roundStartingSteps ?? startingSteps,
+       adventureStartedAt = adventureStartedAt ?? startedAt ?? GameClock.now(),
        walkSteps = walkSteps < 0 ? 0 : walkSteps,
        currentRound = currentRound < 1 ? 1 : currentRound,
        enemyHealth = enemyHealth ?? _scaledEnemyMaxHealth(enemy, stepGoal),
@@ -308,36 +325,6 @@ class AdventureQuest {
 
   int get totalRounds => AttackConfig.roundCountForSteps(stepGoal);
 
-  /// Çok güçlü bir oyuncunun düşmanı yenebileceği ilk round.
-  int get earliestEnemyDefeatRound {
-    final rounds = totalRounds;
-    if (rounds <= 1) return 1;
-    return (rounds * GameConstants.earliestEnemyDefeatRoundRatio).ceil().clamp(
-      1,
-      rounds,
-    );
-  }
-
-  /// Erken roundlarda uygulanabilecek toplam hasarı kademeli açar.
-  ///
-  /// Bu tavan yalnızca aşırı hasarı keser. Normal bir vuruş kendi değerinde
-  /// kalır; eşik rounduna gelindiğinde stat, kritik ve ekipman hasarı yeniden
-  /// tamamen serbesttir.
-  int? get _maxPlayerDamageThisRound {
-    final defeatRound = earliestEnemyDefeatRound;
-    if (currentRound >= defeatRound) return null;
-    if (enemyHealth <= 1) return 0;
-
-    final maxHealth = scaledEnemyMaxHealth;
-    final damageAlreadyDealt = (maxHealth - enemyHealth).clamp(0, maxHealth);
-    final cumulativeDamageLimit =
-        (maxHealth * currentRound / defeatRound).floor();
-    return (cumulativeDamageLimit - damageAlreadyDealt).clamp(
-      0,
-      enemyHealth - 1,
-    );
-  }
-
   double get perfectStreakCap {
     if (perfectRoundStreak <= 0) return 1;
     final multipliers = GameConstants.perfectRoundStreakMultipliers;
@@ -355,7 +342,99 @@ class AdventureQuest {
   /// Macera başladığından beri atılan adım — düşmana verilen toplam hasar.
   /// Günlük sayaç sıfırlanmadığı için [startingSteps] farkı alınır.
   int questSteps(int currentSteps) =>
-      (currentSteps - startingSteps).clamp(0, stepGoal);
+      (currentSteps + carriedSteps - startingSteps).clamp(0, stepGoal);
+
+  bool isStepTargetCompleted(int currentSteps) =>
+      questSteps(currentSteps) >= stepGoal;
+
+  Duration get expectedCompletionDuration =>
+      TimedCombatConfig.expectedDurationForSteps(stepGoal);
+
+  Duration? get completionDuration {
+    final completedAt = stepTargetCompletedAt;
+    if (completedAt == null) return null;
+    final duration = completedAt.difference(adventureStartedAt);
+    return duration.isNegative ? Duration.zero : duration;
+  }
+
+  /// Hedefin ilk tamamlandığı anı bir kez kaydeder.
+  bool recordStepTargetCompletion(int currentSteps, DateTime now) {
+    if (battleOutcome != AdventureBattleOutcome.active ||
+        stepTargetCompletedAt != null ||
+        !isStepTargetCompleted(currentSteps)) {
+      return false;
+    }
+    stepTargetCompletedAt =
+        now.isBefore(adventureStartedAt) ? adventureStartedAt : now;
+    return true;
+  }
+
+  /// Toplam hedef tamamlandıktan sonra tek karşılaşmayı çözer. Düşman her
+  /// zaman önce saldırır; oyuncu hayatta kalırsa mevcut zafer akışına girecek
+  /// öldürücü karşı vuruşu yapar.
+  TimedCombatOutcome? resolveTimedEncounter(
+    int currentSteps,
+    DateTime now, {
+    CombatStats? playerStats,
+    List<ItemEffect> onKillEffects = const [],
+  }) {
+    if (battleOutcome != AdventureBattleOutcome.active ||
+        !isStepTargetCompleted(currentSteps)) {
+      return null;
+    }
+    recordStepTargetCompletion(currentSteps, now);
+    final actualDuration = completionDuration;
+    if (actualDuration == null) return null;
+
+    final stats = (playerStats ?? defaultPlayerStats).sanitized();
+    playerMaxHealth = stats.maxHealth.round();
+    playerHealth = playerHealth.clamp(0, playerMaxHealth);
+    if (combatSeed == 0) {
+      combatSeed = fallbackCombatSeed(enemy.id, startingSteps);
+    }
+    enemyHealthBeforeLastRound = enemyHealth;
+    final timed = resolveTimedCombat(
+      player: stats,
+      enemy: scaledEnemyStats,
+      playerHealth: playerHealth,
+      enemyHealth: enemyHealth,
+      expectedDuration: expectedCompletionDuration,
+      actualDuration: actualDuration,
+      difficultyMultiplier: TimedCombatConfig.difficultyMultiplierForSteps(
+        stepGoal,
+      ),
+      seed: combatSeed,
+      onKillEffects: onKillEffects,
+    );
+    final outcome = timed.combat;
+    combatSeed = outcome.nextSeed;
+    playerHealth = outcome.playerHealthAfter.clamp(0, playerMaxHealth);
+    enemyHealth = outcome.enemyHealthAfter;
+    lastEnemyDamage = outcome.damageTaken;
+    lastPlayerDamage = outcome.damageDealt;
+    enemyAttackSerial += 1;
+    untouchedRounds = outcome.damageTaken == 0 ? untouchedRounds + 1 : 0;
+    lastResolvedRound = totalRounds;
+    currentRound = totalRounds;
+    lastRoundWon = outcome.enemyDefeated;
+    lastRoundPerfect = false;
+    lastPerfectStreakBroken = false;
+    lastPerfectDamageMultiplier = 1;
+    perfectRoundStreak = 0;
+    roundOutcomeSerial += 1;
+    roundStartingSteps = startingSteps + stepGoal;
+    roundTargetSteps = 0;
+    nextEnemyAttackAt = now;
+    nextReminderAt = now;
+
+    if (outcome.playerDefeated) {
+      battleOutcome = AdventureBattleOutcome.defeat;
+    } else {
+      battleOutcome = AdventureBattleOutcome.victory;
+      stampVictory(questStepsAtVictory: stepGoal, round: totalRounds);
+    }
+    return timed;
+  }
 
   /// Ekranın henüz göstermediği **düşmana verilen** hasar; gösterildikten
   /// sonra ikinci kez dönmez.
@@ -384,7 +463,10 @@ class AdventureQuest {
   String get totalAttackDurationLabel => durationLabel(totalAttackDuration);
 
   int stepsThisRound(int currentSteps) =>
-      (currentSteps - roundStartingSteps).clamp(0, roundTargetSteps);
+      (currentSteps + carriedSteps - roundStartingSteps).clamp(
+        0,
+        roundTargetSteps,
+      );
 
   int roundStepsRemaining(int currentSteps) =>
       (roundTargetSteps - stepsThisRound(currentSteps)).clamp(
@@ -397,7 +479,7 @@ class AdventureQuest {
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
-  /// Round hedefi erken tamamlanırsa anında, aksi halde türetilmiş sürede çözülür.
+  /// Resolves a banked round on explicit battle confirmation; time never expires it.
   ///
   /// Hasar artık adımdan değil **statlardan** geliyor: roundun tamamlanma
   /// oranı oyuncunun vuruşunu ölçekliyor, kaçırılan oran da düşmanınkini.
@@ -434,16 +516,15 @@ class AdventureQuest {
     } else {
       perfectRoundStreak = 0;
     }
-    final roundSeconds = currentRoundDuration.inMilliseconds;
+    final roundMilliseconds = currentRoundDuration.inMilliseconds;
     final earlyFraction =
-        perfect && roundSeconds > 0
-            ? expiredAt.difference(now).inMilliseconds / roundSeconds
+        perfect && roundMilliseconds > 0
+            ? expiredAt.difference(now).inMilliseconds / roundMilliseconds
             : 0.0;
     final perfectMultiplier = perfectRoundDamageMultiplier(
       streak: perfectRoundStreak,
       earlyFraction: earlyFraction,
     );
-
     final stats = (playerStats ?? defaultPlayerStats).sanitized();
     playerMaxHealth = stats.maxHealth.round();
     if (playerHealth > playerMaxHealth) playerHealth = playerMaxHealth;
@@ -467,7 +548,6 @@ class AdventureQuest {
         completion: walked / roundTargetSteps,
         seed: combatSeed,
         playerDamageMultiplier: perfectMultiplier,
-        maxPlayerDamage: _maxPlayerDamageThisRound,
         onHitEffects: onHitEffects,
         onKillEffects: onKillEffects,
       );
@@ -568,10 +648,10 @@ class AdventureQuest {
     onKillEffects: onKillEffects,
   );
 
-  /// Süresi dolmuş **tüm** turları sırayla çözer ve toplamlarını döner.
+  /// Legacy batch API: resolves only fully banked rounds. The app does not call
   ///
-  /// Uygulama arka planda kaldığında birden fazla tur birikir; tek tur çözmek
-  /// kalanları sessizce affediyordu (triaj A1). Dolmuş tur yoksa `null`.
+  /// this from lifecycle or timers; the UI confirms one battle round at a time.
+  /// Insufficient steps leave the enemy and player unchanged.
   ///
   /// [maxCatchUpRounds] yalnızca güvenlik ağıdır: can sıfırlanınca ya da
   /// düşman yenilince döngü zaten durur.
@@ -657,6 +737,10 @@ class AdventureQuest {
     'stepGoal': stepGoal,
     'backgroundAsset': backgroundAsset,
     'startingSteps': startingSteps,
+    'adventureStartedAt': adventureStartedAt.toIso8601String(),
+    'stepTargetCompletedAt': stepTargetCompletedAt?.toIso8601String(),
+    'carriedSteps': carriedSteps,
+    'notifiedReadyRound': notifiedReadyRound,
     'xpAwarded': xpAwarded,
     'victoryXpReward': victoryXpReward,
     'victoryCoinReward': victoryCoinReward,
@@ -731,6 +815,14 @@ class AdventureQuest {
       backgroundAsset:
           json['backgroundAsset'] as String? ?? defaultBackgroundAsset,
       startingSteps: json['startingSteps'] as int? ?? 0,
+      adventureStartedAt:
+          _parseDate(json['adventureStartedAt']) ??
+          _parseDate(json['nextEnemyAttackAt'])?.subtract(
+            AttackConfig.durationForSteps(_roundTargetFor(migratedStepGoal, 1)),
+          ),
+      stepTargetCompletedAt: _parseDate(json['stepTargetCompletedAt']),
+      carriedSteps: json['carriedSteps'] as int? ?? 0,
+      notifiedReadyRound: json['notifiedReadyRound'] as int? ?? 0,
       xpAwarded: json['xpAwarded'] as bool? ?? false,
       victoryXpReward: json['victoryXpReward'] as int? ?? 0,
       victoryCoinReward: json['victoryCoinReward'] as int? ?? 0,

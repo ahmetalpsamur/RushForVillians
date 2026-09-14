@@ -1263,11 +1263,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roundCompletedEarly =>
-      'You completed the round goal before time ran out';
+      'You completed the steps required for this round';
 
   @override
   String speedRewardSummary(int rounds, String steps, String multiplier) {
-    return '$rounds rounds · $steps steps — speed reward ×$multiplier';
+    return '$rounds rounds · $steps steps — combat efficiency ×$multiplier';
   }
 
   @override
@@ -1298,7 +1298,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get enemyRoundUpper => 'ENEMY\'S ROUND!';
+  String get enemyRoundUpper => 'ENEMY ATTACKED!';
+
+  @override
+  String enemyKilledBeforeCounter(String enemy) {
+    return '$enemy killed you before you could strike back.';
+  }
 
   @override
   String get restTime => 'Time to recover';
@@ -1515,7 +1520,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enemyBloodWeaverQuest =>
-      'The Blood Weaver feeds on every hesitation. Hold your pace for 2,000 steps and tear apart its web!';
+      'The Blood Weaver waits by its web. Complete 2,000 steps at your own pace, then fight safely.';
 
   @override
   String get enemyCrimsonWingName => 'Crimson Wing';
@@ -1557,7 +1562,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enemyBlackClawQuest =>
-      'Black Claw has found your trail. Outpace the hunter for 5,000 steps and leave the darkness behind!';
+      'Black Claw will wait. Complete 5,000 steps at your own pace and fight in a safe place.';
 
   @override
   String get enemyEmberHeirName => 'Heir to the Ember Throne';
@@ -1715,11 +1720,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Don\'t look that enemy in the eyes. You\'re ruining its confidence.';
 
   @override
-  String get petAdventure2 => 'Every step lands a hit. Simple, but effective.';
+  String get petAdventure2 =>
+      'Bank your steps and start battle when you are safe.';
 
   @override
-  String get petAdventure3 =>
-      'Don\'t miss this round too—I know you better than that.';
+  String get petAdventure3 => 'Your monster can wait. Walk at your own pace.';
 
   @override
   String get petAdventureIdle1 =>
@@ -2237,7 +2242,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String enemyAttackedAfterTimeout(String enemy) {
-    return '$enemy attacked when time ran out';
+    return '$enemy attacked';
   }
 
   @override
@@ -2247,7 +2252,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String victoryCoinsTotal(String total, String base, String bonus) {
-    return '$total coins in total · base $base + speed bonus $bonus';
+    return '$total coins in total · base $base + combat efficiency bonus $bonus';
   }
 
   @override
@@ -2344,7 +2349,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String enemyAttackNotice(String enemy, int damage) {
-    return '$enemy attacked! You lost $damage HP.';
+    return '$enemy took $damage HP from you.';
   }
 
   @override
@@ -2593,7 +2598,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String effectNightWalk(String stat, String value) {
-    return 'during night walks, $stat $value';
+    return 'in battles at night, $stat $value';
   }
 
   @override

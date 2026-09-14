@@ -7,6 +7,7 @@ import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/core/utils/item_leveling.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -160,6 +161,11 @@ void main() {
     return profile;
   }
 
+  Future<void> simulateSteps(WidgetTester tester, int amount) async {
+    tester.widget<HomeScreen>(find.byType(HomeScreen)).onSimulateSteps(amount);
+    await tester.pumpAndSettle();
+  }
+
   /// Envanter listesindeki bir item'ın kartını açar.
   Future<void> openItem(WidgetTester tester, Item item) async {
     await tester.tap(find.text(shown(item)).first);
@@ -303,8 +309,7 @@ void main() {
       // Aynı adım sayısı, tek fark kuşanma.
       final withoutBuff = makeProfile(coins: 0, owned: [boostItem.id]);
       await pumpInventory(tester, profile: withoutBuff, openInventory: false);
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
       final plainCoins = withoutBuff.coins;
 
       final withBuff = makeProfile(
@@ -313,8 +318,7 @@ void main() {
         equipped: {boostItem.category.folder: boostItem.id},
       );
       await pumpInventory(tester, profile: withBuff, openInventory: false);
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       // 5.000 adım = 100 coin; +%50 bonusla 150.
       expect(plainCoins, 100);
@@ -339,8 +343,7 @@ void main() {
       // Envanter itilen bir rota; ana ekrana dönmek için geri gitmek gerek.
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       expect(profile.coins, 100);
     });

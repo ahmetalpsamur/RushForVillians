@@ -1985,13 +1985,13 @@ abstract class AppLocalizations {
   /// No description provided for @roundCompletedEarly.
   ///
   /// In tr, this message translates to:
-  /// **'Round hedefini süresi dolmadan tamamladın'**
+  /// **'Round için gereken adımları tamamladın'**
   String get roundCompletedEarly;
 
   /// No description provided for @speedRewardSummary.
   ///
   /// In tr, this message translates to:
-  /// **'{rounds} round · {steps} adım — hız ödülü ×{multiplier}'**
+  /// **'{rounds} round · {steps} adım — savaş verimi ×{multiplier}'**
   String speedRewardSummary(int rounds, String steps, String multiplier);
 
   /// No description provided for @walkPhaseRemainingNotice.
@@ -2039,8 +2039,14 @@ abstract class AppLocalizations {
   /// No description provided for @enemyRoundUpper.
   ///
   /// In tr, this message translates to:
-  /// **'ROUND CANAVARIN!'**
+  /// **'DÜŞMAN SALDIRDI!'**
   String get enemyRoundUpper;
+
+  /// No description provided for @enemyKilledBeforeCounter.
+  ///
+  /// In tr, this message translates to:
+  /// **'{enemy}, sen vuramadan seni öldürdü.'**
+  String enemyKilledBeforeCounter(String enemy);
 
   /// No description provided for @restTime.
   ///
@@ -2243,7 +2249,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveAdventure.
   ///
   /// In tr, this message translates to:
-  /// **'Maceradan Çık'**
+  /// **'Maceradan Ayrıl'**
   String get leaveAdventure;
 
   /// No description provided for @roundProgress.
@@ -2381,7 +2387,7 @@ abstract class AppLocalizations {
   /// No description provided for @enemyBloodWeaverQuest.
   ///
   /// In tr, this message translates to:
-  /// **'Kan Dokuyan her tereddüdünden güç alıyor. 2.000 adım boyunca temponu koru ve ağını boz!'**
+  /// **'Kan Dokuyan ağının başında bekliyor. 2.000 adımı kendi temponda tamamla, sonra güvenle savaş.'**
   String get enemyBloodWeaverQuest;
 
   /// No description provided for @enemyCrimsonWingName.
@@ -2453,7 +2459,7 @@ abstract class AppLocalizations {
   /// No description provided for @enemyBlackClawQuest.
   ///
   /// In tr, this message translates to:
-  /// **'Kara Pençe izini buldu. 5.000 adım boyunca avcıdan hızlı ol ve karanlığı geride bırak!'**
+  /// **'Kara Pençe seni bekliyor. 5.000 adımı kendi temponda tamamla ve güvenli bir yerde savaş.'**
   String get enemyBlackClawQuest;
 
   /// No description provided for @enemyEmberHeirName.
@@ -2729,13 +2735,13 @@ abstract class AppLocalizations {
   /// No description provided for @petAdventure2.
   ///
   /// In tr, this message translates to:
-  /// **'Yürüdükçe vuruyorsun. Basit ama işe yarıyor.'**
+  /// **'Adımlarını biriktir, güvenli olduğunda savaşa başla.'**
   String get petAdventure2;
 
   /// No description provided for @petAdventure3.
   ///
   /// In tr, this message translates to:
-  /// **'Bir daha kaçırma şu roundu, seni tanıyorum.'**
+  /// **'Canavar bekleyebilir. Kendi temponda yürü.'**
   String get petAdventure3;
 
   /// No description provided for @petAdventureIdle1.
@@ -3605,7 +3611,7 @@ abstract class AppLocalizations {
   /// No description provided for @enemyAttackedAfterTimeout.
   ///
   /// In tr, this message translates to:
-  /// **'{enemy}, süre dolunca saldırdı'**
+  /// **'{enemy} saldırdı'**
   String enemyAttackedAfterTimeout(String enemy);
 
   /// No description provided for @enemyAttackingCycle.
@@ -3617,7 +3623,7 @@ abstract class AppLocalizations {
   /// No description provided for @victoryCoinsTotal.
   ///
   /// In tr, this message translates to:
-  /// **'toplam +{total} altın · taban {base} + hız bonusu {bonus}'**
+  /// **'toplam +{total} altın · taban {base} + savaş verimi bonusu {bonus}'**
   String victoryCoinsTotal(String total, String base, String bonus);
 
   /// No description provided for @damageDealt.
@@ -3742,7 +3748,7 @@ abstract class AppLocalizations {
   /// No description provided for @enemyAttackNotice.
   ///
   /// In tr, this message translates to:
-  /// **'{enemy} saldırdı! {damage} can kaybettin.'**
+  /// **'{enemy} senin {damage} canını aldı.'**
   String enemyAttackNotice(String enemy, int damage);
 
   /// No description provided for @perfectRoundNotice.
@@ -4108,7 +4114,7 @@ abstract class AppLocalizations {
   /// No description provided for @effectNightWalk.
   ///
   /// In tr, this message translates to:
-  /// **'gece yürüyüşlerinde {stat} {value}'**
+  /// **'gece yapılan savaşlarda {stat} {value}'**
   String effectNightWalk(String stat, String value);
 
   /// No description provided for @effectStreakActive.

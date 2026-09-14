@@ -250,13 +250,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _StepSourceCard(
-            usingRealPedometer: usingRealPedometer,
-            useManualSource: useManualSource,
-            onUseManualSourceChanged: onUseManualSourceChanged,
-            onSimulateSteps: onSimulateSteps,
-          ),
         ],
       ),
     );
@@ -314,79 +307,6 @@ class _StepPermissionCard extends StatelessWidget {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Aktif adım kaynağını gösterir ve demo kontrollerini barındırır.
-///
-/// Gerçek sensör aktifken demo butonları kilitlidir; nedenini söyleyerek
-/// kilitlenir. Debug derlemelerinde kaynak anahtarla değiştirilebilir —
-/// emülatörde adım üretebilmek şart.
-class _StepSourceCard extends StatelessWidget {
-  final bool usingRealPedometer;
-  final bool useManualSource;
-  final ValueChanged<bool>? onUseManualSourceChanged;
-  final ValueChanged<int> onSimulateSteps;
-
-  const _StepSourceCard({
-    required this.usingRealPedometer,
-    required this.useManualSource,
-    required this.onUseManualSourceChanged,
-    required this.onSimulateSteps,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onChanged = onUseManualSourceChanged;
-    return SectionCard(
-      title: context.l10n.stepSource,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                usingRealPedometer
-                    ? Icons.directions_walk
-                    : Icons.touch_app_outlined,
-                size: 18,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  usingRealPedometer
-                      ? context.l10n.realPedometer
-                      : context.l10n.manualStepSource,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-              if (onChanged != null)
-                Switch(value: useManualSource, onChanged: onChanged),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            usingRealPedometer
-                ? context.l10n.realPedometerDescription
-                : context.l10n.manualStepSourceDescription,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final amount in const [1000, 5000, 20000])
-                _StepButton(
-                  amount: amount,
-                  enabled: !usingRealPedometer,
-                  onSimulateSteps: onSimulateSteps,
-                ),
-            ],
-          ),
         ],
       ),
     );
@@ -628,26 +548,6 @@ class _StreakCardState extends State<_StreakCard> {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  final int amount;
-  final bool enabled;
-  final ValueChanged<int> onSimulateSteps;
-
-  const _StepButton({
-    required this.amount,
-    required this.onSimulateSteps,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: enabled ? () => onSimulateSteps(amount) : null,
-      child: Text(context.l10n.simulateSteps(amount)),
     );
   }
 }

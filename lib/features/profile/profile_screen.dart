@@ -21,6 +21,8 @@ import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
 import '../inventory/inventory_screen.dart';
 import 'step_history_screen.dart';
+import '../safety/safety_screen.dart';
+import '../../core/constants/safety_messages.dart';
 
 /// Oyuncu profili: seviye, XP, adım geçmişi ve genel istatistikler.
 class ProfileScreen extends StatelessWidget {
@@ -117,7 +119,24 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.profile)),
+      appBar: AppBar(
+        title: Text(context.l10n.profile),
+        actions: [
+          CompactLanguageSelector(
+            value: localePreference,
+            onChanged: onLocalePreferenceChanged,
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.shield_outlined),
+            tooltip: SafetyMessages.of(context).pageTitle,
+            onPressed:
+                () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const SafetyScreen()),
+                ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -185,11 +204,6 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          LanguageSelectorCard(
-            value: localePreference,
-            onChanged: onLocalePreferenceChanged,
           ),
           const SizedBox(height: 12),
           SectionCard(

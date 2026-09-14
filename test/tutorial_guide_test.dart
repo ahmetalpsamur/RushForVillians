@@ -207,6 +207,12 @@ void main() {
 
     await tester.tap(find.byKey(TutorialGuideTargetKeys.enemy));
     await tester.pump(const Duration(milliseconds: 650));
+    await tester.tap(
+      find.byKey(const ValueKey('walking-safety-acknowledgement')),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Güvendeyim, Maceraya Başla'));
+    await tester.pump(const Duration(milliseconds: 650));
     expect(find.textContaining('senin yerine ben yürürüm'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('tutorial-primary-action')));

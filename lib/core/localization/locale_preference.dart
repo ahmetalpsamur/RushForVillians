@@ -37,7 +37,13 @@ abstract final class LocalePreferenceStorage {
 }
 
 Locale resolveSystemLocale(List<Locale>? deviceLocales) {
-  for (final locale in deviceLocales ?? const <Locale>[]) {
+  final locales = deviceLocales ?? const <Locale>[];
+  // Region wins during first/system launch: an English-language phone whose
+  // region is Türkiye should still open Rush for Villains in Turkish.
+  if (locales.any((locale) => locale.countryCode?.toUpperCase() == 'TR')) {
+    return const Locale('tr');
+  }
+  for (final locale in locales) {
     if (locale.languageCode == 'tr') return const Locale('tr');
     if (locale.languageCode == 'en') return const Locale('en');
   }

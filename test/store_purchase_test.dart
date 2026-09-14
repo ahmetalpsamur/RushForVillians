@@ -190,13 +190,8 @@ void main() {
 
   /// Demo kontrolüyle adım üretir (manuel kaynak hız kontrolünden muaf).
   Future<void> simulateSteps(WidgetTester tester, int amount) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byType(HomeScreen),
-        matching: find.text('+$amount adım'),
-      ),
-    );
-    await tester.pump();
+    tester.widget<HomeScreen>(find.byType(HomeScreen)).onSimulateSteps(amount);
+    await tester.pumpAndSettle();
   }
 
   group('ekipman satın alma', () {

@@ -47,8 +47,42 @@ class AdventureNotificationService {
     try {
       await _notifications.initialize(settings);
       _initialized = true;
+      await cancelAdventureReminders();
     } catch (_) {
       _initialized = false;
+    }
+  }
+
+  /// One event per ready round. No new permissions or background tracking.
+  static Future<void> notifyReady(
+    AdventureNotificationCopy copy,
+    String body, {
+    required bool foreground,
+  }) async {
+    try {
+      if (foreground) {
+        await HapticFeedback.mediumImpact();
+        await SystemSound.play(SystemSoundType.alert);
+      } else if (_initialized) {
+        await _notifications.show(
+          _firstNotificationId,
+          'Rush for Villains',
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'adventure_ready',
+              copy.channelName,
+              channelDescription: copy.channelDescription,
+              importance: Importance.defaultImportance,
+              priority: Priority.defaultPriority,
+            ),
+            iOS: const DarwinNotificationDetails(),
+          ),
+          payload: 'adventure',
+        );
+      }
+    } catch (_) {
+      // Denied notifications or unavailable audio never block progression.
     }
   }
 

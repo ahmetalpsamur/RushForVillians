@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 21;
+  static const int schemaVersion = 23;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -296,6 +296,19 @@ class GameStorage {
     // kalıcı hâle geldi (Bölüm B). Eksik alanlar sıfır/false/×1 güvenli
     // varsayılanlarına düştüğü için eski kaydın içeriğini değiştirmek gerekmez.
     20: (state) => state,
+    // v21 -> v22: pending walking progress survives game-day resets.
+    21: (state) {
+      final adventure = state['adventure'];
+      if (adventure is Map<String, dynamic>) {
+        adventure['carriedSteps'] = 0;
+        adventure['notifiedReadyRound'] = 0;
+      }
+      return state;
+    },
+    // v22 -> v23: macera başlangıcı ve toplam hedefin tamamlanma anı eklendi.
+    // Eski kayıtta başlangıç modelin güvenli geri dönüşüyle türetilir; hedef
+    // damgası ilk uygun adım raporunda kaydedilir.
+    22: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

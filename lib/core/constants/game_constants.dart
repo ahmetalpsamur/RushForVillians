@@ -41,7 +41,6 @@ class GameConstants {
   /// Yüksek seviye ve ekipman hasarı erken zaferi hâlâ mümkün kılar, ancak
   /// canavarı maceranın ilk birkaç vuruşunda silip yürüyüşün büyük bölümünü
   /// atlamaya dönüştüremez.
-  static const double earliestEnemyDefeatRoundRatio = 0.60;
 
   /// Oyuncunun başlangıç / taban canı (HP).
   static const int baseHp = 5000;

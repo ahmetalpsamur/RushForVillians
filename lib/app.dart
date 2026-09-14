@@ -8,6 +8,8 @@ import 'core/theme/app_theme.dart';
 import 'features/character/character_creation_screen.dart';
 import 'features/root/root_shell.dart';
 import 'features/start/start_screen.dart';
+import 'features/safety/safety_screen.dart';
+import 'services/safety_notice_storage.dart';
 import 'features/tutorial/guide_selection_screen.dart';
 import 'models/avatar_profile.dart';
 import 'models/game_state.dart';
@@ -35,6 +37,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
   TutorialGuideVariant? _selectedGuide;
   LocalePreference _localePreference = LocalePreference.system;
   bool _isLoading = true;
+  bool _safetyAccepted = false;
 
   /// Kayıt okunamadıysa `true`. Bu durumda kayıt **silinmez**; kullanıcı
   /// varsayılanla oynar ve bir sonraki açılışta okuma yeniden denenir.
@@ -94,6 +97,8 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       _storageFailed = true;
     }
     await notificationInitialization;
+    final safetyAccepted =
+        _storageFailed ? false : await SafetyNoticeStorage.isAccepted();
 
     final elapsed = DateTime.now().difference(startedAt);
     if (elapsed < _minimumStartScreenDuration) {
@@ -106,6 +111,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       _gameState = gameState;
       _selectedGuide = selectedGuide;
       _isLoading = false;
+      _safetyAccepted = safetyAccepted;
     });
     _showStorageWarningIfNeeded();
   }
@@ -177,6 +183,10 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       home:
           _isLoading
               ? const StartScreen()
+              : !_safetyAccepted
+              ? SafetyScreen(
+                onAccepted: () => setState(() => _safetyAccepted = true),
+              )
               : _avatar == null && _selectedGuide == null
               ? GuideSelectionScreen(onSelected: _saveGuide)
               : _avatar == null

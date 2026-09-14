@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../constants/game_constants.dart';
+import '../constants/timed_combat_config.dart';
 import '../../models/combat_stats.dart';
 import '../../models/item_effect.dart';
 
@@ -58,6 +59,148 @@ const double luckToVarianceShift = 0.0125;
 
 /// Hasar tavanı uygulanmayan bir vuruşun en düşük değeri.
 const int minimumDamage = 1;
+
+class TimedCombatBreakdown {
+  final Duration expectedDuration;
+  final Duration actualDuration;
+  final double completionRatio;
+  final double enemyBaseDamage;
+  final double timeMultiplier;
+  final double difficultyMultiplier;
+  final double varianceAmount;
+  final int finalEnemyDamage;
+
+  const TimedCombatBreakdown({
+    required this.expectedDuration,
+    required this.actualDuration,
+    required this.completionRatio,
+    required this.enemyBaseDamage,
+    required this.timeMultiplier,
+    required this.difficultyMultiplier,
+    required this.varianceAmount,
+    required this.finalEnemyDamage,
+  });
+}
+
+class TimedCombatOutcome {
+  final CombatRoundOutcome combat;
+  final TimedCombatBreakdown breakdown;
+
+  const TimedCombatOutcome({required this.combat, required this.breakdown});
+}
+
+/// Resolves the target encounter. The enemy always acts first. If the player
+/// survives, their existing attack/death presentation receives a lethal hit.
+/// Waiting after [actualDuration] was recorded cannot affect this result.
+TimedCombatOutcome resolveTimedCombat({
+  required CombatStats player,
+  required CombatStats enemy,
+  required int playerHealth,
+  required int enemyHealth,
+  required Duration expectedDuration,
+  required Duration actualDuration,
+  required double difficultyMultiplier,
+  required int seed,
+  List<ItemEffect> onKillEffects = const [],
+}) {
+  final safePlayer = player.sanitized();
+  final safeEnemy = enemy.sanitized();
+  final expectedMicros = max(1, expectedDuration.inMicroseconds);
+  final actualMicros = max(0, actualDuration.inMicroseconds);
+  final ratio = actualMicros / expectedMicros;
+  final timeMultiplier = TimedCombatConfig.timeMultiplier(ratio);
+  var currentSeed = seed <= 0 ? 1 : seed;
+  double roll() {
+    final value = Random(currentSeed).nextDouble();
+    currentSeed = nextCombatSeed(currentSeed);
+    return value;
+  }
+
+  final dodge = roll() < safePlayer.effectiveDodge;
+  final varianceAmount = (roll() * 2 - 1) * TimedCombatConfig.variance;
+  final rawDamage =
+      safeEnemy.attack *
+      difficultyMultiplier.clamp(0.1, 10.0) *
+      timeMultiplier *
+      (1 + varianceAmount);
+  final reducedDamage = safePlayer.damageAfterDefense(rawDamage).round();
+  final enemyDamage = dodge
+      ? 0
+      : reducedDamage.clamp(minimumDamage, 1 << 30);
+  final playerAfterEnemy = max(0, playerHealth - enemyDamage);
+  final blows = <CombatBlow>[
+    CombatBlow(
+      attacker: Combatant.enemy,
+      damage: enemyDamage,
+      critical: false,
+      dodged: dodge,
+      healed: 0,
+      lethal: playerAfterEnemy <= 0,
+    ),
+  ];
+
+  var playerAfterCombat = playerAfterEnemy;
+  var enemyAfterCombat = enemyHealth;
+  var playerDamage = 0;
+  var killHeal = 0;
+  if (playerAfterEnemy > 0) {
+    playerDamage = max(0, enemyHealth);
+    enemyAfterCombat = 0;
+    var healed = (playerDamage * safePlayer.lifeSteal).round();
+    final missingBeforeKillEffects =
+        safePlayer.maxHealth.round() - playerAfterCombat;
+    for (final effect in onKillEffects) {
+      if (effect.stat != ItemStat.lifeSteal &&
+          effect.stat != ItemStat.maxHealth) {
+        continue;
+      }
+      killHeal += effect.mode == ItemEffectMode.flat
+          ? effect.value.round()
+          : (missingBeforeKillEffects * effect.value).round();
+    }
+    healed += killHeal;
+    playerAfterCombat = min(
+      safePlayer.maxHealth.round(),
+      playerAfterCombat + max(0, healed),
+    );
+    blows.add(
+      CombatBlow(
+        attacker: Combatant.player,
+        damage: playerDamage,
+        critical: false,
+        dodged: false,
+        healed: max(0, healed),
+        lethal: true,
+      ),
+    );
+  }
+
+  final combat = CombatRoundOutcome(
+    blows: List.unmodifiable(blows),
+    killHeal: killHeal,
+    playerHealthAfter: playerAfterCombat,
+    enemyHealthAfter: enemyAfterCombat,
+    damageDealt: playerDamage,
+    damageTaken: enemyDamage,
+    enemyDefeated: enemyAfterCombat <= 0,
+    playerDefeated: playerAfterCombat <= 0,
+    firstMover: Combatant.enemy,
+    nextSeed: currentSeed,
+  );
+  return TimedCombatOutcome(
+    combat: combat,
+    breakdown: TimedCombatBreakdown(
+      expectedDuration: expectedDuration,
+      actualDuration: actualDuration,
+      completionRatio: ratio,
+      enemyBaseDamage: safeEnemy.attack,
+      timeMultiplier: timeMultiplier,
+      difficultyMultiplier: difficultyMultiplier,
+      varianceAmount: varianceAmount,
+      finalEnemyDamage: enemyDamage,
+    ),
+  );
+}
 
 /// Round tamamlama oranını düşman hasar ölçeğine çevirir.
 ///

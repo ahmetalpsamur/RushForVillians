@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -71,8 +72,7 @@ void main() {
 
   /// Demo kontrolüyle adım üretir (manuel kaynak hız kontrolünden muaf).
   Future<void> addSteps(WidgetTester tester, int amount) async {
-    await tester.ensureVisible(find.text('+$amount adım'));
-    await tester.tap(find.text('+$amount adım'));
+    tester.widget<HomeScreen>(find.byType(HomeScreen)).onSimulateSteps(amount);
     await tester.pump();
   }
 

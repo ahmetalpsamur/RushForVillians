@@ -54,6 +54,8 @@ import '../../services/reward_engine.dart';
 import '../../services/step_permission_service.dart';
 import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
+import '../safety/safety_screen.dart';
+import '../../core/constants/safety_messages.dart';
 import '../character/character_creation_screen.dart';
 import '../home/home_screen.dart';
 import '../inventory/blacksmith_screen.dart';
@@ -151,7 +153,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   Timer? _adventureClock;
   bool _isForeground = true;
-  final Random _random = Random();
   final ValueNotifier<TutorialGuideStep> _tutorialStep = ValueNotifier(
     TutorialGuideStep.welcome,
   );
@@ -160,6 +161,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   OverlayEntry? _rewardNoticeEntry;
   Timer? _rewardNoticeTimer;
   bool _disposing = false;
+  bool _safetyDialogOpen = false;
 
   bool get _tutorialActive =>
       widget.startTutorial && !_profile.hasCompletedTutorial;
@@ -568,13 +570,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     if (!_today.isSameDayAs(now)) {
       _archiveDailySteps(_today);
-      _today = DailyProgress(date: now);
-      // Aktif/zaferle bitmiş günlük macera yenilenir. Otoriter yenilgi ise
-      // Hayat Yürüyüşü tamamlanana ve oyuncu yeniden doğuşu görene kadar
-      // korunur; gün değişimi bu gereksinimi atlatamaz.
-      if (_adventure?.isPlayerDefeated != true) {
-        _adventure = null;
-      }
+      // Keep banked steps and enemies even if the player waits for another day.
+      _adventure?.carriedSteps += _today.steps;
+      _today = DailyProgress(
+        date: now,
+        stepGoal: _adventure?.stepGoal ?? GameConstants.dragonStepGoal,
+      );
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       changed = true;
     }
@@ -1027,6 +1028,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// - [UserProfile.totalSteps] **kredilenen** adım; para, seri ve macera
   ///   buna bakar. 1b'deki çift-sayma koruması değişmeden çalışmaya devam eder.
   void _onStepsReported(int cumulativeSteps) {
+    if (_refreshDayCycle()) setState(() {});
     final now = GameClock.now();
     final elapsed = now.difference(_profile.lastStepReportAt ?? now);
     final reported = cumulativeSteps - _profile.lastReportedStepCount;
@@ -1145,8 +1147,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       final adventure = _adventure;
       if (adventure != null && !adventure.isBattleCompleted) {
         final wasActive = !adventure.isBattleCompleted;
-        // Adımlar savaş yoğunluğunu belirler; round geçişini yalnız deadline
-        // yapar. Süre dolmadıysa bu çağrı state değiştirmeden null döner.
         roundResult = adventure.resolveRound(
           _today.steps,
           now,
@@ -1242,6 +1242,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       }
     }
     if (roundResult case final result?) {
+      if (result.playerDamage > 0) {
+        _showEnemyAttackNotice(_adventure!, result.playerDamage);
+      }
       _showPerfectRoundFeedback(result);
     }
     if (revivalCompleted) {
@@ -1252,7 +1255,24 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (roundResult != null) _persist();
   }
 
-  void _selectAdventure(AdventureQuest adventure) {
+  Future<void> _selectAdventure(AdventureQuest selected) async {
+    if (_safetyDialogOpen) return;
+    _safetyDialogOpen = true;
+    bool accepted;
+    try {
+      accepted = await showSafetyReminder(context);
+    } finally {
+      _safetyDialogOpen = false;
+    }
+    if (!mounted || !accepted) return;
+    _refreshDayCycle();
+    final adventure = AdventureQuest(
+      enemy: selected.enemy,
+      stepGoal: selected.stepGoal,
+      backgroundAsset: selected.backgroundAsset,
+      startingSteps: _today.steps,
+      startedAt: GameClock.now(),
+    );
     final current = _adventure;
     if (current?.isPlayerDefeated == true && !current!.revivalCompleted) {
       _showStoreNotice(context.l10n.revivalRequiredNotice);
@@ -1294,8 +1314,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     unawaited(AdventureNotificationService.requestPermission());
   }
 
-  void _startRevival() {
+  Future<void> _startRevival() async {
+    if (_safetyDialogOpen) return;
     final adventure = _adventure;
+    _safetyDialogOpen = true;
+    bool accepted;
+    try {
+      accepted = await showSafetyReminder(context);
+    } finally {
+      _safetyDialogOpen = false;
+    }
+    if (!mounted || !accepted || !identical(adventure, _adventure)) return;
     if (adventure == null || !adventure.startRevival()) return;
     setState(() {});
     _persist();
@@ -1312,6 +1341,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
     setState(() {
       _adventure = null;
+      _tabIndex = 1;
       // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
       // varsayılana döner. Günlük kazanç sayaçları aynı gerekçeyle taşınır.
       _today = DailyProgress(
@@ -1332,7 +1362,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (adventure == null || adventure.isBattleCompleted) return;
 
     final now = GameClock.now();
-    // Biriken turların hepsi çözülür; arka planda geçen süre affedilmez.
     CombatRoundResult? result;
     setState(() {
       result = adventure.resolveExpiredRounds(
@@ -1349,13 +1378,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         !adventure.isBattleCompleted &&
         adventure.takeDueReminder(now);
 
-    final resolvedResult = result;
-    if (resolvedResult != null) _persist();
-
-    if (resolvedResult != null && resolvedResult.playerDamage > 0) {
-      _showEnemyAttackNotice(adventure, resolvedResult.playerDamage);
+    final resolved = result;
+    if (resolved != null) _persist();
+    if (resolved != null && resolved.playerDamage > 0) {
+      _showEnemyAttackNotice(adventure, resolved.playerDamage);
     }
-    if (resolvedResult != null) _showPerfectRoundFeedback(resolvedResult);
+    if (resolved != null) _showPerfectRoundFeedback(resolved);
     if (adventure.isBattleCompleted) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
     }
@@ -1549,8 +1577,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   }
 
   void _showAdventureReminder(AdventureQuest adventure) {
-    final message =
-        _notificationCopy(adventure).reminderBodies[_random.nextInt(4)];
+    final message = SafetyMessages.of(context).ready;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -2301,6 +2328,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onStartRevival: _startRevival,
         onChooseNewAdventure: _chooseNewAdventure,
         onAdventureUpdated: _persist,
+        onSimulateSteps: kDebugMode ? _simulateSteps : null,
+        usingRealPedometer: _stepSource.isPhysical,
+        useManualSource: _useManualSource,
+        onUseManualSourceChanged: kDebugMode ? _setManualSource : null,
         tutorialMode:
             _tutorialActive &&
             _tutorialStep.value == TutorialGuideStep.enemyChoice,
@@ -2356,6 +2387,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // alt bardaki sekmeleri de aydınlatıyor.
     final showPet =
         !_tutorialActive && (_profile.petCompanionEnabled || _showPetDismissal);
+    // Aktif macera hangi sekmede kalındığından bağımsız olarak ekranı kilitler.
+    // Bu özellikle uygulama altın toplama fazında yeniden açıldığında önemlidir:
+    // `_tabIndex` bellekte 0'dan başlasa da kullanıcı Ana Sayfa'ya düşmemeli.
+    final fullscreenAdventure = _adventure != null;
+    final visibleTabIndex = fullscreenAdventure ? 1 : _tabIndex;
 
     return Stack(
       fit: StackFit.expand,
@@ -2364,10 +2400,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           body: Stack(
             fit: StackFit.expand,
             children: [
-              tabs[_tabIndex],
+              tabs[visibleTabIndex],
               // Kapatılırken katman death GIF'i tamamlanana kadar tutulur.
               // Kayıttan kapalı gelirse doğrudan kurulmaz.
-              if (showPet)
+              if (showPet && !fullscreenAdventure)
                 PetCompanionOverlay(
                   situation: _petSituation,
                   guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
@@ -2376,32 +2412,35 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                 ),
             ],
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _tabIndex,
-            onDestinationSelected: _selectTab,
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home),
-                label: context.l10n.home,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.explore),
-                label: context.l10n.adventure,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.storefront),
-                label: context.l10n.store,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.sports_bar),
-                label: context.l10n.tavernTitle,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.person),
-                label: context.l10n.profile,
-              ),
-            ],
-          ),
+          bottomNavigationBar:
+              fullscreenAdventure
+                  ? null
+                  : NavigationBar(
+                    selectedIndex: _tabIndex,
+                    onDestinationSelected: _selectTab,
+                    destinations: [
+                      NavigationDestination(
+                        icon: const Icon(Icons.home),
+                        label: context.l10n.home,
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.explore),
+                        label: context.l10n.adventure,
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.storefront),
+                        label: context.l10n.store,
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.sports_bar),
+                        label: context.l10n.tavernTitle,
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.person),
+                        label: context.l10n.profile,
+                      ),
+                    ],
+                  ),
         ),
         if (_tutorialActive) _tutorialOverlay(),
       ],

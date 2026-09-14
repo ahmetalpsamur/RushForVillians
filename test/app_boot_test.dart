@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/app.dart';
+import 'package:rush_for_villains/features/safety/safety_screen.dart';
+import 'package:rush_for_villains/services/safety_notice_storage.dart';
+import 'package:rush_for_villains/core/constants/safety_messages.dart';
 import 'package:rush_for_villains/features/start/start_screen.dart';
 import 'package:rush_for_villains/features/tutorial/guide_selection_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,7 +44,7 @@ void main() {
       await bootApp(tester);
 
       expect(find.byType(StartScreen), findsNothing);
-      expect(find.byType(GuideSelectionScreen), findsOneWidget);
+      expect(find.byType(SafetyScreen), findsOneWidget);
     });
 
     testWidgets('kayıt okunamazsa kullanıcı sessizce geçiştirilmez', (
@@ -62,10 +65,27 @@ void main() {
       await bootApp(tester);
       await tester.pump();
 
-      expect(find.byType(GuideSelectionScreen), findsOneWidget);
+      expect(find.byType(SafetyScreen), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
     });
 
+    testWidgets('second launch skips the accepted full notice', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        SafetyNoticeStorage.key: SafetyMessages.noticeVersion,
+      });
+      await bootApp(tester);
+      expect(find.byType(SafetyScreen), findsNothing);
+      expect(find.byType(GuideSelectionScreen), findsOneWidget);
+    });
+
+    testWidgets('notice version update gates launch again', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        SafetyNoticeStorage.key: SafetyMessages.noticeVersion - 1,
+      });
+      await bootApp(tester);
+      expect(find.byType(SafetyScreen), findsOneWidget);
+      expect(find.byType(GuideSelectionScreen), findsNothing);
+    });
     testWidgets('açılış görseli hemen kaybolmaz', (tester) async {
       SharedPreferences.setMockInitialValues({});
 

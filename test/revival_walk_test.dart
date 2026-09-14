@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
-import 'package:rush_for_villains/features/home/home_screen.dart';
+import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -60,7 +60,14 @@ void main() {
     expect(find.byKey(const ValueKey('start-revival-walk')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('start-revival-walk')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(adventure.revivalStarted, isFalse);
+    await tester.tap(
+      find.byKey(const ValueKey('walking-safety-acknowledgement')),
+    );
     await tester.pump();
+    await tester.tap(find.text('Güvendeyim, Maceraya Başla'));
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Hayat Yürüyüşü'), findsOneWidget);
     expect(find.text('0 / 500 adım'), findsOneWidget);
     expect(find.text('Macera Seçimine Dön'), findsNothing);
@@ -97,15 +104,13 @@ void main() {
     );
     await tester.pump();
 
-    final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
-    home.onSimulateSteps(500);
+    final adventureScreen = tester.widget<AdventureScreen>(
+      find.byType(AdventureScreen),
+    );
+    adventureScreen.onSimulateSteps!(500);
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Bugün adımlarından 0 XP kazandın.'), findsOneWidget);
-
-    await tester.tap(find.text('Macera').last);
-    await tester.pump();
     expect(find.text('Yeniden doğdun!'), findsOneWidget);
     expect(find.textContaining('Bu yürüyüş XP vermedi'), findsOneWidget);
 

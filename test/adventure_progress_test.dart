@@ -54,6 +54,7 @@ void main() {
     bool resolveFirstRound = false,
     int perfectRoundStreak = 0,
     VoidCallback? onChooseNewAdventure,
+    ValueChanged<int>? onSimulateSteps,
     AdventureQuest? adventure,
   }) async {
     tester.view.physicalSize = size;
@@ -101,6 +102,9 @@ void main() {
             onStartRevival: () {},
             onChooseNewAdventure: onChooseNewAdventure ?? () {},
             onAdventureUpdated: () {},
+            onSimulateSteps: onSimulateSteps,
+            usingRealPedometer: false,
+            useManualSource: true,
           ),
         ),
       ),
@@ -133,7 +137,10 @@ void main() {
     ) async {
       await pumpAdventure(tester, stepGoal: 2000, steps: 500);
 
-      expect(find.text('500 / 2000 adım — macera ilerlemesi'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('adventure-progress-text')),
+        findsOneWidget,
+      );
       expect(mainBarValue(tester), closeTo(0.25, 0.001));
     });
 
@@ -146,7 +153,10 @@ void main() {
         startingSteps: 3000,
       );
 
-      expect(find.text('500 / 2000 adım — macera ilerlemesi'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('adventure-progress-text')),
+        findsOneWidget,
+      );
       expect(mainBarValue(tester), closeTo(0.25, 0.001));
     });
 
@@ -156,7 +166,10 @@ void main() {
       await pumpAdventure(tester, stepGoal: 2000, steps: 1000);
 
       expect(mainBarValue(tester), closeTo(0.5, 0.001));
-      expect(find.text('1000 / 2000 adım — macera ilerlemesi'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('adventure-progress-text')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('macera bitince bar dolu', (tester) async {
@@ -165,7 +178,7 @@ void main() {
     });
   });
 
-  group('round ilerlemesi ikincil olarak duruyor', () {
+  group('tek hedef ilerlemesi', () {
     testWidgets('oyuncu vurunca düşen can miktarı animasyonda görünür', (
       tester,
     ) async {
@@ -193,7 +206,9 @@ void main() {
       expect(find.text('-10 CAN'), findsOneWidget);
     });
 
-    testWidgets('mükemmel round serisi ve tavanı görünür', (tester) async {
+    testWidgets('raund geri sayımı ve mükemmel seri bilgisi görünür', (
+      tester,
+    ) async {
       await pumpAdventure(
         tester,
         stepGoal: 2000,
@@ -201,50 +216,93 @@ void main() {
         perfectRoundStreak: 2,
       );
 
-      expect(find.text('MÜKEMMEL SERİ 2 · tavan ×1.01'), findsOneWidget);
-      expect(
-        find.textContaining('Bu round 1000 adım · 15 dakika'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('round-countdown')), findsOneWidget);
+      expect(find.textContaining('MÜKEMMEL SERİ'), findsNothing);
     });
 
-    testWidgets('round adımı yazıyla gösteriliyor', (tester) async {
+    testWidgets('düşman saldırısından sonra kayıp ve kalan can net görünür', (
+      tester,
+    ) async {
+      final quest =
+          AdventureQuest(enemy: enemy, stepGoal: 500)
+            ..playerHealth = 77
+            ..playerMaxHealth = 100
+            ..lastEnemyDamage = 23
+            ..enemyAttackSerial = 1
+            ..lastResolvedRound = 1
+            ..lastRoundWon = true
+            ..roundOutcomeSerial = 1;
+
+      await pumpAdventure(tester, stepGoal: 500, steps: 500, adventure: quest);
+
+      expect(find.textContaining('senin 23 canını aldı'), findsOneWidget);
+      expect(find.text('77 / 100 CAN'), findsOneWidget);
+    });
+
+    testWidgets('ölümcül saldırı karşı vuruştan önce öldürdüğünü söyler', (
+      tester,
+    ) async {
+      final quest = AdventureQuest(
+        enemy: enemy,
+        stepGoal: 500,
+        playerHealth: 0,
+        battleOutcome: AdventureBattleOutcome.defeat,
+        lastEnemyDamage: 100,
+        enemyAttackSerial: 1,
+        lastResolvedRound: 1,
+        lastRoundWon: false,
+        roundOutcomeSerial: 1,
+      );
+
+      await pumpAdventure(tester, stepGoal: 500, steps: 500, adventure: quest);
+
+      // Saldırı GIF süresi gerçek dosyadan asenkron okunur. Yavaş disklerde
+      // overlay ilk ısınma turundan sonra hazır olabildiği için kısa bir pay
+      // bırakıp animasyonun ilk karesini çizdir.
+      if (find
+          .textContaining('sen vuramadan seni öldürdü')
+          .evaluate()
+          .isEmpty) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 420)),
+        );
+        await tester.pump();
+      }
+
+      expect(find.textContaining('sen vuramadan seni öldürdü'), findsOneWidget);
+      expect(find.text('0 / 100 CAN'), findsOneWidget);
+    });
+
+    testWidgets('raund adımı yazıyla gösteriliyor', (tester) async {
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(find.text('Bu round: 200 / 1000 adım'), findsOneWidget);
+      expect(find.byKey(const ValueKey('round-progress-text')), findsOneWidget);
     });
 
-    testWidgets('round çubuğu ana çubuktan ince', (tester) async {
+    testWidgets('raund ve toplam hedef çubukları gösteriliyor', (tester) async {
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      final main = tester.widget<LinearProgressIndicator>(
-        find.byKey(const ValueKey('quest-progress-bar')),
-      );
-      final round = tester.widget<LinearProgressIndicator>(
-        find.byKey(const ValueKey('round-progress-bar')),
-      );
-      expect(round.minHeight!, lessThan(main.minHeight!));
+      expect(find.byKey(const ValueKey('quest-progress-bar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('round-progress-bar')), findsOneWidget);
     });
 
-    testWidgets('round çubuğu round içi ilerlemeyi gösterir', (tester) async {
-      // İkinci roundda 200 / 1000 adım → %20.
+    testWidgets('raund çubuğu ve toplam hedef ayrı ilerler', (tester) async {
       await pumpAdventure(
         tester,
         stepGoal: 2000,
         steps: 1200,
         roundStartingSteps: 1000,
       );
-      expect(barValue(tester, 'round-progress-bar'), closeTo(0.2, 0.001));
-      // Ana bar aynı anda %60'ta: round sıfırlansa da macera ilerlemesi durmaz.
       expect(mainBarValue(tester), closeTo(0.6, 0.001));
+      expect(barValue(tester, 'round-progress-bar'), closeTo(0.2, 0.001));
     });
   });
 
@@ -261,9 +319,12 @@ void main() {
 
       // Eski hata: etiket "Adım İlerlemesi" idi ve `3500 / 2000` yazıyordu —
       // hem hedefi aşan bir sayı hem de macera ilerlemesiyle çelişen bir değer.
-      expect(find.text('Günlük Adım'), findsOneWidget);
-      expect(find.text('3500 / 2000 adım'), findsOneWidget);
+      expect(find.text('Günlük Adım'), findsNothing);
       expect(find.text('Adım İlerlemesi'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('adventure-progress-text')),
+        findsOneWidget,
+      );
     });
   });
 
@@ -286,6 +347,52 @@ void main() {
     expect(exited, isTrue);
   });
 
+  group('tam ekran macera HUD yerleşimi', () {
+    for (final size in const [Size(320, 640), Size(390, 844)]) {
+      testWidgets('${size.width.toInt()}x${size.height.toInt()} taşma yapmaz', (
+        tester,
+      ) async {
+        await pumpAdventure(tester, stepGoal: 2000, steps: 500, size: size);
+
+        expect(
+          find.byKey(const ValueKey('active-adventure-hud')),
+          findsOneWidget,
+        );
+        expect(find.byType(AppBar), findsNothing);
+        expect(find.byKey(const ValueKey('player-health-hud')), findsOneWidget);
+        expect(find.byKey(const ValueKey('enemy-health-hud')), findsOneWidget);
+        expect(find.byKey(const ValueKey('round-countdown')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('round-progress-bar')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Bu round 1.000 adım'), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  testWidgets('geçici admin paneli aktif macera kilidinden adım ekler', (
+    tester,
+  ) async {
+    var simulatedSteps = 0;
+    await pumpAdventure(
+      tester,
+      stepGoal: 2000,
+      steps: 0,
+      size: const Size(390, 844),
+      onSimulateSteps: (amount) => simulatedSteps += amount,
+    );
+
+    expect(find.byKey(const ValueKey('admin-steps-1000')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('adventure-admin-panel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('admin-steps-1000')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('admin-steps-1000')));
+    await tester.pump();
+    expect(simulatedSteps, 1000);
+  });
+
   group('hasar mesajı savaş sahnesini örtmez', () {
     // Bulunan hata (Bölüm 6): "Düşmanın N canını aldın" mesajı `titleLarge`
     // ile ve satır sınırı olmadan çiziliyordu. 320 dp'de sahne genişliği
@@ -301,7 +408,7 @@ void main() {
           stepGoal: 2000,
           steps: 1342,
           startingSteps: 0,
-          size: Size(width, 1500),
+          size: Size(width, 844),
           resolveFirstRound: true,
         );
 
@@ -364,7 +471,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('+47 ALTIN'), findsOneWidget);
+      expect(find.text('+47 altın'), findsOneWidget);
       expect(find.text('+180 XP'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('victory-scattered-coin')),
@@ -476,7 +583,7 @@ void main() {
           stepGoal: 2000,
           steps: 1342,
           startingSteps: 0,
-          size: Size(width, 1500),
+          size: Size(width, 844),
         );
         await expectLater(
           find.byType(AdventureScreen),
@@ -517,12 +624,9 @@ void main() {
     }
 
     Future<void> simulateSteps(WidgetTester tester, int amount) async {
-      await tester.tap(
-        find.descendant(
-          of: find.byType(HomeScreen),
-          matching: find.text('+$amount adım'),
-        ),
-      );
+      tester
+          .widget<HomeScreen>(find.byType(HomeScreen))
+          .onSimulateSteps(amount);
       await tester.pump();
     }
 
@@ -572,7 +676,13 @@ void main() {
           startedAt: GameClock.now(),
         ),
       );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(
+        find.byKey(const ValueKey('walking-safety-acknowledgement')),
+      );
       await tester.pump();
+      await tester.tap(find.text('Güvendeyim, Maceraya Başla'));
+      await tester.pump(const Duration(milliseconds: 300));
     }
 
     testWidgets('macera seçmek kazanılan coin sayacını korur', (tester) async {
@@ -603,6 +713,16 @@ void main() {
 
       final before = await savedToday(tester);
       final coinsBefore = await savedCoins(tester);
+
+      // Aktif macera tek işe odaklanan tam ekran moddadır; normal sekmeler
+      // maceradan çıkılana kadar görünmez.
+      expect(find.byType(NavigationBar), findsNothing);
+      final adventureScreen = tester.widget<AdventureScreen>(
+        find.byType(AdventureScreen),
+      );
+      adventureScreen.onChooseNewAdventure();
+      await tester.pump();
+      expect(find.byType(NavigationBar), findsOneWidget);
 
       await tester.tap(find.text('Ana Sayfa').last);
       await tester.pumpAndSettle();

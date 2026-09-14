@@ -34,7 +34,12 @@ class AdventureScreen extends StatefulWidget {
   final VoidCallback onStartRevival;
   final VoidCallback onChooseNewAdventure;
   final VoidCallback onAdventureUpdated;
+  final ValueChanged<int>? onSimulateSteps;
+  final bool usingRealPedometer;
+  final bool useManualSource;
+  final ValueChanged<bool>? onUseManualSourceChanged;
   final bool tutorialMode;
+  final VoidCallback? onStartBattle;
 
   const AdventureScreen({
     super.key,
@@ -46,7 +51,12 @@ class AdventureScreen extends StatefulWidget {
     required this.onStartRevival,
     required this.onChooseNewAdventure,
     required this.onAdventureUpdated,
+    this.onSimulateSteps,
+    this.usingRealPedometer = true,
+    this.useManualSource = false,
+    this.onUseManualSourceChanged,
     this.tutorialMode = false,
+    this.onStartBattle,
   });
 
   @override
@@ -276,6 +286,14 @@ class _AdventureScreenState extends State<AdventureScreen>
 
   Future<void> _playRoundVictory(AdventureQuest adventure) async {
     if (widget.adventure != adventure) return;
+    if (adventure.enemyAttackSerial > 0) {
+      await _playEnemyOpeningAttack(adventure);
+      if (!mounted ||
+          widget.adventure != adventure ||
+          adventure.playerHealth <= 0) {
+        return;
+      }
+    }
     _enemyAnimationTimer?.cancel();
     _roundAttackController.stop();
     final classes = await CharacterCatalog.load();
@@ -484,7 +502,7 @@ class _AdventureScreenState extends State<AdventureScreen>
     } on TickerCanceled {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await Future<void>.delayed(const Duration(milliseconds: 2400));
     if (!mounted) return;
 
     setState(() {
@@ -495,6 +513,46 @@ class _AdventureScreenState extends State<AdventureScreen>
     if (adventure.playerHealth > 0) {
       await _playRoundTransition(adventure.currentRound);
     }
+  }
+
+  Future<void> _playEnemyOpeningAttack(AdventureQuest adventure) async {
+    final attacks = adventure.enemy.attackAssets;
+    if (attacks.isEmpty) return;
+    _enemyAnimationTimer?.cancel();
+    _roundAttackController.stop();
+    final candidates =
+        attacks.length > 1
+            ? attacks
+                .where((asset) => asset != _lastRoundEnemyAttackAsset)
+                .toList()
+            : attacks;
+    final attackAsset = candidates[Random().nextInt(candidates.length)];
+    _lastRoundEnemyAttackAsset = attackAsset;
+    final duration = await GifTiming.cycle(attackAsset);
+    if (!mounted || widget.adventure != adventure) return;
+    _roundAttackController.duration = duration;
+    setState(() {
+      _showRoundVictory = false;
+      _showEnemyRoundVictory = true;
+      _victoryRound = adventure.lastResolvedRound;
+      _enemyVictoryCycle = 1;
+      _roundEnemyAttackAsset = attackAsset;
+      _pendingDamage = 0;
+      _playerDamage = adventure.lastEnemyDamage;
+      _showHurt = false;
+      _showAttack = false;
+    });
+    try {
+      await _roundAttackController.forward(from: 0).orCancel;
+      await Future<void>.delayed(const Duration(milliseconds: 2400));
+    } on TickerCanceled {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _showEnemyRoundVictory = false;
+      _playerDamage = 0;
+    });
   }
 
   void _markRoundOutcomePresented(AdventureQuest adventure) {
@@ -784,6 +842,7 @@ class _AdventureScreenState extends State<AdventureScreen>
   @override
   Widget build(BuildContext context) {
     final adventure = widget.adventure;
+    final fullscreenAdventure = adventure != null;
     final content =
         adventure == null
             ? _buildSelection(context)
@@ -799,8 +858,15 @@ class _AdventureScreenState extends State<AdventureScreen>
             ? _buildCongratulations(context, adventure)
             : _buildAdventure(context, adventure);
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.adventure)),
-      floatingActionButton: ScrollToTopButton(controller: _scrollController),
+      backgroundColor: fullscreenAdventure ? Colors.black : null,
+      appBar:
+          fullscreenAdventure
+              ? null
+              : AppBar(title: Text(context.l10n.adventure)),
+      floatingActionButton:
+          fullscreenAdventure
+              ? null
+              : ScrollToTopButton(controller: _scrollController),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: Stack(
         children: [
@@ -1198,7 +1264,7 @@ class _AdventureScreenState extends State<AdventureScreen>
             children: [
               const Spacer(),
               Text(
-                context.l10n.roundNumberUpper(_victoryRound),
+                context.l10n.enemyName(adventure.enemy).toUpperCase(),
                 style: const TextStyle(
                   color: AppColors.hp,
                   fontSize: 15,
@@ -1218,21 +1284,31 @@ class _AdventureScreenState extends State<AdventureScreen>
               ),
               const SizedBox(height: 14),
               Text(
-                context.l10n.enemyAttackedAfterTimeout(
-                  context.l10n.enemyName(adventure.enemy),
-                ),
+                adventure.playerHealth <= 0
+                    ? context.l10n.enemyKilledBeforeCounter(
+                      context.l10n.enemyName(adventure.enemy),
+                    )
+                    : context.l10n.enemyAttackNotice(
+                      context.l10n.enemyName(adventure.enemy),
+                      adventure.lastEnemyDamage,
+                    ),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white60),
+                style: TextStyle(
+                  color:
+                      adventure.playerHealth <= 0 ? AppColors.hp : Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Row(
                 children: [
-                  const Icon(Icons.favorite, color: AppColors.hp, size: 18),
+                  const Icon(Icons.favorite, color: AppColors.hp, size: 24),
                   const SizedBox(width: 8),
                   Expanded(
                     child: LinearProgressIndicator(
                       value: healthProgress.clamp(0, 1),
-                      minHeight: 9,
+                      minHeight: 14,
                       borderRadius: BorderRadius.circular(99),
                       color: AppColors.hp,
                       backgroundColor: AppColors.hp.withValues(alpha: 0.18),
@@ -1242,14 +1318,13 @@ class _AdventureScreenState extends State<AdventureScreen>
                   Text(
                     context.l10n
                         .healthValue(
-                          AppFormatters.integer(
-                            context,
-                            adventure.playerHealth,
-                          ),
+                          '${AppFormatters.integer(context, adventure.playerHealth)} / '
+                          '${AppFormatters.integer(context, adventure.playerMaxHealth)}',
                         )
                         .toUpperCase(),
                     style: const TextStyle(
                       color: AppColors.hp,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1909,7 +1984,619 @@ class _AdventureScreenState extends State<AdventureScreen>
     );
   }
 
+  Widget _buildActiveAdventureHud(
+    BuildContext context,
+    AdventureQuest adventure,
+  ) {
+    final remaining = adventure.countdownRemaining(GameClock.now());
+    final roundSteps = adventure.stepsThisRound(widget.today.steps);
+    final questSteps = adventure.questSteps(widget.today.steps);
+    final minutes = remaining.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final playerPercent = (adventure.playerHealthProgress * 100).round();
+    final enemyPercent = (adventure.enemyHealthProgress * 100).round();
+
+    return Stack(
+      key: const ValueKey('active-adventure-hud'),
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          adventure.backgroundAsset,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.none,
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, 0.18, 0.52, 0.76, 1],
+              colors: [
+                Color(0xF20A0813),
+                Color(0xB8121020),
+                Color(0x3317132B),
+                Color(0xB8121020),
+                Color(0xFA08070F),
+              ],
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0, -0.05),
+              radius: 0.82,
+              colors: [
+                Colors.transparent,
+                const Color(0xFF08070F).withValues(alpha: 0.72),
+              ],
+            ),
+          ),
+        ),
+        SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 650;
+              final horizontalPadding =
+                  constraints.maxWidth < 360 ? 14.0 : 20.0;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  compact ? 8 : 14,
+                  horizontalPadding,
+                  compact ? 12 : 20,
+                ),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: compact ? 74 : 92,
+                      child: Stack(
+                        alignment: Alignment.topCenter,
+                        children: [
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: IconButton(
+                              key: const ValueKey('adventure-close'),
+                              onPressed: widget.onChooseNewAdventure,
+                              tooltip: context.l10n.leaveAdventure,
+                              style: IconButton.styleFrom(
+                                foregroundColor: Colors.white70,
+                                backgroundColor: Colors.black38,
+                              ),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ),
+                          if (widget.onSimulateSteps != null)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              child: IconButton(
+                                key: const ValueKey('adventure-admin-panel'),
+                                onPressed: _showAdventureAdminPanel,
+                                tooltip: context.l10n.stepSource,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  backgroundColor: Colors.black38,
+                                ),
+                                icon: const Icon(Icons.admin_panel_settings),
+                              ),
+                            ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                context.l10n
+                                    .roundProgress(
+                                      adventure.currentRound,
+                                      adventure.totalRounds,
+                                    )
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: compact ? 14 : 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2.2,
+                                  shadows: const [
+                                    Shadow(color: Colors.black, blurRadius: 8),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: compact ? 2 : 5),
+                              Text(
+                                '$minutes:$seconds',
+                                key: const ValueKey('round-countdown'),
+                                style: TextStyle(
+                                  color: AppColors.streak,
+                                  fontSize: compact ? 38 : 48,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                  fontFeatures: const [
+                                    ui.FontFeature.tabularFigures(),
+                                  ],
+                                  shadows: const [
+                                    Shadow(color: Colors.black, blurRadius: 10),
+                                    Shadow(
+                                      color: AppColors.streak,
+                                      blurRadius: 22,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, stage) {
+                          final spriteWidth = (stage.maxWidth * 0.58).clamp(
+                            150.0,
+                            300.0,
+                          );
+                          final spriteHeight = (stage.maxHeight * 0.82).clamp(
+                            150.0,
+                            390.0,
+                          );
+                          final healthBottom = (spriteHeight - 42).clamp(
+                            94.0,
+                            stage.maxHeight - 66,
+                          );
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned(
+                                left: 0,
+                                bottom: healthBottom,
+                                width: (stage.maxWidth - 18) / 2,
+                                child: _buildHudHealthBar(
+                                  key: const ValueKey('player-health-hud'),
+                                  progressKey: const ValueKey(
+                                    'player-health-progress',
+                                  ),
+                                  label: widget.avatar.name.toUpperCase(),
+                                  value: adventure.playerHealthProgress,
+                                  valueText:
+                                      '${adventure.playerHealth} / ${adventure.playerMaxHealth}  ·  $playerPercent%',
+                                  color: AppColors.xp,
+                                  alignment: CrossAxisAlignment.start,
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: healthBottom,
+                                width: (stage.maxWidth - 18) / 2,
+                                child: _buildHudHealthBar(
+                                  key: const ValueKey('enemy-health-hud'),
+                                  progressKey: const ValueKey(
+                                    'enemy-health-progress',
+                                  ),
+                                  label:
+                                      context.l10n
+                                          .enemyName(adventure.enemy)
+                                          .toUpperCase(),
+                                  value: adventure.enemyHealthProgress,
+                                  valueText:
+                                      '${adventure.remainingEnemyHealth} / ${adventure.scaledEnemyMaxHealth}  ·  $enemyPercent%',
+                                  color: AppColors.hp,
+                                  alignment: CrossAxisAlignment.end,
+                                ),
+                              ),
+                              Positioned(
+                                left: -spriteWidth * 0.12,
+                                bottom: -spriteHeight * 0.08,
+                                width: spriteWidth,
+                                height: spriteHeight,
+                                child: PixelSprite(
+                                  asset: widget.avatar.characterAsset,
+                                  scale: 3.5,
+                                ),
+                              ),
+                              Positioned(
+                                right: -spriteWidth * 0.08,
+                                bottom: -spriteHeight * 0.08,
+                                width: spriteWidth,
+                                height: spriteHeight,
+                                child: PixelSprite(
+                                  asset:
+                                      _showDeath
+                                          ? adventure.enemy.deathAsset
+                                          : _showAttack
+                                          ? adventure.enemy.attackAsset
+                                          : _showHurt
+                                          ? adventure.enemy.hurtAsset
+                                          : adventure.enemy.walkAsset,
+                                  scale: 3.5,
+                                  offset: const Offset(-8, 0),
+                                  imageKey: ValueKey(
+                                    _showDeath
+                                        ? 'death'
+                                        : _showAttack
+                                        ? 'attack-${widget.roundSerial}'
+                                        : _showHurt
+                                        ? 'hurt'
+                                        : 'walk',
+                                  ),
+                                ),
+                              ),
+                              if (_pendingDamage > 0)
+                                Positioned(
+                                  left: stage.maxWidth * 0.28,
+                                  right: stage.maxWidth * 0.28,
+                                  top: compact ? 58 : 72,
+                                  child: FadeTransition(
+                                    opacity: _damageMessageOpacity,
+                                    child: _buildHudDamageLabel(
+                                      context.l10n.damageDealt(_pendingDamage),
+                                      AppColors.streak,
+                                    ),
+                                  ),
+                                ),
+                              if (_playerDamage > 0)
+                                Positioned(
+                                  left: 0,
+                                  width: (stage.maxWidth - 18) / 2,
+                                  top: compact ? 58 : 72,
+                                  child: FadeTransition(
+                                    opacity: _damageMessageOpacity,
+                                    child: _buildHudDamageLabel(
+                                      context.l10n.healthDamageUpper(
+                                        _playerDamage,
+                                      ),
+                                      AppColors.hp,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.fromLTRB(
+                        compact ? 14 : 18,
+                        compact ? 12 : 16,
+                        compact ? 14 : 18,
+                        compact ? 12 : 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xE6151224),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.34),
+                        ),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black54, blurRadius: 24),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.directions_walk,
+                                color: AppColors.streak,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  context.l10n
+                                      .thisRoundSteps(
+                                        AppFormatters.integer(
+                                          context,
+                                          roundSteps,
+                                        ),
+                                        AppFormatters.integer(
+                                          context,
+                                          adventure.roundTargetSteps,
+                                        ),
+                                      )
+                                      .toUpperCase(),
+                                  key: const ValueKey('round-progress-text'),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: compact ? 16 : 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 9),
+                          LinearProgressIndicator(
+                            key: const ValueKey('round-progress-bar'),
+                            value:
+                                adventure.roundTargetSteps == 0
+                                    ? 1
+                                    : (roundSteps / adventure.roundTargetSteps)
+                                        .clamp(0, 1),
+                            minHeight: compact ? 10 : 13,
+                            borderRadius: BorderRadius.circular(20),
+                            color: AppColors.streak,
+                            backgroundColor: Colors.white12,
+                          ),
+                          SizedBox(height: compact ? 8 : 11),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  context.l10n.adventureProgressValue(
+                                    AppFormatters.integer(context, questSteps),
+                                    AppFormatters.integer(
+                                      context,
+                                      adventure.stepGoal,
+                                    ),
+                                  ),
+                                  key: const ValueKey(
+                                    'adventure-progress-text',
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          LinearProgressIndicator(
+                            key: const ValueKey('quest-progress-bar'),
+                            value:
+                                adventure.stepGoal == 0
+                                    ? 1
+                                    : (questSteps / adventure.stepGoal).clamp(
+                                      0,
+                                      1,
+                                    ),
+                            minHeight: 3,
+                            borderRadius: BorderRadius.circular(3),
+                            color: AppColors.primary,
+                            backgroundColor: Colors.white10,
+                          ),
+                          SizedBox(height: compact ? 7 : 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: compact ? 34 : 40,
+                            child: OutlinedButton.icon(
+                              key: const ValueKey('adventure-exit'),
+                              onPressed: widget.onChooseNewAdventure,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white70,
+                                side: BorderSide(
+                                  color: AppColors.hp.withValues(alpha: 0.55),
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                              icon: const Icon(Icons.logout, size: 17),
+                              label: Text(
+                                context.l10n.leaveAdventure,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showAdventureAdminPanel() async {
+    final simulateSteps = widget.onSimulateSteps;
+    if (simulateSteps == null) return;
+    var useManualSource = widget.useManualSource;
+    var usingRealPedometer = widget.usingRealPedometer;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              top: false,
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF171323),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.65),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.admin_panel_settings,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            context.l10n.stepSource,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        if (widget.onUseManualSourceChanged != null)
+                          Switch(
+                            value: useManualSource,
+                            onChanged: (value) {
+                              setSheetState(() {
+                                useManualSource = value;
+                                usingRealPedometer = !value;
+                              });
+                              widget.onUseManualSourceChanged!(value);
+                            },
+                          ),
+                      ],
+                    ),
+                    Text(
+                      usingRealPedometer
+                          ? context.l10n.realPedometerDescription
+                          : context.l10n.manualStepSourceDescription,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        for (final amount in const [1000, 5000, 20000]) ...[
+                          if (amount != 1000) const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              key: ValueKey('admin-steps-$amount'),
+                              onPressed:
+                                  usingRealPedometer
+                                      ? null
+                                      : () {
+                                        Navigator.of(sheetContext).pop();
+                                        simulateSteps(amount);
+                                      },
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(context.l10n.simulateSteps(amount)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildHudHealthBar({
+    required Key key,
+    required Key progressKey,
+    required String label,
+    required double value,
+    required String valueText,
+    required Color color,
+    required CrossAxisAlignment alignment,
+  }) {
+    return DecoratedBox(
+      key: key,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        child: Column(
+          crossAxisAlignment: alignment,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.6,
+                shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+              ),
+            ),
+            const SizedBox(height: 5),
+            LinearProgressIndicator(
+              key: progressKey,
+              value: value.clamp(0, 1),
+              minHeight: 9,
+              borderRadius: BorderRadius.circular(10),
+              color: color,
+              backgroundColor: Colors.white12,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              valueText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHudDamageLabel(String text, Color color) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdventure(BuildContext context, AdventureQuest adventure) {
+    if (!adventure.isWalkPhaseActive) {
+      return _buildActiveAdventureHud(context, adventure);
+    }
     // Yürüyüş fazı savaş ekranını paylaşmaz (Bölüm A.4): düşman sahneden
     // çıkar, oyuncu yürür, kart bonuslu oranı gösterir. İki fazın görsel
     // olarak karışmaması şartın kendisi.
@@ -2203,8 +2890,6 @@ class _AdventureScreenState extends State<AdventureScreen>
   Widget _buildCountdownCard(BuildContext context, AdventureQuest adventure) {
     final remaining = adventure.countdownRemaining(GameClock.now());
     final roundSteps = adventure.stepsThisRound(widget.today.steps);
-    // Macera başladığından beri atılan adım. `today.steps` kullanılamaz:
-    // macera başlamadan önce atılmış adımları da içerir (bkz. `startingSteps`).
     final questSteps = adventure.questSteps(widget.today.steps);
     final minutes = remaining.inMinutes
         .remainder(60)
@@ -2224,6 +2909,7 @@ class _AdventureScreenState extends State<AdventureScreen>
         children: [
           Text(
             '$minutes:$seconds',
+            key: const ValueKey('round-countdown'),
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
               color: AppColors.streak,
               fontWeight: FontWeight.w900,
@@ -2232,14 +2918,6 @@ class _AdventureScreenState extends State<AdventureScreen>
           const SizedBox(height: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 420),
-            transitionBuilder:
-                (child, animation) => ScaleTransition(
-                  scale: CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutBack,
-                  ),
-                  child: FadeTransition(opacity: animation, child: child),
-                ),
             child: Container(
               key: ValueKey(adventure.perfectRoundStreak),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -2322,8 +3000,6 @@ class _AdventureScreenState extends State<AdventureScreen>
             ],
           ),
           const SizedBox(height: 12),
-          // İKİNCİL: round içi ilerleme. Bilgi kaybolmuyor ama ana gösterge
-          // değil — ince çizgi ve küçük yazı.
           LinearProgressIndicator(
             key: const ValueKey('round-progress-bar'),
             value:
@@ -2341,6 +3017,7 @@ class _AdventureScreenState extends State<AdventureScreen>
               AppFormatters.integer(context, roundSteps),
               AppFormatters.integer(context, adventure.roundTargetSteps),
             ),
+            key: const ValueKey('round-progress-text'),
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 8),

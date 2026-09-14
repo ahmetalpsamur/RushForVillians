@@ -22,24 +22,41 @@ class StatBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            // Etiket esner ve gerekirse kısalır; sayı hiçbir zaman kırpılmaz.
-            // Eskiden ikisi de sabit genişlikteydi ve `Spacer` aradaki boşluğu
-            // doldurmaya çalıştığı için dar ekranda satır taşıyordu.
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(valueText, style: Theme.of(context).textTheme.labelMedium),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final style = Theme.of(context).textTheme.labelMedium;
+            final value = Text(
+              valueText,
+              textAlign: TextAlign.end,
+              style: style,
+            );
+            final painter = TextPainter(
+              text: TextSpan(text: valueText, style: style),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            final needsWrap = painter.width > constraints.maxWidth - 30;
+            painter.dispose();
+            return Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 6),
+                // Etiket esner; uzun sayılar dar ekranda kırpılmadan alt satıra geçer.
+                // Eskiden ikisi de sabit genişlikteydi ve `Spacer` aradaki boşluğu
+                // doldurmaya çalıştığı için dar ekranda satır taşıyordu.
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (needsWrap) Flexible(flex: 2, child: value) else value,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 4),
         ClipRRect(

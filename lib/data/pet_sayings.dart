@@ -77,8 +77,8 @@ abstract final class PetSayings {
 
   static const List<String> _adventure = [
     'Şu düşmanın gözlerine bakma, cesareti kırılıyor.',
-    'Yürüdükçe vuruyorsun. Basit ama işe yarıyor.',
-    'Bir daha kaçırma şu roundu, seni tanıyorum.',
+    'Adımlarını biriktir, güvenli olduğunda savaşa başla.',
+    'Canavar bekleyebilir. Kendi temponda yürü.',
   ];
 
   static const List<String> _adventureIdle = [

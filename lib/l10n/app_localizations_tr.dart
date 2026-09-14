@@ -1163,11 +1163,11 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get roundCompletedEarly => 'Round hedefini süresi dolmadan tamamladın';
+  String get roundCompletedEarly => 'Round için gereken adımları tamamladın';
 
   @override
   String speedRewardSummary(int rounds, String steps, String multiplier) {
-    return '$rounds round · $steps adım — hız ödülü ×$multiplier';
+    return '$rounds round · $steps adım — savaş verimi ×$multiplier';
   }
 
   @override
@@ -1198,7 +1198,12 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get enemyRoundUpper => 'ROUND CANAVARIN!';
+  String get enemyRoundUpper => 'DÜŞMAN SALDIRDI!';
+
+  @override
+  String enemyKilledBeforeCounter(String enemy) {
+    return '$enemy, sen vuramadan seni öldürdü.';
+  }
 
   @override
   String get restTime => 'Dinlenme zamanı';
@@ -1327,7 +1332,7 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get leaveAdventure => 'Maceradan Çık';
+  String get leaveAdventure => 'Maceradan Ayrıl';
 
   @override
   String roundProgress(int current, int total) {
@@ -1415,7 +1420,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get enemyBloodWeaverQuest =>
-      'Kan Dokuyan her tereddüdünden güç alıyor. 2.000 adım boyunca temponu koru ve ağını boz!';
+      'Kan Dokuyan ağının başında bekliyor. 2.000 adımı kendi temponda tamamla, sonra güvenle savaş.';
 
   @override
   String get enemyCrimsonWingName => 'Kızıl Kanat';
@@ -1457,7 +1462,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get enemyBlackClawQuest =>
-      'Kara Pençe izini buldu. 5.000 adım boyunca avcıdan hızlı ol ve karanlığı geride bırak!';
+      'Kara Pençe seni bekliyor. 5.000 adımı kendi temponda tamamla ve güvenli bir yerde savaş.';
 
   @override
   String get enemyEmberHeirName => 'Alev Tahtının Varisi';
@@ -1614,10 +1619,11 @@ class AppLocalizationsTr extends AppLocalizations {
       'Şu düşmanın gözlerine bakma, cesareti kırılıyor.';
 
   @override
-  String get petAdventure2 => 'Yürüdükçe vuruyorsun. Basit ama işe yarıyor.';
+  String get petAdventure2 =>
+      'Adımlarını biriktir, güvenli olduğunda savaşa başla.';
 
   @override
-  String get petAdventure3 => 'Bir daha kaçırma şu roundu, seni tanıyorum.';
+  String get petAdventure3 => 'Canavar bekleyebilir. Kendi temponda yürü.';
 
   @override
   String get petAdventureIdle1 =>
@@ -2133,7 +2139,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String enemyAttackedAfterTimeout(String enemy) {
-    return '$enemy, süre dolunca saldırdı';
+    return '$enemy saldırdı';
   }
 
   @override
@@ -2143,7 +2149,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String victoryCoinsTotal(String total, String base, String bonus) {
-    return 'toplam +$total altın · taban $base + hız bonusu $bonus';
+    return 'toplam +$total altın · taban $base + savaş verimi bonusu $bonus';
   }
 
   @override
@@ -2240,7 +2246,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String enemyAttackNotice(String enemy, int damage) {
-    return '$enemy saldırdı! $damage can kaybettin.';
+    return '$enemy senin $damage canını aldı.';
   }
 
   @override
@@ -2488,7 +2494,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String effectNightWalk(String stat, String value) {
-    return 'gece yürüyüşlerinde $stat $value';
+    return 'gece yapılan savaşlarda $stat $value';
   }
 
   @override

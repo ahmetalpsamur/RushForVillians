@@ -8,6 +8,7 @@ import 'package:rush_for_villains/core/utils/equipped_buffs.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/data/title_catalog.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -115,6 +116,11 @@ void main() {
     await tester.pump();
   }
 
+  Future<void> simulateSteps(WidgetTester tester, int amount) async {
+    tester.widget<HomeScreen>(find.byType(HomeScreen)).onSimulateSteps(amount);
+    await tester.pumpAndSettle();
+  }
+
   /// Profil sekmesindeki "Ünvanlar" kartından ünvan ekranını açar.
   Future<void> openTitles(WidgetTester tester) async {
     await tester.tap(
@@ -137,10 +143,13 @@ void main() {
       await tester.scrollUntilVisible(
         button,
         260,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('titles-scroll-view')),
-          matching: find.byType(Scrollable),
-        ).first,
+        scrollable:
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('titles-scroll-view')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
       );
       await tester.pumpAndSettle();
     }
@@ -205,10 +214,13 @@ void main() {
       await tester.scrollUntilVisible(
         find.text(lowHealthTitle.name),
         260,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('titles-scroll-view')),
-          matching: find.byType(Scrollable),
-        ).first,
+        scrollable:
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('titles-scroll-view')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
       );
       expect(
         find.byKey(ValueKey('equip-title-${lowHealthTitle.id}')),
@@ -247,16 +259,14 @@ void main() {
       // Aynı adım sayısı, tek fark takılı ünvan.
       final plain = makeProfile(titles: [coinTitle.id]);
       await pumpShell(tester, profile: plain);
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       final withTitle = makeProfile(
         titles: [coinTitle.id],
         equippedTitle: coinTitle.id,
       );
       await pumpShell(tester, profile: withTitle);
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       // 5.000 adım = 100 coin; +%8 bonusla 108.
       expect(plain.coins, 100);
@@ -285,8 +295,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       expect(profile.coins, 100);
     });
@@ -339,8 +348,7 @@ void main() {
 
       expect(profile.ownsTitle(firstStep.id), isFalse);
 
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       expect(profile.ownsTitle(firstStep.id), isTrue);
 
@@ -353,10 +361,13 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(ValueKey('equip-title-${firstStep.id}')),
         260,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('titles-scroll-view')),
-          matching: find.byType(Scrollable),
-        ).first,
+        scrollable:
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('titles-scroll-view')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
       );
       expect(
         find.byKey(ValueKey('equip-title-${firstStep.id}')),
@@ -369,8 +380,7 @@ void main() {
       final profile = makeProfile(titles: [firstStep.id]);
       await pumpShell(tester, profile: profile);
 
-      await tester.tap(find.text('+5000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 5000);
 
       expect(profile.ownedTitleIds.where((id) => id == firstStep.id).length, 1);
     });
@@ -420,8 +430,7 @@ void main() {
       );
       await pumpShell(tester, profile: profile);
 
-      await tester.tap(find.text('+1000 adım'));
-      await tester.pumpAndSettle();
+      await simulateSteps(tester, 1000);
       await GameStorage.flush();
 
       final preferences = await SharedPreferences.getInstance();

@@ -140,7 +140,7 @@ void main() {
       expect(quest.enemyHealth, 0);
     });
 
-    test('aşırı hasar düşmanı planlanan roundların yüzde 60ından önce öldüremez', () {
+    test('yeterli hasar düşmanı ilk roundda yenebilir', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('ash_guardian')!,
@@ -148,28 +148,58 @@ void main() {
         startedAt: startedAt,
       );
 
-      expect(quest.totalRounds, 5);
-      expect(quest.earliestEnemyDefeatRound, 3);
-
-      for (var round = 1; round < quest.earliestEnemyDefeatRound; round++) {
-        final result = quest.resolveRound(
-          round * 1000,
-          quest.nextEnemyAttackAt.subtract(const Duration(seconds: 1)),
-          playerStats: _victoriousPlayer,
-        );
-        expect(result, isNotNull);
-        expect(quest.isEnemyDefeated, isFalse, reason: '$round. round');
-        expect(quest.enemyHealth, greaterThan(0));
-      }
-
       quest.resolveRound(
-        3000,
+        1000,
         quest.nextEnemyAttackAt.subtract(const Duration(seconds: 1)),
         playerStats: _victoriousPlayer,
       );
 
       expect(quest.isEnemyDefeated, isTrue);
-      expect(quest.victoryRounds, 3);
+      expect(quest.enemyHealth, 0);
+      expect(quest.victoryRounds, 1);
+    });
+
+    test('Cam Top ilk round hasarını artırır', () {
+      final startedAt = DateTime(2026, 8, 17, 12);
+      AdventureQuest quest() => AdventureQuest(
+        enemy: EnemyCatalog.byId('abyss_overlord')!,
+        stepGoal: 6000,
+        startedAt: startedAt,
+      );
+      const normal = CombatStats(
+        attack: 79,
+        defense: 27,
+        maxHealth: 310,
+        critChance: 0.05,
+        critDamage: 0.60,
+        speed: 10,
+        luck: 5,
+      );
+      const glassCannon = CombatStats(
+        attack: 134.3,
+        defense: 27,
+        maxHealth: 217,
+        critChance: 0.05,
+        critDamage: 0.60,
+        speed: 10,
+        luck: 5,
+      );
+
+      final withoutTitle = quest();
+      final withTitle = quest();
+      final resolvedAt = startedAt.add(const Duration(minutes: 1));
+      final plainResult = withoutTitle.resolveRound(
+        1000,
+        resolvedAt,
+        playerStats: normal,
+      );
+      final titleResult = withTitle.resolveRound(
+        1000,
+        resolvedAt,
+        playerStats: glassCannon,
+      );
+
+      expect(titleResult!.enemyDamage, greaterThan(plainResult!.enemyDamage));
     });
 
     test('round sayısı ve süresi toplam hedeften türetilir', () {
