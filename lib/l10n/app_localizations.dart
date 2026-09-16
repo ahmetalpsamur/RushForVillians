@@ -2867,7 +2867,7 @@ abstract class AppLocalizations {
   /// No description provided for @tutorialShopPrompt.
   ///
   /// In tr, this message translates to:
-  /// **'Şimdi altınını güce çevirelim. Mağaza burada.'**
+  /// **'Şimdi altınını güce çevirelim. Mağazaya gitmek için düğmeye dokun.'**
   String get tutorialShopPrompt;
 
   /// No description provided for @tutorialShopWaiting.

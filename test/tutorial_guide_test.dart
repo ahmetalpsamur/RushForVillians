@@ -232,8 +232,16 @@ void main() {
     }
     expect(profile.tutorialStep, TutorialGuideStep.shopPrompt.index);
 
-    await tester.tap(find.text('Mağaza').last);
+    // Victory is fullscreen: there is no store tab to tap here.
+    expect(find.byType(NavigationBar), findsNothing);
+    final coinsBeforeStore = profile.coins;
+    final xpBeforeStore = profile.xp;
+    await tester.tap(find.byKey(const Key('tutorial-primary-action')));
     await tester.pump(const Duration(milliseconds: 650));
+    expect(profile.tutorialStep, TutorialGuideStep.shopWaiting.index);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(profile.coins, coinsBeforeStore);
+    expect(profile.xp, xpBeforeStore);
     final tutorialCard = find.byKey(
       ValueKey('tutorial-store-item-${starter.id}'),
     );

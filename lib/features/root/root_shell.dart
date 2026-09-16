@@ -2078,6 +2078,16 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         _setTutorialStep(TutorialGuideStep.rewardXp);
       case TutorialGuideStep.rewardXp:
         _setTutorialStep(TutorialGuideStep.shopPrompt);
+      case TutorialGuideStep.shopPrompt:
+        // The completed tutorial adventure hides navigation and forces the
+        // adventure tab. Release it before opening the tutorial store.
+        // Use the normal exit path so daily progress and rewards are retained.
+        if (_adventure != null) {
+          if (!_adventure!.isBattleCompleted) return;
+          _chooseNewAdventure();
+          if (_adventure != null) return;
+        }
+        _openStore();
       case TutorialGuideStep.itemBought:
         _setTutorialStep(TutorialGuideStep.equipWaiting);
         _openInventory();
@@ -2116,7 +2126,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       case TutorialGuideStep.adventurePrompt:
       case TutorialGuideStep.enemyChoice:
       case TutorialGuideStep.combatWaiting:
-      case TutorialGuideStep.shopPrompt:
       case TutorialGuideStep.shopWaiting:
       case TutorialGuideStep.equipWaiting:
       case TutorialGuideStep.upgradeWaiting:

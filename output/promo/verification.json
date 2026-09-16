@@ -1,0 +1,15 @@
+{
+  "file": "rush-for-villains-38s-fixed.mp4",
+  "resolution": "1080x1920",
+  "aspect_ratio": "9:16",
+  "seconds": 38,
+  "fps": 30,
+  "frames": 1140,
+  "video_codec": "H.264",
+  "audio_codec": "AAC",
+  "audio_sample_rate": 48000,
+  "bytes": 4477103,
+  "full_decode": "passed",
+  "voice_timing": "12 complete lines; no slot overruns",
+  "game_screen_capture": "Flutter capture passed"
+}

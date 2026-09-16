@@ -1801,7 +1801,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tutorialShopPrompt =>
-      'Now let\'s turn those coins into power. The Store is right here.';
+      'Now let\'s turn those coins into power. Tap the button to open the Store.';
 
   @override
   String get tutorialShopWaiting =>

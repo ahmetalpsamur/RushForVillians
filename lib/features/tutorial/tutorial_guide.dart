@@ -208,8 +208,8 @@ class TutorialGuideFrame {
     TutorialGuideStep.shopPrompt => TutorialGuideFrame(
       message: l10n.tutorialShopPrompt,
       animation: TutorialGuideAnimation.pointing,
-      target: TutorialGuideTarget.shopTab,
       alignment: Alignment(0.05, 0.35),
+      primaryLabel: l10n.tutorialGoToStore,
     ),
     TutorialGuideStep.shopWaiting => TutorialGuideFrame(
       message: l10n.tutorialShopWaiting,

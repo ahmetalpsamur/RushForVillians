@@ -1696,7 +1696,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get tutorialShopPrompt =>
-      'Şimdi altınını güce çevirelim. Mağaza burada.';
+      'Şimdi altınını güce çevirelim. Mağazaya gitmek için düğmeye dokun.';
 
   @override
   String get tutorialShopWaiting =>
