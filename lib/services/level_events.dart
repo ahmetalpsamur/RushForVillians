@@ -10,8 +10,7 @@ class LevelUpEvent {
 
   const LevelUpEvent({required this.previousLevel, required this.newLevel});
 
-  /// Tek seferde kaç seviye atlandı. Büyük bir XP ödülü (düşman, çark) birden
-  /// fazla seviye atlatabilir.
+  /// A single accepted step batch may grant multiple levels.
   int get levelsGained => newLevel - previousLevel;
 
   @override
@@ -26,11 +25,10 @@ class LevelUpEvent {
 ///
 /// **Neden şimdi var:** Aşama 3'te item seviye kilidi (#10) ve mağaza seviye
 /// kilidi (#11) geliyor; ikisi de "seviye değişti" anını bilmek isteyecek.
-/// Yayını seviye motoruyla aynı işte kurmak, sonradan `addXp` çağıran her
+/// Yayını seviye motoruyla aynı işte kurmak, sonradan `creditLevelStepsThrough` çağıran her
 /// noktayı tek tek gezmekten ucuz.
 ///
-/// Olay yalnızca [RootShell] içindeki tek noktadan (`_awardXp`) üretilir;
-/// XP veren her yol oradan geçer.
+/// Emitted only by RootShell._awardLevelSteps after validated walking progress.
 class LevelEvents {
   LevelEvents._();
 

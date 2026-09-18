@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+import '../core/utils/level_steps.dart';
 import '../core/constants/game_constants.dart';
 import '../core/utils/game_clock.dart';
 import '../core/utils/game_day.dart';
@@ -25,6 +27,12 @@ class UserProfile {
   int hp;
   int maxHp;
   int level;
+
+  /// Persistent progress within the current level, independent of daily steps.
+  int levelStepProgress;
+
+  /// Lifetime accepted steps already credited to levels; never reset daily.
+  int lastLevelRewardedStepCount;
   int xp;
   int coins;
   int streakDays;
@@ -240,6 +248,8 @@ class UserProfile {
     int? hp,
     int? maxHp,
     this.level = 1,
+    this.levelStepProgress = 0,
+    int? lastLevelRewardedStepCount,
     this.xp = 0,
     this.coins = 0,
     this.streakDays = 0,
@@ -286,7 +296,8 @@ class UserProfile {
     this.bossesDefeated = 0,
     this.rareVillainsDefeated = 0,
     Map<String, int>? villainDefeatCounts,
-  }) : hp = hp ?? GameConstants.baseHp,
+  }) : lastLevelRewardedStepCount = lastLevelRewardedStepCount ?? totalSteps,
+       hp = hp ?? GameConstants.baseHp,
        maxHp = maxHp ?? GameConstants.baseHp,
        ownedItems = ownedItems ?? <OwnedItem>[],
        ownedUpgradeIds = ownedUpgradeIds ?? <String>[],
@@ -647,24 +658,34 @@ class UserProfile {
     return null;
   }
 
-  /// Bir sonraki seviyeye geçmek için gereken toplam XP.
-  int get xpToNextLevel => GameConstants.baseXpPerLevel * level;
-
-  double get xpProgress => (xp / xpToNextLevel).clamp(0, 1);
-
+  int get stepsToNextLevel => calculateRequiredSteps(level);
+  double get levelStepFraction =>
+      (levelStepProgress / stepsToNextLevel).clamp(0, 1);
   double get hpProgress => (hp / maxHp).clamp(0, 1);
 
-  /// XP ekler, gerekiyorsa seviye atlatır. Kaç seviye atlandığını döner.
-  int addXp(int amount) {
-    if (amount > 0) totalXpEarned += amount;
-    xp += amount;
+  /// Credits only the new portion of the already validated lifetime counter.
+  /// Raw sensor readings must pass the existing step source/rate limiter first.
+  int creditLevelStepsThrough(int acceptedTotalSteps) {
+    if (acceptedTotalSteps <= lastLevelRewardedStepCount) return 0;
+    final delta = acceptedTotalSteps - lastLevelRewardedStepCount;
+    lastLevelRewardedStepCount = acceptedTotalSteps;
+    levelStepProgress += delta;
     var levelsGained = 0;
-    while (xp >= xpToNextLevel) {
-      xp -= xpToNextLevel;
+    while (levelStepProgress >= stepsToNextLevel) {
+      levelStepProgress -= stepsToNextLevel;
       level++;
       levelsGained++;
     }
     return levelsGained;
+  }
+
+  /// XP remains a separate reward/achievement resource; it no longer grants levels.
+  /// The return value is retained for compatibility with previous callers.
+  int addXp(int amount) {
+    if (amount <= 0) return 0;
+    totalXpEarned += amount;
+    xp += amount;
+    return 0;
   }
 
   /// Avatar bilgisi ayrıca [CharacterStorage] tarafından saklandığı için
@@ -676,6 +697,8 @@ class UserProfile {
   /// Aşama 4a'da birleştirilecek; birleşene kadar hiçbiri buradan yazılmaz.
   Map<String, Object?> toJson() => {
     'level': level,
+    'levelStepProgress': levelStepProgress,
+    'lastLevelRewardedStepCount': lastLevelRewardedStepCount,
     'xp': xp,
     'coins': coins,
     'streakDays': streakDays,
@@ -734,7 +757,12 @@ class UserProfile {
   }) {
     return UserProfile(
       avatar: avatar,
-      level: json['level'] as int? ?? 1,
+      level: max(1, json['level'] as int? ?? 1),
+      levelStepProgress: max(0, json['levelStepProgress'] as int? ?? 0),
+      lastLevelRewardedStepCount:
+          json['lastLevelRewardedStepCount'] as int? ??
+          json['totalSteps'] as int? ??
+          0,
       xp: json['xp'] as int? ?? 0,
       coins: json['coins'] as int? ?? 0,
       streakDays: json['streakDays'] as int? ?? 0,

@@ -2333,7 +2333,7 @@ abstract class AppLocalizations {
   /// No description provided for @storageUnavailable.
   ///
   /// In tr, this message translates to:
-  /// **'Kayıtlı ilerlemene şu an ulaşılamadı. Oyun geçici bir kayıtla açıldı; uygulamayı yeniden başlatmayı dene.'**
+  /// **'Kayıtlı ilerlemen okunamadı. Mevcut kayıt korunuyor; bu oturum kaydının üzerine yazmayacak. Uygulamayı yeniden başlatmayı dene.'**
   String get storageUnavailable;
 
   /// No description provided for @studioSplashSemantics.
@@ -2861,7 +2861,7 @@ abstract class AppLocalizations {
   /// No description provided for @tutorialRewardXp.
   ///
   /// In tr, this message translates to:
-  /// **'Deneyim de seni seviye seviye güçlendirir.'**
+  /// **'XP, başarımlarına katkı sağlar. Seviyen ise geçerli yürüyüş adımlarıyla yükselir.'**
   String get tutorialRewardXp;
 
   /// No description provided for @tutorialShopPrompt.
@@ -4426,7 +4426,7 @@ abstract class AppLocalizations {
   /// No description provided for @dailyStepsExplanation.
   ///
   /// In tr, this message translates to:
-  /// **'Günlük adımların macera hedefinden ayrıdır. Yürüyüş ödüllerinde günlük üst sınır yoktur.'**
+  /// **'Günlük yürüyüş, macera hedefi ve seviye ilerlemesi ayrı takip edilir. Yürüyüş ödüllerinde günlük üst sınır yoktur.'**
   String get dailyStepsExplanation;
 
   /// No description provided for @dailyNotificationChannel.
@@ -4506,6 +4506,18 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Daha sonra bakacağım'**
   String get wheelLater;
+
+  /// No description provided for @levelStepsExplanation.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geçerli yürüyüş adımları seviyeni artırır. XP, başarım kazanımlarında kullanılan ayrı bir ödül birikimidir; seviye artırmaz.'**
+  String get levelStepsExplanation;
+
+  /// No description provided for @separateXpBalance.
+  ///
+  /// In tr, this message translates to:
+  /// **'XP birikimi: {amount}'**
+  String separateXpBalance(String amount);
 }
 
 class _AppLocalizationsDelegate

@@ -88,6 +88,8 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       // Oyun durumu avatara bağlı okunur; avatar yoksa yeni oyuncu demektir.
       gameState =
           avatar == null ? null : await GameStorage.load(avatar: avatar);
+      _storageFailed =
+          GameStorage.writeBlocked || CharacterStorage.writeBlocked;
     } catch (error) {
       // Kayıt okunamadıysa temiz varsayılanla başlanır; kayıt silinmez, bir
       // sonraki açılışta tekrar denenir.
@@ -95,6 +97,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       avatar = null;
       gameState = null;
       _storageFailed = true;
+      GameStorage.protectUnreadableSave();
     }
     await notificationInitialization;
     final safetyAccepted =
@@ -145,7 +148,7 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
 
   Future<void> _saveGuide(TutorialGuideVariant guide) async {
     try {
-      await TutorialGuideStorage.save(guide);
+      if (!_storageFailed) await TutorialGuideStorage.save(guide);
     } catch (error) {
       debugPrint('Yol arkadaşı kaydedilemedi ($error)');
     }

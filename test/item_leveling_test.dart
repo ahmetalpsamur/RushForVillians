@@ -1,3 +1,6 @@
+import 'package:rush_for_villains/core/utils/level_steps.dart';
+import 'package:rush_for_villains/models/user_profile.dart';
+import 'level_steps_test.dart' show avatar;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/item_leveling.dart';
@@ -45,10 +48,6 @@ OwnedItem _instance({int level = 1, RewardRarity? rarity}) => OwnedItem(
   level: level,
   rarity: rarity,
 );
-
-/// 6.000 adım/gün atan referans oyuncu.
-const _coinsPerDay = 6000 / GameConstants.stepsPerCoin;
-const _xpPerDay = 6000 / GameConstants.stepsPerXp;
 
 void main() {
   group('iki tavan', () {
@@ -176,31 +175,25 @@ void main() {
       }
     });
 
-    test('ilk dört katmanda seviye kapısı coin kapısından daha sıkı', () {
-      // "Yükseltmek yeni eşya almakla yarışabilir olsun": para gerçek bir
-      // maliyet ama duvar değil. En üst katman (efsanevi) bilerek istisna —
-      // aylara yayılan bir hedef.
-      const prices = {
-        RewardRarity.common: 100,
-        RewardRarity.uncommon: 325,
-        RewardRarity.rare: 825,
-        RewardRarity.epic: 2600,
-      };
-      for (final entry in prices.entries) {
-        final cap = itemLevelCap(entry.key);
-        final coinDays =
-            totalUpgradeCost(entry.value, entry.key) / _coinsPerDay;
-        final levelDays =
-            GameConstants.baseXpPerLevel / 2 * cap * (cap - 1) / _xpPerDay;
-        expect(
-          coinDays,
-          lessThan(levelDays),
-          reason:
-              '${entry.key.name}: coin ${coinDays.round()} gün, '
-              'seviye ${levelDays.round()} gün',
-        );
-      }
-    });
+    test(
+      'walking levels unlock upgrade caps without granting free upgrades',
+      () {
+        for (final rarity in RewardRarity.values) {
+          final cap = itemLevelCap(rarity);
+          final target = List.generate(
+            cap - 1,
+            (i) => calculateRequiredSteps(i + 1),
+          ).fold<int>(0, (a, b) => a + b);
+          final player = UserProfile(avatar: avatar);
+          player.creditLevelStepsThrough(target - 1);
+          expect(maxItemLevelFor(rarity, player.level), cap - 1);
+          player.creditLevelStepsThrough(target);
+          expect(maxItemLevelFor(rarity, player.level), cap);
+          expect(player.coins, 0);
+          expect(totalUpgradeCost(100, rarity), greaterThan(0));
+        }
+      },
+    );
 
     test('en ucuz yükseltme en ucuz eşyadan pahalı değil', () {
       // İlk yükseltme, oyuncunun ilk gününde ulaşabileceği bir adım olmalı.

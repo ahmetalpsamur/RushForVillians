@@ -481,7 +481,7 @@
   "@totalDuration": {"placeholders": {"duration": {"type": "String"}}},
   "enemyCombatExplanation": "{rounds} rounds; each round requires {steps} steps within {duration}. Reaching the goal early builds a perfect-round streak and increases damage. Missing it breaks the streak, and the enemy attacks based on your shortfall.",
   "@enemyCombatExplanation": {"placeholders": {"rounds": {"type": "int"}, "steps": {"type": "int"}, "duration": {"type": "String"}}},
-  "storageUnavailable": "Your saved progress is unavailable right now. The game opened with a temporary save; try restarting the app.",
+  "storageUnavailable": "Your saved progress could not be read. The existing save is protected and this session will not overwrite it. Please restart the app.",
   "studioSplashSemantics": "Heapchi Studios splash screen",
   "enemyAshGuardianName": "Ash Guardian",
   "enemyAshGuardianQuest": "The Ash Guardian holds the silent pass. Break the seal on its armor with your first 500 steps!",
@@ -569,7 +569,7 @@
   "tutorialEnemyReaction": "See? Enemies fight back too.",
   "tutorialVictoryCelebration": "That's it! Your first victory.",
   "tutorialRewardCoins": "Defeating enemies earns you a random amount of coins.",
-  "tutorialRewardXp": "Experience also makes you stronger, one level at a time.",
+  "tutorialRewardXp": "XP counts toward your achievements. Your level grows with valid walking steps.",
   "tutorialShopPrompt": "Now let's turn those coins into power. Tap the button to open the Store.",
   "tutorialShopWaiting": "Use your training coins to buy the first weapon I've marked.",
   "tutorialItemBought": "Now we're getting stronger!",
@@ -936,7 +936,7 @@
   "leaveAdventureWalkWarning": "You won! Ending the bonus walk keeps your victory rewards, earned gold, and daily wheel access. Only this adventure's bonus gold rate ends. Would you like to choose a new adventure?",
   "leaveAdventureWarning": "If you leave before defeating the enemy, your adventure progress will be lost and you will not earn any adventure rewards. Your daily steps and walking earnings will be kept. Are you sure?",
   "stayInAdventure": "Keep adventuring",
-  "dailyStepsExplanation": "Daily steps are separate from your adventure goal. There is no daily walking reward limit.",
+  "dailyStepsExplanation": "Daily walking, adventure goals and level progress are tracked separately. Walking rewards have no daily cap.",
   "dailyNotificationChannel": "Daily streak and wheel",
   "streakReminderTitle": "Your hero is waiting!",
   "streakReminderBody": "Hey, how about keeping today's streak going? A little walk or one victory will do. I'll be right here!",
@@ -951,5 +951,8 @@
   "wheelReadyBody": "Your daily wheel is ready. Would you like to give it a spin?",
   "wheelReadyNotification": "Your daily wheel is unlocked! Your reward is waiting.",
   "goToWheel": "Go to the wheel",
-  "wheelLater": "I'll check later"
+  "wheelLater": "I'll check later",
+  "levelStepsExplanation": "Valid walking steps raise your level. XP is a separate reward total used for achievements; it does not raise your level.",
+  "separateXpBalance": "XP balance: {amount}",
+  "@separateXpBalance": {"placeholders": {"amount": {"type": "String"}}}
 }

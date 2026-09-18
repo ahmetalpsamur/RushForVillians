@@ -433,11 +433,24 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
                 StatBar(
-                  label: 'XP',
+                  label: context.l10n.levelNumber(profile.level),
                   icon: Icons.bolt,
                   color: AppColors.xp,
-                  progress: profile.xpProgress,
-                  valueText: '${profile.xp} / ${profile.xpToNextLevel}',
+                  progress: profile.levelStepFraction,
+                  valueText: context.l10n.dailyStepProgressValue(
+                    AppFormatters.integer(context, profile.levelStepProgress),
+                    AppFormatters.integer(context, profile.stepsToNextLevel),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  context.l10n.separateXpBalance(
+                    AppFormatters.integer(context, profile.xp),
+                  ),
+                ),
+                Text(
+                  context.l10n.levelStepsExplanation,
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),

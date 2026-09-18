@@ -1489,7 +1489,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageUnavailable =>
-      'Your saved progress is unavailable right now. The game opened with a temporary save; try restarting the app.';
+      'Your saved progress could not be read. The existing save is protected and this session will not overwrite it. Please restart the app.';
 
   @override
   String get studioSplashSemantics => 'Heapchi Studios splash screen';
@@ -1797,7 +1797,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tutorialRewardXp =>
-      'Experience also makes you stronger, one level at a time.';
+      'XP counts toward your achievements. Your level grows with valid walking steps.';
 
   @override
   String get tutorialShopPrompt =>
@@ -2847,7 +2847,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyStepsExplanation =>
-      'Daily steps are separate from your adventure goal. There is no daily walking reward limit.';
+      'Daily walking, adventure goals and level progress are tracked separately. Walking rewards have no daily cap.';
 
   @override
   String get dailyNotificationChannel => 'Daily streak and wheel';
@@ -2895,4 +2895,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wheelLater => 'I\'ll check later';
+
+  @override
+  String get levelStepsExplanation =>
+      'Valid walking steps raise your level. XP is a separate reward total used for achievements; it does not raise your level.';
+
+  @override
+  String separateXpBalance(String amount) {
+    return 'XP balance: $amount';
+  }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/base_combat_stats.dart';
+import '../core/constants/game_constants.dart';
 import '../data/enemy_catalog.dart';
 
 import '../models/avatar_profile.dart';
@@ -24,7 +25,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 24;
+  static const int schemaVersion = 25;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -311,6 +312,22 @@ class GameStorage {
     22: (state) => state,
     // Daily notification and celebration acknowledgements default to unseen.
     23: (state) => state,
+    // Preserve legacy levels/XP. Never replay historical steps into the new curve.
+    24: (state) {
+      final profile = state['profile'];
+      if (profile is Map<String, dynamic>) {
+        profile.putIfAbsent('levelStepProgress', () => 0);
+        profile.putIfAbsent(
+          'lastLevelRewardedStepCount',
+          () => profile['totalSteps'] ?? 0,
+        );
+      }
+      final today = state['today'];
+      if (today is Map<String, dynamic>) {
+        today['stepGoal'] = GameConstants.dailyStepGoal;
+      }
+      return state;
+    },
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde
@@ -318,32 +335,61 @@ class GameStorage {
   /// kötü ihtimalle bu kadarlık ilerleme kaybolur.
   static const Duration writeInterval = Duration(seconds: 2);
 
+  static bool _writeBlocked = false;
+  static bool get writeBlocked => _writeBlocked;
+  static const migrationBackupKey = 'game_state_v1_migration_backup';
+
+  /// A failed read must never be followed by a default-state overwrite.
+  static void protectUnreadableSave() {
+    _writeBlocked = true;
+    _pendingWrite?.cancel();
+    _pendingWrite = null;
+    _pendingState = null;
+  }
+
   static Timer? _pendingWrite;
   static GameState? _pendingState;
 
   /// Kaydı okur. Kayıt yoksa, bozuksa veya bilinmeyen bir sürümdeyse `null`
   /// döner; çağıran taraf temiz varsayılanla başlar.
   static Future<GameState?> load({required AvatarProfile avatar}) async {
-    final preferences = await SharedPreferences.getInstance();
-    final value = preferences.getString(_key);
-    if (value == null) return null;
-
+    protectUnreadableSave();
     try {
+      final preferences = await SharedPreferences.getInstance();
+      final value = preferences.getString(_key);
+      if (value == null) {
+        _writeBlocked = false;
+        return null;
+      }
       final envelope = jsonDecode(value) as Map<String, dynamic>;
+      final oldVersion = envelope['schemaVersion'] as int? ?? 0;
       final state = _migrate(envelope);
-      if (state == null) return null;
-      return GameState.fromJson(state, avatar: avatar);
-    } on FormatException catch (error) {
-      debugPrint(
-        'GameStorage: kayıt çözümlenemedi, sıfırdan başlanıyor ($error)',
-      );
-      return null;
-    } on TypeError catch (error) {
-      debugPrint('GameStorage: kayıt biçimi beklenenden farklı ($error)');
-      return null;
+      if (state == null || state['profile'] is! Map<String, dynamic>) {
+        return null;
+      }
+      final restored = GameState.fromJson(state, avatar: avatar);
+      if (oldVersion < schemaVersion) {
+        // Keep the exact pre-upgrade bytes until the complete model is validated.
+        if (!await preferences.setString(migrationBackupKey, value)) {
+          throw StateError('Could not back up the pre-migration save');
+        }
+        final upgraded = jsonEncode({
+          'schemaVersion': schemaVersion,
+          'savedAt': DateTime.now().toIso8601String(),
+          'state': state,
+        });
+        if (!await preferences.setString(_key, upgraded)) {
+          throw StateError('Could not commit the migrated save');
+        }
+      }
+      _writeBlocked = false;
+      return restored;
     } catch (error) {
-      // Bozuk kayıt hiçbir koşulda uygulamayı çökertmemeli.
-      debugPrint('GameStorage: kayıt okunamadı ($error)');
+      // The original bytes stay in place; this session cannot overwrite them.
+      protectUnreadableSave();
+      debugPrint(
+        'GameStorage: saved data unavailable; writes protected ($error)',
+      );
       return null;
     }
   }
@@ -376,18 +422,23 @@ class GameStorage {
 
   /// Kaydı hemen diske yazar.
   static Future<void> save(GameState state) async {
+    if (_writeBlocked) return;
     final preferences = await SharedPreferences.getInstance();
     final envelope = {
       'schemaVersion': schemaVersion,
       'savedAt': DateTime.now().toIso8601String(),
       'state': state.toJson(),
     };
-    await preferences.setString(_key, jsonEncode(envelope));
+    if (_writeBlocked) return;
+    if (!await preferences.setString(_key, jsonEncode(envelope))) {
+      throw StateError('Could not save game state');
+    }
   }
 
   /// Yazmayı [writeInterval] kadar geciktirir. Aralık dolmadan gelen yeni
   /// istekler birikmez, sonuncusu yazılır.
   static void scheduleSave(GameState state) {
+    if (_writeBlocked) return;
     _pendingState = state;
     _pendingWrite ??= Timer(writeInterval, () {
       _pendingWrite = null;
@@ -407,11 +458,19 @@ class GameStorage {
     final state = _pendingState;
     if (state == null) return;
     _pendingState = null;
-    await save(state);
+    try {
+      await save(state);
+    } catch (error) {
+      // Retain the latest unsaved state for a later flush, without deleting disk data.
+      _pendingState ??= state;
+      debugPrint('GameStorage: save deferred ($error)');
+    }
   }
 
   /// Kaydı siler. Testler ve ileride "ilerlemeyi sıfırla" için.
   static Future<void> clear() async {
+    if (kReleaseMode) throw StateError('Save reset is disabled in production');
+    _writeBlocked = false;
     _pendingWrite?.cancel();
     _pendingWrite = null;
     _pendingState = null;

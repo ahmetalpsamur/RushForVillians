@@ -765,10 +765,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _archiveDailySteps(_today);
       // Keep banked steps and enemies even if the player waits for another day.
       _adventure?.carriedSteps += _today.steps;
-      _today = DailyProgress(
-        date: now,
-        stepGoal: _adventure?.stepGoal ?? GameConstants.dragonStepGoal,
-      );
+      _today = DailyProgress(date: now, stepGoal: GameConstants.dailyStepGoal);
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       changed = true;
     }
@@ -1036,31 +1033,22 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
-  /// XP veren **tek** nokta: adım, düşman ve çark hep buradan geçer.
-  ///
-  /// Seviye atlandığında hem uygulama içi kutlamayı tetikler hem de
-  /// [LevelEvents] üzerinden yayınlar. Yayını tek noktada tutmak, Aşama 3'teki
-  /// seviye kilitlerinin (#10, #11) `addXp` çağıran her yeri gezmesini
-  /// gereksiz kılar.
-  ///
-  /// `setState` içinden de çağrılabilsin diye kendisi `setState` çağırmaz;
-  /// kutlama bir sonraki frame'e bırakılır.
-  ///
-  /// **Gerçekten verilen** XP'yi döner: "2x XP" yükseltmesi etkinse çarpan
-  /// burada uygulanır. Çarpanın tek noktası burası, çünkü yükseltmenin sözü
-  /// "kazandığın XP" — adım, düşman ve çark, hepsi.
+  /// Keeps XP rewards and multipliers independent of walking-based levels.
   int _awardXp(int amount) {
     if (amount <= 0) return 0;
     final granted =
         _profile.isXpBoostActive
             ? amount * GameConstants.xpBoostMultiplier
             : amount;
-    final previousLevel = _profile.level;
     _profile.addXp(granted);
-    // Seviye savaş canı tavanını büyütebilir. Adım/zafer/çark kaynağı fark
-    // etmeden aynı XP kapısından geçtiği için senkronizasyon da burada yapılır.
+    return granted;
+  }
+
+  void _awardLevelSteps() {
+    final previousLevel = _profile.level;
+    _profile.creditLevelStepsThrough(_profile.totalSteps);
+    if (_profile.level == previousLevel) return;
     _syncAdventureStats();
-    if (_profile.level == previousLevel) return granted;
 
     final event = LevelUpEvent(
       previousLevel: previousLevel,
@@ -1071,7 +1059,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showLevelUp(event);
     });
-    return granted;
   }
 
   /// Seviye atlama kutlaması.
@@ -1285,6 +1272,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     setState(() {
       _today.addSteps(amount);
       _profile.totalSteps += amount;
+      _awardLevelSteps();
       if (amount > _profile.longestSingleWalkSteps) {
         _profile.longestSingleWalkSteps = amount;
       }
@@ -1470,21 +1458,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           adventure.startingSteps,
         );
       }
-      // Günün adımları korunur; macera kendi başlangıç adımını taşır
-      // (AdventureQuest.startingSteps). Yalnızca günlük hedef güncellenir.
-      //
-      // `coinsEarned` / `xpEarned` de taşınır: ikisi de günün yürüyüş
-      // kazancını gösteren sayaçlardır; macera seçmek geçmişi silmemeli.
-      // `enemyDefeated` aynı gerekçeyle taşınır: bugün kazanılmış bir seri ve
-      // açılmış bir çark, yeni macera seçilince geri alınamaz.
-      _today = DailyProgress(
-        date: _today.date,
-        steps: _today.steps,
-        stepGoal: adventure.stepGoal,
-        coinsEarned: _today.coinsEarned,
-        xpEarned: _today.xpEarned,
-        enemyDefeated: _today.enemyDefeated,
-      );
+      // Daily progress and its 7,000-step goal stay independent of adventures.
     });
     _persist();
     if (_tutorialStep.value == TutorialGuideStep.enemyChoice) {
@@ -1559,15 +1533,6 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     setState(() {
       _adventure = null;
       _tabIndex = 1;
-      // Macera bırakılınca da günün adımları yanmaz; yalnızca günlük hedef
-      // varsayılana döner. Günlük kazanç sayaçları aynı gerekçeyle taşınır.
-      _today = DailyProgress(
-        date: _today.date,
-        steps: _today.steps,
-        coinsEarned: _today.coinsEarned,
-        xpEarned: _today.xpEarned,
-        enemyDefeated: _today.enemyDefeated,
-      );
     });
     _persist();
     unawaited(AdventureNotificationService.cancelAdventureReminders());

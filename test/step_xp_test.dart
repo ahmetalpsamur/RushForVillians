@@ -9,7 +9,6 @@ import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/user_profile.dart';
 import 'package:rush_for_villains/services/game_storage.dart';
-import 'package:rush_for_villains/services/level_events.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _storageKey = 'game_state_v1';
@@ -28,17 +27,7 @@ final _coinRate = GameConstants.stepsPerCoin;
 final _legacyCoinCap = GameConstants.maxDailyStepCoins;
 
 /// `RootShell._awardXp`'in test kopyası: XP verir, seviye atlandıysa yayınlar.
-void awardXp(UserProfile profile, int amount) {
-  if (amount <= 0) return;
-  final previousLevel = profile.level;
-  profile.addXp(amount);
-  if (profile.level == previousLevel) return;
-  final event = LevelUpEvent(
-    previousLevel: previousLevel,
-    newLevel: profile.level,
-  );
-  LevelEvents.emit(event);
-}
+void awardXp(UserProfile profile, int amount) => profile.addXp(amount);
 
 /// Adım akışının test kopyası: para ve XP aynı partiden, **ayrı**
 /// işaretçilerle hesaplanır (RootShell._onStepsReported ile aynı sıra).
@@ -46,6 +35,7 @@ void walk(UserProfile profile, DailyProgress today, int steps) {
   if (steps <= 0) return;
   today.addSteps(steps);
   profile.totalSteps += steps;
+  profile.creditLevelStepsThrough(profile.totalSteps);
 
   final coinReward = calculateStepCoins(
     pendingSteps: profile.totalSteps - profile.lastRewardedStepCount,
@@ -64,9 +54,6 @@ void walk(UserProfile profile, DailyProgress today, int steps) {
 }
 
 /// Belirli bir seviyeye ulaşmak için gereken kümülatif XP: 500·N·(N-1).
-int cumulativeXpForLevel(int level) =>
-    GameConstants.baseXpPerLevel * level * (level - 1) ~/ 2;
-
 void main() {
   group('adım → XP dönüşümü', () {
     test('oran kadar adım 1 XP eder', () {
@@ -99,48 +86,6 @@ void main() {
       final reward = calculateStepXp(pendingSteps: _xpRate * 10, multiplier: 2);
       expect(reward.xp, 20);
       expect(reward.consumedSteps, _xpRate * 10);
-    });
-  });
-
-  group('seviye eğrisi', () {
-    test('seviye başına maliyet doğrusal artar', () {
-      final profile = UserProfile(avatar: _avatar);
-      expect(profile.xpToNextLevel, GameConstants.baseXpPerLevel);
-      profile.level = 5;
-      expect(profile.xpToNextLevel, GameConstants.baseXpPerLevel * 5);
-    });
-
-    test('10. seviyeye ulaşmak 45.000 XP ister', () {
-      expect(cumulativeXpForLevel(10), 45000);
-    });
-
-    test('günde 6.000 adım atan 10. seviyeye 15 günde ulaşır', () {
-      final profile = UserProfile(avatar: _avatar);
-      var today = DailyProgress(date: DateTime(2026, 8, 18));
-      var days = 0;
-
-      while (profile.level < 10) {
-        days++;
-        today = DailyProgress(
-          date: DateTime(2026, 8, 18).add(Duration(days: days)),
-        );
-        walk(profile, today, 6000);
-        // Kilitlenmeye karşı güvenlik ağı.
-        expect(days, lessThan(400));
-      }
-
-      expect(days, 15);
-    });
-
-    test('günde 10.000 adım atan aynı seviyeye daha erken ulaşır', () {
-      final profile = UserProfile(avatar: _avatar);
-      var days = 0;
-      while (profile.level < 10) {
-        days++;
-        walk(profile, DailyProgress(date: DateTime(2026, 8, 18)), 10000);
-        expect(days, lessThan(400));
-      }
-      expect(days, 9);
     });
   });
 
@@ -217,67 +162,6 @@ void main() {
       expect(profile.lastRewardedStepCount, 50);
       expect(profile.coins, 1);
       expect(today.xpEarned, 37);
-    });
-  });
-
-  group('seviye atlama olayı', () {
-    test('seviye atlayınca yayınlanır', () async {
-      final events = <LevelUpEvent>[];
-      final subscription = LevelEvents.stream.listen(events.add);
-      addTearDown(subscription.cancel);
-
-      final profile = UserProfile(avatar: _avatar);
-      awardXp(profile, GameConstants.baseXpPerLevel);
-      await Future<void>.delayed(Duration.zero);
-
-      expect(events, hasLength(1));
-      expect(events.single.previousLevel, 1);
-      expect(events.single.newLevel, 2);
-      expect(events.single.levelsGained, 1);
-    });
-
-    test('seviye atlanmadıysa yayın yok', () async {
-      final events = <LevelUpEvent>[];
-      final subscription = LevelEvents.stream.listen(events.add);
-      addTearDown(subscription.cancel);
-
-      final profile = UserProfile(avatar: _avatar);
-      awardXp(profile, GameConstants.baseXpPerLevel - 1);
-      await Future<void>.delayed(Duration.zero);
-
-      expect(events, isEmpty);
-    });
-
-    test(
-      'tek ödülle birden fazla seviye atlanırsa tek olay yayınlanır',
-      () async {
-        final events = <LevelUpEvent>[];
-        final subscription = LevelEvents.stream.listen(events.add);
-        addTearDown(subscription.cancel);
-
-        final profile = UserProfile(avatar: _avatar);
-        // 1 → 4 için 1000 + 2000 + 3000 = 6000 XP.
-        awardXp(profile, 6000);
-        await Future<void>.delayed(Duration.zero);
-
-        expect(events, hasLength(1));
-        expect(events.single.newLevel, 4);
-        expect(events.single.levelsGained, 3);
-      },
-    );
-
-    test('sıfır veya negatif XP hiçbir şey yapmaz', () async {
-      final events = <LevelUpEvent>[];
-      final subscription = LevelEvents.stream.listen(events.add);
-      addTearDown(subscription.cancel);
-
-      final profile = UserProfile(avatar: _avatar);
-      awardXp(profile, 0);
-      awardXp(profile, -500);
-      await Future<void>.delayed(Duration.zero);
-
-      expect(profile.xp, 0);
-      expect(events, isEmpty);
     });
   });
 

@@ -29,7 +29,7 @@ class DailyProgress {
   DailyProgress({
     required this.date,
     this.steps = 0,
-    this.stepGoal = GameConstants.dragonStepGoal,
+    this.stepGoal = GameConstants.dailyStepGoal,
     this.coinsEarned = 0,
     this.xpEarned = 0,
     this.enemyDefeated = false,
@@ -53,7 +53,7 @@ class DailyProgress {
       enemyDefeated || steps >= GameConstants.dailyWheelUnlockSteps;
 
   void addSteps(int amount) {
-    steps += amount;
+    if (amount > 0) steps += amount;
   }
 
   /// Kayıtlı ilerlemenin hâlâ aynı oyun gününe ait olup olmadığını söyler.
@@ -76,7 +76,7 @@ class DailyProgress {
           (rawDate is String ? DateTime.tryParse(rawDate) : null) ??
           GameClock.now(),
       steps: json['steps'] as int? ?? 0,
-      stepGoal: json['stepGoal'] as int? ?? GameConstants.dragonStepGoal,
+      stepGoal: json['stepGoal'] as int? ?? GameConstants.dailyStepGoal,
       coinsEarned: json['coinsEarned'] as int? ?? 0,
       xpEarned: json['xpEarned'] as int? ?? 0,
       enemyDefeated: json['enemyDefeated'] as bool? ?? false,

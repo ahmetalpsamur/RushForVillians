@@ -137,6 +137,7 @@ class HomeScreen extends StatelessWidget {
                   onTogglePet: onTogglePet,
                 ),
                 const SizedBox(height: 14),
+                Text(context.l10n.dailyGoalSteps(today.stepGoal)),
                 Text(
                   context.l10n.dailyStepsExplanation,
                   textAlign: TextAlign.center,

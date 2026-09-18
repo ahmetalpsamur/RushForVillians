@@ -482,7 +482,7 @@
   "@totalDuration": {"placeholders": {"duration": {"type": "String"}}},
   "enemyCombatExplanation": "{rounds} round; her round {steps} adım ve {duration}. Hedefe süre dolmadan ulaşırsan mükemmel round serisi hasarını büyütür; kaçırırsan seri kırılır ve düşman eksik oranının eğrisine göre saldırır.",
   "@enemyCombatExplanation": {"placeholders": {"rounds": {"type": "int"}, "steps": {"type": "int"}, "duration": {"type": "String"}}},
-  "storageUnavailable": "Kayıtlı ilerlemene şu an ulaşılamadı. Oyun geçici bir kayıtla açıldı; uygulamayı yeniden başlatmayı dene.",
+  "storageUnavailable": "Kayıtlı ilerlemen okunamadı. Mevcut kayıt korunuyor; bu oturum kaydının üzerine yazmayacak. Uygulamayı yeniden başlatmayı dene.",
   "studioSplashSemantics": "Heapchi Studios açılış ekranı",
   "enemyAshGuardianName": "Kül Muhafızı",
   "enemyAshGuardianQuest": "Kül Muhafızı sessiz geçidi tuttu. İlk 500 adımınla zırhındaki mührü parçala!",
@@ -570,7 +570,7 @@
   "tutorialEnemyReaction": "Gördün mü? Düşmanlar da karşılık verir.",
   "tutorialVictoryCelebration": "İşte bu! İlk zaferin.",
   "tutorialRewardCoins": "Düşmanları yenerek rastgele altın kazanırsın.",
-  "tutorialRewardXp": "Deneyim de seni seviye seviye güçlendirir.",
+  "tutorialRewardXp": "XP, başarımlarına katkı sağlar. Seviyen ise geçerli yürüyüş adımlarıyla yükselir.",
   "tutorialShopPrompt": "Şimdi altınını güce çevirelim. Mağazaya gitmek için düğmeye dokun.",
   "tutorialShopWaiting": "Eğitim altınınla gösterdiğim ilk silahı satın al.",
   "tutorialItemBought": "İşte şimdi güçleniyoruz!",
@@ -937,7 +937,7 @@
   "leaveAdventureWalkWarning": "Zaferi kazandın! Bonus yürüyüşü bırakırsan zafer ödüllerin, kazandığın altın ve günlük çark hakkın korunur. Yalnızca bu maceranın bonus altın oranı sona erer. Yeni macera seçmek istiyor musun?",
   "leaveAdventureWarning": "Düşmanı yenmeden ayrılırsan macera ilerlemen kaybolur ve bu maceradan ödül kazanamazsın. Günlük adımların ve yürüyüşten kazandıkların korunur. Emin misin?",
   "stayInAdventure": "Maceraya devam et",
-  "dailyStepsExplanation": "Günlük adımların macera hedefinden ayrıdır. Yürüyüş ödüllerinde günlük üst sınır yoktur.",
+  "dailyStepsExplanation": "Günlük yürüyüş, macera hedefi ve seviye ilerlemesi ayrı takip edilir. Yürüyüş ödüllerinde günlük üst sınır yoktur.",
   "dailyNotificationChannel": "Günlük seri ve çark",
   "streakReminderTitle": "Kahramanın seni bekliyor!",
   "streakReminderBody": "Hadi ama, bugünkü serimizi de tamamlayalım! Biraz yürüyüş ya da bir zafer yeter. Ben burada seni bekliyorum!",
@@ -952,5 +952,8 @@
   "wheelReadyBody": "Günlük çarkın hazır. Çarkı çevirmek ister misin?",
   "wheelReadyNotification": "Günlük çarkın açıldı! Ödülün seni bekliyor.",
   "goToWheel": "Çarka git",
-  "wheelLater": "Daha sonra bakacağım"
+  "wheelLater": "Daha sonra bakacağım",
+  "levelStepsExplanation": "Geçerli yürüyüş adımları seviyeni artırır. XP, başarım kazanımlarında kullanılan ayrı bir ödül birikimidir; seviye artırmaz.",
+  "separateXpBalance": "XP birikimi: {amount}",
+  "@separateXpBalance": {"placeholders": {"amount": {"type": "String"}}}
 }

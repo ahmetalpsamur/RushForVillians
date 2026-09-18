@@ -347,18 +347,21 @@ void main() {
       expect(await GameStorage.load(avatar: _avatar), isNull);
     });
 
-    test('bozuk kayıttan sonra temiz kayıt yazılabilir', () async {
+    test('unreadable save cannot be overwritten by defaults', () async {
       SharedPreferences.setMockInitialValues({_storageKey: 'bozuk'});
       expect(await GameStorage.load(avatar: _avatar), isNull);
 
-      final restored = await _saveAndLoad(_sampleState());
-
-      expect(restored!.profile.level, 4);
+      await GameStorage.save(_sampleState());
+      expect(GameStorage.writeBlocked, isTrue);
+      expect(
+        (await SharedPreferences.getInstance()).getString(_storageKey),
+        'bozuk',
+      );
     });
   });
 
   group('eksik alanlar', () {
-    test('tamamen boş durum varsayılanlara düşer', () async {
+    test('empty existing save is protected instead of replaced', () async {
       SharedPreferences.setMockInitialValues({
         _storageKey: jsonEncode({
           'schemaVersion': GameStorage.schemaVersion,
@@ -368,14 +371,8 @@ void main() {
 
       final restored = await GameStorage.load(avatar: _avatar);
 
-      expect(restored, isNotNull);
-      expect(restored!.profile.level, 1);
-      expect(restored.profile.xp, 0);
-      expect(restored.profile.coins, 0);
-      expect(restored.profile.totalSteps, 0);
-      expect(restored.profile.ownedItems, isEmpty);
-      expect(restored.profile.lastWheelSpinAt, isNull);
-      expect(restored.today.steps, 0);
+      expect(restored, isNull);
+      expect(GameStorage.writeBlocked, isTrue);
     });
 
     test('eksik alanlar diğer alanları bozmaz', () async {

@@ -1389,7 +1389,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageUnavailable =>
-      'Kayıtlı ilerlemene şu an ulaşılamadı. Oyun geçici bir kayıtla açıldı; uygulamayı yeniden başlatmayı dene.';
+      'Kayıtlı ilerlemen okunamadı. Mevcut kayıt korunuyor; bu oturum kaydının üzerine yazmayacak. Uygulamayı yeniden başlatmayı dene.';
 
   @override
   String get studioSplashSemantics => 'Heapchi Studios açılış ekranı';
@@ -1692,7 +1692,8 @@ class AppLocalizationsTr extends AppLocalizations {
       'Düşmanları yenerek rastgele altın kazanırsın.';
 
   @override
-  String get tutorialRewardXp => 'Deneyim de seni seviye seviye güçlendirir.';
+  String get tutorialRewardXp =>
+      'XP, başarımlarına katkı sağlar. Seviyen ise geçerli yürüyüş adımlarıyla yükselir.';
 
   @override
   String get tutorialShopPrompt =>
@@ -2725,7 +2726,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get dailyStepsExplanation =>
-      'Günlük adımların macera hedefinden ayrıdır. Yürüyüş ödüllerinde günlük üst sınır yoktur.';
+      'Günlük yürüyüş, macera hedefi ve seviye ilerlemesi ayrı takip edilir. Yürüyüş ödüllerinde günlük üst sınır yoktur.';
 
   @override
   String get dailyNotificationChannel => 'Günlük seri ve çark';
@@ -2773,4 +2774,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get wheelLater => 'Daha sonra bakacağım';
+
+  @override
+  String get levelStepsExplanation =>
+      'Geçerli yürüyüş adımları seviyeni artırır. XP, başarım kazanımlarında kullanılan ayrı bir ödül birikimidir; seviye artırmaz.';
+
+  @override
+  String separateXpBalance(String amount) {
+    return 'XP birikimi: $amount';
+  }
 }

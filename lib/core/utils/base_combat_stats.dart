@@ -5,12 +5,8 @@ import '../../models/combat_stats.dart';
 /// Ekipmansız, serisiz bir oyuncunun sahip olduğu değerler. Efektif statlar
 /// bunun üstüne kurulur (`effective_stats.dart`).
 ///
-/// ## Neden doğrusal
-///
-/// Seviye eğrisi zaten karesel bir emek istiyor (`baseXpPerLevel * level`,
-/// bkz. Aşama 2b): 10. seviye 15 gün, 20. seviye 63 gün. Statlar da üstel
-/// büyüseydi, düşman kataloğunun (20 kademe) üst ucu erişilemez, alt ucu
-/// anlamsız olurdu. Doğrusal artış, kademelerin hepsini oynanabilir tutuyor.
+/// Combat stats still scale linearly with the level, independently of the
+/// walking step curve. This update does not rebalance equipment or enemies.
 ///
 /// ## Neden bazı statlar seviyeyle büyümüyor
 ///

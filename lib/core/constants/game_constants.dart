@@ -48,21 +48,11 @@ class GameConstants {
   /// Ejderha görevini tamamlamak için gereken adım sayısı.
   static const int dragonStepGoal = 20000;
 
+  /// Daily walking goal, independent of adventure commitments and level costs.
+  static const int dailyStepGoal = 7000;
+
   /// Yürüyüş özetlerinde kullanılan yaklaşık adım → mesafe dönüşümü.
   static const int stepsPerKilometer = 1250;
-
-  /// Bir seviye atlamak için gereken taban XP. Her seviyede artar.
-  ///
-  /// Eğri `baseXpPerLevel * level`: seviye başına maliyet **doğrusal** artar,
-  /// kümülatif maliyet karesel olur (N. seviyeye ulaşmak `500·N·(N-1)` XP).
-  /// Günlük girdisi kabaca sabit olan bir oyuncu için seviye numarası
-  /// `√gün` hızında ilerler — erken seviyeler hızlı, sonrakiler anlamlı.
-  ///
-  /// **Üstel eğri bilerek seçilmedi:** girdisi gerçek hayattan gelen bir
-  /// oyunda üstel maliyet, bir noktada "aylarca sürecek seviye" üretir ve
-  /// sayı durmuş gibi görünür. Doğrusal artış, sonraki seviyeyi her zaman
-  /// makul bir ufukta tutar.
-  static const int baseXpPerLevel = 1000;
 
   /// Günlük çarkın çevrilebilmesi için gereken minimum adım sayısı.
   static const int dailyWheelUnlockSteps = 3000;
@@ -173,16 +163,7 @@ class GameConstants {
   /// sınırsız büyürdü.
   static const double maxVictorySpeedMultiplier = 1.02;
 
-  /// Kaç adımın 1 XP ettiği.
-  ///
-  /// Seviye eğrisinden ([baseXpPerLevel]) türetildi: 10. seviyeye ulaşmak
-  /// 45.000 XP istiyor. Günde 6.000 adım atan kullanıcı bu oranla 3.000 XP/gün
-  /// kazanır ve 10. seviyeye **yalnızca adımla 15 günde** ulaşır; düşman ve
-  /// çark XP'si bunu ~12 güne indirir. Erken seviyeler günler değil saatler
-  /// sürer, bu da ilk oturumda ilerleme hissi verir.
-  ///
-  /// XP'nin günlük tavanı yoktur. Sahte adıma karşı koruma
-  /// [maxStepsPerMinute] ile yapılır.
+  /// Walking XP remains an independent reward resource, not a level cost.
   static const int stepsPerXp = 2;
 
   /// Kaldırılan günlük coin tavanının eski değeri.

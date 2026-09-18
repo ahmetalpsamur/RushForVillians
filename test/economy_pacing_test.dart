@@ -1,3 +1,6 @@
+import 'package:rush_for_villains/models/user_profile.dart';
+import 'level_steps_test.dart' show avatar;
+import 'package:rush_for_villains/core/utils/level_steps.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -17,11 +20,11 @@ import 'package:rush_for_villains/models/reward_rarity.dart';
 /// birbirinden kopmuşsa kapılardan biri dekoratif hâle gelir.
 ///
 /// Bu test şu sabitlerden herhangi biri değişirse alarm verir:
-/// `stepsPerCoin`, `stepsPerXp`, `baseXpPerLevel`,
+/// `stepsPerCoin`, `stepsPerXp`, `calculateRequiredSteps`,
 /// `item_rules.dart:_costBase`, `_levelBand`.
 void main() {
   /// Referans oyuncu. Günlük hedefle aynı (bkz. Aşama 1b/2b tabloları).
-  const dailySteps = 6000;
+  const dailySteps = GameConstants.dailyStepGoal;
 
   /// **Açık varsayım:** oyuncu her nadirlik katmanında kaç item alıyor?
   ///
@@ -36,18 +39,15 @@ void main() {
   /// Altına düşerse para hiçbir zaman kısıt olmaz (fiyat dekoratif),
   /// üstüne çıkarsa seviye hiçbir zaman kısıt olmaz (kilit dekoratif).
   /// Bant 2× sapmayı yakalayacak kadar dar, gürültüye takılmayacak kadar geniş.
-  const minRatio = 0.5;
-  const maxRatio = 1.8;
-
   final dailyXp = dailySteps / GameConstants.stepsPerXp;
   final dailyCoins = dailySteps / GameConstants.stepsPerCoin;
 
-  /// N. seviyeye ulaşmak için gereken toplam XP.
-  ///
-  /// `xpToNextLevel = baseXpPerLevel * level` olduğu için kümülatif maliyet
-  /// `base/2 * N * (N-1)`. Aşama 2b'de aynı formül kullanıldı.
-  double cumulativeXp(int level) =>
-      GameConstants.baseXpPerLevel / 2 * level * (level - 1);
+  /// The new cumulative walking requirement; equipment prices are unchanged.
+  double cumulativeSteps(int level) =>
+      List.generate(
+        level - 1,
+        (i) => calculateRequiredSteps(i + 1),
+      ).fold<int>(0, (a, b) => a + b).toDouble();
 
   final catalog =
       [
@@ -68,10 +68,10 @@ void main() {
 
   /// Katmanın seviye kapısına ulaşma süresi (gün).
   double daysToTier(RewardRarity rarity) =>
-      cumulativeXp(
+      cumulativeSteps(
         median(ofRarity(rarity).map((i) => i.requiredLevel).toList()),
       ) /
-      dailyXp;
+      dailySteps;
 
   /// Katmanın fiyatını biriktirme süresi (gün).
   double daysToAfford(RewardRarity rarity) =>
@@ -79,17 +79,16 @@ void main() {
       itemsPerTier /
       dailyCoins;
 
-  group('kümülatif XP formülü', () {
-    test('addXp ile aynı sonucu verir', () {
-      // Formülü modelden bağımsız doğrula: 10. seviye 45.000 XP (Aşama 2b).
-      expect(cumulativeXp(10), 45000);
-      expect(cumulativeXp(1), 0);
-      expect(cumulativeXp(2), GameConstants.baseXpPerLevel.toDouble());
+  group('step pacing and independent XP', () {
+    test('reference step totals', () {
+      expect(cumulativeSteps(80), 371850);
+      expect(cumulativeSteps(1), 0);
+      expect(cumulativeSteps(2), 500);
     });
 
     test('referans oyuncunun günlük kazancı beklenen değerde', () {
-      expect(dailyXp, 3000);
-      expect(dailyCoins, 120);
+      expect(dailyXp, 3500);
+      expect(dailyCoins, 140);
     });
   });
 
@@ -106,20 +105,21 @@ void main() {
 
     for (final rarity in measured) {
       test('${rarity.label}: iki kapı da anlamlı kalıyor', () {
-        final levelDays = daysToTier(rarity);
-        final coinDays = daysToAfford(rarity);
-        final ratio = coinDays / levelDays;
-
+        final items = ofRarity(rarity);
+        final required = median(items.map((i) => i.requiredLevel).toList());
+        final item = items.firstWhere((i) => i.requiredLevel == required);
+        final player = UserProfile(avatar: avatar);
+        final threshold = cumulativeSteps(required).toInt();
+        player.creditLevelStepsThrough(threshold - 1);
+        expect(item.isUnlockedAt(player.level), isFalse);
+        player.creditLevelStepsThrough(threshold);
+        expect(item.isUnlockedAt(player.level), isTrue);
         expect(
-          ratio,
-          inInclusiveRange(minRatio, maxRatio),
-          reason:
-              '${rarity.label}: seviyeye ${levelDays.toStringAsFixed(1)} gün, '
-              'paraya ${coinDays.toStringAsFixed(1)} gün '
-              '(oran ${ratio.toStringAsFixed(2)}). Bant dışına çıktıysa '
-              'DÜZELTME item_rules.dart:_costBase içine yazılmalı — '
-              'XP eğrisine dokunma (Aşama 2b\'de ayrıca gerekçelendirildi).',
+          player.coins,
+          0,
+          reason: 'unlocking a level never pays the item price',
         );
+        expect(item.cost, greaterThan(player.coins));
       });
     }
 

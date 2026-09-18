@@ -76,6 +76,17 @@ void main() {
     await tester.pump();
   }
 
+  Future<void> waitForNotice(WidgetTester tester, String text) async {
+    // Step-based levels can queue a level notice before the streak bonus.
+    for (
+      var i = 0;
+      i < 80 && find.textContaining(text).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+  }
+
   testWidgets('seri eşiği geçilince bonus verilir ve duyurulur', (
     tester,
   ) async {
@@ -99,6 +110,7 @@ void main() {
 
     // Kazanılan stat kullanıcıya söylenir.
     final stat = profile.streakStatBonuses.tenths.keys.single;
+    await waitForNotice(tester, '1. gün:');
     expect(find.textContaining('1. gün:'), findsOneWidget);
     expect(find.textContaining(stat.label), findsOneWidget);
   });
@@ -271,6 +283,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 750));
 
     expect(profile.streakDays, 501);
+    await waitForNotice(tester, '501. gün: +%0,5');
     expect(find.textContaining('501. gün: +%0,5'), findsOneWidget);
     expect(find.textContaining('Döngü başa döndü!'), findsOneWidget);
   });
@@ -296,6 +309,7 @@ void main() {
 
     expect(profile.streakDays, 151);
     // İkinci basamak: gün başına +%0,4.
+    await waitForNotice(tester, '151. gün: +%0,4');
     expect(find.textContaining('151. gün: +%0,4'), findsOneWidget);
     expect(find.textContaining('Döngü başa döndü!'), findsNothing);
   });

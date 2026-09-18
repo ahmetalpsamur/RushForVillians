@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -24,17 +25,16 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('tr'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: AppTheme.dark,
         home: Scaffold(
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: HeroProgressRings(
               profile: UserProfile(avatar: _avatar),
-              today: DailyProgress(
-                date: DateTime(2026, 8, 27),
-                steps: steps,
-                stepGoal: 20000,
-              ),
+              today: DailyProgress(date: DateTime(2026, 8, 27), steps: steps),
             ),
           ),
         ),
@@ -47,10 +47,10 @@ void main() {
     tester,
   ) async {
     await pumpRings(tester, 625);
-    expect(find.text('625 / 20000 adım (0,5 km)'), findsOneWidget);
+    expect(find.textContaining('625 / 7.000'), findsOneWidget);
 
     await pumpRings(tester, 14000);
-    expect(find.text('14000 / 20000 adım (11,2 km)'), findsOneWidget);
+    expect(find.textContaining('14.000 / 7.000'), findsOneWidget);
   });
 
   testWidgets('adım kapsülü halka ve stat barı arasında boşlukla durur', (

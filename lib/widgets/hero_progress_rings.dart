@@ -168,8 +168,11 @@ class HeroProgressRings extends StatelessWidget {
           label: context.l10n.levelNumber(profile.level),
           icon: Icons.bolt,
           color: AppColors.xp,
-          progress: profile.xpProgress,
-          valueText: '${profile.xp} / ${profile.xpToNextLevel} XP',
+          progress: profile.levelStepFraction,
+          valueText: context.l10n.dailyStepProgressValue(
+            AppFormatters.integer(context, profile.levelStepProgress),
+            AppFormatters.integer(context, profile.stepsToNextLevel),
+          ),
         ),
       ],
     );
@@ -200,7 +203,7 @@ class _StepProgressLabel extends StatelessWidget {
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              '${context.l10n.stepsLabel(AppFormatters.integer(context, today.steps))} · $distance km',
+              '${context.l10n.dailyStepProgressValue(AppFormatters.integer(context, today.steps), AppFormatters.integer(context, today.stepGoal))} · $distance km',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
