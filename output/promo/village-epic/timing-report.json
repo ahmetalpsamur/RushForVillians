@@ -1,0 +1,130 @@
+[
+  {
+    "line": 0,
+    "speaker": "PINKY",
+    "duration": 3.1053125,
+    "start": 3.7,
+    "end": 8.1,
+    "tempo": 1
+  },
+  {
+    "line": 1,
+    "speaker": "PINKY",
+    "duration": 1.883875,
+    "start": 11.4,
+    "end": 14.4,
+    "tempo": 1
+  },
+  {
+    "line": 2,
+    "speaker": "PINKY",
+    "duration": 2.7883541666666667,
+    "start": 15.8,
+    "end": 18.9,
+    "tempo": 1
+  },
+  {
+    "line": 3,
+    "speaker": "MAVILI",
+    "duration": 1.3884375,
+    "start": 20,
+    "end": 22.3,
+    "tempo": 1
+  },
+  {
+    "line": 4,
+    "speaker": "KUP KUZU",
+    "duration": 1.8713125,
+    "start": 22.5,
+    "end": 24.6,
+    "tempo": 1
+  },
+  {
+    "line": 5,
+    "speaker": "PINKY",
+    "duration": 1.9993125,
+    "start": 25,
+    "end": 28.8,
+    "tempo": 1
+  },
+  {
+    "line": 6,
+    "speaker": "PINKY",
+    "duration": 1.2261041666666668,
+    "start": 32.1,
+    "end": 34.1,
+    "tempo": 1
+  },
+  {
+    "line": 7,
+    "speaker": "PINKY",
+    "duration": 1.3606666666666667,
+    "start": 39,
+    "end": 41.3,
+    "tempo": 1
+  },
+  {
+    "line": 8,
+    "speaker": "KUP KUZU",
+    "duration": 0.5817083333333334,
+    "start": 45.3,
+    "end": 46.8,
+    "tempo": 1
+  },
+  {
+    "line": 9,
+    "speaker": "MAVILI",
+    "duration": 1.2329375,
+    "start": 47.1,
+    "end": 49.4,
+    "tempo": 1
+  },
+  {
+    "line": 10,
+    "speaker": "MAVILI",
+    "duration": 0.7249583333333334,
+    "start": 49.7,
+    "end": 51.9,
+    "tempo": 1
+  },
+  {
+    "line": 10,
+    "speaker": "KUP KUZU",
+    "duration": 1.1392708333333332,
+    "start": 49.7,
+    "end": 51.9,
+    "tempo": 1
+  },
+  {
+    "line": 11,
+    "speaker": "PINKY",
+    "duration": 1.9126041666666667,
+    "start": 52.3,
+    "end": 55.7,
+    "tempo": 1
+  },
+  {
+    "line": 12,
+    "speaker": "PINKY",
+    "duration": 2.5247291666666665,
+    "start": 57,
+    "end": 61.8,
+    "tempo": 1
+  },
+  {
+    "line": 13,
+    "speaker": "PINKY",
+    "duration": 1.7105625,
+    "start": 62.1,
+    "end": 64.8,
+    "tempo": 1
+  },
+  {
+    "line": 14,
+    "speaker": "PINKY",
+    "duration": 1.0158333333333334,
+    "start": 68,
+    "end": 71.2,
+    "tempo": 1
+  }
+]

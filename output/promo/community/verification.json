@@ -1,0 +1,16 @@
+{
+  "file": "rush-for-villains-android-beta-community.mp4",
+  "duration_seconds": 76,
+  "resolution": "1080x1920",
+  "fps": 30,
+  "frames": 2280,
+  "full_decode": "passed",
+  "voice_tracks": 23,
+  "distinct_character_voices": 3,
+  "voice_timing": "passed",
+  "subtitle_timecodes": "passed",
+  "final_cta_reading_seconds": 7.9,
+  "sprite_placements_checked": 8074,
+  "out_of_bounds": 0,
+  "bytes": 9012589
+}

@@ -1,3 +1,4 @@
+import 'daily_engagement.dart';
 import '../core/utils/game_clock.dart';
 import '../data/enemy_catalog.dart';
 import 'adventure_quest.dart';
@@ -18,12 +19,14 @@ import 'user_profile.dart';
 /// Avatar burada tutulmaz; o [CharacterStorage] tarafından ayrıca saklanır ve
 /// okuma sırasında dışarıdan verilir.
 class GameState {
+  final DailyEngagement? engagement;
   final UserProfile profile;
   final DailyProgress today;
   final AdventureQuest? adventure;
   final List<DailyStepRecord> stepHistory;
 
   const GameState({
+    this.engagement,
     required this.profile,
     required this.today,
     this.adventure,
@@ -31,6 +34,7 @@ class GameState {
   });
 
   Map<String, Object?> toJson() => {
+    'engagement': engagement?.toJson(),
     'profile': profile.toJson(),
     'today': today.toJson(),
     'adventure': adventure?.toJson(),
@@ -56,6 +60,7 @@ class GameState {
             : DailyProgress(date: GameClock.now());
 
     return GameState(
+      engagement: DailyEngagement.fromJson(json['engagement']),
       profile: profile,
       today: today,
       adventure: _adventureFromJson(json['adventure']),

@@ -323,7 +323,7 @@ abstract class AppLocalizations {
   /// No description provided for @wheelUnlockRequirement.
   ///
   /// In tr, this message translates to:
-  /// **'Çarkı açmak için bir macera tamamla (düşmanı devir) ya da {goal} adım at. {remaining} adım kaldı.'**
+  /// **'Günlük çarkı açmak için bugün bir düşmanı yen ya da {goal} adım at. Zaferden sonra bonus yürüyüşü bitirmen gerekmez. {remaining} adım kaldı.'**
   String wheelUnlockRequirement(int goal, int remaining);
 
   /// No description provided for @newWheelPrefix.
@@ -4398,6 +4398,114 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Bozkır Binicisi'**
   String get classOrcRider;
+
+  /// No description provided for @leaveAdventureTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Maceradan ayrılmak istiyor musun?'**
+  String get leaveAdventureTitle;
+
+  /// No description provided for @leaveAdventureWalkWarning.
+  ///
+  /// In tr, this message translates to:
+  /// **'Zaferi kazandın! Bonus yürüyüşü bırakırsan zafer ödüllerin, kazandığın altın ve günlük çark hakkın korunur. Yalnızca bu maceranın bonus altın oranı sona erer. Yeni macera seçmek istiyor musun?'**
+  String get leaveAdventureWalkWarning;
+
+  /// No description provided for @leaveAdventureWarning.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düşmanı yenmeden ayrılırsan macera ilerlemen kaybolur ve bu maceradan ödül kazanamazsın. Günlük adımların ve yürüyüşten kazandıkların korunur. Emin misin?'**
+  String get leaveAdventureWarning;
+
+  /// No description provided for @stayInAdventure.
+  ///
+  /// In tr, this message translates to:
+  /// **'Maceraya devam et'**
+  String get stayInAdventure;
+
+  /// No description provided for @dailyStepsExplanation.
+  ///
+  /// In tr, this message translates to:
+  /// **'Günlük adımların macera hedefinden ayrıdır. Yürüyüş ödüllerinde günlük üst sınır yoktur.'**
+  String get dailyStepsExplanation;
+
+  /// No description provided for @dailyNotificationChannel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Günlük seri ve çark'**
+  String get dailyNotificationChannel;
+
+  /// No description provided for @streakReminderTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kahramanın seni bekliyor!'**
+  String get streakReminderTitle;
+
+  /// No description provided for @streakReminderBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hadi ama, bugünkü serimizi de tamamlayalım! Biraz yürüyüş ya da bir zafer yeter. Ben burada seni bekliyorum!'**
+  String get streakReminderBody;
+
+  /// No description provided for @streakCompleteTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Günlük seri tamamlandı!'**
+  String get streakCompleteTitle;
+
+  /// No description provided for @streakCompleteBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Serin {days} güne ulaştı. Böyle devam et!'**
+  String streakCompleteBody(int days);
+
+  /// No description provided for @streakCelebrationTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'{days} günlük seri!'**
+  String streakCelebrationTitle(int days);
+
+  /// No description provided for @streakCelebrationBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bugün de kendin için bir adım attın. Kahramanın seninle gurur duyuyor. Böyle devam et!'**
+  String get streakCelebrationBody;
+
+  /// No description provided for @dailyContinue.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam et'**
+  String get dailyContinue;
+
+  /// No description provided for @wheelReadyTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çark tamir edildi!'**
+  String get wheelReadyTitle;
+
+  /// No description provided for @wheelReadyBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Günlük çarkın hazır. Çarkı çevirmek ister misin?'**
+  String get wheelReadyBody;
+
+  /// No description provided for @wheelReadyNotification.
+  ///
+  /// In tr, this message translates to:
+  /// **'Günlük çarkın açıldı! Ödülün seni bekliyor.'**
+  String get wheelReadyNotification;
+
+  /// No description provided for @goToWheel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çarka git'**
+  String get goToWheel;
+
+  /// No description provided for @wheelLater.
+  ///
+  /// In tr, this message translates to:
+  /// **'Daha sonra bakacağım'**
+  String get wheelLater;
 }
 
 class _AppLocalizationsDelegate

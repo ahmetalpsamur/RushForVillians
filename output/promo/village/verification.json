@@ -1,0 +1,16 @@
+{
+  "file": "rush-for-villains-village-75s.mp4",
+  "duration_seconds": 75,
+  "resolution": "1080x1920",
+  "fps": 30,
+  "frames": 2250,
+  "full_decode": "passed",
+  "dialogue_lines": 15,
+  "voice_tracks": 16,
+  "adult_english_voices": 3,
+  "voice_speed_multiplier": 1,
+  "final_card_static_seconds": 3,
+  "subtitles": "passed",
+  "actual_flutter_combat_frames": 120,
+  "bytes": 10915660
+}

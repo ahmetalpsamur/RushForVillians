@@ -19,6 +19,17 @@ import AVFoundation
     GeneratedPluginRegistrant.register(with: self)
     registerStepSensorChannels()
     registerLaunchSoundChannel()
+    if let controller = window?.rootViewController as? FlutterViewController {
+      FlutterMethodChannel(name: "rush_for_villains/daily_notifications",
+        binaryMessenger: controller.binaryMessenger).setMethodCallHandler { call, result in
+        guard call.method == "configuration" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        result(["timeZone": TimeZone.current.identifier, "directory": directory.path])
+      }
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

@@ -1,5 +1,10 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+
+import '../core/utils/game_day.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -33,6 +38,163 @@ class AdventureNotificationService {
   static String? _attachmentPath;
   static bool _initialized = false;
 
+  static final ValueNotifier<String?> tappedPayload = ValueNotifier(null);
+  static const noonReminderId = 4300;
+  static const noonReminderCount = 30;
+  static const streakCompletedId = 4201;
+  static const wheelUnlockedId = 4202;
+  static const _dailyChannel = MethodChannel(
+    'rush_for_villains/daily_notifications',
+  );
+  static Future<void> _dailyQueue = Future.value();
+
+  static String dailyPayload(String kind, DateTime day) =>
+      '$kind|${GameDay.startOf(day).toIso8601String()}';
+
+  /// Device-local noon; calendar construction also handles DST boundaries.
+  static DateTime nextNoon(DateTime now, {required bool openedToday}) {
+    final noon = DateTime(now.year, now.month, now.day, 12);
+    return !openedToday && now.isBefore(noon)
+        ? noon
+        : DateTime(now.year, now.month, now.day + 1, 12);
+  }
+
+  static Future<void> _dailyOperation(Future<void> Function() operation) {
+    final next = _dailyQueue.then((_) async {
+      if (!_initialized) return;
+      try {
+        await operation();
+      } catch (_) {
+        // Permission denial, unavailable platform, or artwork must never block play.
+      }
+    });
+    _dailyQueue = next;
+    return next;
+  }
+
+  static Future<Map<Object?, Object?>> _dailyConfiguration() async {
+    final config =
+        await _dailyChannel.invokeMethod<Map<Object?, Object?>>(
+          'configuration',
+        ) ??
+        {};
+    final name = config['timeZone'];
+    if (name is String) tz.setLocalLocation(tz.getLocation(name));
+    return config;
+  }
+
+  static Future<String?> _dailyArtwork(
+    String asset,
+    Map<Object?, Object?> config,
+  ) async {
+    try {
+      final root = config['directory'];
+      if (root is! String) return null;
+      final directory = await Directory(
+        '$root/daily_notifications',
+      ).create(recursive: true);
+      final file = File('${directory.path}/character.png');
+      final data = await rootBundle.load(asset);
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        targetWidth: 512,
+      );
+      try {
+        final frame = await codec.getNextFrame();
+        try {
+          final png = await frame.image.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
+          if (png == null) return null;
+          await file.writeAsBytes(
+            png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+            flush: true,
+          );
+        } finally {
+          frame.image.dispose();
+        }
+      } finally {
+        codec.dispose();
+      }
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static NotificationDetails _dailyDetails(
+    String channelName,
+    String body, {
+    String? artwork,
+  }) => NotificationDetails(
+    android: AndroidNotificationDetails(
+      'daily_progress',
+      channelName,
+      importance: Importance.high,
+      priority: Priority.high,
+      styleInformation:
+          artwork == null
+              ? BigTextStyleInformation(body)
+              : BigPictureStyleInformation(
+                FilePathAndroidBitmap(artwork),
+                summaryText: body,
+              ),
+      largeIcon: artwork == null ? null : FilePathAndroidBitmap(artwork),
+    ),
+    iOS: DarwinNotificationDetails(
+      attachments:
+          artwork == null ? null : [DarwinNotificationAttachment(artwork)],
+    ),
+  );
+
+  /// Opening the app removes today's reminder and starts daily repetition tomorrow.
+  static Future<void> scheduleNoonReminder({
+    required DateTime now,
+    required String title,
+    required String body,
+    required String channelName,
+    required String characterAsset,
+  }) => _dailyOperation(() async {
+    for (var i = 0; i < noonReminderCount; i++) {
+      await _notifications.cancel(noonReminderId + i);
+    }
+    final config = await _dailyConfiguration();
+    final artwork = await _dailyArtwork(characterAsset, config);
+    final noon = nextNoon(now, openedToday: true);
+    // Date-only requests avoid iOS time-only repetition firing again today.
+    // Refill 30 days at each visit, below the shared 64-request iOS limit.
+    for (var i = 0; i < noonReminderCount; i++) {
+      await _notifications.zonedSchedule(
+        noonReminderId + i,
+        title,
+        body,
+        tz.TZDateTime(tz.local, noon.year, noon.month, noon.day + i, 12),
+        _dailyDetails(channelName, body, artwork: artwork),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: 'daily-reminder',
+      );
+    }
+  });
+
+  static Future<void> notifyDaily({
+    required int id,
+    required String title,
+    required String body,
+    required String channelName,
+    required String payload,
+  }) => _dailyOperation(() async {
+    await _notifications.show(
+      id,
+      title,
+      body,
+      _dailyDetails(channelName, body),
+      payload: payload,
+    );
+  });
+
+  static Future<void> dismissDailyNotification(int id) =>
+      _dailyOperation(() => _notifications.cancel(id));
+
   static Future<void> initialize() async {
     tz_data.initializeTimeZones();
     tz.setLocalLocation(tz.UTC);
@@ -45,7 +207,16 @@ class AdventureNotificationService {
     );
     const settings = InitializationSettings(android: android, iOS: darwin);
     try {
-      await _notifications.initialize(settings);
+      await _notifications.initialize(
+        settings,
+        onDidReceiveNotificationResponse: (response) {
+          tappedPayload.value = response.payload;
+        },
+      );
+      final launch = await _notifications.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp == true) {
+        tappedPayload.value = launch?.notificationResponse?.payload;
+      }
       _initialized = true;
       await cancelAdventureReminders();
     } catch (_) {

@@ -24,7 +24,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 23;
+  static const int schemaVersion = 24;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -309,6 +309,8 @@ class GameStorage {
     // Eski kayıtta başlangıç modelin güvenli geri dönüşüyle türetilir; hedef
     // damgası ilk uygun adım raporunda kaydedilir.
     22: (state) => state,
+    // Daily notification and celebration acknowledgements default to unseen.
+    23: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

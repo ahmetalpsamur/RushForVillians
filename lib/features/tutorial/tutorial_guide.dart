@@ -335,6 +335,7 @@ class TutorialGuideFrame {
 
 /// Her rota üzerinde kullanılabilen; hedef dışındaki UI'ı kilitleyen guide katmanı.
 class TutorialGuideOverlay extends StatefulWidget {
+  final bool showConversation;
   final ValueListenable<TutorialGuideStep> step;
   final ValueChanged<TutorialGuideStep> onPrimary;
   final ValueChanged<TutorialGuideStep> onSecondary;
@@ -357,6 +358,7 @@ class TutorialGuideOverlay extends StatefulWidget {
 
   const TutorialGuideOverlay({
     super.key,
+    this.showConversation = true,
     required this.step,
     required this.onPrimary,
     required this.onSecondary,
@@ -445,44 +447,45 @@ class _TutorialGuideOverlayState extends State<TutorialGuideOverlay> {
                 if (!leaving)
                   Positioned.fill(child: _TutorialInteractionBarrier(target)),
                 if (target != null) _TargetArrow(rect: target),
-                AnimatedAlign(
-                  duration:
-                      step == TutorialGuideStep.leaving
-                          ? const Duration(milliseconds: 950)
-                          : step == TutorialGuideStep.wheelReward
-                          ? Duration.zero
-                          : const Duration(milliseconds: 560),
-                  curve: Curves.easeInOutCubic,
-                  alignment: frame.alignment,
-                  child: AnimatedOpacity(
-                    key: const ValueKey('tutorial-guide-body'),
-                    opacity: _leaveOpacity,
-                    duration: TutorialGuideOverlay.farewellFade,
-                    child: IgnorePointer(
-                      // Yalnızca bilgi veren balon hedefin üzerinden geçerken
-                      // bile zorunlu hedef dokunmasını engellememeli. Eylem
-                      // düğmeli balonlar kendi düğmelerini almaya devam eder.
-                      ignoring:
-                          leaving ||
-                          (frame.primaryLabel == null &&
-                              frame.secondaryLabel == null),
-                      child: _GuideConversation(
-                        key: ValueKey(step),
-                        frame: frame,
-                        animation: _transientAnimation ?? frame.animation,
-                        guide: widget.guide,
-                        onPrimary:
-                            frame.primaryLabel == null
-                                ? null
-                                : () => widget.onPrimary(step),
-                        onSecondary:
-                            frame.secondaryLabel == null
-                                ? null
-                                : () => widget.onSecondary(step),
+                if (widget.showConversation)
+                  AnimatedAlign(
+                    duration:
+                        step == TutorialGuideStep.leaving
+                            ? const Duration(milliseconds: 950)
+                            : step == TutorialGuideStep.wheelReward
+                            ? Duration.zero
+                            : const Duration(milliseconds: 560),
+                    curve: Curves.easeInOutCubic,
+                    alignment: frame.alignment,
+                    child: AnimatedOpacity(
+                      key: const ValueKey('tutorial-guide-body'),
+                      opacity: _leaveOpacity,
+                      duration: TutorialGuideOverlay.farewellFade,
+                      child: IgnorePointer(
+                        // Yalnızca bilgi veren balon hedefin üzerinden geçerken
+                        // bile zorunlu hedef dokunmasını engellememeli. Eylem
+                        // düğmeli balonlar kendi düğmelerini almaya devam eder.
+                        ignoring:
+                            leaving ||
+                            (frame.primaryLabel == null &&
+                                frame.secondaryLabel == null),
+                        child: _GuideConversation(
+                          key: ValueKey(step),
+                          frame: frame,
+                          animation: _transientAnimation ?? frame.animation,
+                          guide: widget.guide,
+                          onPrimary:
+                              frame.primaryLabel == null
+                                  ? null
+                                  : () => widget.onPrimary(step),
+                          onSecondary:
+                              frame.secondaryLabel == null
+                                  ? null
+                                  : () => widget.onSecondary(step),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
@@ -923,4 +926,32 @@ class _RenderTutorialInteractionBarrier extends RenderBox {
 
   @override
   void handleEvent(PointerEvent event, covariant HitTestEntry entry) {}
+}
+
+/// A layout-owned conversation that never paints over the screen content.
+class TutorialGuideConversation extends StatelessWidget {
+  final TutorialGuideStep step;
+  final TutorialGuideVariant guide;
+  final VoidCallback onPrimary;
+  final VoidCallback onSecondary;
+  const TutorialGuideConversation({
+    super.key,
+    required this.step,
+    required this.guide,
+    required this.onPrimary,
+    required this.onSecondary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final frame = TutorialGuideFrame.forStep(step, context.l10n);
+    return _GuideConversation(
+      key: ValueKey(step),
+      frame: frame,
+      animation: frame.animation,
+      guide: guide,
+      onPrimary: frame.primaryLabel == null ? null : onPrimary,
+      onSecondary: frame.secondaryLabel == null ? null : onSecondary,
+    );
+  }
 }

@@ -1,0 +1,59 @@
+{
+  "format": "1080x1920, 9:16, 30 fps, H.264/AAC",
+  "physical_steps": false,
+  "capture": "Actual application web build; built-in demo step controls",
+  "planned_app_footage_seconds": 14.5,
+  "variants": {
+    "a": {
+      "file": "Rush-for-Villains-A-FINAL.mp4",
+      "frames": 690,
+      "duration": "00:00:23.00",
+      "bytes": 2539473,
+      "decode_errors": false,
+      "sha256": "94ce8bf84bc42a9a02bfe3d3884b84bdcd4ee2136e3d9b9aeb5903a970beda57",
+      "integrated_lufs": "-15.19",
+      "true_peak_dbtp": "-3.06"
+    },
+    "b": {
+      "file": "Rush-for-Villains-B-FINAL.mp4",
+      "frames": 690,
+      "duration": "00:00:23.00",
+      "bytes": 2541692,
+      "decode_errors": false,
+      "sha256": "24aabcdc68702491ac47e6977f9f8b1b0ac57208bfaed8d6f3c6a0938272f1de",
+      "integrated_lufs": "-15.39",
+      "true_peak_dbtp": "-3.00"
+    },
+    "c": {
+      "file": "Rush-for-Villains-C-FINAL.mp4",
+      "frames": 690,
+      "duration": "00:00:23.00",
+      "bytes": 2552067,
+      "decode_errors": false,
+      "sha256": "6c4ffcd07899c10098581043b5f4dee3316e545dc2bc0417bddcc669e8839502",
+      "integrated_lufs": "-15.00",
+      "true_peak_dbtp": "-3.06"
+    },
+    "opening-b": {
+      "file": "opening-B-2s.mp4",
+      "frames": 60,
+      "duration": "00:00:02.00",
+      "bytes": 148594,
+      "decode_errors": false,
+      "sha256": "e2166342664ab72d44615dd5c55de42225e4790538295cd1dd3abe9841abc561"
+    },
+    "opening-c": {
+      "file": "opening-C-2s.mp4",
+      "frames": 60,
+      "duration": "00:00:02.00",
+      "bytes": 158446,
+      "decode_errors": false,
+      "sha256": "fd9168f0cd7106443fc024a463099d75bf63b08ab42caeded23f156895e39e23"
+    }
+  },
+  "checks": {
+    "common_pcm_after_2s_identical": true,
+    "b_common_video_mean_pixel_error_0_to_255": 0.0,
+    "c_common_video_mean_pixel_error_0_to_255": 0.0
+  }
+}

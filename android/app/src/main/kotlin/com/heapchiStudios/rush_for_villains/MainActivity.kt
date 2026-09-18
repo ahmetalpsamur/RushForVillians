@@ -14,6 +14,13 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "rush_for_villains/daily_notifications").setMethodCallHandler { call, result ->
+            if (call.method == "configuration") {
+                result.success(mapOf("timeZone" to java.util.TimeZone.getDefault().id,
+                    "directory" to filesDir.absolutePath))
+            } else result.notImplemented()
+        }
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,

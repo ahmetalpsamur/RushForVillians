@@ -1,0 +1,15 @@
+{
+  "file": "rush-for-villains-pinky-adventure-en-adult-voice.mp4",
+  "voice": "en-US-AvaMultilingualNeural",
+  "pitch_adjustment_hz": 0,
+  "seconds": 40,
+  "resolution": "1080x1920",
+  "fps": 30,
+  "frames": 1200,
+  "encoded_video_unchanged": true,
+  "video_hash": "SHA256=9ba1d390a588a9b2da235b08dfc7aba11b8151d17b7e5b5b6376fec2edc13b88",
+  "full_decode": "passed",
+  "complete_voice_lines": 12,
+  "maximum_tempo_fit": 1.131,
+  "bytes": 10273251
+}

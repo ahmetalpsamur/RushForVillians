@@ -1,3 +1,4 @@
+import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -613,6 +614,10 @@ void main() {
             avatar: _avatar,
             initialState: GameState(
               profile: UserProfile(avatar: _avatar, level: 50),
+              engagement: DailyEngagement(
+                streakCelebratedOn: GameClock.now(),
+                wheelPromptedOn: GameClock.now(),
+              ),
               today: DailyProgress(date: GameClock.now()),
             ),
             onAvatarChanged: (_) {},
@@ -720,8 +725,28 @@ void main() {
       final adventureScreen = tester.widget<AdventureScreen>(
         find.byType(AdventureScreen),
       );
+      await tester.tap(find.byKey(const ValueKey('adventure-close')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      await tester.tap(find.text('Maceraya devam et'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        tester.widget<AdventureScreen>(find.byType(AdventureScreen)).adventure,
+        same(adventureScreen.adventure),
+      );
       adventureScreen.onChooseNewAdventure();
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(AlertDialog),
+              matching: find.byType(TextButton),
+            )
+            .last,
+      );
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(NavigationBar), findsOneWidget);
 
       await tester.tap(find.text('Ana Sayfa').last);
@@ -750,7 +775,16 @@ void main() {
         find.byType(AdventureScreen),
       );
       screen.onChooseNewAdventure();
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(AlertDialog),
+              matching: find.byType(TextButton),
+            )
+            .last,
+      );
+      await tester.pump(const Duration(milliseconds: 300));
 
       final after = await savedToday(tester);
       expect(after.coinsEarned, 20000 ~/ GameConstants.stepsPerCoin);

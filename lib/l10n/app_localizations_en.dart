@@ -185,7 +185,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String wheelUnlockRequirement(int goal, int remaining) {
-    return 'Complete an adventure (defeat the enemy) or take $goal steps to unlock the wheel. $remaining steps remaining.';
+    return 'Defeat an enemy today or take $goal steps to unlock the daily wheel. You do not need to finish the bonus walk after winning. $remaining steps remaining.';
   }
 
   @override
@@ -2227,7 +2227,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String roundGoalSummary(int rounds, String steps, String duration) {
-    return '$rounds rounds · $steps steps/round · $duration/round';
+    String _temp0 = intl.Intl.pluralLogic(
+      rounds,
+      locale: localeName,
+      other: '$rounds rounds',
+      one: '1 round',
+    );
+    return '$_temp0 · $steps steps/round · $duration/round';
   }
 
   @override
@@ -2824,4 +2830,69 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get classOrcRider => 'Steppe Rider';
+
+  @override
+  String get leaveAdventureTitle => 'Leave adventure?';
+
+  @override
+  String get leaveAdventureWalkWarning =>
+      'You won! Ending the bonus walk keeps your victory rewards, earned gold, and daily wheel access. Only this adventure\'s bonus gold rate ends. Would you like to choose a new adventure?';
+
+  @override
+  String get leaveAdventureWarning =>
+      'If you leave before defeating the enemy, your adventure progress will be lost and you will not earn any adventure rewards. Your daily steps and walking earnings will be kept. Are you sure?';
+
+  @override
+  String get stayInAdventure => 'Keep adventuring';
+
+  @override
+  String get dailyStepsExplanation =>
+      'Daily steps are separate from your adventure goal. There is no daily walking reward limit.';
+
+  @override
+  String get dailyNotificationChannel => 'Daily streak and wheel';
+
+  @override
+  String get streakReminderTitle => 'Your hero is waiting!';
+
+  @override
+  String get streakReminderBody =>
+      'Hey, how about keeping today\'s streak going? A little walk or one victory will do. I\'ll be right here!';
+
+  @override
+  String get streakCompleteTitle => 'Streak complete!';
+
+  @override
+  String streakCompleteBody(int days) {
+    return 'Your streak is now $days days. Keep it going!';
+  }
+
+  @override
+  String streakCelebrationTitle(int days) {
+    return '$days-day streak!';
+  }
+
+  @override
+  String get streakCelebrationBody =>
+      'You showed up for yourself today. Your hero is proud of you. Keep it going!';
+
+  @override
+  String get dailyContinue => 'Continue';
+
+  @override
+  String get wheelReadyTitle => 'The wheel is repaired!';
+
+  @override
+  String get wheelReadyBody =>
+      'Your daily wheel is ready. Would you like to give it a spin?';
+
+  @override
+  String get wheelReadyNotification =>
+      'Your daily wheel is unlocked! Your reward is waiting.';
+
+  @override
+  String get goToWheel => 'Go to the wheel';
+
+  @override
+  String get wheelLater => 'I\'ll check later';
 }

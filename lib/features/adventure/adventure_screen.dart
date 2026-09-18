@@ -3442,7 +3442,7 @@ class _GoalSelectorButton extends StatelessWidget {
                         AttackConfig.roundCountForSteps(goal),
                         AppFormatters.integer(
                           context,
-                          GameConstants.combatRoundStepTarget,
+                          goal.clamp(1, GameConstants.combatRoundStepTarget),
                         ),
                         context.l10n.adventureDuration(
                           GameConstants.combatRoundDuration,

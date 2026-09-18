@@ -1,0 +1,17 @@
+{
+  "file": "rush-for-villains-natural-voices.mp4",
+  "duration_seconds": 118.3,
+  "resolution": "1080x1920",
+  "aspect_ratio": "9:16",
+  "fps": 30,
+  "frames": 3549,
+  "full_decode": "passed",
+  "dialogue_lines": 48,
+  "voice_tracks": 49,
+  "voice_timing": "passed",
+  "subtitle_timecodes": "passed",
+  "peak_audio": 0.793,
+  "sprite_placements_checked": 6350,
+  "out_of_bounds": 0,
+  "bytes": 9109754
+}

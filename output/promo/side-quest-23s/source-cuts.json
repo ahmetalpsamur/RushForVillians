@@ -1,0 +1,34 @@
+{
+  "source": "page@b634b8f3e003245e5cbe5e5302c52441.webm",
+  "crop": [
+    0,
+    0,
+    432,
+    768
+  ],
+  "selection": [
+    214,
+    216
+  ],
+  "details": [
+    260,
+    262
+  ],
+  "progress": [
+    302,
+    304.5
+  ],
+  "strike": [
+    334,
+    334.8
+  ],
+  "result": [
+    350,
+    353.2
+  ],
+  "final": [
+    380,
+    384
+  ],
+  "input": "Actual local web application; built-in demo steps, not physical walking"
+}

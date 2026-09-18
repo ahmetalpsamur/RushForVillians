@@ -200,7 +200,7 @@ class _StepProgressLabel extends StatelessWidget {
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              context.l10n.stepProgress(today.steps, today.stepGoal, distance),
+              '${context.l10n.stepsLabel(AppFormatters.integer(context, today.steps))} · $distance km',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),

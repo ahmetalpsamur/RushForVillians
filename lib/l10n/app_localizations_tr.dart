@@ -148,7 +148,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String wheelUnlockRequirement(int goal, int remaining) {
-    return 'Çarkı açmak için bir macera tamamla (düşmanı devir) ya da $goal adım at. $remaining adım kaldı.';
+    return 'Günlük çarkı açmak için bugün bir düşmanı yen ya da $goal adım at. Zaferden sonra bonus yürüyüşü bitirmen gerekmez. $remaining adım kaldı.';
   }
 
   @override
@@ -2708,4 +2708,69 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get classOrcRider => 'Bozkır Binicisi';
+
+  @override
+  String get leaveAdventureTitle => 'Maceradan ayrılmak istiyor musun?';
+
+  @override
+  String get leaveAdventureWalkWarning =>
+      'Zaferi kazandın! Bonus yürüyüşü bırakırsan zafer ödüllerin, kazandığın altın ve günlük çark hakkın korunur. Yalnızca bu maceranın bonus altın oranı sona erer. Yeni macera seçmek istiyor musun?';
+
+  @override
+  String get leaveAdventureWarning =>
+      'Düşmanı yenmeden ayrılırsan macera ilerlemen kaybolur ve bu maceradan ödül kazanamazsın. Günlük adımların ve yürüyüşten kazandıkların korunur. Emin misin?';
+
+  @override
+  String get stayInAdventure => 'Maceraya devam et';
+
+  @override
+  String get dailyStepsExplanation =>
+      'Günlük adımların macera hedefinden ayrıdır. Yürüyüş ödüllerinde günlük üst sınır yoktur.';
+
+  @override
+  String get dailyNotificationChannel => 'Günlük seri ve çark';
+
+  @override
+  String get streakReminderTitle => 'Kahramanın seni bekliyor!';
+
+  @override
+  String get streakReminderBody =>
+      'Hadi ama, bugünkü serimizi de tamamlayalım! Biraz yürüyüş ya da bir zafer yeter. Ben burada seni bekliyorum!';
+
+  @override
+  String get streakCompleteTitle => 'Günlük seri tamamlandı!';
+
+  @override
+  String streakCompleteBody(int days) {
+    return 'Serin $days güne ulaştı. Böyle devam et!';
+  }
+
+  @override
+  String streakCelebrationTitle(int days) {
+    return '$days günlük seri!';
+  }
+
+  @override
+  String get streakCelebrationBody =>
+      'Bugün de kendin için bir adım attın. Kahramanın seninle gurur duyuyor. Böyle devam et!';
+
+  @override
+  String get dailyContinue => 'Devam et';
+
+  @override
+  String get wheelReadyTitle => 'Çark tamir edildi!';
+
+  @override
+  String get wheelReadyBody =>
+      'Günlük çarkın hazır. Çarkı çevirmek ister misin?';
+
+  @override
+  String get wheelReadyNotification =>
+      'Günlük çarkın açıldı! Ödülün seni bekliyor.';
+
+  @override
+  String get goToWheel => 'Çarka git';
+
+  @override
+  String get wheelLater => 'Daha sonra bakacağım';
 }

@@ -1,0 +1,17 @@
+{
+  "file": "rush-for-villains-friendly-rivalry.mp4",
+  "duration_seconds": 88.96666666666667,
+  "resolution": "1080x1920",
+  "aspect_ratio": "9:16",
+  "fps": 30,
+  "frames": 2669,
+  "full_decode": "passed",
+  "dialogue_lines": 48,
+  "voice_tracks": 49,
+  "voice_timing": "passed",
+  "subtitle_timecodes": "passed",
+  "peak_audio": 0.789,
+  "sprite_placements_checked": 4804,
+  "out_of_bounds": 0,
+  "bytes": 7649567
+}

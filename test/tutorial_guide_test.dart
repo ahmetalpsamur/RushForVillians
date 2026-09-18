@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
+import 'package:rush_for_villains/l10n/app_localizations_en.dart';
+import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/features/inventory/inventory_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
@@ -17,6 +19,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('English adventure summary uses singular and plural rounds', () {
+    final l10n = AppLocalizationsEn();
+    expect(l10n.roundGoalSummary(1, '500', '15 min'), startsWith('1 round '));
+    expect(l10n.roundGoalSummary(2, '1,000', '15 min'), startsWith('2 rounds '));
+  });
 
   test('guide state gerçek assetlere merkezi olarak eşlenir', () {
     expect(
@@ -187,6 +195,10 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(
+      tester.getRect(find.byType(HomeScreen)).bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(TutorialGuideConversation)).top),
+    );
     expect(find.textContaining('Maceranda yanında olacağım'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('tutorial-primary-action')));

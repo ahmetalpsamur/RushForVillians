@@ -1,0 +1,128 @@
+Create a cinematic, story-driven, cute and exciting vertical 9:16 animated advertisement for Rush for Villains. Target duration: 60–75 seconds.
+Use the project’s existing Pinky, Mavili, Küp Kuzu, enemy, class and app assets. Preserve their original designs, colors, proportions and visual identities. Do not replace them with newly generated characters.
+WORLD AND CHARACTERS
+A charming fantasy village is home to three friendly communities: Pinkys, Mavilis and Küp Kuzus. Treat these existing character types as the village’s inhabitants. Populate the village using instances of their original assets, with natural differences in placement and activity.
+Our main heroine is Pinky. Keep her easy to follow through framing and camera focus.
+Pinky’s voice: Clear, youthful adult female English voice. Warm, playful and expressive, never baby-like. Use natural pronunciation, gentle breaths, small laughs and thoughtful reactions. Never read acting instructions aloud.
+Mavili: Friendly adult male English voice.
+Küp Kuzu: Cheerful, clear female English voice.
+The story begins peacefully, becomes suspenseful, and turns into a heroic adventure. Combat should remain fun and non-graphic.
+SCENE 1 — A PERFECT LITTLE VILLAGE
+0–9 seconds
+Open on a beautiful morning in a cozy fantasy village.
+Slowly move the camera through the village:
+- Mavilis carry baskets and wave to their neighbors.
+- Küp Kuzus play together near the village square.
+- Pinkys tend flowers and enjoy the sunshine.
+Everyone lives happily together.
+Follow our main Pinky as she finishes a short walk and stretches beside a large tree.
+PINKY — relaxed, with a happy little sigh:
+“Ahh. Sunshine, good friends… perfect.”
+She lies down beside the tree and closes her eyes.
+Birdsong, a soft breeze and gentle music establish the peaceful mood.
+SCENE 2 — SOMETHING BLOCKS THE SUN
+9–19 seconds
+Close-up of Pinky resting comfortably.
+A large shadow slowly moves across the grass and covers her face.
+The birds fall silent.
+Pinky opens one eye.
+PINKY — mildly annoyed, still sleepy:
+“Hmm? Who stole my sunshine?”
+Cut to Pinky’s point of view.
+Use the project’s existing enemy assets. Several monsters loom above the camera, looking directly down into the lens as though they are staring at Pinky.
+Use a low camera angle, close framing and a slight push toward their faces. Preserve their original designs.
+One monster tilts its head. Another leans closer.
+A short, awkward pause.
+PINKY — off-screen, suddenly alert:
+“Oh. That’s… definitely not a cloud.”
+SCENE 3 — THE VILLAGE IN TROUBLE
+19–29 seconds
+Cut wide.
+More existing enemies approach the village.
+The villagers scatter in alarm. A basket spills, a market awning falls, fences break and dust rises around damaged stalls.
+Make the village look disrupted and partly wrecked, but show no injured villagers or graphic destruction.
+MAVILI — urgently calling to the others:
+“Everyone! This way!”
+KÜP KUZU:
+“Pinky! Help!”
+Pinky looks from her frightened friends to the approaching monsters.
+Her expression becomes determined.
+She stands and brushes herself off.
+PINKY — a small exhale, then quiet confidence:
+“Okay. Looks like it’s up to me.”
+SCENE 4 — ONE STEP CHANGES EVERYTHING
+29–44 seconds
+Close-up of Pinky planting her foot firmly on the ground.
+STEP.
+A subtle magical pulse spreads beneath her foot.
+She takes another step.
+STEP.
+Reveal her phone with the actual Rush for Villains interface.
+Connect her walking to the game’s real progression system. Use short time-compressed cuts to show that she keeps walking toward the goal; do not imply that two literal steps complete an entire adventure.
+The step counter advances:
+742 / 1000 → 891 / 1000 → 1000 / 1000
+PINKY — gaining confidence:
+“One step at a time.”
+The goal is reached. Transition into the actual game’s battle presentation using an existing class character and enemy.
+Intercut between:
+- Pinky striding forward with determination.
+- Her step goal completing.
+- Her selected class character attacking.
+- Enemy health decreasing.
+- Villagers peeking out from safety.
+PINKY — playful and confident:
+“You picked the wrong village.”
+The final attack defeats the enemy. The remaining monsters retreat or disappear in harmless game-style effects.
+Show VICTORY!, coins and XP briefly.
+Keep Pinky central to the story while making the walking-to-gameplay connection clear.
+SCENE 5 — THANK YOU, PINKY!
+44–56 seconds
+The dust settles.
+Pinky pauses, catches her breath and looks around.
+A Küp Kuzu cautiously emerges from hiding.
+KÜP KUZU — relieved and delighted:
+“You did it!”
+Mavili runs over, followed by the other villagers.
+MAVILI:
+“You saved our village!”
+VILLAGERS — warm, happy voices together:
+“Thank you, Pinky!”
+They gather around her and celebrate. Some villagers begin setting the fallen baskets and decorations upright.
+Pinky gives a modest little smile.
+PINKY — with a light chuckle:
+“Heh. Just getting my steps in.”
+SCENE 6 — THE ADVENTURE ISN’T OVER
+56–65 seconds
+As the celebration continues, Pinky notices something in the distance.
+Beyond the village, on a faraway hill, more silhouettes of existing enemy characters appear.
+The camera moves closer to Pinky.
+She looks toward the hill, then turns to the audience with an excited, knowing smile.
+PINKY:
+“But our adventure? It’s just getting started.”
+She raises her phone.
+Show the real Rush for Villains app clearly.
+PINKY — inviting the viewer along:
+“Come on. Walk with me!”
+FINAL — RUSH FOR VILLAINS!
+65–75 seconds
+The music rises into a triumphant finish.
+Pinky takes the lead. Mavili, Küp Kuzu and the villagers join her as they walk toward their next adventure.
+Cut to a strong hero composition with Pinky in front, her friends behind her and the game logo appearing above them.
+PINKY — an enthusiastic, clearly pronounced cheer:
+“RUSH FOR VILLAINS!”
+Finish with:
+RUSH FOR VILLAINS
+WALK. FIGHT. LEVEL UP.
+Your next walk could be an adventure.
+Hold the final card for at least three seconds.
+ANIMATION AND SOUND DIRECTION
+- Preserve every character’s original appearance throughout all shots.
+- Keep feet planted correctly during idle poses. During walking, synchronize foot contact and movement to prevent sliding.
+- Keep characters grounded beside the tree and on village paths. Avoid floating, drifting, clipping or accidental changes in scale.
+- Make the monster close-up unmistakably Pinky’s point of view, with the enemies looking down toward her.
+- Build emotion through camera angles, timing, body language and sound.
+- Use genuine pauses and small vocal reactions where appropriate. Do not speak punctuation or instructions such as “sigh” or “laugh.”
+- Deliver English dialogue clearly, without rushing or artificially speeding up the voices.
+- Transition the music from peaceful village warmth → playful suspense → heroic action → heartfelt celebration → anticipation.
+- Keep game UI readable and use actual app screens wherever available.
+Overall feeling: A peaceful little village, an unexpected threat, an unlikely heroine—and an adventure that has only just begun.

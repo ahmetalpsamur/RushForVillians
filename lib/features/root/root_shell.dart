@@ -1,3 +1,6 @@
+import '../../models/daily_engagement.dart';
+import '../daily_progress/daily_progress_dialog.dart';
+import '../../core/utils/game_day.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -162,6 +165,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   Timer? _rewardNoticeTimer;
   bool _disposing = false;
   bool _safetyDialogOpen = false;
+  DailyEngagement _engagement = DailyEngagement();
+  bool _dailyCheckQueued = false;
+  bool _dailyDialogOpen = false;
+  String? _noonReminderKey;
+  bool _dailyPermissionRequested = false;
 
   bool get _tutorialActive =>
       widget.startTutorial && !_profile.hasCompletedTutorial;
@@ -182,6 +190,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     super.initState();
     _restoreState();
     _attachStepSource();
+    _queueDailyEngagementCheck();
     unawaited(_loadItemCatalog());
     WidgetsBinding.instance.addObserver(this);
     _adventureClock = Timer.periodic(
@@ -549,6 +558,189 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   /// Saniyelik nabız: önce gün döngüsü (gün değişimi + seri), sonra macera
   /// saati. Gün döngüsü görünür bir şey değiştirmedikçe yeniden çizim yok.
+
+  void _registerDailyStreak(DateTime now) {
+    if (!_today.enemyDefeated && _today.steps < _buffs.streakStepThreshold) {
+      return;
+    }
+    if (!_profile.registerStreakDay(now)) return;
+    final bonus = _profile.grantStreakStatBonus(now);
+    final milestone = _profile.reachedStreakMilestone;
+    var freezeGranted = false;
+    final titles = <GameTitle>[];
+    if (milestone != null) {
+      freezeGranted = _profile.grantStreakFreeze(1, _buffs.streakFreezeCap) > 0;
+      final title = TitleCatalog.forMilestone(milestone);
+      if (title != null && _profile.grantTitle(title.id)) titles.add(title);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isForeground) return;
+      if (bonus != null) _showStreakStatBonus(bonus);
+      if (milestone != null) {
+        _showStreakMilestone(milestone, freezeGranted: freezeGranted);
+      }
+      if (titles.isNotEmpty) _showTitlesEarned(titles);
+    });
+  }
+
+  void _queueDailyEngagementCheck() {
+    if (_disposing || _dailyCheckQueued) return;
+    _dailyCheckQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dailyCheckQueued = false;
+      if (mounted && !_disposing) _checkDailyEngagement();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _checkDailyEngagement() {
+    if (_tutorialActive) return;
+    final now = GameClock.now();
+    final l10n = context.l10n;
+    if (_today.isSameDayAs(now) &&
+        !_profile.streakCompletedOn(now) &&
+        (_today.enemyDefeated || _today.steps >= _buffs.streakStepThreshold)) {
+      setState(() => _registerDailyStreak(now));
+      _persist();
+    }
+    final streakReady = _profile.streakCompletedOn(now);
+    if (_isForeground || streakReady) {
+      final reminderKey =
+          '${now.year}-${now.month}-${now.day}|${l10n.localeName}|${_profile.avatar.characterAsset}';
+      if (_noonReminderKey != reminderKey) {
+        _noonReminderKey = reminderKey;
+        unawaited(_scheduleDailyReminder(now));
+      }
+    }
+    final wheelReady = _today.isWheelUnlocked && !_profile.wheelSpunToday;
+    var changed = false;
+    if (streakReady &&
+        !DailyEngagement.matches(_engagement.streakNotifiedOn, now)) {
+      _engagement.streakNotifiedOn = now;
+      changed = true;
+      unawaited(
+        AdventureNotificationService.notifyDaily(
+          id: AdventureNotificationService.streakCompletedId,
+          title: l10n.streakCompleteTitle,
+          body: l10n.streakCompleteBody(_profile.streakDays),
+          channelName: l10n.dailyNotificationChannel,
+          payload: AdventureNotificationService.dailyPayload(
+            'daily-streak',
+            now,
+          ),
+        ),
+      );
+    }
+    if (wheelReady &&
+        !DailyEngagement.matches(_engagement.wheelNotifiedOn, now)) {
+      _engagement.wheelNotifiedOn = now;
+      changed = true;
+      unawaited(
+        AdventureNotificationService.notifyDaily(
+          id: AdventureNotificationService.wheelUnlockedId,
+          title: l10n.wheelReadyTitle,
+          body: l10n.wheelReadyNotification,
+          channelName: l10n.dailyNotificationChannel,
+          payload: AdventureNotificationService.dailyPayload(
+            'daily-wheel',
+            now,
+          ),
+        ),
+      );
+    }
+    // A notification tap can reopen a deferred wheel offer, but not yesterday's.
+    final payload = AdventureNotificationService.tappedPayload.value;
+    if (payload != null && _isForeground) {
+      AdventureNotificationService.tappedPayload.value = null;
+      if (wheelReady &&
+          payload ==
+              AdventureNotificationService.dailyPayload('daily-wheel', now)) {
+        _engagement.wheelPromptedOn = null;
+        changed = true;
+      }
+    }
+    if (changed) _persist();
+    if (!_isForeground ||
+        _dailyDialogOpen ||
+        _safetyDialogOpen ||
+        _leaveAdventureDialogOpen ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    // Keep combat, its outcome animation, and tutorial interactions uninterrupted.
+    final adventure = _adventure;
+    if (adventure != null &&
+        (!adventure.isEnemyDefeated || !adventure.deathAnimationPlayed)) {
+      return;
+    }
+    if (streakReady &&
+        !DailyEngagement.matches(_engagement.streakCelebratedOn, now)) {
+      unawaited(_presentDailyProgress(wheel: false, day: now));
+    } else if (wheelReady &&
+        !DailyEngagement.matches(_engagement.wheelPromptedOn, now)) {
+      unawaited(_presentDailyProgress(wheel: true, day: now));
+    }
+  }
+
+  Future<void> _scheduleDailyReminder(DateTime now) async {
+    final l10n = context.l10n;
+    final asset = _profile.avatar.characterAsset;
+    if (_isForeground && !_dailyPermissionRequested) {
+      _dailyPermissionRequested = true;
+      await AdventureNotificationService.requestPermission();
+    }
+    if (!mounted || (!_isForeground && !_profile.streakCompletedOn(now))) {
+      return;
+    }
+    await AdventureNotificationService.scheduleNoonReminder(
+      now: now,
+      title: l10n.streakReminderTitle,
+      body: l10n.streakReminderBody,
+      channelName: l10n.dailyNotificationChannel,
+      characterAsset: asset,
+    );
+  }
+
+  Future<void> _presentDailyProgress({
+    required bool wheel,
+    required DateTime day,
+  }) async {
+    _dailyDialogOpen = true;
+    try {
+      final accepted = await showDailyProgressDialog(
+        context,
+        wheel: wheel,
+        streakDays: _profile.streakDays,
+        avatar: _profile.avatar,
+      );
+      if (!mounted || accepted == null) return;
+      if (wheel) {
+        _engagement.wheelPromptedOn = day;
+      } else {
+        _engagement.streakCelebratedOn = day;
+      }
+      _persist();
+      unawaited(GameStorage.flush());
+      unawaited(
+        AdventureNotificationService.dismissDailyNotification(
+          wheel
+              ? AdventureNotificationService.wheelUnlockedId
+              : AdventureNotificationService.streakCompletedId,
+        ),
+      );
+      if (wheel &&
+          accepted &&
+          GameDay.isSameGameDay(day, GameClock.now()) &&
+          _today.isWheelUnlocked &&
+          !_profile.wheelSpunToday) {
+        _openWheel();
+      }
+    } finally {
+      _dailyDialogOpen = false;
+      if (mounted) _queueDailyEngagementCheck();
+    }
+  }
+
   void _tick() {
     if (!mounted) return;
     if (_refreshDayCycle()) {
@@ -556,6 +748,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _persist();
     }
     _updateAdventureClock();
+    _queueDailyEngagementCheck();
   }
 
   /// Gün döngüsünü işler: oyun günü değiştiyse günlük ilerlemeyi sıfırlar ve
@@ -612,6 +805,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// streak gibi kalıcı ilerleme her durumda korunur.
   void _restoreState() {
     final restored = widget.initialState;
+    _engagement = restored?.engagement ?? DailyEngagement();
     _profile =
         restored?.profile ??
         UserProfile(
@@ -631,8 +825,19 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       List<DailyStepRecord>.of(restored?.stepHistory ?? const []),
     );
     _adventure = restored?.adventure;
+    // Repair legacy same-day victories whose clock path awarded loot but
+    // omitted the daily wheel flag. Never carry yesterday's win into today.
+    final adventure = _adventure;
+    final repairedVictory =
+        adventure != null &&
+        adventure.isEnemyDefeated &&
+        adventure.xpAwarded &&
+        !_today.enemyDefeated &&
+        _today.isSameDayAs(adventure.adventureStartedAt);
+    if (repairedVictory) _today.enemyDefeated = true;
     // Gün değişimi ve seri tazeleme tek yerden: _refreshDayCycle.
-    if (_refreshDayCycle()) _persist();
+    final dayChanged = _refreshDayCycle();
+    if (dayChanged || repairedVictory) _persist();
   }
 
   /// Güncel durumu kalıcı depoya gönderir. Yazma sıklığını [GameStorage]
@@ -664,8 +869,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         today: _today,
         adventure: _adventure,
         stepHistory: _stepHistory,
+        engagement: _engagement,
       ),
     );
+    if (!_disposing) _queueDailyEngagementCheck();
   }
 
   RewardStatistics get _rewardStatistics => RewardEngine.statistics(
@@ -751,9 +958,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isForeground = true;
+      _noonReminderKey = null;
+      _queueDailyEngagementCheck();
       unawaited(AdventureNotificationService.cancelAdventureReminders());
       final adventure = _adventure;
-      if (adventure != null && !adventure.isBattleCompleted) {
+      if (adventure != null &&
+          !adventure.isAdventureCompleted &&
+          !adventure.isPlayerDefeated) {
         adventure.nextReminderAt = GameClock.now().add(
           AdventureQuest.reminderInterval,
         );
@@ -930,6 +1141,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     int? forcedCoins,
   }) {
     if (!adventure.isEnemyDefeated || adventure.xpAwarded) return null;
+    // Every victory path (steps, clock, tutorial) unlocks today's wheel.
+    // Keep this inside the one-time grant so an old victory cannot unlock
+    // the wheel again after the daily reset.
+    _today.enemyDefeated = true;
+    _registerDailyStreak(GameClock.now());
     adventure.xpAwarded = true;
     // Hız çarpanı (Bölüm A.2) **hem XP'ye hem altına** uygulanır.
     //
@@ -1060,10 +1276,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     var playerDefeated = false;
     var revivalCompleted = false;
     CombatRoundResult? roundResult;
-    int? milestoneReached;
-    var milestoneFreezeGranted = false;
     final earnedTitles = <GameTitle>[];
-    StreakBonusDraw? streakStatGained;
     final revivalAdventure = _adventure;
     final revivalStepsWithoutXp =
         revivalAdventure?.isRevivalActive == true
@@ -1174,31 +1387,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // Seri günlük hedefe değil, düşük ve sabit bir eşiğe bağlı. Kuşanılan
       // ekipman bu eşiği düşürebilir (`streakRelief`); eşik yalnızca **o an**
       // kontrol ediliyor, yani kuşanmayı çıkarmak geçmiş günleri bozmaz.
-      if ((_today.enemyDefeated ||
-              _today.steps >= _buffs.streakStepThreshold) &&
-          _profile.registerStreakDay(now)) {
-        // Günün savaş stat bonusu: seri ilerledikten **sonra** çekilir.
-        // Aynı oyun gününde ikinci çağrı null döner, yani kapat-aç ile
-        // yeniden zar atılamaz (bkz. `streak_bonus.dart`).
-        streakStatGained = _profile.grantStreakStatBonus(now);
-        milestoneReached = _profile.reachedStreakMilestone;
-        // Her kilometre taşı bir dondurma hakkı verir (stok sınırlı).
-        // Aşama 2c'de bilerek boş bırakılan kazanım yolu bu.
-        if (milestoneReached != null) {
-          milestoneFreezeGranted =
-              _profile.grantStreakFreeze(1, _buffs.streakFreezeCap) > 0;
-          // Kilometre taşı ünvanı (Bölüm C.4). Katalogda o güne bir ünvan
-          // tanımlıysa verilir; yoksa sessizce geçilir.
-          final milestoneTitle = TitleCatalog.forMilestone(milestoneReached!);
-          if (milestoneTitle != null &&
-              _profile.grantTitle(milestoneTitle.id)) {
-            earnedTitles.add(milestoneTitle);
-          }
-        }
-      }
-      // Başarım ünvanları en sonda: bu partinin bütün sayaçları işlendikten
-      // sonra bakılmalı, yoksa aynı partide açılan bir ünvan bir sonraki
-      // partiye kalırdı.
+      _registerDailyStreak(now);
       earnedTitles.addAll(_grantEarnedTitles());
       if (earnedTitles.isNotEmpty) _refreshEquipment();
     });
@@ -1213,19 +1402,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // gelmez, hiç görülmeden kapanıyordu. Frame sonu callback'leri kayıt
     // sırasıyla çalıştığı için burada kaydedilenler kutlamanın arkasına
     // düşüyor ve sırayla gösteriliyor.
-    final statGained = streakStatGained;
-    final milestone = milestoneReached;
-    if (statGained != null || milestone != null || earnedTitles.isNotEmpty) {
+    if (earnedTitles.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (statGained != null) _showStreakStatBonus(statGained);
-        if (milestone != null) {
-          _showStreakMilestone(
-            milestone,
-            freezeGranted: milestoneFreezeGranted,
-          );
-        }
-        _showTitlesEarned(earnedTitles);
+        if (mounted) _showTitlesEarned(earnedTitles);
       });
     }
     if (enemyDefeated) {
@@ -1331,13 +1510,51 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     unawaited(AdventureNotificationService.cancelAdventureReminders());
   }
 
-  void _chooseNewAdventure() {
+  bool _leaveAdventureDialogOpen = false;
+
+  Future<void> _chooseNewAdventure() async {
+    if (_leaveAdventureDialogOpen) return;
     final adventure = _adventure;
     if (adventure?.isPlayerDefeated == true && !adventure!.revivalCompleted) {
       _showStoreNotice(
         context.l10n.revivalRemainingNotice(adventure.revivalRemainingSteps),
       );
       return;
+    }
+    if (adventure != null &&
+        !adventure.isAdventureCompleted &&
+        !adventure.isPlayerDefeated) {
+      _leaveAdventureDialogOpen = true;
+      bool? leave;
+      try {
+        leave = await showDialog<bool>(
+          context: context,
+          builder:
+              (dialogContext) => AlertDialog(
+                title: Text(context.l10n.leaveAdventureTitle),
+                content: Text(
+                  adventure.isEnemyDefeated
+                      ? context.l10n.leaveAdventureWalkWarning
+                      : context.l10n.leaveAdventureWarning,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(context.l10n.stayInAdventure),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: Text(context.l10n.leaveAdventure),
+                  ),
+                ],
+              ),
+        );
+      } finally {
+        _leaveAdventureDialogOpen = false;
+      }
+      if (!mounted || leave != true || !identical(adventure, _adventure)) {
+        return;
+      }
     }
     setState(() {
       _adventure = null;
@@ -2040,6 +2257,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (!_tutorialActive || _tutorialStep.value == step) return;
     _profile.tutorialStep = step.index;
     _tutorialStep.value = step;
+    setState(() {});
     _persist();
   }
 
@@ -2182,13 +2400,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     setState(() => _showPetDismissal = false);
   }
 
-  Widget _tutorialOverlay() => TutorialGuideOverlay(
-    step: _tutorialStep,
-    guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
-    onPrimary: _onTutorialPrimary,
-    onSecondary: _onTutorialSecondary,
-    onLeavingCompleted: _completeTutorial,
-  );
+  Widget _tutorialOverlay({bool showConversation = true}) =>
+      TutorialGuideOverlay(
+        showConversation: showConversation,
+        step: _tutorialStep,
+        guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+        onPrimary: _onTutorialPrimary,
+        onSecondary: _onTutorialSecondary,
+        onLeavingCompleted: _completeTutorial,
+      );
 
   void _selectTab(int index) {
     setState(() => _tabIndex = index);
@@ -2402,7 +2622,11 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final fullscreenAdventure = _adventure != null;
     final visibleTabIndex = fullscreenAdventure ? 1 : _tabIndex;
 
-    return Stack(
+    final dockTutorial =
+        _tutorialActive &&
+        !fullscreenAdventure &&
+        (visibleTabIndex == 0 || visibleTabIndex == 1);
+    final shell = Stack(
       fit: StackFit.expand,
       children: [
         Scaffold(
@@ -2451,7 +2675,31 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
                     ],
                   ),
         ),
-        if (_tutorialActive) _tutorialOverlay(),
+        if (_tutorialActive) _tutorialOverlay(showConversation: !dockTutorial),
+      ],
+    );
+    if (!dockTutorial) return shell;
+    return Column(
+      children: [
+        Expanded(child: shell),
+        Material(
+          child: SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .45,
+              ),
+              child: SingleChildScrollView(
+                child: TutorialGuideConversation(
+                  step: _tutorialStep.value,
+                  guide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
+                  onPrimary: () => _onTutorialPrimary(_tutorialStep.value),
+                  onSecondary: () => _onTutorialSecondary(_tutorialStep.value),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
