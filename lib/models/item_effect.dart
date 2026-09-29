@@ -173,6 +173,23 @@ class ItemEffect {
   /// kaldığı durumlar için. Yine **veri**dir; kod değil.
   final String? customLabel;
 
+  /// [customLabel]'ın İngilizcesi.
+  ///
+  /// **Neden ayrı bir alan:** İngilizce etiket bir dönem tetikleyici + stat
+  /// + değerden yeniden üretiliyordu ve özel metni tamamen atıyordu. Sonuç
+  /// yalnızca kuru değil, **yanlıştı**: "günün ilk yürüyüşünde adım XP +%10"
+  /// İngilizce'de "while your streak is active" oluyordu. Oyuncu yanlış
+  /// bilgiyle karar veriyordu.
+  ///
+  /// ARB'ye taşınmadı çünkü bunlar 131 adet **katalog verisi** — ARB'nin işi
+  /// arayüz çerçevesi. Model Kuralları #1 temiz: alan bir `String?`,
+  /// [ItemEffect] diske hiç yazılmıyor (katalogdan çözülüyor).
+  ///
+  /// `null` bırakılırsa İngilizce, [ContentLocalizations.itemEffectLabel]
+  /// içindeki üretilen cümleye düşer — çoğu kuraldan türeyen efekt için
+  /// doğru olan da bu.
+  final String? customLabelEn;
+
   const ItemEffect({
     required this.stat,
     required this.value,
@@ -181,6 +198,7 @@ class ItemEffect {
     this.chance = 1,
     this.threshold = 0,
     this.customLabel,
+    this.customLabelEn,
   });
 
   /// Sabit artış kısayolu.
@@ -191,6 +209,7 @@ class ItemEffect {
     this.chance = 1,
     this.threshold = 0,
     this.customLabel,
+    this.customLabelEn,
   }) : mode = ItemEffectMode.flat;
 
   /// Koşulsuz ve tam ihtimalli mi. Ekonomi çarpanlarına yalnızca bunlar girer.
@@ -208,6 +227,7 @@ class ItemEffect {
     chance: chance,
     threshold: threshold,
     customLabel: customLabel,
+    customLabelEn: customLabelEn,
   );
 
   /// Değeri [limit] ile sınırlanmış kopya (işareti korunur).

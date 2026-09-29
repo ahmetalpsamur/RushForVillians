@@ -1,52 +1,88 @@
 import 'package:flutter/widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_context.dart';
 
-/// All safety copy and the independently versioned device notice.
+/// Güvenlik metinleri ve bağımsız sürümlenen cihaz uyarısı.
+///
+/// Metinler ARB'den geliyor (GD85). Eskiden bu sınıf `tr ? ... : ...` deseniyle
+/// iki dili elle taşıyordu; resmî yerelleştirme hattının dışında kalan tek
+/// kullanıcı metni burasıydı.
+///
+/// **Metinler bilerek dürüst:** bir dönem "süre sınırı yok" diyorlardı, oysa
+/// round'un süre sınırı **var** (`AttackConfig.durationForSteps`). Oyuncuya
+/// yanlış söylenen şey güvenlik metniyse, bu bir üslup sorunu değil. Yeni
+/// metinler süre sınırını açıkça kabul ediyor ve karşılığında doğru olanı
+/// söylüyor: **süre var ama senden bir karar beklenmiyor**, o yüzden ekrana
+/// bakman gerekmiyor.
 class SafetyMessages {
-  static const noticeVersion = 1;
-  final bool tr;
-  const SafetyMessages({this.tr = true});
+  /// Uyarı metni anlamlı biçimde değişince artırılır; kullanıcı yeniden onaylar.
+  ///
+  /// v1 → v2: "süre sınırı yok" yanlış bilgisi kaldırıldı ve uyarılar
+  /// trafik, karanlık, kulaklık gibi gerçek riskleri ismen sayar hâle geldi.
+  static const noticeVersion = 2;
+
+  final AppLocalizations l10n;
+
+  const SafetyMessages._(this.l10n);
+
   factory SafetyMessages.of(BuildContext context) =>
-      SafetyMessages(tr: context.l10n.localeName == 'tr');
-  String get title => tr ? 'Güvenlik Uyarısı' : 'Safety Warning';
-  String get pageTitle => tr ? 'Güvenlik' : 'Safety';
-  String get fullNotice =>
-      tr
-          ? 'Rush for Villains fiziksel aktivite ile birlikte kullanılan bir oyundur.\n\nUygulamayı kullanırken çevrenize, trafik koşullarına, araçlara, yayalara ve çevrenizdeki engellere dikkat edin.\n\nAraç kullanırken veya güvenli şekilde ekranla etkileşime geçemeyeceğiniz durumlarda uygulamayı kullanmayın.\n\nÖzel mülklere, erişimi yasak alanlara veya tehlikeli bölgelere oyun amacıyla girmeyin.\n\nOyun ekranıyla etkileşime geçmeden önce güvenli bir yerde olduğunuzdan emin olun.'
-          : 'Rush for Villains is a game used with physical activity.\n\nPay attention to your surroundings, traffic, vehicles, pedestrians and obstacles.\n\nDo not use the app while driving or when you cannot safely interact with the screen.\n\nDo not enter private property, restricted areas or dangerous places to play.\n\nMake sure you are in a safe place before interacting with the game.';
-  String get checkbox =>
-      tr
-          ? 'Güvenlik uyarısını okudum ve anladım.'
-          : 'I have read and understood the safety warning.';
-  String get continueLabel => tr ? 'Devam Et' : 'Continue';
-  String get saveError =>
-      tr
-          ? 'Onay kaydedilemedi. Lütfen tekrar dene.'
-          : 'Could not save your acknowledgement. Please try again.';
-  String get firstSafety => tr ? '⚠️ Önce Güvenlik' : '⚠️ Safety First';
-  String get adventureNotice =>
-      tr
-          ? 'Çevrene ve trafiğe dikkat et.\nHareket halindeyken veya araç kullanırken ekranla etkileşime geçme.\nCanavarların ve ödüllerin seni bekleyecek.'
-          : 'Pay attention to your surroundings and traffic.\nDo not interact with the screen while moving or driving.\nYour monsters and rewards will wait.';
-  String get walkingAcknowledgement =>
-      tr
-          ? 'Yürürken telefonla ilgilenmeyeceğimi onaylıyorum.'
-          : 'I agree not to use my phone while walking.';
-  String get startAdventure =>
-      tr ? 'Güvendeyim, Maceraya Başla' : 'I’m safe, start adventure';
-  String get battleNotice =>
-      tr
-          ? 'Çevreni kontrol et. Güvenli olduğunda savaşa başla.'
-          : 'Check your surroundings. Start the battle when you are safe.';
-  String get startBattle => tr ? 'Savaşa Başla' : 'Start Battle';
-  String get later => tr ? 'Daha Sonra' : 'Later';
-  String get walking =>
-      tr
-          ? 'Önce yürü, sonra güvenle savaş. Süre sınırı yok; telefonunu cebinde tutabilirsin.'
-          : 'Walk first, fight safely later. There is no time limit; you can keep your phone in your pocket.';
-  String get noTimeLimit => tr ? 'Süre sınırı yok' : 'No time limit';
-  String get ready =>
-      tr
-          ? 'Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.'
-          : 'Step target complete. Your monster will wait; fight when you are safe.';
+      SafetyMessages._(context.l10n);
+
+  /// Testlerin ve çağrı noktalarının dili elle verebildiği kapı.
+  factory SafetyMessages.from(AppLocalizations l10n) = SafetyMessages._;
+
+  String get title => l10n.safetyTitle;
+
+  String get pageTitle => l10n.safetyPageTitle;
+
+  /// Güvenlik sayfasında **hepsi birden** gösterilen uyarı maddeleri.
+  ///
+  /// Sıralı ve sabit: rastgele seçim ya da döndürme yok. Bir maddeyi hiç
+  /// görmemiş kullanıcı kalmamalı.
+  List<String> get tips => [
+    l10n.safetyTip1,
+    l10n.safetyTip2,
+    l10n.safetyTip3,
+    l10n.safetyTip4,
+    l10n.safetyTip5,
+    l10n.safetyTip6,
+    l10n.safetyTip7,
+    l10n.safetyTip8,
+  ];
+
+  /// Maddelerin tek bir metin bloğu hâli.
+  ///
+  /// Ekran davranışı korunuyor: sayfa eskiden de tek bir blok gösteriyordu.
+  /// Madde sayısı değişirse burası kendiliğinden uyum sağlar.
+  String get fullNotice => tips.join('\n\n');
+
+  String get checkbox => l10n.safetyAcknowledgement;
+
+  String get continueLabel => l10n.safetyContinue;
+
+  String get saveError => l10n.safetySaveError;
+
+  String get firstSafety => l10n.safetyFirstSafety;
+
+  String get adventureNotice => l10n.safetyAdventureNotice;
+
+  String get walkingAcknowledgement => l10n.safetyWalkingAcknowledgement;
+
+  String get startAdventure => l10n.safetyStartAdventure;
+
+  String get battleNotice => l10n.safetyBattleNotice;
+
+  String get startBattle => l10n.safetyStartBattle;
+
+  String get later => l10n.safetyLater;
+
+  String get walking => l10n.safetyWalking;
+
+  /// Eski adı `noTimeLimit` idi ve **yanlış** bilgi veriyordu; süre sınırı var.
+  String get timeLimitNotice => l10n.safetyTimeLimitNotice;
+
+  String get ready => l10n.safetyReady;
+
+  /// Bağlam okunamadığında gösterilecek en kısa uyarı.
+  String get fallbackNotice => l10n.fallbackSafetyMessage;
 }

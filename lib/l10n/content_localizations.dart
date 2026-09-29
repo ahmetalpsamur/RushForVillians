@@ -183,6 +183,12 @@ extension ContentLocalizations on AppLocalizations {
 
   String itemEffectLabel(ItemEffect effect) {
     if (!_isEnglish) return effect.label;
+    // Elle yazılmış etiket varsa üretilen cümleyi **kullanma**. Üretilen
+    // cümle yalnızca stat + tetikleyici + değeri biliyor; özel etiketin
+    // anlattığı kuralı (ör. "düşman yenince bir sonraki tur") bilmiyor ve
+    // sessizce yanlış bir cümle kuruyordu.
+    final custom = effect.customLabelEn;
+    if (custom != null) return custom;
     final stat = itemStatName(effect.stat);
     final value = _englishEffectValue(effect);
     final threshold = _plainNumber(effect.threshold * 100);
@@ -282,13 +288,11 @@ extension ContentLocalizations on AppLocalizations {
           RegExp(r' Type ([1-9])$'),
           (match) => _roman(match[1]!),
         )
-        .replaceAll(' V2', ' II')
-        .replaceAll(' Demons ', " Demon's ")
-        .replaceAll(' Dragons ', " Dragon's ")
-        .replaceAll(' Vampires ', " Vampire's ")
-        .replaceAll(' Nights ', " Night's ")
-        .replaceAll(' Reapers ', " Reaper's ")
-        .replaceAll(' Sages ', " Sage's ");
+        .replaceAll(' V2', ' II');
+    // İyelik düzeltmesi kelime sınırında yapılır. Eskiden kalıplar iki yanına
+    // boşluk isteyordu (`' Reapers '`), bu yüzden adın **başındaki** kelimeyi
+    // hiç yakalamıyordu: `reapers_scythe` → "Reapers Scythe" kalıyordu.
+    name = _applyPossessives(name);
     final variant = identity.variant;
     if (variant != null) {
       final offset = stableSpread(identity.baseId, _englishAdjectives.length);
@@ -299,7 +303,9 @@ extension ContentLocalizations on AppLocalizations {
   }
 
   String titleName(GameTitle title) =>
-      _isEnglish ? _titleCaseIdentifier(title.id) : title.name;
+      _isEnglish
+          ? _applyPossessives(_titleCaseIdentifier(title.id))
+          : title.name;
 
   String titleLore(GameTitle title) {
     if (!_isEnglish) return title.lore;
@@ -498,6 +504,35 @@ extension ContentLocalizations on AppLocalizations {
     final unit = effect.stat == ItemStat.streakRelief ? ' steps' : '';
     return '$sign${_plainNumber(magnitude)}$unit';
   }
+}
+
+/// Asset adlarında iyelik eki almış hâlde geçen kelimeler.
+///
+/// `reapers_scythe` → "Reaper's Scythe". Liste bilerek kısa: yalnızca
+/// katalogda gerçekten geçen kelimeler var, genel bir çoğul→iyelik kuralı
+/// yok (aksi hâlde "Bones" → "Bone's" gibi yanlışlar çıkardı).
+const _possessiveNouns = <String>[
+  'Demon',
+  'Dragon',
+  'Vampire',
+  'Night',
+  'Reaper',
+  'Sage',
+  'Blacksmith',
+];
+
+/// `reapers_scythe` → `Reaper's Scythe`, `blacksmiths_regular` →
+/// `Blacksmith's Regular`. Kelime sınırında çalışır, yani adın başındaki
+/// kelimeyi de yakalar.
+String _applyPossessives(String name) {
+  var result = name;
+  for (final noun in _possessiveNouns) {
+    result = result.replaceAllMapped(
+      RegExp('\\b${noun}s\\b'),
+      (_) => "$noun's",
+    );
+  }
+  return result;
 }
 
 const _englishAdjectives = <String>[

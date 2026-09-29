@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/combat_stats.dart';
@@ -369,7 +370,7 @@ void main() {
   });
 
   group('mükemmel round serisi', () {
-    test('erken tamamlamalar seriyi büyütür, üçüncüde ×1,02 tavanını açar', () {
+    test('erken tamamlamalar seriyi büyütür, üçüncüde ×2 tavanını açar', () {
       final startedAt = DateTime(2026, 8, 20, 12);
       final quest = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
@@ -388,8 +389,16 @@ void main() {
       }
 
       expect(quest.perfectRoundStreak, 3);
-      expect(quest.perfectStreakCap, 1.02);
-      expect(quest.lastPerfectDamageMultiplier, closeTo(1.02, 0.002));
+      // Tavanlar GameConstants'tan okunur; sabit bir dönem ×1,01/×1,015/×1,02
+      // idi (sıfır kayması) ve mağaza metninin vaat ettiği ×2'yi tutmuyordu.
+      expect(
+        quest.perfectStreakCap,
+        GameConstants.perfectRoundStreakMultipliers.last,
+      );
+      expect(
+        quest.lastPerfectDamageMultiplier,
+        closeTo(GameConstants.perfectRoundStreakMultipliers.last, 0.002),
+      );
     });
 
     test('kaçırılan round seriyi sıfırlar ve kırılmayı işaretler', () {

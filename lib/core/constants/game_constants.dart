@@ -32,9 +32,14 @@ class GameConstants {
 
   /// Mükemmel round serisinin erişebildiği hasar çarpanları.
   ///
-  /// İlk, ikinci ve üçüncü mükemmel round sırasıyla ×1,01 / ×1,015 / ×1,02
+  /// İlk, ikinci ve üçüncü mükemmel round sırasıyla ×1,2 / ×1,5 / ×2
   /// tavanını açar; sonraki roundlar son değerde kalır.
-  static const List<double> perfectRoundStreakMultipliers = [1.01, 1.015, 1.02];
+  ///
+  /// **Neden ×2'ye kadar:** mağaza ve macera metni zaten "üç tane üst üste
+  /// yaparsan iki kat vuruyorsun" diye yazıyor. Değerler bir dönem
+  /// ×1,01/×1,015/×1,02 idi (yüze bölünmüş bir sıfır kayması); metin
+  /// vaat ettiği şeyi tutmuyordu.
+  static const List<double> perfectRoundStreakMultipliers = [1.2, 1.5, 2.0];
 
   /// Düşmanın yenilebileceği en erken noktanın planlanan roundlara oranı.
   ///
@@ -158,18 +163,29 @@ class GameConstants {
   /// Zafer ödülü hız çarpanının tavanı (Bölüm A.2).
   ///
   /// Düşmanı adım taahhüdünün ne kadar erken bir noktasında devirdiysen ödül
-  /// o kadar büyür: hiç adım harcamadan devirmek teorik üst sınır (×1,02), tam
+  /// o kadar büyür: hiç adım harcamadan devirmek teorik üst sınır (×1,5), tam
   /// hedefte devirmek taban (×1). Tavan olmadan güçlü oyuncunun ödülü
   /// sınırsız büyürdü.
-  static const double maxVictorySpeedMultiplier = 1.02;
+  ///
+  /// **Neden ×1,5, ×2 değil:** zafer ödülü artık kademe bazlı büyüyor ve her
+  /// savaştan garanti eşya düşüyor. Üç kaldıracın birden iki katına çıkması
+  /// fazla olurdu. Eski değer ×1,02 idi — bu bir denge kararı değil,
+  /// [perfectRoundStreakMultipliers] ile aynı sıfır kaymasıydı.
+  static const double maxVictorySpeedMultiplier = 1.5;
 
   /// Walking XP remains an independent reward resource, not a level cost.
   static const int stepsPerXp = 2;
 
   /// Kaldırılan günlük coin tavanının eski değeri.
   ///
-  /// Yalnızca eski UI/API ve eski `dailyCoinCap` item etkilerini adım-parası
-  /// oranına dönüştürmek için korunur. Coin hesaplayıcı bunu uygulamaz.
+  /// ⚠️ **KULLANILMIYOR.** `coin_calculator.dart` bu değeri hiç okumaz ve
+  /// `StepCoinReward.capReached` her zaman `false` döner. Yalnızca eski
+  /// UI/API imzaları ve eski `dailyCoinCap` item etkilerini adım-parası
+  /// oranına dönüştüren `equipped_buffs.dart` için korunur.
+  ///
+  /// Günlük tavan bilerek geri getirilmedi: ekonomi koruması
+  /// [maxStepsPerMinute] fiziksel hız denetimine dayanıyor ve o daha sağlam
+  /// — sabit bir tavan, çok yürüyen dürüst oyuncuyu cezalandırır.
   static const int maxDailyStepCoins = 400;
 
   /// Bir dakikada kabul edilen en fazla adım.

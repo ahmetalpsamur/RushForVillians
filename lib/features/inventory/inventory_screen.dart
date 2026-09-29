@@ -169,6 +169,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     // Kuşanılanlar önce, sonra nadirlik, sonra eşya seviyesi: en değerli
     // en üstte. Son ölçüt örnek kimliği — aynı eşyanın iki adedi arasında
     // sıra her çizimde aynı kalsın.
+    //
+    // Ad ölçütü **gösterilen** adı kullanır, kanonik Türkçe alanı değil:
+    // İngilizce seçiliyken sıra İngilizce adlara göre olmalı.
+    final l10n = context.l10n;
     entries.sort((a, b) {
       final aEquipped = a.equipped ? 0 : 1;
       final bEquipped = b.equipped ? 0 : 1;
@@ -179,7 +183,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       if (byItemLevel != 0) return byItemLevel;
       final byLock = b.item.requiredLevel.compareTo(a.item.requiredLevel);
       if (byLock != 0) return byLock;
-      final byName = a.item.name.compareTo(b.item.name);
+      final byName = l10n
+          .itemName(a.item)
+          .toLowerCase()
+          .compareTo(l10n.itemName(b.item).toLowerCase());
       if (byName != 0) return byName;
       return a.instanceId.compareTo(b.instanceId);
     });
@@ -1750,7 +1757,12 @@ class _UpgradePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final item = entry.item;
     final rarity = entry.instance.effectiveRarity(item.rarity);
-    final reason = quote.reason(rarity, playerLevel);
+    // `quote.reason(...)` sabit Türkçe; gösterimde yerelleştirilmiş sürüm
+    // kullanılır (diğer üç çağrı noktası da bunu kullanıyor).
+    final reason =
+        quote.canUpgrade
+            ? null
+            : context.l10n.upgradeBlockReason(quote, rarity, playerLevel);
     final preview =
         quote.canUpgrade
             ? compareLevels(item, entry.level, quote.nextLevel)

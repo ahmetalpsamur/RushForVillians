@@ -279,7 +279,7 @@ class ProfileScreen extends StatelessWidget {
                                     ownedTitleCount,
                                   )
                                   : context.l10n.equippedTitleSummary(
-                                    equippedTitle!.name,
+                                    context.l10n.titleName(equippedTitle!),
                                     ownedTitleCount,
                                   ),
                               style: const TextStyle(

@@ -9,6 +9,7 @@ import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/features/safety/safety_screen.dart';
+import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -27,7 +28,11 @@ const avatar = AvatarProfile(
   characterAsset:
       'lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Swordsman/Swordsman/Swordsman_Walk.gif',
 );
-const copy = SafetyMessages();
+// Metinler artık ARB'den geliyor. Testlerdeki `MaterialApp` yerelleştirme
+// delegesi kurmuyor; `context.l10n` bu durumda Türkçeye düşüyor
+// (`l10n_context.dart`), o yüzden beklenen metinler de Türkçe şablondan
+// okunuyor.
+final copy = SafetyMessages.from(AppLocalizationsTr());
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

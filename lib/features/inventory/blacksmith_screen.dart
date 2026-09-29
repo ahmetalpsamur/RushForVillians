@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_context.dart';
 import '../../l10n/content_localizations.dart';
 import '../../models/item.dart';
@@ -46,7 +47,10 @@ class BlacksmithScreen extends StatelessWidget {
   ///
   /// Sıra: nadirlik (yüksekten alçağa), sonra en yüksek eşya seviyesi, sonra
   /// ad. Son ölçüt anahtar — her çizimde aynı sıra çıksın.
-  List<_ForgeGroup> _groups(InventoryState state) {
+  ///
+  /// Ad ölçütü **gösterilen** adı kullanır ([l10n]), kanonik Türkçe alanı
+  /// değil: İngilizce seçiliyken sıra İngilizce adlara göre olmalı.
+  List<_ForgeGroup> _groups(InventoryState state, AppLocalizations l10n) {
     final byKey = <String, List<InventoryEntry>>{};
     for (final entry in state.entries) {
       byKey
@@ -65,7 +69,10 @@ class BlacksmithScreen extends StatelessWidget {
       if (byRarity != 0) return byRarity;
       final byLevel = b.bestLevel.compareTo(a.bestLevel);
       if (byLevel != 0) return byLevel;
-      final byName = a.item.name.compareTo(b.item.name);
+      final byName = l10n
+          .itemName(a.item)
+          .toLowerCase()
+          .compareTo(l10n.itemName(b.item).toLowerCase());
       if (byName != 0) return byName;
       return a.key.compareTo(b.key);
     });
@@ -78,7 +85,7 @@ class BlacksmithScreen extends StatelessWidget {
       valueListenable: revision,
       builder: (context, _, __) {
         final state = readState();
-        final groups = _groups(state);
+        final groups = _groups(state, context.l10n);
 
         return Scaffold(
           appBar: AppBar(

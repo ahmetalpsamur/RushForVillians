@@ -133,7 +133,15 @@ class _TitlesScreenState extends State<TitlesScreen> {
       case _TitleSort.rarity:
         list.sort((a, b) => b.rarity.index.compareTo(a.rarity.index));
       case _TitleSort.name:
-        list.sort((a, b) => a.name.compareTo(b.name));
+        // Gösterilen adla sıralanır, kanonik Türkçe alanla değil: İngilizce
+        // seçiliyken "Glass Cannon" G'de olmalı, "Cam Top" C'sinde değil.
+        final l10n = context.l10n;
+        list.sort(
+          (a, b) => l10n
+              .titleName(a)
+              .toLowerCase()
+              .compareTo(l10n.titleName(b).toLowerCase()),
+        );
       case _TitleSort.progress:
         // En çok yaklaşılan başarım en üstte: "az kaldı" bilgisi listenin
         // en değerli bilgisi. Sahip olunanlar ve ilerlemesi olmayanlar

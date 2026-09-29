@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/base_combat_stats.dart';
 import 'package:rush_for_villains/core/utils/combat_engine.dart';
 import 'package:rush_for_villains/models/combat_stats.dart';
@@ -139,18 +140,32 @@ void main() {
       );
     });
 
-    test('mükemmel seri tavanları ×1,01 → ×1,015 → ×1,02 büyür', () {
-      expect(perfectRoundDamageMultiplier(streak: 1, earlyFraction: 1), 1.01);
-      expect(perfectRoundDamageMultiplier(streak: 2, earlyFraction: 1), 1.015);
-      expect(perfectRoundDamageMultiplier(streak: 3, earlyFraction: 1), 1.02);
-      expect(perfectRoundDamageMultiplier(streak: 99, earlyFraction: 1), 1.02);
+    test('mükemmel seri tavanları ×1,2 → ×1,5 → ×2 büyür', () {
+      // Tavanlar config'ten okunur; koda gömülü sayı yok. Bir dönem
+      // ×1,01/×1,015/×1,02 idiler — denge kararı değil, sıfır kaymasıydı.
+      final caps = GameConstants.perfectRoundStreakMultipliers;
+      expect(caps, [1.2, 1.5, 2.0]);
+      for (var streak = 1; streak <= caps.length; streak++) {
+        expect(
+          perfectRoundDamageMultiplier(streak: streak, earlyFraction: 1),
+          caps[streak - 1],
+        );
+      }
+      // Üçüncüden sonra son değerde kalır.
+      expect(
+        perfectRoundDamageMultiplier(streak: 99, earlyFraction: 1),
+        caps.last,
+      );
     });
 
     test('aynı seride daha erken bitirmek daha çok bonus hasar verir', () {
       final late = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.1);
       final early = perfectRoundDamageMultiplier(streak: 2, earlyFraction: 0.9);
       expect(early, greaterThan(late));
-      expect(early, lessThanOrEqualTo(1.015));
+      expect(
+        early,
+        lessThanOrEqualTo(GameConstants.perfectRoundStreakMultipliers[1]),
+      );
     });
 
     test('tamamlanma oranı arttıkça oyuncunun hasarı artar', () {

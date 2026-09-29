@@ -32,7 +32,11 @@ void main() {
         locale: const Locale('en'),
         child: Builder(
           builder: (context) {
-            fallback = AppLocalizations.of(context).fallbackSafetyMessage;
+            // `untranslatedTemplateProbe` app_en.arb içine bilerek eklenmedi;
+            // GD87'nin nöbetçisi bu. Eskiden bu işi `fallbackSafetyMessage`
+            // yapıyordu, ama o ad gerçek bir güvenlik metniymiş gibi duruyor
+            // ve İngilizcesi eklenince nöbetçi sessizce etkisiz kalıyordu.
+            fallback = AppLocalizations.of(context).untranslatedTemplateProbe;
             return const SizedBox.shrink();
           },
         ),

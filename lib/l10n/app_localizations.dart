@@ -137,8 +137,152 @@ abstract class AppLocalizations {
   /// No description provided for @fallbackSafetyMessage.
   ///
   /// In tr, this message translates to:
-  /// **'Türkçe yedek metin'**
+  /// **'Çevrene dikkat et. Oyun bekleyebilir.'**
   String get fallbackSafetyMessage;
+
+  /// TEST NÖBETÇİSİ — app_en.arb içine BİLEREK eklenmedi. Eksik bir İngilizce çevirinin Türkçe şablona düştüğünü (GD87) localization_test.dart doğruluyor. Bu anahtar hiçbir ekranda gösterilmez; İngilizcesini eklemek nöbetçiyi etkisiz kılar.
+  ///
+  /// In tr, this message translates to:
+  /// **'Türkçe yedek metin'**
+  String get untranslatedTemplateProbe;
+
+  /// No description provided for @safetyTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvenlik Uyarısı'**
+  String get safetyTitle;
+
+  /// No description provided for @safetyPageTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvenlik'**
+  String get safetyPageTitle;
+
+  /// No description provided for @safetyTip1.
+  ///
+  /// In tr, this message translates to:
+  /// **'Telefon cebinde kalsın. Adımların sayılıyor, ekrana bakman gerekmiyor.'**
+  String get safetyTip1;
+
+  /// No description provided for @safetyTip2.
+  ///
+  /// In tr, this message translates to:
+  /// **'Round\'un bir süre sınırı var ama vermen gereken bir karar yok. Yürü, gerisi kendiliğinden çözülüyor.'**
+  String get safetyTip2;
+
+  /// No description provided for @safetyTip3.
+  ///
+  /// In tr, this message translates to:
+  /// **'Karşıdan karşıya geçerken oyuna değil yola bak.'**
+  String get safetyTip3;
+
+  /// No description provided for @safetyTip4.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kulaklık taktıysan sesi düşür. Arkandan gelen aracı duyman lazım.'**
+  String get safetyTip4;
+
+  /// No description provided for @safetyTip5.
+  ///
+  /// In tr, this message translates to:
+  /// **'Süre bitmek üzereyken hızlanmak zorunda değilsin. Kaybedeceğin şey biraz hasar, diğeri sağlık.'**
+  String get safetyTip5;
+
+  /// No description provided for @safetyTip6.
+  ///
+  /// In tr, this message translates to:
+  /// **'Karanlıkta yürüyorsan açık renk veya yansıtıcı bir şey giy.'**
+  String get safetyTip6;
+
+  /// No description provided for @safetyTip7.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tanımadığın bir yolda yürüyorsan önce nereye gittiğine bak.'**
+  String get safetyTip7;
+
+  /// No description provided for @safetyTip8.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kendini kötü hissediyorsan macerayı bitir. Oyun bekler.'**
+  String get safetyTip8;
+
+  /// No description provided for @safetyAcknowledgement.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvenlik uyarısını okudum ve anladım.'**
+  String get safetyAcknowledgement;
+
+  /// No description provided for @safetyContinue.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam Et'**
+  String get safetyContinue;
+
+  /// No description provided for @safetySaveError.
+  ///
+  /// In tr, this message translates to:
+  /// **'Onay kaydedilemedi. Lütfen tekrar dene.'**
+  String get safetySaveError;
+
+  /// No description provided for @safetyFirstSafety.
+  ///
+  /// In tr, this message translates to:
+  /// **'⚠️ Önce Güvenlik'**
+  String get safetyFirstSafety;
+
+  /// No description provided for @safetyAdventureNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Telefonun cebinde kalabilir; adımların ekrana bakmadan da sayılıyor.\nRound\'un süre sınırı var ama senden bir karar beklenmiyor.\nKarşıdan karşıya geçerken yola bak, oyuna değil.'**
+  String get safetyAdventureNotice;
+
+  /// No description provided for @safetyWalkingAcknowledgement.
+  ///
+  /// In tr, this message translates to:
+  /// **'Süreyi yetiştirmek için tehlikeli bir şey yapmayacağımı onaylıyorum.'**
+  String get safetyWalkingAcknowledgement;
+
+  /// No description provided for @safetyStartAdventure.
+  ///
+  /// In tr, this message translates to:
+  /// **'Güvendeyim, Maceraya Başla'**
+  String get safetyStartAdventure;
+
+  /// No description provided for @safetyBattleNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çevreni kontrol et. Güvenli olduğunda savaşa başla.'**
+  String get safetyBattleNotice;
+
+  /// No description provided for @safetyStartBattle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Savaşa Başla'**
+  String get safetyStartBattle;
+
+  /// No description provided for @safetyLater.
+  ///
+  /// In tr, this message translates to:
+  /// **'Daha Sonra'**
+  String get safetyLater;
+
+  /// No description provided for @safetyWalking.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yürü, savaş kendiliğinden çözülüyor. Round\'un süre sınırı var ama ekrana bakman gerekmiyor.'**
+  String get safetyWalking;
+
+  /// No description provided for @safetyTimeLimitNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Round\'un süre sınırı var'**
+  String get safetyTimeLimitNotice;
+
+  /// No description provided for @safetyReady.
+  ///
+  /// In tr, this message translates to:
+  /// **'Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.'**
+  String get safetyReady;
 
   /// No description provided for @commonClose.
   ///

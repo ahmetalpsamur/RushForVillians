@@ -60,6 +60,7 @@ class ItemEffects {
           chance: 0.15,
           customLabel:
               'vuruşta %15 ihtimalle göktaşı düşer: kritik hasarı +%90',
+          customLabelEn: '15% chance on hit to call down a meteor: critical damage +90%',
         ),
         ItemEffect(stat: ItemStat.stepXp, value: 0.1),
       ],
@@ -120,6 +121,7 @@ class ItemEffects {
           value: 0.35,
           trigger: ItemEffectTrigger.onKill,
           customLabel: 'düşman yenince kaybettiğin canın %35\'i geri gelir',
+          customLabelEn: 'after defeating an enemy, you recover 35% of the HP you lost',
         ),
         ItemEffect(stat: ItemStat.enemyXp, value: 0.15),
         ItemEffect(stat: ItemStat.defense, value: -0.2),
@@ -229,6 +231,7 @@ class ItemEffects {
           customLabel:
               'vuruşta %10 ihtimalle iki yıldız çakışır: '
               'kritik hasarı +%100',
+          customLabelEn: '10% chance on hit as twin stars collide: critical damage +100%',
         ),
         ItemEffect(stat: ItemStat.wheelXp, value: 0.14),
       ],
@@ -301,6 +304,7 @@ class ItemEffects {
           customLabel:
               'can %40 altındayken alınan her darbe geri döner: '
               'saldırı +%50',
+          customLabelEn: 'while below 40% HP, every blow you take is returned: attack +50%',
         ),
         ItemEffect(stat: ItemStat.stepXp, value: 0.12),
       ],
@@ -317,6 +321,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.onKill,
           customLabel:
               'düşman yenince ruhu hapsedilir: canın %40\'ı geri gelir',
+          customLabelEn: 'after defeating an enemy, its soul is bound: you recover 40% of your HP',
         ),
         ItemEffect.flat(stat: ItemStat.streakFreezeCap, value: 1),
       ],
@@ -415,6 +420,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.onHit,
           chance: 0.2,
           customLabel: 'vuruşta %20 ihtimalle alev alır: saldırı +%30',
+          customLabelEn: '20% chance on hit to burst into flame: attack +30%',
         ),
         ItemEffect(stat: ItemStat.defense, value: -0.12),
       ],
@@ -507,6 +513,7 @@ class ItemEffects {
           value: 0.28,
           trigger: ItemEffectTrigger.onKill,
           customLabel: 'düşman yenince bir sonraki tur saldırı +%28',
+          customLabelEn: 'after defeating an enemy, attack +28% on the next round',
         ),
         ItemEffect(stat: ItemStat.stepCoin, value: 0.1),
       ],
@@ -690,6 +697,7 @@ class ItemEffects {
           trigger: ItemEffectTrigger.onHit,
           chance: 0.3,
           customLabel: 'vuruşta %30 ihtimalle zehir işler: saldırı +%22',
+          customLabelEn: '30% chance on hit as venom sets in: attack +22%',
         ),
       ],
     ),

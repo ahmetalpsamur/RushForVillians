@@ -28,7 +28,91 @@ class AppLocalizationsTr extends AppLocalizations {
   String get languageEnglish => 'İngilizce';
 
   @override
-  String get fallbackSafetyMessage => 'Türkçe yedek metin';
+  String get fallbackSafetyMessage => 'Çevrene dikkat et. Oyun bekleyebilir.';
+
+  @override
+  String get untranslatedTemplateProbe => 'Türkçe yedek metin';
+
+  @override
+  String get safetyTitle => 'Güvenlik Uyarısı';
+
+  @override
+  String get safetyPageTitle => 'Güvenlik';
+
+  @override
+  String get safetyTip1 =>
+      'Telefon cebinde kalsın. Adımların sayılıyor, ekrana bakman gerekmiyor.';
+
+  @override
+  String get safetyTip2 =>
+      'Round\'un bir süre sınırı var ama vermen gereken bir karar yok. Yürü, gerisi kendiliğinden çözülüyor.';
+
+  @override
+  String get safetyTip3 => 'Karşıdan karşıya geçerken oyuna değil yola bak.';
+
+  @override
+  String get safetyTip4 =>
+      'Kulaklık taktıysan sesi düşür. Arkandan gelen aracı duyman lazım.';
+
+  @override
+  String get safetyTip5 =>
+      'Süre bitmek üzereyken hızlanmak zorunda değilsin. Kaybedeceğin şey biraz hasar, diğeri sağlık.';
+
+  @override
+  String get safetyTip6 =>
+      'Karanlıkta yürüyorsan açık renk veya yansıtıcı bir şey giy.';
+
+  @override
+  String get safetyTip7 =>
+      'Tanımadığın bir yolda yürüyorsan önce nereye gittiğine bak.';
+
+  @override
+  String get safetyTip8 =>
+      'Kendini kötü hissediyorsan macerayı bitir. Oyun bekler.';
+
+  @override
+  String get safetyAcknowledgement => 'Güvenlik uyarısını okudum ve anladım.';
+
+  @override
+  String get safetyContinue => 'Devam Et';
+
+  @override
+  String get safetySaveError => 'Onay kaydedilemedi. Lütfen tekrar dene.';
+
+  @override
+  String get safetyFirstSafety => '⚠️ Önce Güvenlik';
+
+  @override
+  String get safetyAdventureNotice =>
+      'Telefonun cebinde kalabilir; adımların ekrana bakmadan da sayılıyor.\nRound\'un süre sınırı var ama senden bir karar beklenmiyor.\nKarşıdan karşıya geçerken yola bak, oyuna değil.';
+
+  @override
+  String get safetyWalkingAcknowledgement =>
+      'Süreyi yetiştirmek için tehlikeli bir şey yapmayacağımı onaylıyorum.';
+
+  @override
+  String get safetyStartAdventure => 'Güvendeyim, Maceraya Başla';
+
+  @override
+  String get safetyBattleNotice =>
+      'Çevreni kontrol et. Güvenli olduğunda savaşa başla.';
+
+  @override
+  String get safetyStartBattle => 'Savaşa Başla';
+
+  @override
+  String get safetyLater => 'Daha Sonra';
+
+  @override
+  String get safetyWalking =>
+      'Yürü, savaş kendiliğinden çözülüyor. Round\'un süre sınırı var ama ekrana bakman gerekmiyor.';
+
+  @override
+  String get safetyTimeLimitNotice => 'Round\'un süre sınırı var';
+
+  @override
+  String get safetyReady =>
+      'Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.';
 
   @override
   String get commonClose => 'Kapat';

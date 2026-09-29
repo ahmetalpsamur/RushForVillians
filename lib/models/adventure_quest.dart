@@ -453,13 +453,21 @@ class AdventureQuest {
 
   int get roundDurationMinutes => currentRoundDuration.inMinutes;
 
+  /// ⚠️ **Arayüzde kullanma — metni sabit Türkçe.**
+  ///
+  /// Ekranda süre göstermek için `context.l10n.adventureDuration(duration)`
+  /// kullanılır (`content_localizations.dart`); İngilizce seçiliyken doğru
+  /// olan tek yol o. Bu yardımcı yalnızca kayıt/log tarafındaki eski çağrı
+  /// noktaları için duruyor ve bugün hiçbir yerden çağrılmıyor.
   static String durationLabel(Duration duration) {
     if (duration.inSeconds < 60) return '${duration.inSeconds} saniye';
     return '${duration.inMinutes} dakika';
   }
 
+  /// [durationLabel] ile aynı uyarı: arayüzde `l10n.adventureDuration` kullan.
   String get roundDurationLabel => durationLabel(currentRoundDuration);
 
+  /// [durationLabel] ile aynı uyarı: arayüzde `l10n.adventureDuration` kullan.
   String get totalAttackDurationLabel => durationLabel(totalAttackDuration);
 
   int stepsThisRound(int currentSteps) =>

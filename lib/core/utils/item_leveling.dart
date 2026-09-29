@@ -246,6 +246,7 @@ ItemEffect _scaleCombat(ItemEffect effect, double factor) {
       chance: effect.chance,
       threshold: effect.threshold,
       customLabel: effect.customLabel,
+      customLabelEn: effect.customLabelEn,
     );
   }
   // Yarım yüzdeye yuvarlanır: `+%6,5` okunur kalsın.
@@ -259,5 +260,6 @@ ItemEffect _scaleCombat(ItemEffect effect, double factor) {
     chance: effect.chance,
     threshold: effect.threshold,
     customLabel: effect.customLabel,
+    customLabelEn: effect.customLabelEn,
   );
 }

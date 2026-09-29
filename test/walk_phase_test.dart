@@ -179,11 +179,19 @@ void main() {
             victorySteps: steps,
           ).speedRewardMultiplier;
 
-      // Bonus aralığı artık dar: en erken zafer bile en fazla ×1,02.
-      expect(multiplierAt(400), closeTo(1.016, 0.0001));
-      expect(multiplierAt(1000), closeTo(1.01, 0.0001));
-      expect(multiplierAt(1600), closeTo(1.004, 0.0001));
+      // Çarpan config'ten türer; koda gömülü sayı yok:
+      //   1 + (1 − harcanan/hedef) × (tavan − 1)
+      final span = GameConstants.maxVictorySpeedMultiplier - 1;
+      expect(multiplierAt(400), closeTo(1 + 0.8 * span, 0.0001));
+      expect(multiplierAt(1000), closeTo(1 + 0.5 * span, 0.0001));
+      expect(multiplierAt(1600), closeTo(1 + 0.2 * span, 0.0001));
       expect(multiplierAt(400), greaterThan(multiplierAt(1000)));
+      // Tam hedefte devirmek taban, hiç harcamadan devirmek tavan.
+      expect(multiplierAt(2000), closeTo(1, 0.0001));
+      expect(
+        multiplierAt(0),
+        closeTo(GameConstants.maxVictorySpeedMultiplier, 0.0001),
+      );
     });
 
     test('zafer altını tohumlu ve tekrarlanabilir', () {

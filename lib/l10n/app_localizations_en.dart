@@ -28,7 +28,95 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get fallbackSafetyMessage => 'Türkçe yedek metin';
+  String get fallbackSafetyMessage =>
+      'Watch your surroundings. The game can wait.';
+
+  @override
+  String get untranslatedTemplateProbe => 'Türkçe yedek metin';
+
+  @override
+  String get safetyTitle => 'Safety Warning';
+
+  @override
+  String get safetyPageTitle => 'Safety';
+
+  @override
+  String get safetyTip1 =>
+      'Keep the phone in your pocket. Your steps are counted whether you look or not.';
+
+  @override
+  String get safetyTip2 =>
+      'The round has a time limit, but there is nothing for you to decide. Just walk. The rest resolves on its own.';
+
+  @override
+  String get safetyTip3 =>
+      'When you cross the street, look at the street, not the game.';
+
+  @override
+  String get safetyTip4 =>
+      'If you have headphones in, turn them down. You need to hear what is coming up behind you.';
+
+  @override
+  String get safetyTip5 =>
+      'You do not have to speed up when the clock runs low. The worst you lose is some damage.';
+
+  @override
+  String get safetyTip6 =>
+      'Walking after dark? Wear something light or reflective.';
+
+  @override
+  String get safetyTip7 =>
+      'On an unfamiliar route, check where you are going before you start.';
+
+  @override
+  String get safetyTip8 =>
+      'If you feel unwell, end the adventure. The game will wait.';
+
+  @override
+  String get safetyAcknowledgement =>
+      'I have read and understood the safety warning.';
+
+  @override
+  String get safetyContinue => 'Continue';
+
+  @override
+  String get safetySaveError =>
+      'Could not save your acknowledgement. Please try again.';
+
+  @override
+  String get safetyFirstSafety => '⚠️ Safety First';
+
+  @override
+  String get safetyAdventureNotice =>
+      'Your phone can stay in your pocket; steps are counted whether you look or not.\nThe round has a time limit, but nothing is asked of you.\nWhen you cross the street, look at the street, not the game.';
+
+  @override
+  String get safetyWalkingAcknowledgement =>
+      'I agree not to do anything unsafe to beat the clock.';
+
+  @override
+  String get safetyStartAdventure => 'I’m safe, start adventure';
+
+  @override
+  String get safetyBattleNotice =>
+      'Check your surroundings. Start the battle when you are safe.';
+
+  @override
+  String get safetyStartBattle => 'Start Battle';
+
+  @override
+  String get safetyLater => 'Later';
+
+  @override
+  String get safetyWalking =>
+      'Just walk; the battle resolves on its own. The round has a time limit, but you do not need to watch the screen.';
+
+  @override
+  String get safetyTimeLimitNotice => 'The round is on a timer';
+
+  @override
+  String get safetyReady =>
+      'Step target complete. Your monster will wait; fight when you are safe.';
 
   @override
   String get commonClose => 'Close';

@@ -80,7 +80,8 @@ oyunu ilerletir; oturan biri ilerletmez.
 ```
 gerçek adım
    ├─► coin           (50 adım = 1 · yürüyüş fazında 30 adım = 1)
-   ├─► XP → seviye    (2 adım = 1 XP)
+   ├─► XP             (2 adım = 1 XP — seviye vermez, bkz. §6.3)
+   ├─► seviye         (adımdan: 500·(1+ln sv)^1,5)
    ├─► günlük seri    (2000 adım ya da bir zafer)
    ├─► çark hakkı     (3000 adım ya da bir zafer)
    └─► macera roundu  (round hedefi tutarsa vurursun, tutmazsa yersin)
@@ -91,7 +92,7 @@ gerçek adım
               ┌──────────────┴───────────────┐
               ▼                              ▼
       zafer ödülü (XP + altın)        YÜRÜYÜŞ FAZI
-      × hız çarpanı (≤ ×2)            30 adım = 1 altın
+      × hız çarpanı (≤ ×1,5)          30 adım = 1 altın
                                       taahhüt bitene kadar
 ```
 
@@ -108,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v20 + migration | Firebase |
+| Yerel kalıcılık, şema v25 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -125,7 +126,9 @@ lib/
 ├── core/
 │   ├── constants/
 │   │   ├── game_constants.dart    # BÜTÜN denge sabitleri — tek dosya
-│   │   └── attack_config.dart     # 6 saldırı hedefi × 5 round tablosu
+│   │   ├── attack_config.dart     # 6 saldırı hedefi + sabit round tablosu
+│   │   ├── timed_combat_config.dart  # tek atımlık savaş eğrisi (bağlanmamış)
+│   │   └── safety_messages.dart   # güvenlik metinleri (ARB'den okur)
 │   ├── theme/app_theme.dart       # AppColors + AppTheme.dark
 │   └── utils/                     # SAF FONKSİYONLAR (aşağıda)
 ├── data/                      # SABİT VERİ (kod değil, tablo)
@@ -148,6 +151,7 @@ aynı deseni izle.
 | `game_clock.dart` | Enjekte edilebilir "şimdi"; geriye alınan cihaz saatini emer |
 | `coin_calculator.dart` | Adım → coin (oran parametreli, yürüyüş fazı için) |
 | `xp_calculator.dart` | Adım → XP |
+| `level_steps.dart` | **Seviye maliyeti — adımdan.** `500·(1+ln sv)^1,5`, 50'ye yuvarlı |
 | `step_rate_limiter.dart` | "İnsan bu adımı bu sürede atabilir mi" |
 | `step_history.dart` | Günlük halka arşivi + 400 gün kırpması |
 | `item_rules.dart` | Dosya yolundan item türetme: ad, nadirlik, seviye, fiyat, buff |
@@ -505,25 +509,39 @@ Hesap **iki geçişli**, çünkü bir parti faz sınırını geçebilir: önce b
 pay 30/1 ile, sonra kalanı 50/1 ile. İşaretçi her geçişte yalnızca tüketilen
 adım kadar ilerler.
 
-### XP ve seviye eğrisi
+### Seviye eğrisi — **adımdan**, XP'den değil
 
-**2 adım = 1 XP** (`stepsPerXp`). Seviye maliyeti `baseXpPerLevel * level` —
-seviye başına **doğrusal** artar, kümülatif maliyet karesel olur:
+⚠️ **Seviye XP'den gelmiyor.** Tek kaynak `core/utils/level_steps.dart`:
 
+```dart
+calculateRequiredSteps(lv) = round(500 · (1 + ln lv)^1,5 / 50) · 50
 ```
-N. seviyeye ulaşmak için gereken toplam XP = 500 · N · (N−1)
-```
 
-**Üstel eğri bilerek seçilmedi:** girdisi gerçek hayattan gelen bir oyunda
-üstel maliyet bir noktada "aylarca sürecek seviye" üretir ve sayı durmuş gibi
-görünür.
+`UserProfile.creditLevelStepsThrough(totalSteps)` bunu tüketir; giriş
+`RootShell._awardLevelSteps`. **Seviye tavanı yok.**
 
-| Günlük adım | XP/gün | 10. seviye | 20. seviye |
-|---|---|---|---|
-| 3.000 | 1.500 | 30 gün | 127 gün |
-| **6.000 (referans)** | 3.000 | **15 gün** | 63 gün |
-| 10.000 | 5.000 | 9 gün | 38 gün |
-| 20.000 | 10.000 | 4,5 gün | 19 gün |
+| Seviye | Gereken adım | Kümülatif |
+|---|---|---|
+| 1→2 | 500 | 500 |
+| 2→3 | 1.100 | 1.600 |
+| 5→6 | 2.100 | 7.050 |
+| 10→11 | 3.000 | 20.500 |
+| 20→21 | 4.000 | 56.400 |
+| 30→31 | 4.600 | 99.900 |
+
+Eğri **logaritmik**, yani seviye başına maliyet artıyor ama doyuyor: 30.
+seviyede bir seviye 1. seviyenin 9 katı, 90 katı değil. Üstel eğri bilerek
+seçilmedi — girdisi gerçek hayattan gelen bir oyunda üstel maliyet bir
+noktada "aylarca sürecek seviye" üretir ve sayı durmuş gibi görünür.
+
+Günlük 7.000 adım (`dailyStepGoal`) atan oyuncu: **1. gün sv. 5**,
+**1. hafta sv. 19**, **1. ay sv. 52**.
+
+### XP — bağımsız bir kaynak
+
+**2 adım = 1 XP** (`stepsPerXp`). XP **seviye vermez**; bugün yalnızca iki
+tüketicisi var: `TitleCondition.xpEarned` başarım ünvanı ve
+`UserProfile.totalXpEarned` üzerinden koleksiyon ödülleri.
 
 **XP'nin günlük tavanı yok** — harcanacak bir yeri olmadığı için ekonomi
 koruması gerekmiyor.
@@ -532,9 +550,10 @@ koruması gerekmiyor.
 `lastXpRewardedStepCount`): iki ekonominin birbirine bağlanmaması gerekiyor ve
 artık-adım davranışları farklı (50 vs 2).
 
-**Seviye atlama tek noktadan yayınlanır:** `RootShell._awardXp` XP veren
-**tek** yol; `services/level_events.dart` bir `Stream<LevelUpEvent>` yayar. Tek
-ödülle birden fazla seviye atlanırsa **tek** olay çıkar (`levelsGained > 1`).
+**Seviye atlama tek noktadan yayınlanır:** `RootShell._awardLevelSteps` seviye
+veren **tek** yol; `services/level_events.dart` bir `Stream<LevelUpEvent>`
+yayar. Tek raporla birden fazla seviye atlanırsa **tek** olay çıkar
+(`levelsGained > 1`). `RootShell._awardXp` ise yalnızca XP dağıtır.
 
 ### Ekonomi hizalama ölçümü
 
@@ -554,8 +573,8 @@ Kabul bandı [0,5 – 1,8]: altında para hiç kısıt olmaz, üstünde seviye h
 olmaz. Sıradan katman **mutlak** ölçütle bağlı: günlük hedefini tutturan oyuncu
 **ilk akşam** bir item alabilmeli.
 
-`stepsPerCoin`, `stepsPerXp`, `baseXpPerLevel`, `_costBase` ya da `_levelBand`
-değişirse bu test alarm verir.
+`stepsPerCoin`, `stepsPerXp`, `calculateRequiredSteps`, `_costBase` ya da
+`_levelBand` değişirse bu test alarm verir.
 
 ## 6.4 Seri (streak)
 
@@ -1212,55 +1231,74 @@ gösterir + tek cümlelik davranış açıklaması.
 
 ### Saldırı yapısı — `attack_config.dart`
 
-Bir macera **bir saldırıdır**. Sürenin tek doğruluk kaynağı
-`GameConstants.stepsPerMinute = 100`:
+Bir macera **bir saldırıdır**. Round boyu ve süresi **sabit**:
 
-```
-toplamSüreDakika = toplamAdım / stepsPerMinute
-roundSayısı = clamp(ceil(toplamAdım / 250), 2, 5)
-roundAdımı = toplamAdım / roundSayısı  // kalan adımlar ilk roundlara dağıtılır
-roundSüresi = roundAdımı / stepsPerMinute
+```dart
+GameConstants.combatRoundStepTarget = 1000   // adım
+GameConstants.combatRoundDuration   = 15 dk
+
+roundSayısı  = ceil(toplamAdım / 1000)
+toplamSüre   = 15 dk × roundSayısı
+roundHedefi(i) = clamp(toplamAdım − i×1000, 1, 1000)
 ```
 
-250, hedef round boyudur; bir düşmana elle round/süre yazılmaz. Alt sınır 2,
-500 adımlık başlangıç savaşını tek roundluk gerilimsiz bir sayaç olmaktan
-çıkarır. 1.000 adım **4 × 250** olarak seçilir: 2 round fazla kaba, 10–11
-round tekrarlı olur. Üst sınır 5, 10.000 adımlık düşmanın 40 rounda dönüşmesini
-engeller. Uzun hedeflerde round başına adım ve süre büyür, toplam kadans hep
-100 adım/dakika kalır.
+⚠️ `GameConstants.stepsPerMinute = 100` yalnızca **arayüzde gösterilen
+referans tempo**; round hesabına hiç girmiyor.
+
+⚠️ `GameConstants.maxCombatRounds = 5` da **uygulanmıyor**:
+`AttackConfig.roundCountForSteps` onu okumuyor, bu yüzden 10.000 adımlık
+hedef **10 round** üretiyor.
 
 **Altı seçilebilir hedef:**
 
-| Adım hedefi | Toplam süre | Düşman güç çarpanı |
-|---|---|---|
-| 500 | 5 dk | ×1,00 |
-| 1.000 | 10 dk | ×1,15 |
-| 2.000 | 20 dk | ×1,35 |
-| 3.000 | 30 dk | ×1,55 |
-| 5.000 | 50 dk | ×1,85 |
-| 10.000 | 100 dk | ×2,40 |
+| Adım hedefi | Round | Toplam süre | Düşman güç çarpanı (tabloda) |
+|---|---|---|---|
+| 500 | 1 | 15 dk | ×1,00 |
+| 1.000 | 1 | 15 dk | ×1,15 |
+| 2.000 | 2 | 30 dk | ×1,35 |
+| 3.000 | 3 | 45 dk | ×1,55 |
+| 5.000 | 5 | 75 dk | ×1,85 |
+| 10.000 | 10 | 150 dk | ×2,40 |
 
-### Tempo sonrası ekonomi kontrolü
+⚠️ **Düşman güç çarpanı savaşta uygulanmıyor.**
+`AdventureQuest.enemyPowerMultiplier` sabit `1` döndürüyor, yani
+`scaledEnemyStats` kademe çarpanını hiç görmüyor. Tablo bugün yalnızca
+`TimedCombatConfig.difficultyMultiplierForSteps` üzerinden, **bağlanmamış**
+tek atımlık savaş yolunda okunuyor (aşağıya bak).
 
-Referans oyuncu günde 6.000 adım atar: macera dışında **120 coin + 3.000
-XP** değişmemiştir. Aşağıdaki zafer hesabı buffsızdır; coin sütunu tohumlu
-aralığı, parantez içi ortalamayı gösterir. "İlk round mükemmel" sütunu güçlü
-oyuncunun ilk 250 adımda bitirdiği üst-sınır senaryosudur; kalan taahhüt 30/1
-yürüyüş coinine ve mevcut hız ödülüne girer.
+### ⚠️ Bağlanmamış ikinci savaş yolu
 
-| Düşman | Savaş süresi | Normal günlük toplam | İlk round mükemmel üst sınırı |
-|---|---:|---:|---:|
-| 500 adım | 5 dk (2×250) | 127–136 coin (131,5) · 3.100 XP | en çok 147 coin · 3.150 XP |
-| 1.000 adım | 10 dk (4×250) | 130–142 coin (136) · 3.175 XP | en çok 168 coin · 3.306 XP |
+`AdventureQuest.resolveTimedEncounter` + `TimedCombatConfig` +
+`combat_engine.resolveTimedCombat` **tam yazılmış ve testli**
+(`timed_combat_test.dart`), ama `RootShell` bunu **hiç çağırmıyor**. Canlı yol
+hâlâ round tabanlı (`resolveRound` / `resolveExpiredRounds`).
 
-Eski **120 coin/gün** yürüyüş tabanı değişmedi. Normal tek macera 500'de
-ortalama +%9,6, 1.000'de +%13,3 ekler; bu zaten var olan zafer damlasıdır.
-Mükemmel round doğrudan coin/XP basmaz: yalnızca düşmanı erken indirmeyi
-kolaylaştırıp mevcut, tavanı ×2 olan hız ödülünü ve sınırlı yürüyüş-fazı
-farkını besler. En sert 1.000 adım senaryosu 120 tabanına göre +%40'tır ama
-yalnızca güçlü oyuncunun ilk roundda öldürmesiyle oluşur ve mutlak fark 48
-coindir. Bu nedenle ödül oranı düşürülmedi; ekonomi sapması büyürse ayarlanacak
-kaldıraç tempo değil `maxVictorySpeedMultiplier`dır.
+Yarım kalmış bir geçiş; **dokunma** — motoru bağlamak, silmek ya da refactor
+etmek kapsam dışı.
+
+### Zafer ödülü
+
+`RootShell._grantAdventureVictoryXpIfNeeded`, kademe bazlı ve **tohumlu**:
+
+```
+tier = ceil(enemy.minimumDailySteps / 500)
+coin = tohumluÇekiliş(4 + tier×3, 10 + tier×6) × hızÇarpanı
+xp   = enemy.xpReward × enemyXpMultiplier × hızÇarpanı
+```
+
+| Hedef | tier | Zafer coini (ham) | Zafer XP'si |
+|---|---|---|---|
+| 500 | 1 | 7–16 (ort. 11,5) | 100 |
+| 1.000 | 2 | 10–22 (ort. 16) | 175 |
+| 2.000 | 4 | 16–34 (ort. 25) | 325 |
+| 3.000 | 6 | 22–46 (ort. 34) | 500 |
+| 5.000 | 10 | 34–70 (ort. 52) | 900 |
+| 10.000 | 20 | 64–130 (ort. 97) | 2.750 |
+
+Referans oyuncu (7.000 adım/gün = **140 coin**) için tek bir 500'lük macera
+ortalama **+%8** ekler. Mükemmel round doğrudan coin/XP basmaz: yalnızca
+düşmanı erken indirmeyi kolaylaştırıp hız ödülünü (tavan ×1,5) ve yürüyüş-fazı
+farkını besler.
 
 ### İki faz (GD55)
 
@@ -1295,7 +1333,8 @@ ise ekran doğrudan yürüyüş sahnesine düşer.
 çarpan = 1 + (1 − victorySteps / stepGoal) × (maxVictorySpeedMultiplier − 1)
 ```
 
-Tavan **×2**. Tam hedefte devirmek ×1, hiç adım harcamadan devirmek ×2.
+Tavan **×1,5**. Tam hedefte devirmek ×1, hiç adım harcamadan devirmek ×1,5.
+(Bir dönem kodda ×1,02 yazıyordu — denge kararı değil, sıfır kaymasıydı.)
 
 **Neden adımla ölçülüyor, roundla değil:**
 1. Round sayısı kaba — 500 adımlık hedefte round sayısı düşük, hız ödülü hiç
@@ -1540,6 +1579,24 @@ sınıf adları (eski kayıt kimlikleri dahil), 1.244 koleksiyon ödülünün ad
 katmanına alındı. Faz 3 golden temsilleri `phase3_guides_en_390.png` ve
 `phase3_rewards_en_390.png`.
 
+**Bölüm C Faz 1 (sızıntı kapatma):** beş canlı sızıntı kapatıldı —
+takılı ünvan adı (profil özeti), yükseltme engeli sebebi (envanter kartı) ve
+üç sıralama ölçütü (ünvan A→Z, envanter, demirci) artık gösterilen adı
+kullanıyor (GD92). Ünvan ve imzalı eşya **özel etki etiketleri** ARB yerine
+`ItemEffect.customLabelEn` ile veri olarak çevrildi — 129 etiket (GD89).
+Asset adlarındaki iyelik eki kelime sınırında düzeltiliyor: "Reapers Scythe"
+→ "Reaper's Scythe", "Blacksmiths Regular" → "Blacksmith's Regular".
+Güvenlik metinleri ARB'ye taşındı ve içerikleri dürüstleştirildi (GD90).
+
+**Ölçülen taşma riski düşük:** İngilizce en uzun eşya adı **34** karakter
+(TR 31), en uzun ünvan adı **19** (TR 19), en uzun ünvan etki etiketi **60**
+(TR 49). Ünvan ekranı 320 ve 390 dp'de İngilizce olarak render edildi;
+`RenderFlex` taşma hatası **yok**.
+
+**Faz 1b'ye bırakıldı:** 61 imzalı eşya lore'u İngilizce'de tek jenerik
+cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa göre
+4 şablondan üretiliyor. Toplam 126 cümle; ayrı bir iş.
+
 ### Faz 0 metin envanteri
 
 | Kategori | Adet | Yer / saklama biçimi | Durum |
@@ -1548,7 +1605,7 @@ katmanına alındı. Faz 3 golden temsilleri `phase3_guides_en_390.png` ve
 | Sınıf seçimi | 22 güncel/eski sınıf kimliği + seçim sözü + cinsiyet etiketleri | `AvatarProfile` kanonik değerleri gösterimde `content_localizations.dart` üzerinden çözülüyor | Faz 3 tamamlandı |
 | Koleksiyon ödülleri | 1.244 görsel için 17 koşul türünden üretilen ad, açıklama ve gereksinim | Kalıcı katalog alanları değişmeden koşul türü, hedef ve villain kimliği yerelleştiriliyor | Faz 3 tamamlandı |
 | Item ad üretimi | 166 temel ad + 36 varyant sıfatı + 5 nadirlik | `data/item_definitions.dart`, `core/utils/item_rules.dart`, `models/reward_rarity.dart`; gösterimde sabit asset kimliği, nadirlik ve sıfat yerelleştiriliyor | Faz 3 tamamlandı |
-| Ünvanlar | 65 ad + 65 lore + 123 özel etki etiketi | `data/title_catalog.dart` içine gömülü katalog; adlar sabit kimlikten, lore/kilit/etkiler yapılandırılmış kaynaktan yerelleştiriliyor | Faz 3 tamamlandı |
+| Ünvanlar | 65 ad + 65 lore + 121 özel etki etiketi | `data/title_catalog.dart` içine gömülü katalog; adlar sabit kimlikten, etkiler `customLabelEn` ile | Etiketler tamam (C/Faz 1); **lore İngilizce'de şablon** → Faz 1b |
 | Canavarlar | 20 ad + 20 görev metni + 4 arketip | `data/enemy_catalog.dart`; gösterim sabit `id` ile | Faz 3 tamamlandı |
 | Görev/macera | Round, süre, adım, savaş sonucu, ödül ve kök akış bildirimleri | `adventure_screen.dart`, `root_shell.dart`; modeldeki süre/ad alanları gösterimde locale üzerinden çözülüyor | Faz 3 tamamlandı |
 | Tutorial | 28 dolu frame mesajı + düğme etiketleri | ARB; adım enum'u yalnızca kalıcı akış kimliği | Faz 3 tamamlandı |
@@ -1591,9 +1648,9 @@ katmanına alındı. Faz 3 golden temsilleri `phase3_guides_en_390.png` ve
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v20**
+## Şema — **güncel sürüm v25**
 
-`GameStorage.schemaVersion = 20` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 25` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -1611,6 +1668,11 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 17 → 18 | Seri bonusu gün sayısından **bindeye**: her değer ×10 |
 | 18 → 19 | Ejderha Pelerini → "Gece Yürüyüşçüsü" ünvanı; `title_villain_hunter` → gerçek ünvan |
 | 19 → 20 | Rehberin serbest dolaşma ayarı |
+| 20 → 21 | Mükemmel-round serisi ve son round geri bildirimi kalıcı hâle geldi |
+| 21 → 22 | `carriedSteps` / `notifiedReadyRound`: yarım yürüyüş gün sıfırlamasını aşıyor |
+| 22 → 23 | Macera başlangıcı ve toplam hedefin tamamlanma anı (`adventureStartedAt`, `stepTargetCompletedAt`) |
+| 23 → 24 | Günlük bildirim ve kutlama onayları |
+| 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,
 `debugPrint` ile loglanır, `null` dönülür → temiz varsayılan. **Yeni** sürümdeki
@@ -1851,10 +1913,15 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD81 | Çark altın veriyor; epik/efsanevi ekipman çarktan kalktı | Altın adım ekonomisinden **ayrı** bir kaynak (işaretçiye dokunmuyor). Epik/efsanevi kaldırma GD19'un geri gelmesi |
 | GD82 | Rehber `Scaffold.body` içinde yaşıyor; konumu sabit pikselden çıkmıyor | Body'nin alt kenarı zaten alt gezinme çubuğunun üst kenarı → `bottom: 0` "barın hemen üstü" demek. Ölçüm, tema sorgusu ya da 96 px tahmini gerekmiyor; jest çubuğu olan/olmayan cihazda, bar gizlendiğinde ve klavye açıldığında kendiliğinden doğru |
 | GD83 | Eğitim rehberi ekrandan yürüyerek çıkmıyor, **death** animasyonuyla veda ediyor | Çıkış artık pet'i kapatmakla aynı hissi veriyor. Süre sabit (960 ms): üç rehberin `*_Death_8.gif` dosyası da 8 kare × 120 ms, ve geçişi gerçek dosya okumasına bağlamak hem testlerde sahte saatle ilerletilemez hem asset okunamazsa eğitimi biteceği anda takardı |
-| GD84 | Savaş temposu tek sabitten **100 adım/dk**; round sayısı 250 hedefinden 2–5 arası türetiliyor; mükemmel seri ×2 tavanlı | Eski 1.000 adım/15 dk roundu ile yüzdeli config çelişiyordu; bazı UI hedefleri sprint istiyordu. 500→2 ve 1.000→4 round gerilimi korurken, 5 tavanı uzun düşmanlarda tekrar hissini engelliyor |
+| GD84 | *(kodda uygulanmadı — geri alındı)* Savaş temposunun 100 adım/dk'dan türetilmesi | Kod sabit **1.000 adım / 15 dk** rounda geri dönmüş; `stepsPerMinute` yalnızca arayüz etiketi, `maxCombatRounds` hiç okunmuyor. Tempo tablosu Bölüm C Faz 2'de yeniden ele alınacak |
 | GD85 | Yerelleştirme resmî `flutter_localizations` + `intl` + ARB/`gen_l10n` hattında | Flutter SDK ile sürüm uyumlu, üçüncü parti çalışma zamanı ve ayrı anahtar üretim sistemi getirmiyor |
 | GD86 | Dil tercihi `GameState` dışında ayrı SharedPreferences anahtarında | Dil bir oyun ilerlemesi değil cihaz/uygulama tercihidir; oyun kayıt şemasını ve ilerideki Firebase zarfını gereksiz yere değiştirmemeli |
 | GD87 | Türkçe ARB şablon ve eksik çeviri yedeği; desteklenmeyen sistem dili de Türkçe | Mevcut Türkçe hiçbir şey kaybetmez; yarım İngilizce çeviride boş değer veya anahtar adı kullanıcıya görünmez |
+| GD88 | Uygulama **yalnızca dikey**; kilit üç yerde birden (`main.dart`, `AndroidManifest`, `Info.plist`) | Macera sahnesi, savaş HUD'u ve rehber yerleşimi dikey orana göre ölçülüyor (GD82); yatayda bozuluyordu. Tek yerde kilitlemek yetmez: Flutter kilidi platform açılış karesini kapsamaz |
+| GD89 | Ünvan/eşya özel etiketlerinin İngilizcesi **veri**: `ItemEffect.customLabelEn` | İngilizce bir dönem etiketi stat+tetikleyiciden yeniden üretiyor, `customLabel`'ı atıyordu — sonuç kuru değil **yanlıştı** ("günün ilk yürüyüşünde" → "while your streak is active"). ARB'ye taşınmadı: bunlar 129 adet katalog verisi, ARB'nin işi arayüz çerçevesi. `ItemEffect` diske yazılmıyor, Model Kuralları #1 temiz |
+| GD90 | Güvenlik metinleri ARB'ye taşındı ve **"süre sınırı yok" iddiası kaldırıldı** | Metin `AttackConfig.durationForSteps`'in verdiği gerçekle çelişiyordu. Çözüm motoru metne değil **metni gerçeğe** uydurmak: süre sınırı olduğu kabul ediliyor, karşılığında doğru olan söyleniyor — süre var ama **karar yok**, o yüzden ekrana bakmak gerekmiyor. `SafetyMessages.noticeVersion` 1→2, kullanıcı yeniden onaylıyor |
+| GD91 | `fallbackSafetyMessage` gerçek metne dönüştü; GD87 nöbetçisi `untranslatedTemplateProbe` adına taşındı | Eski ad gerçek bir güvenlik metniymiş gibi duruyordu ve İngilizcesini eklemek nöbetçiyi sessizce etkisiz kılıyordu. Yeni ad ne olduğunu söylüyor |
+| GD92 | Sıralamalar **gösterilen** adla yapılıyor (`l10n.itemName` / `l10n.titleName`), kanonik Türkçe alanla değil | A→Z sıralaması İngilizce'de Türkçe adlara göre çıkıyordu: "Glass Cannon" C'de görünüyordu |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
