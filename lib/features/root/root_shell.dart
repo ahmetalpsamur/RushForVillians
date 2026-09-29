@@ -18,6 +18,7 @@ import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../core/utils/endless_rules.dart';
 import '../../core/utils/item_drop.dart';
 import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
@@ -28,6 +29,7 @@ import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
 import '../../l10n/l10n_context.dart';
 import '../../l10n/content_localizations.dart';
+import '../../data/enemy_catalog.dart';
 import '../../data/mock_data.dart';
 import '../../data/pet_sayings.dart';
 import '../../data/reward_catalog.dart';
@@ -38,6 +40,7 @@ import '../../models/combat_stats.dart';
 import '../../models/collection_reward.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
+import '../../models/endless_run.dart';
 import '../../models/game_state.dart';
 import '../../models/game_title.dart';
 import '../../models/item.dart';
@@ -59,6 +62,7 @@ import '../../services/reward_engine.dart';
 import '../../services/step_permission_service.dart';
 import '../../services/step_source.dart';
 import '../adventure/adventure_screen.dart';
+import '../adventure/endless_run_screen.dart';
 import '../safety/safety_screen.dart';
 import '../../core/constants/safety_messages.dart';
 import '../character/character_creation_screen.dart';
@@ -120,6 +124,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   late final UserProfile _profile;
   late DailyProgress _today;
   AdventureQuest? _adventure;
+
+  /// Yarım kalmış Sonsuz Koşu (Bölüm C / Faz 3).
+  ///
+  /// [_adventure] ile **karşılıklı dışlar**: biri aktifken diğeri
+  /// başlatılamaz. Kural tek yerde, [_endlessBlocked] / [_adventureBlocked]
+  /// kapılarında; iki mod aynı adım partisini paylaşsaydı hem ödül hem
+  /// hasar iki kez sayılırdı.
+  EndlessRun? _endlessRun;
   late List<DailyStepRecord> _stepHistory;
   late final _team = MockData.defaultTeam();
   final List<XpStoreItem> _storeItems = MockData.storeItems();
@@ -824,6 +836,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       List<DailyStepRecord>.of(restored?.stepHistory ?? const []),
     );
     _adventure = restored?.adventure;
+    _endlessRun = restored?.endlessRun;
     // Repair legacy same-day victories whose clock path awarded loot but
     // omitted the daily wheel flag. Never carry yesterday's win into today.
     final adventure = _adventure;
@@ -867,6 +880,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         profile: _profile,
         today: _today,
         adventure: _adventure,
+        endlessRun: _endlessRun,
         stepHistory: _stepHistory,
         engagement: _engagement,
       ),
@@ -1299,6 +1313,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
     var enemyDefeated = false;
     var playerDefeated = false;
+    var endlessCuts = 0;
+    var endlessDefeated = false;
     var revivalCompleted = false;
     CombatRoundResult? roundResult;
     final earnedTitles = <GameTitle>[];
@@ -1383,6 +1399,30 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // göstermeli: "2x XP" etkinse [_awardXp] çarpanı uygulayıp döner.
       _today.xpEarned += _awardXp(xpReward.xp);
 
+      // Sonsuz Koşu: kesimler adımdan, hasar saatten (macerayla aynı
+      // ayrım). Çarpan **yalnızca** koşunun bankasına uygulanıyor; yukarıda
+      // hesaplanan düz adım parası ve XP'si buna hiç dokunmuyor.
+      final endless = _endlessRun;
+      if (endless != null && endless.isActive) {
+        endlessCuts = endless.addSteps(amount, _profile.totalSteps);
+        final hit = endless.resolveExpiredRounds(
+          _profile.totalSteps,
+          now,
+          playerStats: _playerCombatStats(),
+          onHitEffects: triggeredEffects(_buffs, ItemEffectTrigger.onHit),
+        );
+        endlessDefeated = hit.defeated;
+        if (endlessDefeated) endless.settleDefeat();
+        // Seri: kesim **zafer kapısını açmaz**, yalnızca adım kapısı çalışır
+        // (aşağıdaki `_registerDailyStreak` adım eşiğine bakıyor). Çark da
+        // aynı sebeple açılmıyor: kesim 200 adımda bir oluyor, "günün ilk
+        // zaferi" sayılsaydı çark kilidi 3000 adımdan 200'e düşerdi.
+        //
+        // `enemiesDefeated`, `flawlessWins`, `currentWinStreak` ve
+        // `villainDefeatCounts` sayaçlarına da **yazılmıyor**: yoksa
+        // "1000 düşman devir" ünvanı bir saatte alınırdı.
+      }
+
       final adventure = _adventure;
       if (adventure != null && !adventure.isBattleCompleted) {
         final wasActive = !adventure.isBattleCompleted;
@@ -1458,9 +1498,17 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       ).showSnackBar(SnackBar(content: Text(context.l10n.revivalDoneNotice)));
     }
     if (roundResult != null) _persist();
+    // Sonsuz Koşu ilerlemesi de diske yazılmalı: uygulama kapanıp açılınca
+    // mod kaldığı yerden devam etmeli. Kesim olduysa banka büyümüştür,
+    // yenilgi olduysa ödeme yapılmıştır.
+    if (endlessCuts > 0 || endlessDefeated) _persist();
   }
 
   Future<void> _selectAdventure(AdventureQuest selected) async {
+    if (_adventureBlocked) {
+      _showStoreNotice(context.l10n.endlessAdventureBlocked);
+      return;
+    }
     if (_safetyDialogOpen) return;
     _safetyDialogOpen = true;
     bool accepted;
@@ -1503,6 +1551,85 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       _setTutorialStep(TutorialGuideStep.enemySelected);
     }
     unawaited(AdventureNotificationService.requestPermission());
+  }
+
+  // --- Sonsuz Koşu (Bölüm C / Faz 3) ---
+
+  /// Macera sürerken Sonsuz Koşu başlatılamaz.
+  bool get _endlessBlocked =>
+      _adventure != null && !_adventure!.isAdventureCompleted;
+
+  /// Sonsuz Koşu sürerken yeni macera seçilemez.
+  bool get _adventureBlocked => _endlessRun?.isActive == true;
+
+  Future<void> _startEndlessRun() async {
+    if (_endlessBlocked) {
+      _showStoreNotice(context.l10n.endlessBlockedByAdventure);
+      return;
+    }
+    if (_endlessRun?.isActive == true) return;
+    if (_safetyDialogOpen) return;
+    _safetyDialogOpen = true;
+    bool accepted;
+    try {
+      accepted = await showSafetyReminder(context);
+    } finally {
+      _safetyDialogOpen = false;
+    }
+    if (!mounted || !accepted) return;
+
+    final enemy = EnemyCatalog.byId(EndlessRun.enemyId);
+    if (enemy == null) return;
+    final stats = _playerCombatStats();
+    setState(() {
+      _endlessRun = EndlessRun(
+        enemy: enemy,
+        startingSteps: _profile.totalSteps,
+        startedAt: GameClock.now(),
+        playerMaxHealth: stats.maxHealth.round(),
+      );
+    });
+    _persist();
+  }
+
+  /// "Macerayı bitir": **tam** banka ödenir.
+  void _bankEndlessRun() {
+    final run = _endlessRun;
+    if (run == null || !run.bank()) return;
+    setState(() => _settleEndlessRun(run));
+    _persist();
+  }
+
+  /// Bankayı gerçekten ödeyen tek nokta. Hem bitirme hem yenilgi buradan
+  /// geçer; iki ödeme yolu ayrışmasın diye.
+  void _settleEndlessRun(EndlessRun run) {
+    if (run.paidCoins > 0) {
+      _profile.coins += run.paidCoins;
+      _profile.lifetimeCoins += run.paidCoins;
+    }
+    if (run.paidXp > 0) _awardXp(run.paidXp);
+
+    // Eşya ödülü: çarpan **eşya nadirliğini** büyütmez. Kademe, kesim
+    // sayısından türetiliyor ama üst bantlara ulaşamıyor — sonsuz koşu
+    // efsanevi düşürmez, o boss savaşının işi.
+    if (_equipment.isNotEmpty && run.rewardItemId == null) {
+      final tier = endlessDropTierFor(run.cutCount);
+      final dropped = rollItemDrop(
+        tier: tier,
+        seed: 'endless|${run.startingSteps}|${run.cutCount}|${run.combatSeed}',
+        pool: _equipment,
+      );
+      if (dropped != null) {
+        final instance = _profile.addItem(dropped.id, rarity: dropped.rarity);
+        run.rewardItemId = dropped.id;
+        run.rewardItemInstanceId = instance.instanceId;
+      }
+    }
+  }
+
+  void _closeEndlessRun() {
+    setState(() => _endlessRun = null);
+    _persist();
   }
 
   Future<void> _startRevival() async {
@@ -2551,12 +2678,24 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onUseManualSourceChanged: kDebugMode ? _setManualSource : null,
         useManualSource: _useManualSource,
       ),
+      // Sonsuz Koşu aktifse macera sekmesi **onu** gösterir: iki mod
+      // karşılıklı dışladığı için aynı sekmeyi paylaşmaları doğru ve
+      // altıncı bir sekme alt çubuğu sıkıştırırdı (GD27 ile aynı gerekçe).
+      if (_endlessRun != null)
+        EndlessRunScreen(
+          run: _endlessRun!,
+          avatar: _profile.avatar,
+          onFinish: _bankEndlessRun,
+          onClose: _closeEndlessRun,
+        )
+      else
       AdventureScreen(
         adventure: _adventure,
         roundSerial: _adventure?.roundOutcomeSerial ?? 0,
         avatar: _profile.avatar,
         today: _today,
         onAdventureSelected: _selectAdventure,
+        onStartEndlessRun: _startEndlessRun,
         onStartRevival: _startRevival,
         onChooseNewAdventure: _chooseNewAdventure,
         onAdventureUpdated: _persist,

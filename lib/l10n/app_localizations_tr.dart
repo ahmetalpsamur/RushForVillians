@@ -115,6 +115,102 @@ class AppLocalizationsTr extends AppLocalizations {
       'Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.';
 
   @override
+  String get endlessTitle => 'Sonsuz Koşu';
+
+  @override
+  String get endlessSubtitle =>
+      'Yürüdükçe çarpan büyür. Ne zaman duracağına sen karar verirsin.';
+
+  @override
+  String get endlessStart => 'Sonsuz Koşuya Başla';
+
+  @override
+  String get endlessFinish => 'Macerayı bitir';
+
+  @override
+  String get endlessMultiplier => 'ÇARPAN';
+
+  @override
+  String endlessCuts(int count) {
+    return '$count canavar';
+  }
+
+  @override
+  String get endlessBanked => 'Biriken ödül';
+
+  @override
+  String endlessBankedValue(int coins, int xp) {
+    return '$coins altın · $xp XP';
+  }
+
+  @override
+  String endlessNextCut(int steps) {
+    return 'Sonraki canavara $steps adım';
+  }
+
+  @override
+  String endlessRoundInfo(int steps, int minutes) {
+    return 'Round $steps adım · $minutes dakika';
+  }
+
+  @override
+  String get endlessNoInput =>
+      'Hiçbir şeye dokunman gerekmiyor. Telefonu cebine koy ve yürü.';
+
+  @override
+  String get endlessFinishQuestion => 'Koşuyu bitirip ödülü alasın mı?';
+
+  @override
+  String endlessFinishDetail(int coins, int xp) {
+    return '$coins altın ve $xp XP kazanacaksın. Devam edersen çarpan büyür ama düşersen ödülün yarısını kaybedersin.';
+  }
+
+  @override
+  String get endlessKeepRunning => 'Devam et';
+
+  @override
+  String get endlessBankedTitle => 'Koşu tamamlandı';
+
+  @override
+  String get endlessDefeatedTitle => 'Düştün';
+
+  @override
+  String get endlessDefeatedNote =>
+      'Biriken ödülün yarısı yine de senin. Sonsuz Koşu eli boş bırakmaz.';
+
+  @override
+  String endlessResultCuts(int count) {
+    return '$count canavar devirdin';
+  }
+
+  @override
+  String endlessResultReward(int coins, int xp) {
+    return '$coins altın · $xp XP';
+  }
+
+  @override
+  String endlessResultItem(String name) {
+    return 'Düşen eşya: $name';
+  }
+
+  @override
+  String get endlessClose => 'Kapat';
+
+  @override
+  String get endlessBlockedByAdventure =>
+      'Önce süren maceranı bitir. İki mod aynı anda çalışmaz.';
+
+  @override
+  String get endlessAdventureBlocked =>
+      'Önce Sonsuz Koşunu bitir. İki mod aynı anda çalışmaz.';
+
+  @override
+  String get endlessMonsterHealth => 'Canavar';
+
+  @override
+  String get endlessPlayerHealth => 'Canın';
+
+  @override
   String get commonClose => 'Kapat';
 
   @override

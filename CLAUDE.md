@@ -109,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v27 + migration | Firebase |
+| Yerel kalıcılık, şema v28 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -162,6 +162,8 @@ aynı deseni izle.
 | `effective_stats.dart` | Taban + ekipman + seri + koşullu → nihai savaş statı |
 | `base_combat_stats.dart` | Seviyeden gelen taban statlar |
 | `enemy_stats.dart` | Kademe + arketipten düşman statı türetme |
+| `endless_rules.dart` | **Sonsuz Koşu**: kesim → çarpan, can, hasar, ölçek (§6.17) |
+| `item_drop.dart` | Zafer sonrası **garanti** eşya düşmesi (tohumlu, tablo) |
 | `combat_engine.dart` | **Saf, deterministik savaş motoru** |
 | `streak_bonus.dart` | Günlük seri stat çekilişi (ağırlıklı, tohumlu) |
 | `wheel_rewards.dart` | Çark havuzu ve kazanan dilim (tohumlu) |
@@ -1547,6 +1549,85 @@ Sözler bağlama duyarlı: sekme + macera var mı + çark hakkı duruyor mu + se
 güvencede mi. Test iki yönü bağlar: hiçbir havuz boş değil **ve** hiçbir cümle
 iki bağlamda birden geçmiyor.
 
+## 6.17 Sonsuz Koşu
+
+`models/endless_run.dart` + `core/utils/endless_rules.dart` +
+`features/adventure/endless_run_screen.dart`.
+
+**Normal maceranın yerine geçmiyor, yanına ekleniyor.** Hedef seçimi,
+ödüller ve akış aynen duruyor; sonsuz koşu macera sekmesinde **ikinci bir
+seçenek**, varsayılan değil. İki mod **karşılıklı dışlıyor** (GD95).
+
+### Kendi temposu — ana tablo bu modda geçerli değil
+
+| | Sonsuz Koşu | Ana tablo |
+|---|---|---|
+| Round | **100 adım / 2 dk** | 250–2.000 adım / 2,5–20 dk |
+| Kadans | **50 adım/dk** | 100 adım/dk |
+
+Kadans bilerek **yarısı**: bu mod telefona bakılmadan, cepte oynanacak;
+affedici olmak zorunda.
+
+### Eğriler — hepsi tavanlı, hepsi `endless_rules.dart` içinde
+
+| Kesim | Çarpan | Can (adım) | Hasar × | Ölçek | Kesim süresi | Kümülatif |
+|---|---|---|---|---|---|---|
+| 0 | ×0,25 | 200 | 0,50 | 1,00 | 4,0 dk | 4 dk |
+| 5 | ×1,00 | 300 | 0,75 | 1,20 | 6,0 dk | 30 dk |
+| 10 | ×1,75 | 400 | 1,00 | 1,40 | 8,0 dk | 66 dk |
+| 15 | ×2,50 | **500** (tavan) | 1,25 | **1,60** (tavan) | 10,0 dk | 112 dk |
+| 19+ | **×3,00** (tavan) | 500 | 1,45 → 2,00 | 1,60 | 10,0 dk | — |
+
+**Bir saatte ~10 kesim, çarpan ×1,75, banka 160 altın** (+ 60 düz adım
+parası = 220 altın / 3.000 adım).
+
+**Can ve hasar bağıl olarak birebir aynı hızda büyüyor** (`1 + 0,10n`):
+15. kesimde can tavana vuruyor, hasar büyümeye devam ediyor. Sonuç tam
+olarak istenen sıra — **önce "bu uzuyor", sonra "bu tehlikeli"**. Daha dik
+bir hasar eğrisi tehlikeyi ilk kesime alıyordu ve mod erken bitiyordu.
+
+**Can tavanı** (500 adım = 10 dk) "her kesim bir öncekinden uzun" hissini
+kesiyor.
+
+### Çarpan yalnızca bankaya
+
+⚠️ **Düz adım parası ve adım XP'si çarpandan etkilenmiyor.** Etkilenseydi
+sonsuz koşu her durumda en kârlı mod olur ve boss savaşları ölürdü.
+
+Ödül **kesim anında** o kesimin çarpanıyla bankaya yazılıyor, sonda tek bir
+çarpanla çarpılmıyor: (1) "şimdi bitir mi, devam mı" sorusu ancak birikmiş
+bir banka varsa gerçek bir soru olur; (2) sondaki tek çarpan ödülü karesel
+büyütürdü.
+
+**Eşya ödülü tavanlı** (`endlessMaxDropTier = 9`): Faz 2'nin düşme
+tablosunda 5–9 bandı epik ve efsanevi içermiyor. **Sonsuz koşu para modu,
+boss savaşı nadir eşya modu** — çarpan bankayı büyütür, eşyanın kalitesini
+değil.
+
+### Tek karar: bitir ya da devam et
+
+Ekranda **tek dokunulabilir şey** "Macerayı bitir" düğmesi. Kesimler, çarpan
+artışı ve canavar değişimi otomatik; hiçbir karar, seçim, zamanlama ya da
+mini oyun yok. Ekran veri de tutmuyor — durumu `RootShell`'den okuyor.
+
+- **Bitir** → tam banka.
+- **Düş** → bankanın yarısı, **asla sıfır değil** (GD96).
+
+### Çizim maceranınkiyle aynı
+
+Aynı `PixelSprite`, aynı 100×100 tuval, aynı `bottom: -22` oturtması, aynı
+animasyon havuzu (`walkAsset` / `hurtAsset`). **Tek fark `scale`**: taban
+orana kesim ölçeği biniyor. `PixelSprite` zaten `ClipRect` içinde ve
+`FilterQuality.none` koruyor — büyüyen sprite bulanıklaşmıyor, pikselleşiyor.
+
+### Seri, çark ve sayaçlar
+
+| | Sayılıyor mu |
+|---|---|
+| Günlük seri | ✅ — adım kapısından, ayrı koda gerek yok |
+| Çark | ❌ — kesim "günün ilk zaferi" değil (GD97) |
+| `enemiesDefeated` · `flawlessWins` · `currentWinStreak` · `villainDefeatCounts` | ❌ (GD97) |
+
 ## 6.14 Taverna
 
 `features/team/team_screen.dart`. Eski "Takım" sekmesinin yeni adı
@@ -1687,9 +1768,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v27**
+## Şema — **güncel sürüm v28**
 
-`GameStorage.schemaVersion = 27` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 28` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -1713,6 +1794,7 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 23 → 24 | Günlük bildirim ve kutlama onayları |
 | 25 → 26 | Kademe güç çarpanı gerçekten uygulanmaya başladı; yarım maceranın `enemyHealth`'i **oranı korunarak** yeni tavana taşındı |
 | 26 → 27 | Zaferden garanti eşya düşmesi (`droppedItemId`, `droppedItemInstanceId`). Bitmiş maceraya geriye dönük eşya verilmiyor |
+| 27 → 28 | Sonsuz Koşu (`endlessRun`). Eski kayıtta `null` — hiç başlamamış koşu |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,
@@ -1919,7 +2001,7 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD46 | Seri bildirimi `addPostFrameCallback`'e alındı | `_showLevelUp` `hideCurrentSnackBar()` çağırıyor; seri bildirimi kuyruğa önce girip hiç görülmeden kapanıyordu |
 | GD47 | Adım partisinin **bütün** bildirimleri frame sonuna alındı | Ölçüldü: 6 günlük seriyle 5000 adım atan 1. seviye oyuncu, kazandığı dondurma hakkını duyuran tek bildirimi hiç görmüyordu |
 | GD48 | `StillGifFrame` test edilebilmek için public yapıldı | Hatalı asset enjekte etmenin başka yolu yoktu; `rootBundle` mock'lamak alakasız hatalar üretirdi |
-| GD49 | Düşman canı adımdan koparıldı; `stepGoal` yalnızca yürüyüş taahhüdü | "Her adım 1 hasar" modelinde 15 statın 9'u tanımlıydı ama okunmuyordu. Adım hedefi bitip düşman ayaktaysa round hedefi tam boya döner (kilitlenme kapatıldı) |
+| GD49 | *(Faz 2'de netleştirildi)* Düşman canı **doğrudan** adımdan koparıldı; ama `stepGoal` **planlanan round sayısı üzerinden** cana girmeye devam ediyor | Yasaklanan şey "her adım 1 hasar" modeliydi. §6.10'un can formülü zaten `round başına hasar × beklenen round sayısı` ve round sayısını hedef belirliyor. Bir dönem kademeden türetilen bir **vekil** kullanılıyordu (`expectedRoundsForTier`); tempo bandı değiştiren hedeflerde ikisi ayrışıyor ve 3.000 adımlık macerada yük oranı **1,81** oluyordu — taahhüt bittiğinde düşman ayakta kalıyordu. Artık can o maceranın **gerçekten planlanan** round sayısından kuruluyor. Vekil yalnızca katalog tabanında kaldı |
 | GD50 | Savaş motoru saf, deterministik, tohumu saklanan | Aynı motor ileride sunucuda çalışacak. Tohum akışı çarktan **ayrı** — yoksa çark çevirerek savaşın zarı kaydırılırdı |
 | GD51 | Düşman statları kademe + arketipten türetiliyor | 20 düşmana elle 9'ar stat yazmak tutarsız ve bakımsız olurdu. Katalogdaki elle yazılmış `attackDamage` çarpan olarak korunuyor |
 | GD52 | `speed` ve `luck` eklendi ama **itemler vermiyor** | Arketip tablolarına eklemek 784 item'ın buff'ını yeniden çeker ve ölçülmüş dengeyi geçersiz kılardı |
@@ -1963,6 +2045,11 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD90 | Güvenlik metinleri ARB'ye taşındı ve **"süre sınırı yok" iddiası kaldırıldı** | Metin `AttackConfig.durationForSteps`'in verdiği gerçekle çelişiyordu. Çözüm motoru metne değil **metni gerçeğe** uydurmak: süre sınırı olduğu kabul ediliyor, karşılığında doğru olan söyleniyor — süre var ama **karar yok**, o yüzden ekrana bakmak gerekmiyor. `SafetyMessages.noticeVersion` 1→2, kullanıcı yeniden onaylıyor |
 | GD91 | `fallbackSafetyMessage` gerçek metne dönüştü; GD87 nöbetçisi `untranslatedTemplateProbe` adına taşındı | Eski ad gerçek bir güvenlik metniymiş gibi duruyordu ve İngilizcesini eklemek nöbetçiyi sessizce etkisiz kılıyordu. Yeni ad ne olduğunu söylüyor |
 | GD92 | Sıralamalar **gösterilen** adla yapılıyor (`l10n.itemName` / `l10n.titleName`), kanonik Türkçe alanla değil | A→Z sıralaması İngilizce'de Türkçe adlara göre çıkıyordu: "Glass Cannon" C'de görünüyordu |
+| GD93 | Her zaferden **garanti** eşya düşüyor; nadirlik kademeye bağlı bir **tabloda** (`item_drop.dart`) | Savaş sonunda eli boş dönmek savaşmayı ekonomik olarak görünmez kılıyordu. Tablo formülden yeğ: düşük kademede nadir **hiç** çıkmamalı, 20. kademede epik/efsanevi hissedilmeli — formül her kademede "doğru" bir sayı üretir ama hiçbirinde istenen sayıyı üretmez. Aynı eşyanın tekrar düşmesi **elenmiyor**: birleştirme zaten kopya istiyor (GD39) |
+| GD94 | Yükseltme katı nadirlikle **monoton değil** (×6 · ×7 · ×8 · ×7 · ×4,5) | Bağlayıcı ölçüt kat değil **gün**. Fiyat zaten nadirlikle ×116 artıyor; katı da artırmak aynı şeyi iki kez saymaktı ve efsaneviyi **503 güne** çıkarıyordu — bir hedef değil, bir duvar. Toplam maliyet ve gün hâlâ kesin artan (2 · 8 · 22 · 89 · 174 gün) |
+| GD95 | Sonsuz Koşu **ayrı bir model** (`EndlessRun`), `AdventureQuest`'e hiç dokunulmadı | Macera `stepGoal`'a, `AttackConfig`'e ve zafer damgasına bağlı; sonsuz koşuda bunların hiçbiri yok. Aynı sınıfa sığdırmak hem modeli hem ona dayanan ~15 testi riske atardı. İki mod **karşılıklı dışlıyor** — aynı adım partisini paylaşsalardı hem ödül hem hasar iki kez sayılırdı |
+| GD96 | Sonsuz Koşu yenilgisi bankanın **yarısını** öder; normal macera yenilgisi ödülü tamamen siler | Bilerek ayrışıyor. Sıfır ödeme, oyuncuyu canını takip etmek için telefona bakmaya iter — bu modun varlık sebebi tam olarak telefona **bakmamak**. Kural kodla zorlanıyor: banka boş değilse ödeme en az 1 (`floor(1 × 0,5)` sıfır ediyordu) |
+| GD97 | Sonsuz Koşu kesimleri çarka ve başarım sayaçlarına **yazılmıyor**, seriye **yazılıyor** | Kesim 200 adımda bir oluyor. "Günün ilk zaferi" sayılsaydı çark kilidi 3.000 adımdan 200'e düşerdi; `enemiesDefeated` sayılsaydı "1000 düşman devir" ünvanı bir saatte alınırdı. Seri ise zaten **adım** kapısından geçiyor, ayrı koda gerek yok |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 

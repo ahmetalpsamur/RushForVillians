@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants/attack_config.dart';
+import '../../core/utils/enemy_stats.dart';
 import '../../core/constants/game_constants.dart';
 import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
@@ -31,6 +32,13 @@ class AdventureScreen extends StatefulWidget {
   final AvatarProfile avatar;
   final DailyProgress today;
   final ValueChanged<AdventureQuest> onAdventureSelected;
+  /// Sonsuz Koşuyu başlatır (Bölüm C / Faz 3).
+  ///
+  /// Mod normal maceranın **yerine geçmiyor**, yanına ekleniyor: hedef
+  /// seçimi, ödüller ve akış aynen duruyor. Bu yüzden giriş noktası ikinci
+  /// bir seçenek, varsayılan değil.
+  final VoidCallback onStartEndlessRun;
+
   final VoidCallback onStartRevival;
   final VoidCallback onChooseNewAdventure;
   final VoidCallback onAdventureUpdated;
@@ -48,6 +56,7 @@ class AdventureScreen extends StatefulWidget {
     required this.avatar,
     required this.today,
     required this.onAdventureSelected,
+    required this.onStartEndlessRun,
     required this.onStartRevival,
     required this.onChooseNewAdventure,
     required this.onAdventureUpdated,
@@ -1718,6 +1727,42 @@ class _AdventureScreenState extends State<AdventureScreen>
           context.l10n.adventureSelectionDescription,
           style: const TextStyle(color: Colors.white70),
         ),
+        // Sonsuz Koşu **ikinci bir seçenek**, varsayılan değil: normal
+        // macera akışı ve hedef seçimi aynen aşağıda duruyor. Eğitim
+        // sırasında gizli — yeni oyuncu önce ana döngüyü öğreniyor.
+        if (!widget.tutorialMode) ...[
+          const SizedBox(height: 14),
+          SectionCard(
+            key: const ValueKey('endless-run-entry'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.endlessTitle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  context.l10n.endlessSubtitle,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.tonal(
+                  key: const ValueKey('endless-run-start'),
+                  onPressed: widget.onStartEndlessRun,
+                  child: Text(context.l10n.endlessStart),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _GoalSelectorButton(goal: _stepGoal, onTap: _showGoalPicker),
         const SizedBox(height: 16),
@@ -3515,7 +3560,13 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
   @override
   Widget build(BuildContext context) {
     final enemy = widget.enemy;
-    final scaledStats = enemy.stats;
+    // Önizleme **seçili hedefin** statlarını göstermeli: kademe güç çarpanı
+    // (×1,00–×2,40) ve canın planlanan round sayısı ikisi de hedefe bağlı.
+    // Katalog tabanını göstermek, oyuncuya girmeyeceği bir savaşı anlatıyordu.
+    final scaledStats = enemyStatsForGoal(
+      enemy: enemy,
+      stepGoal: widget.selectedGoal,
+    );
     return Material(
       color: Colors.black.withValues(alpha: 0.94),
       child: SafeArea(
@@ -3662,7 +3713,7 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                         _EnemyInfoChip(
                           icon: Icons.shield_moon,
                           label: context.l10n.defenseStat(
-                            enemy.stats.defense.round(),
+                            scaledStats.defense.round(),
                           ),
                           color: AppColors.primary,
                         ),

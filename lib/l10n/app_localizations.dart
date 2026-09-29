@@ -284,6 +284,156 @@ abstract class AppLocalizations {
   /// **'Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.'**
   String get safetyReady;
 
+  /// No description provided for @endlessTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sonsuz Koşu'**
+  String get endlessTitle;
+
+  /// No description provided for @endlessSubtitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yürüdükçe çarpan büyür. Ne zaman duracağına sen karar verirsin.'**
+  String get endlessSubtitle;
+
+  /// No description provided for @endlessStart.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sonsuz Koşuya Başla'**
+  String get endlessStart;
+
+  /// No description provided for @endlessFinish.
+  ///
+  /// In tr, this message translates to:
+  /// **'Macerayı bitir'**
+  String get endlessFinish;
+
+  /// No description provided for @endlessMultiplier.
+  ///
+  /// In tr, this message translates to:
+  /// **'ÇARPAN'**
+  String get endlessMultiplier;
+
+  /// No description provided for @endlessCuts.
+  ///
+  /// In tr, this message translates to:
+  /// **'{count} canavar'**
+  String endlessCuts(int count);
+
+  /// No description provided for @endlessBanked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Biriken ödül'**
+  String get endlessBanked;
+
+  /// No description provided for @endlessBankedValue.
+  ///
+  /// In tr, this message translates to:
+  /// **'{coins} altın · {xp} XP'**
+  String endlessBankedValue(int coins, int xp);
+
+  /// No description provided for @endlessNextCut.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sonraki canavara {steps} adım'**
+  String endlessNextCut(int steps);
+
+  /// No description provided for @endlessRoundInfo.
+  ///
+  /// In tr, this message translates to:
+  /// **'Round {steps} adım · {minutes} dakika'**
+  String endlessRoundInfo(int steps, int minutes);
+
+  /// No description provided for @endlessNoInput.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hiçbir şeye dokunman gerekmiyor. Telefonu cebine koy ve yürü.'**
+  String get endlessNoInput;
+
+  /// No description provided for @endlessFinishQuestion.
+  ///
+  /// In tr, this message translates to:
+  /// **'Koşuyu bitirip ödülü alasın mı?'**
+  String get endlessFinishQuestion;
+
+  /// No description provided for @endlessFinishDetail.
+  ///
+  /// In tr, this message translates to:
+  /// **'{coins} altın ve {xp} XP kazanacaksın. Devam edersen çarpan büyür ama düşersen ödülün yarısını kaybedersin.'**
+  String endlessFinishDetail(int coins, int xp);
+
+  /// No description provided for @endlessKeepRunning.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam et'**
+  String get endlessKeepRunning;
+
+  /// No description provided for @endlessBankedTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Koşu tamamlandı'**
+  String get endlessBankedTitle;
+
+  /// No description provided for @endlessDefeatedTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düştün'**
+  String get endlessDefeatedTitle;
+
+  /// No description provided for @endlessDefeatedNote.
+  ///
+  /// In tr, this message translates to:
+  /// **'Biriken ödülün yarısı yine de senin. Sonsuz Koşu eli boş bırakmaz.'**
+  String get endlessDefeatedNote;
+
+  /// No description provided for @endlessResultCuts.
+  ///
+  /// In tr, this message translates to:
+  /// **'{count} canavar devirdin'**
+  String endlessResultCuts(int count);
+
+  /// No description provided for @endlessResultReward.
+  ///
+  /// In tr, this message translates to:
+  /// **'{coins} altın · {xp} XP'**
+  String endlessResultReward(int coins, int xp);
+
+  /// No description provided for @endlessResultItem.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düşen eşya: {name}'**
+  String endlessResultItem(String name);
+
+  /// No description provided for @endlessClose.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kapat'**
+  String get endlessClose;
+
+  /// No description provided for @endlessBlockedByAdventure.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce süren maceranı bitir. İki mod aynı anda çalışmaz.'**
+  String get endlessBlockedByAdventure;
+
+  /// No description provided for @endlessAdventureBlocked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce Sonsuz Koşunu bitir. İki mod aynı anda çalışmaz.'**
+  String get endlessAdventureBlocked;
+
+  /// No description provided for @endlessMonsterHealth.
+  ///
+  /// In tr, this message translates to:
+  /// **'Canavar'**
+  String get endlessMonsterHealth;
+
+  /// No description provided for @endlessPlayerHealth.
+  ///
+  /// In tr, this message translates to:
+  /// **'Canın'**
+  String get endlessPlayerHealth;
+
   /// No description provided for @commonClose.
   ///
   /// In tr, this message translates to:

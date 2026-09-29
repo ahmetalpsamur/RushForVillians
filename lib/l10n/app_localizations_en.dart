@@ -119,6 +119,102 @@ class AppLocalizationsEn extends AppLocalizations {
       'Step target complete. Your monster will wait; fight when you are safe.';
 
   @override
+  String get endlessTitle => 'Endless Run';
+
+  @override
+  String get endlessSubtitle =>
+      'The multiplier grows while you walk. You decide when to stop.';
+
+  @override
+  String get endlessStart => 'Start Endless Run';
+
+  @override
+  String get endlessFinish => 'End the adventure';
+
+  @override
+  String get endlessMultiplier => 'MULTIPLIER';
+
+  @override
+  String endlessCuts(int count) {
+    return '$count monsters';
+  }
+
+  @override
+  String get endlessBanked => 'Banked reward';
+
+  @override
+  String endlessBankedValue(int coins, int xp) {
+    return '$coins gold · $xp XP';
+  }
+
+  @override
+  String endlessNextCut(int steps) {
+    return '$steps steps to the next monster';
+  }
+
+  @override
+  String endlessRoundInfo(int steps, int minutes) {
+    return 'Round: $steps steps · $minutes minutes';
+  }
+
+  @override
+  String get endlessNoInput =>
+      'There is nothing to tap. Put the phone in your pocket and walk.';
+
+  @override
+  String get endlessFinishQuestion => 'End the run and take the reward?';
+
+  @override
+  String endlessFinishDetail(int coins, int xp) {
+    return 'You will earn $coins gold and $xp XP. Keep going and the multiplier grows, but if you fall you lose half of it.';
+  }
+
+  @override
+  String get endlessKeepRunning => 'Keep running';
+
+  @override
+  String get endlessBankedTitle => 'Run complete';
+
+  @override
+  String get endlessDefeatedTitle => 'You fell';
+
+  @override
+  String get endlessDefeatedNote =>
+      'Half of what you banked is still yours. Endless Run never sends you home empty-handed.';
+
+  @override
+  String endlessResultCuts(int count) {
+    return 'You felled $count monsters';
+  }
+
+  @override
+  String endlessResultReward(int coins, int xp) {
+    return '$coins gold · $xp XP';
+  }
+
+  @override
+  String endlessResultItem(String name) {
+    return 'Item dropped: $name';
+  }
+
+  @override
+  String get endlessClose => 'Close';
+
+  @override
+  String get endlessBlockedByAdventure =>
+      'Finish your current adventure first. The two modes cannot run at once.';
+
+  @override
+  String get endlessAdventureBlocked =>
+      'Finish your Endless Run first. The two modes cannot run at once.';
+
+  @override
+  String get endlessMonsterHealth => 'Monster';
+
+  @override
+  String get endlessPlayerHealth => 'Your health';
+
+  @override
   String get commonClose => 'Close';
 
   @override

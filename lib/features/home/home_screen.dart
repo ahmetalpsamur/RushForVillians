@@ -185,7 +185,7 @@ class HomeScreen extends StatelessWidget {
                           color: AppColors.hp,
                           progress: adventure!.enemyHealthProgress,
                           valueText:
-                              '${adventure!.remainingEnemyHealth} / ${adventure!.enemy.maxHealth}',
+                              '${adventure!.remainingEnemyHealth} / ${adventure!.scaledEnemyMaxHealth}',
                         ),
                       ],
                     ),

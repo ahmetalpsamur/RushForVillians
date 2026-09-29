@@ -57,6 +57,81 @@ class GameConstants {
     ),
   ];
 
+  // --- Sonsuz Koşu modu (Bölüm C / Faz 3) ---
+  //
+  // Bu bloğun hiçbir sayısı [combatRoundPacing] ile ilişkili **değil**.
+  // Sonsuz koşunun kendi sabit temposu var ve ana tablo bu modda geçerli
+  // değil: round 100 adım / 2 dakika, yani **50 adım/dk** — ana tablonun
+  // kadansının (100 adım/dk) tam yarısı. Bilinçli: bu mod telefona
+  // bakılmadan, cepte oynanacak; affedici olmak zorunda.
+
+  /// Sonsuz koşuda bir roundun adım hedefi. Sabit.
+  static const int endlessRoundSteps = 100;
+
+  /// Sonsuz koşuda bir roundun süresi (saniye). Sabit.
+  static const int endlessRoundSeconds = 120;
+
+  /// İlk canavarın canı — **adım cinsinden**. Tam iki round.
+  static const int endlessBaseHealthSteps = 200;
+
+  /// Kesim başına can artışı (adım).
+  static const int endlessHealthStep = 20;
+
+  /// Canın tavanı (adım). Kesim başına süre 10 dakikayı aşmasın diye:
+  /// 500 adım / 50 adım-dk = 10 dk. Tavansız bırakılsaydı "her kesim bir
+  /// öncekinden uzun" hissi tempoyu öldürürdü.
+  static const int endlessMaxHealthSteps = 500;
+
+  /// Çarpanın başlangıcı. İlk kesimler bilerek çok az ödül veriyor.
+  static const double endlessStartMultiplier = 0.25;
+
+  /// Kesim başına çarpan artışı.
+  static const double endlessMultiplierStep = 0.15;
+
+  /// Çarpan tavanı.
+  static const double endlessMaxMultiplier = 3.0;
+
+  /// Canavar hasar çarpanının başlangıcı.
+  static const double endlessStartDamageMultiplier = 0.5;
+
+  /// Kesim başına hasar artışı.
+  ///
+  /// ⚠️ **Can eğrisiyle aynı bağıl hızda seçildi.** Can `200 → 200+20n`, yani
+  /// bağıl olarak `1 + 0,10n`. Hasar `0,5 → 0,5+0,05n`, yani bağıl olarak
+  /// yine `1 + 0,10n`. İkisi 15. kesime kadar **birebir aynı** büyüyor;
+  /// orada can tavana vuruyor (500 adım) ama hasar büyümeye devam ediyor.
+  ///
+  /// Sonuç tam olarak istenen sıra: **15. kesime kadar "bu uzuyor"**
+  /// (kesim süresi 4 → 10 dakika), **16. kesimden sonra "bu tehlikeli"**
+  /// (süre sabit, hasar artıyor). Daha dik bir hasar eğrisi (0,12) ilk
+  /// kesimden itibaren tehlikeyi öne alıyordu ve mod erken bitiyordu.
+  static const double endlessDamageStep = 0.05;
+
+  /// Canavar hasar çarpanının tavanı.
+  static const double endlessMaxDamageMultiplier = 2.0;
+
+  /// Kesim başına sprite büyümesi.
+  static const double endlessScaleStep = 0.04;
+
+  /// Sprite ölçeğinin tavanı. Sahne kutusunu taşırmamak için.
+  static const double endlessMaxSpriteScale = 1.6;
+
+  /// Bir kesimin bankaya eklediği taban altın (çarpandan önce).
+  static const int endlessCutBaseCoins = 15;
+
+  /// Bir kesimin bankaya eklediği taban XP (çarpandan önce).
+  static const int endlessCutBaseXp = 50;
+
+  /// Yenilgide bankanın ödenen oranı. **Asla sıfır olmamalı.**
+  static const double endlessDefeatPayoutRatio = 0.5;
+
+  /// Sonsuz koşuda düşen eşyanın en yüksek kademesi.
+  ///
+  /// 9 seçildi çünkü Faz 2'nin düşme tablosunda 5–9 bandı **epik ve
+  /// efsanevi içermiyor** (sıradan 560 · az bulunur 400 · nadir 40).
+  /// Sonsuz koşu ne kadar uzarsa uzasın efsanevi düşüremez.
+  static const int endlessMaxDropTier = 9;
+
   /// Zafer altınının kademe tabanı: `min = taban + kademe × eğim`.
   ///
   /// Eski değerler (4 + 3·kademe … 10 + 6·kademe) 1. kademede ortalama
@@ -373,19 +448,32 @@ class GameConstants {
   /// bir kısıt, yani yükseltmek pahalı ama imkânsız değil.
   static const double itemUpgradeTotalMultiplier = 7.0;
 
-  /// Nadirliğe göre yükseltme toplam maliyeti katı (güç enflasyonu freni).
+  /// Nadirliğe göre yükseltme toplam maliyeti katı.
   ///
-  /// Eskiden bütün nadirliklerde tek bir sayıydı (×7). Artık yükseldikçe
-  /// sertleşiyor: sıradan bir eşyayı sonuna kadar götürmek ucuzladı (×6),
-  /// efsaneviyi götürmek neredeyse iki katına çıktı (×13). Nadirlik böylece
-  /// yalnızca **tavanı** değil, o tavana çıkmanın **maliyetini** de
-  /// belirliyor.
+  /// ⚠️ **Kat nadirlikle monoton değil — bilerek.** Bağlayıcı ölçüt kat değil,
+  /// **gün**: bağlı oyuncunun (≈300 coin/gün) bir eşyayı 1'den tavana
+  /// çıkarması ne kadar sürüyor.
+  ///
+  /// | Nadirlik | Kat | Fiyat | Toplam | Gün |
+  /// |---|---|---|---|---|
+  /// | Sıradan | ×6,0 | 100 | 600 | 2 |
+  /// | Az Bulunur | ×7,0 | 350 | 2.425 | 8 |
+  /// | Nadir | ×8,0 | 825 | 6.575 | 22 |
+  /// | Epik | ×7,0 | 3.825 | ~26.800 | ~89 |
+  /// | Efsanevi | ×4,5 | 11.600 | ~52.200 | ~174 |
+  ///
+  /// **Neden efsanevinin katı en düşük:** fiyat zaten nadirlikle keskin
+  /// artıyor (100 → 11.600, **×116**). Katı da yükseltmek aynı şeyi iki kez
+  /// saymaktı ve efsaneviyi **503 güne** çıkarıyordu — bir hedef değil, bir
+  /// duvar. Oyuncu o eşyayı hiç yükseltmemeye karar verdiğinde sistem ölür.
+  /// Toplam maliyet ve gün sayısı **hâlâ kesin artan** (600 → 52.200,
+  /// 2 → 174 gün); tersine dönen tek şey oranın kendisi.
   static const Map<RewardRarity, double> itemUpgradeMultiplierByRarity = {
     RewardRarity.common: 6.0,
     RewardRarity.uncommon: 7.0,
     RewardRarity.rare: 8.0,
-    RewardRarity.epic: 10.0,
-    RewardRarity.legendary: 13.0,
+    RewardRarity.epic: 7.0,
+    RewardRarity.legendary: 4.5,
   };
 
   /// [itemUpgradeMultiplierByRarity] araması; tanımsızsa eski tek sayıya

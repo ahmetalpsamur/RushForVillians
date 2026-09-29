@@ -2,6 +2,7 @@ import 'daily_engagement.dart';
 import '../core/utils/game_clock.dart';
 import '../data/enemy_catalog.dart';
 import 'adventure_quest.dart';
+import 'endless_run.dart';
 import 'avatar_profile.dart';
 import 'daily_progress.dart';
 import 'daily_step_record.dart';
@@ -23,6 +24,12 @@ class GameState {
   final UserProfile profile;
   final DailyProgress today;
   final AdventureQuest? adventure;
+
+  /// Yarım kalmış Sonsuz Koşu (Bölüm C / Faz 3).
+  ///
+  /// [adventure] ile **karşılıklı dışlar**: ikisi aynı anda aktif olamaz.
+  /// Kural `RootShell` tarafında zorlanıyor; burada yalnızca taşınıyor.
+  final EndlessRun? endlessRun;
   final List<DailyStepRecord> stepHistory;
 
   const GameState({
@@ -30,6 +37,7 @@ class GameState {
     required this.profile,
     required this.today,
     this.adventure,
+    this.endlessRun,
     this.stepHistory = const [],
   });
 
@@ -38,6 +46,7 @@ class GameState {
     'profile': profile.toJson(),
     'today': today.toJson(),
     'adventure': adventure?.toJson(),
+    'endlessRun': endlessRun?.toJson(),
     'stepHistory': stepHistory.map((record) => record.toJson()).toList(),
   };
 
@@ -64,6 +73,7 @@ class GameState {
       profile: profile,
       today: today,
       adventure: _adventureFromJson(json['adventure']),
+      endlessRun: _endlessRunFromJson(json['endlessRun']),
       stepHistory: _stepHistoryFromJson(json['stepHistory']),
     );
   }
@@ -85,5 +95,16 @@ class GameState {
     final enemy = EnemyCatalog.byId(enemyId);
     if (enemy == null) return null;
     return AdventureQuest.fromJson(value, enemy: enemy);
+  }
+
+  /// [_adventureFromJson] ile aynı savunma: canavar katalogdan kalkmışsa
+  /// koşu atılır, kalıcı ilerleme korunur.
+  static EndlessRun? _endlessRunFromJson(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final enemy = EnemyCatalog.byId(
+      value['enemyId'] as String? ?? EndlessRun.enemyId,
+    );
+    if (enemy == null) return null;
+    return EndlessRun.fromJson(value, enemy);
   }
 }

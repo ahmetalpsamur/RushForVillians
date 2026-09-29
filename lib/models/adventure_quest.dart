@@ -314,10 +314,7 @@ class AdventureQuest {
   /// Güç çarpanını **uygulamak zorunda**: `scaledEnemyMaxHealth` getter'ı da
   /// uyguluyor ve ikisi ayrışırsa düşman can barı dolu başlamaz.
   static int _scaledEnemyMaxHealth(Enemy enemy, int stepGoal) =>
-      scaleEnemyCombatStats(
-        enemy.stats,
-        TimedCombatConfig.difficultyMultiplierForSteps(stepGoal),
-      ).maxHealth.round();
+      enemyStatsForGoal(enemy: enemy, stepGoal: stepGoal).maxHealth.round();
 
   AttackTargetConfig get attackConfig =>
       AttackConfig.supportsStepTarget(stepGoal)
@@ -349,8 +346,11 @@ class AdventureQuest {
 
   /// Her okumada katalog tabanından türetilir; ölçeklenmiş stat tekrar
   /// ölçeklenmediği için round sayısı çarpanı katlayamaz.
+  ///
+  /// Can **bu maceranın** planlanan round sayısından kuruluyor (GD49), yani
+  /// aynı düşman farklı hedeflerde farklı dayanıklılıkta.
   CombatStats get scaledEnemyStats =>
-      scaleEnemyCombatStats(enemy.stats, enemyPowerMultiplier);
+      enemyStatsForGoal(enemy: enemy, stepGoal: stepGoal);
 
   int get scaledEnemyMaxHealth => scaledEnemyStats.maxHealth.round();
 

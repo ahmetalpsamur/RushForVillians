@@ -1,6 +1,7 @@
 import '../../models/combat_stats.dart';
 import '../../models/enemy.dart';
 import '../constants/attack_config.dart';
+import '../constants/timed_combat_config.dart';
 import 'base_combat_stats.dart';
 
 /// Düşman savaş statlarını **kademeden ve arketipten** türeten saf kurallar.
@@ -42,17 +43,19 @@ const double missedRoundHealthCost = 0.15;
 /// Kademenin doğrusal saldırı beklentisi. Katalogdaki değer buna oranlanır.
 double expectedCatalogAttack(int tier) => 7 + tier.toDouble();
 
-/// Kademe *i* için beklenen round sayısı — **azalmayan** zarf.
+/// Kademe *i* için beklenen round sayısı — düşmanın **kendi kilit eşiğinde**
+/// (kademe × 500 adım) dövüştüğü varsayımı, **azalmayan zarf** olarak.
 ///
-/// Ölçüt, düşmanın kendi kilit eşiğinde (kademe × 500 adım) dövüşmesi;
-/// bir düşman ancak hedefi eşiğini karşılayan oyuncuya açılıyor.
+/// Yalnızca **katalog tabanı** için: gerçek savaşta can [enemyCombatStats]'a
+/// verilen `plannedRounds` ile, yani o maceranın gerçekten planlanan round
+/// sayısıyla hesaplanıyor (GD49) ve bu fonksiyon devreye hiç girmiyor.
 ///
-/// ⚠️ Doğrudan `roundCountForSteps(kademe × 500)` **kullanılamaz**: tempo
-/// tablosu bant değiştirirken round sayısını düşürebiliyor (2.500 adım
-/// 5 round, 3.000 adım 3 round). Can bu sayıdan türediği için 6. kademe
-/// düşman 5. kademeden **zayıf** çıkıyordu. Zarf, tabloyu değiştirmeden
-/// "üst kademe asla daha az round sürmez" değişmezini geri getiriyor:
-/// sayı hâlâ tablodan geliyor, uydurulmuş bir değer yok.
+/// ⚠️ **Zarf hâlâ gerekli.** Doğrudan `roundCountForSteps(kademe × 500)`
+/// kullanılınca tempo tablosu bant sınırında round sayısını düşürüyor
+/// (2.500 → 5 round, 3.000 → 3 round) ve katalogdaki 6. kademe düşman
+/// 5. kademeden **zayıf** görünüyor. Katalog tabanı bugün yalnızca ölçüm ve
+/// eski çağrı noktaları tarafından okunuyor ama "üst kademe asla daha zayıf
+/// değildir" gerçek bir değişmez; `combat_balance_test` onu bağlıyor.
 int expectedRoundsForTier(int tier) {
   var rounds = 0;
   for (var step = 1; step <= tier; step++) {
@@ -125,22 +128,35 @@ double baseEnemyDefense(int tier) => 2 + tier.toDouble();
 /// Bir düşmanın savaş statları.
 ///
 /// [catalogAttackDamage] katalogdaki elle yazılmış saldırı değeri;
+///
+/// [plannedRounds] verilirse can **o maceranın gerçekten planlanan round
+/// sayısından** hesaplanır; verilmezse düşmanın kendi kilit eşiğindeki
+/// beklenti kullanılır (önizleme/katalog tabanı).
+///
+/// **Neden hedefin round sayısı** (GD49): §6.10'un can formülü zaten
+/// "round başına hasar × **beklenen round sayısı**" ve GD49 `stepGoal`'un
+/// beklenen round sayısını belirlediğini açıkça söylüyor. Kademeden türetilen
+/// vekil kullanılınca tempo bandı değiştiren hedeflerde ikisi ayrışıyordu:
+/// 3.000 adımlık macera 3 round planlıyor ama tier-6 düşmanın canı 5 round
+/// için kuruluyordu — taahhüt bittiğinde düşman hâlâ ayakta kalıyordu
+/// (ölçülen yük oranı 1,81).
 CombatStats enemyCombatStats({
   required int tier,
   required EnemyArchetype archetype,
   required int catalogAttackDamage,
+  int? plannedRounds,
 }) {
   final profile = enemyArchetypeProfile(archetype);
   final player = baseCombatStats(tier);
 
   final defense = baseEnemyDefense(tier) * profile.defense;
 
-  // 1) Can: ölçüt oyuncunun round başına hasarı × beklenen round sayısı.
+  // 1) Can: ölçüt oyuncunun round başına hasarı × planlanan round sayısı.
   final defenseForHealth = CombatStats(defense: defense);
   final playerDamagePerRound = defenseForHealth.damageAfterDefense(
     player.attack,
   );
-  final rounds = expectedRoundsForTier(tier);
+  final rounds = plannedRounds ?? expectedRoundsForTier(tier);
   final health = playerDamagePerRound * rounds * profile.health;
 
   // 2) Saldırı: kaçırılan roundun oyuncu canından götürdüğü oran sabit.
@@ -192,3 +208,30 @@ CombatStats scaleEnemyCombatStats(
       )
       .sanitized();
 }
+
+/// Bir maceranın düşman statları: canı **o hedefin planlanan round
+/// sayısından** kurar, sonra hedefin güç çarpanını uygular.
+///
+/// Savaşın tek stat kaynağı bu. Katalogdaki [Enemy.stats] yalnızca
+/// önizlemenin tabanı; ikisi ayrışmasın diye burada yeniden türetiliyor,
+/// ölçeklenmiş bir değer ikinci kez çarpılmıyor.
+CombatStats enemyStatsForGoal({required Enemy enemy, required int stepGoal}) =>
+    scaleEnemyCombatStats(
+      enemyBaseStatsForGoal(enemy: enemy, stepGoal: stepGoal),
+      TimedCombatConfig.difficultyMultiplierForSteps(stepGoal),
+    );
+
+/// [enemyStatsForGoal]'un **güç çarpanı uygulanmamış** hâli.
+///
+/// Yalnızca çarpanı ayrıca uygulayan çağrı noktaları için: v13 taşıması
+/// kalan can oranını bununla kuruyor, çarpanı v25→v26 taşıması ekliyor.
+/// İkisini birden uygulamak çarpanı **iki kez** saymak olurdu.
+CombatStats enemyBaseStatsForGoal({
+  required Enemy enemy,
+  required int stepGoal,
+}) => enemyCombatStats(
+  tier: enemy.tier,
+  archetype: enemy.archetype,
+  catalogAttackDamage: enemy.attackDamage,
+  plannedRounds: AttackConfig.roundCountForSteps(stepGoal),
+);

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/base_combat_stats.dart';
+import '../core/utils/enemy_stats.dart';
 import '../core/constants/game_constants.dart';
 import '../core/constants/timed_combat_config.dart';
 import '../data/enemy_catalog.dart';
@@ -26,7 +27,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 27;
+  static const int schemaVersion = 28;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -192,7 +193,16 @@ class GameStorage {
       final questSteps = (steps - startingSteps).clamp(0, stepGoal);
       final remainingRatio =
           stepGoal <= 0 ? 1.0 : (stepGoal - questSteps) / stepGoal;
-      adventure['enemyHealth'] = (enemy.maxHealth * remainingRatio).round();
+      // Payda savaşın gerçekten kullanacağı tavan olmalı: can artık o
+      // maceranın planlanan round sayısından kuruluyor (GD49). Katalog
+      // tabanını kullanmak, taşınan oranı sahte bir tavana yazıyordu.
+      // Güç çarpanı burada **uygulanmıyor** — onu v25→v26 ekliyor.
+      final scaledMax =
+          enemyBaseStatsForGoal(
+            enemy: enemy,
+            stepGoal: stepGoal,
+          ).maxHealth.round();
+      adventure['enemyHealth'] = (scaledMax * remainingRatio).round();
 
       // Oyuncunun canı 0-100 ölçeğindeydi; oranı korunarak yeni tavana
       // taşınıyor. Gerçek tavan (ekipman dâhil) açılışta
@@ -356,6 +366,9 @@ class GameStorage {
     // varsayılan — bitmiş bir maceraya geriye dönük eşya **verilmiyor**,
     // ödül zaten bir kez dağıtılmış sayılıyor (`xpAwarded`).
     26: (state) => state,
+    // v27 -> v28: Sonsuz Koşu modu (`endlessRun`). Eski kayıtta alan yok;
+    // `null` doğru varsayılan — hiç başlamamış bir koşu.
+    27: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde

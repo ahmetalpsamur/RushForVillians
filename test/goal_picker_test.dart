@@ -43,6 +43,7 @@ void main() {
             avatar: _avatar,
             today: DailyProgress(date: GameClock.now()),
             onAdventureSelected: (_) {},
+            onStartEndlessRun: () {},
             onStartRevival: () {},
             onChooseNewAdventure: () {},
             onAdventureUpdated: () {},
