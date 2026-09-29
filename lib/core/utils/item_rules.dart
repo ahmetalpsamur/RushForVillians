@@ -67,12 +67,23 @@ ItemAssetIdentity? parseItemAsset(String assetPath) {
 /// Yayılma, aynı nadirlikteki yüzlerce item'ın hepsinin aynı seviyede
 /// açılmasını engelliyor: kilitler bir banda dağılıyor, oyuncu her seviyede
 /// yeni bir şey açıyor.
+/// ⚠️ **Güç enflasyonu freni** (Bölüm C / Faz 2 · İş 4).
+///
+/// Epik ve efsanevi kilitleri bilerek geriye itildi (14→22, 22→34). Ölçülen
+/// sorun şuydu: seviye adımdan, para da adımdan geliyor ve seviye **çok daha
+/// hızlı** koşuyor. Eski bantlarda kilit açıldığında oyuncunun elinde epik
+/// fiyatının %68'i, efsanevi fiyatının yalnızca **%42**'si oluyordu — kilit
+/// bir kapı değil, boş bir vitrin oluyordu.
+///
+/// Sıradan / az bulunur / nadir **dokunulmadı**: ölçülen karşılama oranları
+/// sırasıyla %170 · %132 · %101, yani erken oyun zaten hizalı ve Faz 2'nin
+/// birinci hedefi başlangıcı rahatlatmak.
 (int, int) _levelBand(RewardRarity rarity) => switch (rarity) {
   RewardRarity.common => (1, 3),
   RewardRarity.uncommon => (4, 4),
   RewardRarity.rare => (8, 5),
-  RewardRarity.epic => (14, 6),
-  RewardRarity.legendary => (22, 8),
+  RewardRarity.epic => (22, 6),
+  RewardRarity.legendary => (34, 8),
 };
 
 /// [id] için kararlı, platformdan bağımsız bir dağılım değeri (0..[buckets]).
@@ -108,8 +119,11 @@ int _costBase(RewardRarity rarity) => switch (rarity) {
   RewardRarity.common => 100,
   RewardRarity.uncommon => 260,
   RewardRarity.rare => 550,
-  RewardRarity.epic => 1400,
-  RewardRarity.legendary => 3600,
+  // Epik ve efsanevi tabanları yükseltildi (1400→1700, 3600→4000): zafer
+  // ödülü Faz 2'de belirgin biçimde büyüdü ve para tek başına güçlü eşyayı
+  // yakınlaştırmamalı. Erken katmanlar bilerek sabit.
+  RewardRarity.epic => 1700,
+  RewardRarity.legendary => 4000,
 };
 
 /// Mağaza fiyatı. Seviye kilidi yükseldikçe fiyat da yükselir, ama fiyatı

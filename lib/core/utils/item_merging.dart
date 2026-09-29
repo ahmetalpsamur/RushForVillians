@@ -99,15 +99,9 @@ class MergeQuote {
 
   bool get canMerge => block == MergeBlock.none;
 
-  /// Engelin kullanıcıya gösterilecek nedeni; engel yoksa `null`.
-  String? reason(RewardRarity rarity) => switch (block) {
-    MergeBlock.none => null,
-    MergeBlock.maxRarity => '${rarity.label} en üst nadirlik; birleştirilemez.',
-    MergeBlock.notEnough =>
-      'Birleştirmek için $requiredCount adet gerekiyor, elinde '
-          '$availableCount adet var.',
-    MergeBlock.coins => '$cost coin gerekiyor.',
-  };
+  /// Engelin kullanıcıya gösterilecek nedeni [ContentLocalizations
+  /// .mergeBlockReason] içinde, [block] enum'undan üretilir. Sabit Türkçe
+  /// sürüm bilerek tutulmuyor (bkz. [UpgradeQuote]).
 }
 
 /// Tüketilecek örnekleri seçer: **en düşük seviyeli ve kuşanılı olmayanlar

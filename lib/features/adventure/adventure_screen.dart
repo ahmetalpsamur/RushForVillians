@@ -3442,10 +3442,10 @@ class _GoalSelectorButton extends StatelessWidget {
                         AttackConfig.roundCountForSteps(goal),
                         AppFormatters.integer(
                           context,
-                          goal.clamp(1, GameConstants.combatRoundStepTarget),
+                          AttackConfig.roundStepsFor(goal),
                         ),
                         context.l10n.adventureDuration(
-                          GameConstants.combatRoundDuration,
+                          AttackConfig.roundDurationFor(goal),
                         ),
                       ),
                       style: const TextStyle(
@@ -3722,9 +3722,11 @@ class _EnemyPreviewDialogState extends State<_EnemyPreviewDialog>
                               AttackConfig.roundCountForSteps(
                                 widget.selectedGoal,
                               ),
-                              GameConstants.combatRoundStepTarget,
+                              AttackConfig.roundStepsFor(widget.selectedGoal),
                               context.l10n.adventureDuration(
-                                GameConstants.combatRoundDuration,
+                                AttackConfig.roundDurationFor(
+                                  widget.selectedGoal,
+                                ),
                               ),
                             ),
                             style: const TextStyle(

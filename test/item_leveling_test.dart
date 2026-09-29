@@ -82,10 +82,6 @@ void main() {
       expect(quote.block, UpgradeBlock.rarityCap);
       expect(quote.canUpgrade, isFalse);
       expect(quote.cost, 0);
-      expect(
-        quote.reason(RewardRarity.common, 50),
-        contains('Nadirlik sınırı'),
-      );
     });
 
     test('oyuncu seviyesi bağlıyorsa sebebi ayrı söylenir', () {
@@ -96,7 +92,6 @@ void main() {
         coins: 999999,
       );
       expect(quote.block, UpgradeBlock.playerLevel);
-      expect(quote.reason(RewardRarity.common, 5), contains('kendi seviyeni'));
     });
 
     test('para bağlıyorsa maliyet söylenir', () {
@@ -108,7 +103,6 @@ void main() {
       );
       expect(quote.block, UpgradeBlock.coins);
       expect(quote.cost, greaterThan(0));
-      expect(quote.reason(RewardRarity.common, 50), contains('coin'));
     });
 
     test('engel yoksa sonraki seviye ve maliyet doğru', () {
@@ -121,7 +115,7 @@ void main() {
       expect(quote.canUpgrade, isTrue);
       expect(quote.nextLevel, 4);
       expect(quote.cost, upgradeCostFor(100, RewardRarity.common, 3));
-      expect(quote.reason(RewardRarity.common, 50), isNull);
+      expect(quote.block, UpgradeBlock.none);
     });
   });
 
@@ -156,8 +150,9 @@ void main() {
       }
     });
 
-    test('tavana çıkarmak fiyatın ~7 katı tutar', () {
-      // Tek sayı, bütün katmanlarda aynı şekil: eğri yalnızca ölçekleniyor.
+    test('tavana çıkarmak nadirliğin katı kadar tutar', () {
+      // Kat artık nadirliğe göre sertleşiyor (×6 → ×13): eğrinin şekli aynı,
+      // yalnızca ölçeği değişiyor. Sayı config'ten okunur, kopyalanmaz.
       for (final entry
           in {
             RewardRarity.common: 100,
@@ -169,7 +164,7 @@ void main() {
         final ratio = totalUpgradeCost(entry.value, entry.key) / entry.value;
         expect(
           ratio,
-          closeTo(GameConstants.itemUpgradeTotalMultiplier, 0.4),
+          closeTo(GameConstants.upgradeMultiplierFor(entry.key), 0.4),
           reason: '${entry.key.name} için toplam maliyet oranı $ratio',
         );
       }

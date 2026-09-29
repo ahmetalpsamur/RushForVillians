@@ -85,6 +85,16 @@ class AdventureQuest {
   int victoryXpReward;
   int victoryCoinReward;
   int walkCoinReward;
+
+  /// Zaferden düşen eşyanın katalog kimliği; düşmediyse `null`.
+  ///
+  /// Model Kuralları #1 temiz: kimlik `String`, `Item` diske hiç yazılmıyor
+  /// ve her açılışta katalogdan çözülüyor.
+  String? droppedItemId;
+
+  /// Düşen eşyanın envanterdeki **örnek** kimliği (`OwnedItem.instanceId`).
+  /// Zafer ekranının "bunu kuşan" kısayolu buna bakar.
+  int? droppedItemInstanceId;
   int acknowledgedDamage;
   bool deathAnimationPlayed;
   int playerHealth;
@@ -193,6 +203,8 @@ class AdventureQuest {
     this.victoryXpReward = 0,
     this.victoryCoinReward = 0,
     this.walkCoinReward = 0,
+    this.droppedItemId,
+    this.droppedItemInstanceId,
     this.acknowledgedDamage = 0,
     this.deathAnimationPlayed = false,
     this.playerHealth = maxPlayerHealth,
@@ -233,7 +245,7 @@ class AdventureQuest {
        revivalSteps = revivalSteps.clamp(0, revivalStepTarget),
        roundTargetSteps = _roundTargetFor(stepGoal, currentRound),
        nextEnemyAttackAt = (startedAt ?? GameClock.now()).add(
-         roundDurationForSteps(_roundTargetFor(stepGoal, currentRound)),
+         roundDurationForGoal(stepGoal),
        ),
        nextReminderAt = (startedAt ?? GameClock.now()).add(reminderInterval) {
     if (battleOutcome != AdventureBattleOutcome.active) {
@@ -259,15 +271,19 @@ class AdventureQuest {
 
   static int _roundTargetFor(int stepGoal, int round) {
     if (stepGoal <= 0) return 0;
-    final completedRoundSteps =
-        (round - 1) * GameConstants.combatRoundStepTarget;
+    final roundSteps = AttackConfig.roundStepsFor(stepGoal);
+    final completedRoundSteps = (round - 1) * roundSteps;
     final remaining = stepGoal - completedRoundSteps;
-    if (remaining <= 0) return GameConstants.combatRoundStepTarget;
-    return remaining.clamp(1, GameConstants.combatRoundStepTarget);
+    // Adım taahhüdü bitse bile düşman ayaktaysa round hedefi tam boya döner
+    // (GD49); 0 döndürmek savaşı kilitliyordu.
+    if (remaining <= 0) return roundSteps;
+    return remaining.clamp(1, roundSteps);
   }
 
-  static Duration roundDurationForSteps(int steps) =>
-      AttackConfig.durationForSteps(steps);
+  /// Bir roundun süresi — **maceranın hedefinden** gelir, o roundun adım
+  /// payından değil. Tempo bant içinde sabit (`combatRoundPacing`).
+  static Duration roundDurationForGoal(int stepGoal) =>
+      AttackConfig.roundDurationFor(stepGoal);
 
   /// İlk eğitim savaşını guide tamamlar. Gerçek adım sayacına dokunmaz; yalnızca
   /// bu maceranın otoriter savaş sonucunu zafere taşır.
@@ -293,8 +309,15 @@ class AdventureQuest {
     nextReminderAt = now;
   }
 
+  /// Yeni bir maceranın başlangıç düşman canı.
+  ///
+  /// Güç çarpanını **uygulamak zorunda**: `scaledEnemyMaxHealth` getter'ı da
+  /// uyguluyor ve ikisi ayrışırsa düşman can barı dolu başlamaz.
   static int _scaledEnemyMaxHealth(Enemy enemy, int stepGoal) =>
-      enemy.maxHealth;
+      scaleEnemyCombatStats(
+        enemy.stats,
+        TimedCombatConfig.difficultyMultiplierForSteps(stepGoal),
+      ).maxHealth.round();
 
   AttackTargetConfig get attackConfig =>
       AttackConfig.supportsStepTarget(stepGoal)
@@ -308,13 +331,21 @@ class AdventureQuest {
 
   AttackPhase get currentPhase => currentRoundConfig.phase;
 
-  Duration get totalAttackDuration =>
-      GameConstants.combatRoundDuration * totalRounds;
+  Duration get totalAttackDuration => AttackConfig.durationForSteps(stepGoal);
 
   Duration get currentRoundDuration =>
-      roundTargetSteps <= 0 ? Duration.zero : GameConstants.combatRoundDuration;
+      roundTargetSteps <= 0 ? Duration.zero : roundDurationForGoal(stepGoal);
 
-  double get enemyPowerMultiplier => 1;
+  /// Seçilen adım hedefinin düşman güç çarpanı (`AttackConfig.targets`,
+  /// ×1,00 → ×2,40).
+  ///
+  /// Bir dönem sabit `1` döndürüyordu, yani tablo yazılıydı ama **hiç
+  /// uygulanmıyordu**: 10.000 adımlık hedef 500'lükle aynı statlı düşman
+  /// veriyordu, yani yüksek kademe yalnızca *daha uzun* bir savaştı, daha
+  /// zor değil. Ödül kademeyle büyüdüğü için bu, sabırlı oyuncuya bedava
+  /// para basardı.
+  double get enemyPowerMultiplier =>
+      TimedCombatConfig.difficultyMultiplierForSteps(stepGoal);
 
   /// Her okumada katalog tabanından türetilir; ölçeklenmiş stat tekrar
   /// ölçeklenmediği için round sayısı çarpanı katlayamaz.
@@ -753,6 +784,8 @@ class AdventureQuest {
     'victoryXpReward': victoryXpReward,
     'victoryCoinReward': victoryCoinReward,
     'walkCoinReward': walkCoinReward,
+    'droppedItemId': droppedItemId,
+    'droppedItemInstanceId': droppedItemInstanceId,
     'acknowledgedDamage': acknowledgedDamage,
     'deathAnimationPlayed': deathAnimationPlayed,
     'playerHealth': playerHealth,
@@ -825,9 +858,9 @@ class AdventureQuest {
       startingSteps: json['startingSteps'] as int? ?? 0,
       adventureStartedAt:
           _parseDate(json['adventureStartedAt']) ??
-          _parseDate(json['nextEnemyAttackAt'])?.subtract(
-            AttackConfig.durationForSteps(_roundTargetFor(migratedStepGoal, 1)),
-          ),
+          _parseDate(
+            json['nextEnemyAttackAt'],
+          )?.subtract(roundDurationForGoal(migratedStepGoal)),
       stepTargetCompletedAt: _parseDate(json['stepTargetCompletedAt']),
       carriedSteps: json['carriedSteps'] as int? ?? 0,
       notifiedReadyRound: json['notifiedReadyRound'] as int? ?? 0,
@@ -835,6 +868,8 @@ class AdventureQuest {
       victoryXpReward: json['victoryXpReward'] as int? ?? 0,
       victoryCoinReward: json['victoryCoinReward'] as int? ?? 0,
       walkCoinReward: json['walkCoinReward'] as int? ?? 0,
+      droppedItemId: json['droppedItemId'] as String?,
+      droppedItemInstanceId: json['droppedItemInstanceId'] as int?,
       acknowledgedDamage: json['acknowledgedDamage'] as int? ?? 0,
       deathAnimationPlayed: json['deathAnimationPlayed'] as bool? ?? false,
       playerHealth: savedPlayerHealth,

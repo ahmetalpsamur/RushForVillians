@@ -85,17 +85,10 @@ class UpgradeQuote {
 
   bool get canUpgrade => block == UpgradeBlock.none;
 
-  /// Engelin kullanıcıya gösterilecek nedeni; engel yoksa `null`.
-  String? reason(RewardRarity rarity, int playerLevel) => switch (block) {
-    UpgradeBlock.none => null,
-    UpgradeBlock.rarityCap =>
-      'Nadirlik sınırı (${rarity.label}: $rarityCap). Daha ileri gitmek için '
-          'birleştirerek nadirliğini yükseltmelisin.',
-    UpgradeBlock.playerLevel =>
-      'Eşya kendi seviyeni geçemez (Sv. $playerLevel). Sen yükseldikçe eşyan '
-          'da yükselebilir.',
-    UpgradeBlock.coins => '$cost coin gerekiyor.',
-  };
+  /// Engelin kullanıcıya gösterilecek nedeni [ContentLocalizations
+  /// .upgradeBlockReason] içinde, [block] enum'undan üretilir. Burada sabit
+  /// Türkçe bir sürüm **tutulmuyor**: iki metin kaynağı er ya da geç ayrışır
+  /// ve ikincisi İngilizce seçiliyken sessizce Türkçe sızdırırdı.
 }
 
 /// Tek bir seviye atlamanın maliyeti.
@@ -110,7 +103,10 @@ int upgradeCostFor(int itemCost, RewardRarity rarity, int fromLevel) {
   if (cap <= 1) return 0;
   final weight = GameConstants.itemUpgradeEarlyWeight + fromLevel / cap;
   final raw =
-      itemCost * GameConstants.itemUpgradeTotalMultiplier * weight / (cap - 1);
+      itemCost *
+      GameConstants.upgradeMultiplierFor(rarity) *
+      weight /
+      (cap - 1);
   final rounded = (raw / 25).round() * 25;
   return rounded < 25 ? 25 : rounded;
 }

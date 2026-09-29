@@ -1,8 +1,9 @@
-import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/attack_config.dart';
+import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
@@ -302,8 +303,14 @@ void main() {
         steps: 1200,
         roundStartingSteps: 1000,
       );
+      // Ana bar macera ilerlemesi: 1200 / 2000.
       expect(mainBarValue(tester), closeTo(0.6, 0.001));
-      expect(barValue(tester, 'round-progress-bar'), closeTo(0.2, 0.001));
+      // Round barı **round içi** ilerleme: bu roundda yürünen 200 adım,
+      // roundun hedefi tempo tablosundan (2.000 hedef → 500 adım).
+      expect(
+        barValue(tester, 'round-progress-bar'),
+        closeTo(200 / AttackConfig.roundStepsFor(2000), 0.001),
+      );
     });
   });
 

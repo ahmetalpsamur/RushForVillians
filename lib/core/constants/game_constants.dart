@@ -9,19 +9,76 @@ class GameConstants {
 
   // --- Savaş temposu ve mükemmel round (Bölüm B) ---
 
-  /// Arayüzde gösterilen referans yürüyüş temposu.
+  /// Referans yürüyüş temposu — ve [combatRoundPacing]'in **ortak kadansı**.
+  ///
+  /// Tablonun dört bandının hepsi tam olarak bu hızı verir:
+  /// 250/2,5dk · 500/5dk · 1.000/10dk · 2.000/20dk = **100 adım/dk**.
+  /// Yani bant değiştikçe roundun boyu ve süresi birlikte iki katına çıkıyor,
+  /// oyuncudan istenen tempo hiç değişmiyor. Bir dönem bu sabit yalnızca
+  /// arayüz etiketiydi ve round hesabına hiç girmiyordu.
   static const int stepsPerMinute = 100;
 
-  /// Eski macera düzeninde her tam roundun sabit adım hedefi.
-  static const int combatRoundStepTarget = 1000;
+  /// Round temposu tablosu — **sabit, türetilmiyor, kullanıcı değiştiremez**.
+  ///
+  /// Her satır bir adım hedefi bandını ve o bandın round boyunu verir.
+  /// Bir hedef için geçerli satır, `minGoal`'ü hedefi aşmayan **son**
+  /// satırdır:
+  ///
+  /// ```
+  ///   hedef  <  1.000 : round  250 adım /  2,5 dk
+  ///   1.000–  2.999   : round  500 adım /  5   dk
+  ///   3.000–  9.999   : round 1.000 adım / 10  dk
+  ///   hedef >= 10.000 : round 2.000 adım / 20  dk
+  /// ```
+  ///
+  /// **Neden tablo, formül değil:** tempo bir denge kararı, matematiksel bir
+  /// sonuç değil. Formül her hedefte "doğru" bir sayı üretir ama hiçbirinde
+  /// istenen sayıyı üretmez. Bant sayısı dört; her bandın round boyu bir
+  /// öncekinin iki katı, süresi de öyle — yani kadans bant içinde sabit,
+  /// bantlar arasında iki katına çıkıyor.
+  ///
+  /// Bu tablo **sabit 1.000 adım / 15 dakika** düzeninin yerine geçti; eski
+  /// düzende 500 adımlık macera tek roundluk gerilimsiz bir sayaçtı,
+  /// 10.000'lik macera ise 10 rounda dağılıyordu.
+  /// [rewardMultiplier] aynı bandın **zafer ödülü** çarpanıdır: ödül ile
+  /// tempo tek tablodan okunur, ikinci bir kademe tanımı yoktur.
+  static const List<
+    ({int minGoal, int roundSteps, int roundSeconds, double rewardMultiplier})
+  >
+  combatRoundPacing = [
+    (minGoal: 0, roundSteps: 250, roundSeconds: 150, rewardMultiplier: 1.0),
+    (minGoal: 1000, roundSteps: 500, roundSeconds: 300, rewardMultiplier: 1.4),
+    (minGoal: 3000, roundSteps: 1000, roundSeconds: 600, rewardMultiplier: 2.0),
+    (
+      minGoal: 10000,
+      roundSteps: 2000,
+      roundSeconds: 1200,
+      rewardMultiplier: 3.0,
+    ),
+  ];
 
-  /// Eski macera düzeninde her round için verilen sabit süre.
-  static const Duration combatRoundDuration = Duration(minutes: 15);
+  /// Zafer altınının kademe tabanı: `min = taban + kademe × eğim`.
+  ///
+  /// Eski değerler (4 + 3·kademe … 10 + 6·kademe) 1. kademede ortalama
+  /// **11,5 coin** veriyordu — günlük yürüyüşün (140 coin) %8'i. Savaşmanın
+  /// ekonomik karşılığı ölçülemezdi; asıl kaldıraç buydu (Faz 0 bulgusu).
+  ///
+  /// Yeni tabanla 1. kademe ortalama 26 coin, yani ilk günün ~%19'u.
+  /// Kademe eğimi de dikleşti: 20. kademe ham ortalama 140 coin.
+  static const int victoryCoinBase = 12;
+  static const int victoryCoinPerTier = 4;
+  static const int victoryCoinSpreadBase = 28;
+  static const int victoryCoinSpreadPerTier = 8;
 
   /// Kısa macerada bile gerilim kurmak için gereken en az round.
   static const int minCombatRounds = 2;
 
   /// Uzun maceraların tekrar hissine dönüşmemesi için round tavanı.
+  ///
+  /// [combatRoundPacing] altı seçilebilir hedefin hepsinde zaten en fazla 5
+  /// round üretiyor; bu tavan **eski kayıtlardan** gelen ya da tabloda
+  /// karşılığı olmayan hedefler için bağlayıcı bir güvence. Tavan devreye
+  /// girerse round boyu büyür, round sayısı 5'te kalır.
   static const int maxCombatRounds = 5;
 
   /// Eksik round hasar eğrisinin üssü.
@@ -316,6 +373,26 @@ class GameConstants {
   /// bir kısıt, yani yükseltmek pahalı ama imkânsız değil.
   static const double itemUpgradeTotalMultiplier = 7.0;
 
+  /// Nadirliğe göre yükseltme toplam maliyeti katı (güç enflasyonu freni).
+  ///
+  /// Eskiden bütün nadirliklerde tek bir sayıydı (×7). Artık yükseldikçe
+  /// sertleşiyor: sıradan bir eşyayı sonuna kadar götürmek ucuzladı (×6),
+  /// efsaneviyi götürmek neredeyse iki katına çıktı (×13). Nadirlik böylece
+  /// yalnızca **tavanı** değil, o tavana çıkmanın **maliyetini** de
+  /// belirliyor.
+  static const Map<RewardRarity, double> itemUpgradeMultiplierByRarity = {
+    RewardRarity.common: 6.0,
+    RewardRarity.uncommon: 7.0,
+    RewardRarity.rare: 8.0,
+    RewardRarity.epic: 10.0,
+    RewardRarity.legendary: 13.0,
+  };
+
+  /// [itemUpgradeMultiplierByRarity] araması; tanımsızsa eski tek sayıya
+  /// düşer, böylece yeni bir nadirlik eklenirse sessizce bozulmaz.
+  static double upgradeMultiplierFor(RewardRarity rarity) =>
+      itemUpgradeMultiplierByRarity[rarity] ?? itemUpgradeTotalMultiplier;
+
   /// Maliyet eğrisinin erken seviye ağırlığı.
   ///
   /// Bir seviyenin payı `erken ağırlık + seviye / tavan`. İlk seviyeler ucuz,
@@ -344,11 +421,14 @@ class GameConstants {
   /// olmadığı için efsaneviler birleştirilemiyor.
   ///
   /// Tek config sabiti; koda gömülü sayı yok.
+  /// Nadir ve epik adetleri Faz 2'de artırıldı (5→6, 6→8): her savaştan
+  /// garanti eşya düştüğü için kopya biriktirmek belirgin biçimde
+  /// kolaylaştı, birleştirme de aynı oranda zorlaşmalıydı.
   static const Map<RewardRarity, int> itemMergeCounts = {
     RewardRarity.common: 3,
     RewardRarity.uncommon: 4,
-    RewardRarity.rare: 5,
-    RewardRarity.epic: 6,
+    RewardRarity.rare: 6,
+    RewardRarity.epic: 8,
   };
 
   /// Birleştirme ücretinin, **hedef** nadirlikteki eşya fiyatına oranı.

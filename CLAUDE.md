@@ -109,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v25 + migration | Firebase |
+| Yerel kalıcılık, şema v27 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -275,8 +275,17 @@ yapmalı.
 ## 5.2 ⚠️ TEST ORTAMI — testler `--no-test-assets` ile çalışır
 
 ```powershell
-flutter test --no-test-assets
+flutter test
 ```
+
+> **ARTIK GEREKMİYOR (Bölüm C / Faz 2).** Aşağıdaki `--no-test-assets`
+> prosedürü bir dönem zorunluydu. Bu makinede normal `flutter test` artık
+> çökmeden çalışıyor ve asset paketini kendisi kuruyor. **Asset hatası
+> alırsan** (`Asset 'shaders/ink_sparkle.frag' not found` gibi) aşağıdaki
+> prosedüre geri dön — makine ya da Smart App Control ayarı değişmiş
+> olabilir. Prosedür bu yüzden silinmedi.
+
+<details><summary>Eski prosedür: <code>--no-test-assets</code></summary>
 
 **Bu bayrak olmadan hiçbir test çalışmaz — araç çöker.**
 
@@ -305,6 +314,8 @@ testlerini sahte sebeplerle kırar — bir golden beklenmedik yerde kırmızıys
 
 `flutter analyze` ve `flutter pub get` etkilenmiyor.
 
+</details>
+
 **Bash üzerinden `flutter test` bir hook tarafından engelleniyor** (Very Good
 CLI istiyor). Testleri **PowerShell** aracıyla çalıştır.
 
@@ -313,7 +324,7 @@ CLI istiyor). Testleri **PowerShell** aracıyla çalıştır.
 Aynı Smart App Control kısıtı yüzünden uygulama bu makinede çalıştırılamıyor.
 **Cihazda gözle doğrulama yok.** Görsel bir iş yaptıysan:
 
-1. Golden üret: `flutter test --no-test-assets --update-goldens <yol>`
+1. Golden üret: `flutter test --update-goldens <yol>`
 2. **PNG'yi oku ve gerçekten bak.**
 3. Birden çok genişlik için üret (320 / 360 / 390 / 412 / 800 dp).
 
@@ -697,13 +708,20 @@ ve seviye kilidi zaten 784 item'ı uzun bir ilerlemeye yayıyor.
 
 ### Denge tablosu
 
-| Nadirlik | Adet | Seviye kilidi | Fiyat | Eşya sv. tavanı | Birleştirme adedi |
-|---|---|---|---|---|---|
-| Sıradan | 371 | 1–3 | 100–125 | 10 | 3 |
-| Az Bulunur | 271 | 4–7 | 300–350 | 20 | 4 |
-| Nadir | 81 | 8–12 | 775–875 | 30 | 5 |
-| Epik | 43 | 14–19 | 2.375–2.725 | 40 | 6 |
-| Efsanevi | 18 | 22–29 | 7.550–8.825 | 50 | — |
+| Nadirlik | Adet | Seviye kilidi | Fiyat | Eşya sv. tavanı | Birleştirme adedi | Yükseltme katı |
+|---|---|---|---|---|---|---|
+| Sıradan | 371 | 1–3 | 100–125 | 10 | 3 | ×6 |
+| Az Bulunur | 271 | 4–7 | 300–350 | 20 | 4 | ×7 |
+| Nadir | 81 | 8–12 | 775–875 | 30 | **6** | ×8 |
+| Epik | 43 | **22–27** | **3.575–4.000** | 40 | **8** | ×10 |
+| Efsanevi | 18 | **34–41** | **10.800–12.400** | 50 | — | ×13 |
+
+⚠️ **Epik ve efsanevi kilitleri Faz 2'de geriye itildi** (14→22, 22→34) ve
+fiyat tabanları yükseldi (1400→1700, 3600→4000). Ölçülen sorun: seviye
+adımdan, para da adımdan geliyor ve seviye çok daha hızlı koşuyor — eski
+bantlarda kilit açıldığında oyuncunun elinde epik fiyatının %68'i, efsanevi
+fiyatının yalnızca **%42**'si oluyordu. Kilit bir kapı değil, boş bir
+vitrindi. Erken üç katman **bilerek dokunulmadı** (%170 · %132 · %101).
 
 Seviye kilidi `stableSpread` ile kimlikten türetilir — **`String.hashCode`
 kullanılmadı** (GD8): sürümler arası sabit değil, bir güncelleme sonrası
@@ -871,22 +889,23 @@ başına cevap değil.
 olduğu gibi geçer). Ekonomi dikkatle dengelendi; çarpanlar eşya seviyesiyle
 büyüseydi denge çökerdi.
 
-**Maliyet tek sayıdan:** 1'den tavana çıkarmak eşya fiyatının **7 katı**
-(`itemUpgradeTotalMultiplier`). Bir seviyenin payı
-`itemUpgradeEarlyWeight + seviye / tavan`; ağırlıkların toplamı tam olarak
-`tavan − 1` ettiği için toplam oranla birebir tutar.
+**Maliyet katı nadirliğe göre** (`itemUpgradeMultiplierByRarity`): ×6 → ×13.
+Bir seviyenin payı `itemUpgradeEarlyWeight + seviye / tavan`; ağırlıkların
+toplamı tam olarak `tavan − 1` ettiği için toplam katla birebir tutar.
 
-| Nadirlik | 1→tavan maliyet | Coin günü (120/gün) | Oyuncu seviyesi günü |
+| Nadirlik | Kat | 1→tavan maliyet | *(eski)* |
 |---|---|---|---|
-| Sıradan | 675 (6,8×) | **6** | 15 |
-| Az Bulunur | 2.300 | **19** | 63 |
-| Nadir | 5.775 | **48** | 145 |
-| Epik | 18.225 | **152** | 260 |
-| Efsanevi | 59.200 | 493 | 408 |
+| Sıradan | ×6 | **600** | *675* |
+| Az Bulunur | ×7 | **2.425** | *2.300* |
+| Nadir | ×8 | **6.575** | *5.775* |
+| Epik | ×10 | **38.175** | *18.225* |
+| Efsanevi | ×13 | **150.750** | *59.200* |
 
-**Okuma:** ilk dört katmanda oyuncunun kendi seviyesi coinden daha sıkı bir
-kısıt. Para gerçek bir maliyet ama duvar değil — "yükseltmek mi, yeni eşya mı"
-gerçekten sorulabilen bir soru.
+Kat bir dönem bütün nadirliklerde tek bir sayıydı (×7). Artık nadirlik
+yalnızca **tavanı** değil, o tavana çıkmanın **maliyetini** de belirliyor:
+sıradan bir eşyayı sonuna kadar götürmek ucuzladı, efsaneviyi götürmek iki
+katından fazla pahalandı. İkinci tavan (oyuncunun kendi seviyesi) zaten
+efsaneviyi Sv. 50'ye kadar bağlıyor.
 
 Yükseltme her zaman grubun **en gelişmiş** adedine uygulanır; oyuncu yatırımını
 tek eşyada toplasın.
@@ -895,12 +914,15 @@ tek eşyada toplasın.
 
 Aynı eşyadan N örnek + coin → 1 örnek, **bir üst nadirlikte**.
 
-| Geçiş | Adet | Ücret | Toplam | Doğrudan alım |
-|---|---|---|---|---|
-| Sıradan → Az Bulunur | 3 | 150 | 450 | 325 |
-| Az Bulunur → Nadir | 4 | 350 | 1.650 | 825 |
-| Nadir → Epik | 5 | 1.050 | 5.175 | 2.600 |
-| Epik → Efsanevi | 6 | 3.325 | 18.925 | 8.450 |
+| Geçiş | Adet | Doğrudan alım |
+|---|---|---|
+| Sıradan → Az Bulunur | 3 | 325 |
+| Az Bulunur → Nadir | 4 | 825 |
+| Nadir → Epik | **6** | 3.825 |
+| Epik → Efsanevi | **8** | 11.600 |
+
+Nadir ve epik adetleri Faz 2'de artırıldı (5→6, 6→8): her savaştan **garanti
+eşya düştüğü** için kopya biriktirmek belirgin biçimde kolaylaştı.
 
 Adetler tek config sabitinde (`itemMergeCounts`); efsanevinin haritada anahtarı
 **yok** → birleştirilemez ve nedeni söylenir. Ücret hedef nadirliğin fiyatının
@@ -1231,40 +1253,47 @@ gösterir + tek cümlelik davranış açıklaması.
 
 ### Saldırı yapısı — `attack_config.dart`
 
-Bir macera **bir saldırıdır**. Round boyu ve süresi **sabit**:
+Bir macera **bir saldırıdır**. Round boyu ve süresi
+`GameConstants.combatRoundPacing` **tablosundan** gelir — türetilmez,
+kullanıcı değiştiremez:
 
-```dart
-GameConstants.combatRoundStepTarget = 1000   // adım
-GameConstants.combatRoundDuration   = 15 dk
+| Adım hedefi bandı | Round boyu | Round süresi |
+|---|---|---|
+| < 1.000 | 250 adım | 2,5 dk |
+| 1.000 – 2.999 | 500 adım | 5 dk |
+| 3.000 – 9.999 | 1.000 adım | 10 dk |
+| ≥ 10.000 | 2.000 adım | 20 dk |
 
-roundSayısı  = ceil(toplamAdım / 1000)
-toplamSüre   = 15 dk × roundSayısı
-roundHedefi(i) = clamp(toplamAdım − i×1000, 1, 1000)
-```
+**Dört bandın kadansı da tam olarak `stepsPerMinute` = 100 adım/dk.** Bant
+değiştikçe roundun boyu ve süresi birlikte iki katına çıkıyor, oyuncudan
+istenen tempo hiç değişmiyor.
 
-⚠️ `GameConstants.stepsPerMinute = 100` yalnızca **arayüzde gösterilen
-referans tempo**; round hesabına hiç girmiyor.
-
-⚠️ `GameConstants.maxCombatRounds = 5` da **uygulanmıyor**:
-`AttackConfig.roundCountForSteps` onu okumuyor, bu yüzden 10.000 adımlık
-hedef **10 round** üretiyor.
+`GameConstants.maxCombatRounds = 5` artık **bağlayıcı**: tablonun daha fazla
+round üreteceği bir hedefte (yalnızca eski kayıtlardan gelebilir) round boyu
+büyür, sayı 5'te kalır, kadans korunur.
 
 **Altı seçilebilir hedef:**
 
-| Adım hedefi | Round | Toplam süre | Düşman güç çarpanı (tabloda) |
-|---|---|---|---|
-| 500 | 1 | 15 dk | ×1,00 |
-| 1.000 | 1 | 15 dk | ×1,15 |
-| 2.000 | 2 | 30 dk | ×1,35 |
-| 3.000 | 3 | 45 dk | ×1,55 |
-| 5.000 | 5 | 75 dk | ×1,85 |
-| 10.000 | 10 | 150 dk | ×2,40 |
+| Adım hedefi | Round | Round boyu | Toplam süre | Düşman güç çarpanı | Ödül çarpanı |
+|---|---|---|---|---|---|
+| 500 | 2 | 250 | 5 dk | ×1,00 | ×1,0 |
+| 1.000 | 2 | 500 | 10 dk | ×1,15 | ×1,4 |
+| 2.000 | 4 | 500 | 20 dk | ×1,35 | ×1,4 |
+| 3.000 | 3 | 1.000 | 30 dk | ×1,55 | ×2,0 |
+| 5.000 | 5 | 1.000 | 50 dk | ×1,85 | ×2,0 |
+| 10.000 | 5 | 2.000 | 100 dk | ×2,40 | ×3,0 |
 
-⚠️ **Düşman güç çarpanı savaşta uygulanmıyor.**
-`AdventureQuest.enemyPowerMultiplier` sabit `1` döndürüyor, yani
-`scaledEnemyStats` kademe çarpanını hiç görmüyor. Tablo bugün yalnızca
-`TimedCombatConfig.difficultyMultiplierForSteps` üzerinden, **bağlanmamış**
-tek atımlık savaş yolunda okunuyor (aşağıya bak).
+**Düşman güç çarpanı artık gerçekten uygulanıyor**
+(`AdventureQuest.enemyPowerMultiplier`). Bir dönem sabit `1` döndürüyordu:
+tablo yazılıydı ama okunmuyordu, yani 10.000 adımlık hedef 500'lükle aynı
+statlı düşman veriyordu — yüksek kademe *daha uzun* bir savaştı, daha zor
+değil.
+
+⚠️ **Düşman canı kademede monoton olmalı.** Tempo tablosu bant sınırında
+round sayısını düşürebiliyor (2.500 → 5 round, 3.000 → 3 round). Can
+`expectedRoundsForTier` üzerinden round sayısından türediği için 6. kademe
+düşman 5. kademeden zayıf çıkıyordu. `expectedRoundsForTier` bu yüzden
+**azalmayan bir zarf** döndürüyor — sayı hâlâ tablodan geliyor.
 
 ### ⚠️ Bağlanmamış ikinci savaş yolu
 
@@ -1278,27 +1307,37 @@ etmek kapsam dışı.
 
 ### Zafer ödülü
 
-`RootShell._grantAdventureVictoryXpIfNeeded`, kademe bazlı ve **tohumlu**:
+Aralık tek yerden: `AttackConfig.victoryCoinRange`. İki eksen **ayrı** —
+**kademe** hangi düşmanı devirdiğini, **bant** ne kadar yürümeyi göze aldığını
+ödüllendirir:
 
 ```
 tier = ceil(enemy.minimumDailySteps / 500)
-coin = tohumluÇekiliş(4 + tier×3, 10 + tier×6) × hızÇarpanı
+min  = (victoryCoinBase        + tier × victoryCoinPerTier)       × bantÇarpanı
+max  = (victoryCoinSpreadBase  + tier × victoryCoinSpreadPerTier) × bantÇarpanı
+coin = tohumluÇekiliş(min, max) × hızÇarpanı
 xp   = enemy.xpReward × enemyXpMultiplier × hızÇarpanı
 ```
 
-| Hedef | tier | Zafer coini (ham) | Zafer XP'si |
-|---|---|---|---|
-| 500 | 1 | 7–16 (ort. 11,5) | 100 |
-| 1.000 | 2 | 10–22 (ort. 16) | 175 |
-| 2.000 | 4 | 16–34 (ort. 25) | 325 |
-| 3.000 | 6 | 22–46 (ort. 34) | 500 |
-| 5.000 | 10 | 34–70 (ort. 52) | 900 |
-| 10.000 | 20 | 64–130 (ort. 97) | 2.750 |
+| Hedef | tier | Bant çarpanı | Zafer coini | Ortalama | *(eski ort.)* |
+|---|---|---|---|---|---|
+| 500 | 1 | ×1,0 | 16–36 | **26** | *11,5* |
+| 1.000 | 2 | ×1,4 | 28–62 | **45** | *16* |
+| 2.000 | 4 | ×1,4 | 39–84 | **62** | *25* |
+| 3.000 | 6 | ×2,0 | 72–152 | **112** | *34* |
+| 5.000 | 10 | ×2,0 | 104–216 | **160** | *52* |
+| 10.000 | 20 | ×3,0 | 276–564 | **420** | *97* |
 
-Referans oyuncu (7.000 adım/gün = **140 coin**) için tek bir 500'lük macera
-ortalama **+%8** ekler. Mükemmel round doğrudan coin/XP basmaz: yalnızca
-düşmanı erken indirmeyi kolaylaştırıp hız ödülünü (tavan ×1,5) ve yürüyüş-fazı
-farkını besler.
+**Neden asıl kaldıraç buydu:** eski tabanda 1. kademe zaferi ortalama 11,5
+coin veriyordu — günlük yürüyüşün (140 coin) **%8'i**. Savaşmanın ekonomik
+karşılığı ölçülemezdi. `stepsPerCoin` ve `stepsPerXp` **hiç değişmedi**;
+büyüyen tek şey zafer ödülü.
+
+Ödül büyürken düşman da güçlendi (`enemyPowerMultiplier` artık gerçekten
+uygulanıyor), yoksa yüksek kademe sabırlı oyuncuya bedava para basardı.
+
+Mükemmel round doğrudan coin/XP basmaz: yalnızca düşmanı erken indirmeyi
+kolaylaştırıp hız ödülünü (tavan ×1,5) ve yürüyüş-fazı farkını besler.
 
 ### İki faz (GD55)
 
@@ -1648,9 +1687,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v25**
+## Şema — **güncel sürüm v27**
 
-`GameStorage.schemaVersion = 25` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 27` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -1672,6 +1711,8 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 21 → 22 | `carriedSteps` / `notifiedReadyRound`: yarım yürüyüş gün sıfırlamasını aşıyor |
 | 22 → 23 | Macera başlangıcı ve toplam hedefin tamamlanma anı (`adventureStartedAt`, `stepTargetCompletedAt`) |
 | 23 → 24 | Günlük bildirim ve kutlama onayları |
+| 25 → 26 | Kademe güç çarpanı gerçekten uygulanmaya başladı; yarım maceranın `enemyHealth`'i **oranı korunarak** yeni tavana taşındı |
+| 26 → 27 | Zaferden garanti eşya düşmesi (`droppedItemId`, `droppedItemInstanceId`). Bitmiş maceraya geriye dönük eşya verilmiyor |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,

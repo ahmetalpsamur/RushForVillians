@@ -42,10 +42,24 @@ const double missedRoundHealthCost = 0.15;
 /// Kademenin doğrusal saldırı beklentisi. Katalogdaki değer buna oranlanır.
 double expectedCatalogAttack(int tier) => 7 + tier.toDouble();
 
-/// Kademe *i* için beklenen round sayısı.
+/// Kademe *i* için beklenen round sayısı — **azalmayan** zarf.
+///
+/// Ölçüt, düşmanın kendi kilit eşiğinde (kademe × 500 adım) dövüşmesi;
+/// bir düşman ancak hedefi eşiğini karşılayan oyuncuya açılıyor.
+///
+/// ⚠️ Doğrudan `roundCountForSteps(kademe × 500)` **kullanılamaz**: tempo
+/// tablosu bant değiştirirken round sayısını düşürebiliyor (2.500 adım
+/// 5 round, 3.000 adım 3 round). Can bu sayıdan türediği için 6. kademe
+/// düşman 5. kademeden **zayıf** çıkıyordu. Zarf, tabloyu değiştirmeden
+/// "üst kademe asla daha az round sürmez" değişmezini geri getiriyor:
+/// sayı hâlâ tablodan geliyor, uydurulmuş bir değer yok.
 int expectedRoundsForTier(int tier) {
-  final steps = tier * 500;
-  return AttackConfig.roundCountForSteps(steps);
+  var rounds = 0;
+  for (var step = 1; step <= tier; step++) {
+    final count = AttackConfig.roundCountForSteps(step * 500);
+    if (count > rounds) rounds = count;
+  }
+  return rounds;
 }
 
 /// Arketipin stat bütçesini nasıl kaydırdığı.

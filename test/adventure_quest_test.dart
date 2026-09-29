@@ -78,7 +78,7 @@ void main() {
     });
   });
 
-  group('1000 adım ve 15 dakikalık sabit round düzeni', () {
+  group('tempo tablosuna göre round düzeni', () {
     test('adım hedefi dolunca deadline beklenmeden round geçer', () {
       final startedAt = DateTime(2026, 8, 17, 12);
       final quest = AdventureQuest(
@@ -96,9 +96,11 @@ void main() {
       expect(early?.roundNumber, 1);
       expect(early?.targetReached, isTrue);
       expect(quest.currentRound, 2);
+      // 2.000 hedef -> 500 adımlık / 5 dakikalık round bandı.
+      expect(quest.roundTargetSteps, 500);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 107, minutes: 15)),
+        startedAt.add(const Duration(seconds: 107, minutes: 5)),
       );
     });
 
@@ -112,7 +114,7 @@ void main() {
 
       final result = quest.resolveExpiredRound(
         0,
-        startedAt.add(const Duration(minutes: 15)),
+        startedAt.add(const Duration(minutes: 5)),
       );
 
       expect(result, isNotNull);
@@ -188,14 +190,17 @@ void main() {
 
       final withoutTitle = quest();
       final withTitle = quest();
+      // Round hedefi tempo tablosundan gelir; sabit yazmak tabloyu
+      // değiştirince testi sahte sebeple kırardı.
+      final roundSteps = withoutTitle.roundTargetSteps;
       final resolvedAt = startedAt.add(const Duration(minutes: 1));
       final plainResult = withoutTitle.resolveRound(
-        1000,
+        roundSteps,
         resolvedAt,
         playerStats: normal,
       );
       final titleResult = withTitle.resolveRound(
-        1000,
+        roundSteps,
         resolvedAt,
         playerStats: glassCannon,
       );
@@ -211,13 +216,15 @@ void main() {
         startedAt: startedAt,
       );
 
-      expect(quest.currentRoundDuration, const Duration(minutes: 15));
+      // 2.500 hedef 1.000-2.999 bandında: round 500 adım / 5 dakika.
+      expect(quest.roundTargetSteps, 500);
+      expect(quest.currentRoundDuration, const Duration(minutes: 5));
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 15)),
+        startedAt.add(const Duration(minutes: 5)),
       );
-      expect(quest.totalRounds, 3);
-      expect(quest.totalAttackDuration, const Duration(minutes: 45));
+      expect(quest.totalRounds, 5);
+      expect(quest.totalAttackDuration, const Duration(minutes: 25));
     });
   });
 
@@ -238,12 +245,14 @@ void main() {
         playerStats: _durablePlayer,
       );
 
-      expect(result?.roundNumber, 2);
-      expect(quest.roundOutcomeSerial, 2);
-      expect(quest.currentRound, 3);
+      // 5.000 hedef -> 1.000 adımlık / 10 dakikalık round: 31 dakikada üç
+      // round dolmuş olur.
+      expect(result?.roundNumber, 3);
+      expect(quest.roundOutcomeSerial, 3);
+      expect(quest.currentRound, 4);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 45)),
+        startedAt.add(const Duration(minutes: 40)),
       );
     });
 
@@ -257,9 +266,9 @@ void main() {
         playerStats: _durablePlayer,
       );
 
-      expect(result?.walkedSteps, 2000);
-      expect(result?.targetSteps, 2000);
-      expect(quest.roundStartingSteps, 2000);
+      expect(result?.walkedSteps, 2500);
+      expect(result?.targetSteps, 3000);
+      expect(quest.roundStartingSteps, 2500);
     });
 
     test('süresi dolmamış ilk round state değiştirmez', () {
@@ -287,21 +296,32 @@ void main() {
       expect(quest.questSteps(4000), 0);
       expect(quest.questSteps(5000), 1000);
       expect(quest.roundStartingSteps, 4000);
-      expect(quest.roundTargetSteps, 1000);
+      expect(quest.roundTargetSteps, 500);
       expect(quest.stepsThisRound(4150), 150);
-      expect(quest.roundStepsRemaining(4150), 850);
+      expect(quest.roundStepsRemaining(4150), 350);
     });
 
-    test('düşman canı hedefe göre ölçeklenmez', () {
-      final quest = AdventureQuest(
+    test('düşman canı hedefin güç çarpanıyla ölçeklenir', () {
+      // Çarpan bir dönem hiç uygulanmıyordu (sabit 1): yüksek hedef yalnızca
+      // daha uzun bir savaştı, daha zor değil.
+      final easy = AdventureQuest(
         enemy: EnemyCatalog.byId('tense_soldier')!,
-        stepGoal: 2000,
+        stepGoal: 500,
+      );
+      final hard = AdventureQuest(
+        enemy: EnemyCatalog.byId('tense_soldier')!,
+        stepGoal: 10000,
       );
 
-      expect(quest.enemyPowerMultiplier, 1);
-      expect(quest.enemyHealth, quest.scaledEnemyMaxHealth);
-      expect(quest.enemyHealth, quest.enemy.maxHealth);
-      expect(quest.enemyHealthProgress, 1);
+      expect(easy.enemyPowerMultiplier, 1.0);
+      expect(hard.enemyPowerMultiplier, greaterThan(2));
+      // Başlangıç canı tavanla aynı olmalı: düşman yarı canlı başlamaz.
+      expect(easy.enemyHealth, easy.scaledEnemyMaxHealth);
+      expect(hard.enemyHealth, hard.scaledEnemyMaxHealth);
+      expect(easy.enemyHealthProgress, 1);
+      expect(hard.enemyHealthProgress, 1);
+      // Aynı düşman, daha uzun taahhüt = daha güçlü düşman.
+      expect(hard.enemyHealth, greaterThan(easy.enemyHealth));
     });
 
     test('çıplak can sıfırı terminal sonuç yerine geçmez', () {

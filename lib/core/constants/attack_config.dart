@@ -6,23 +6,11 @@ import 'game_constants.dart';
 /// kullanılırsa ileride okunabilir kalır.
 enum AttackPhase { warmUp, attack, rush, recovery, finalRush }
 
-extension AttackPhaseLabel on AttackPhase {
-  String get label => switch (this) {
-    AttackPhase.warmUp => 'WARM-UP',
-    AttackPhase.attack => 'ATTACK',
-    AttackPhase.rush => 'RUSH',
-    AttackPhase.recovery => 'RECOVERY',
-    AttackPhase.finalRush => 'FINAL RUSH',
-  };
-
-  String get fitnessDescription => switch (this) {
-    AttackPhase.warmUp => '100 adım/dk ritmini yakala.',
-    AttackPhase.attack => 'Ritmini koru ve hedefe odaklan.',
-    AttackPhase.rush => 'Erken bitirme bonusu için ritmi aksatma.',
-    AttackPhase.recovery => 'Durma; 100 adım/dk ritmini koru.',
-    AttackPhase.finalRush => 'Seriyi korumak için son hedefi tamamla.',
-  };
-}
+// `AttackPhase`'in kullanıcıya dönük etiketleri (`label`,
+// `fitnessDescription`) **kaldırıldı**: hiçbir ekranda gösterilmiyorlardı ve
+// sabit Türkçe taşıyorlardı. Faz enum'u duruyor — `CombatRoundResult.phase`
+// üzerinden taşınıyor ve round anlatısı ileride arayüze çıkarsa metinler
+// ARB'den gelmeli, buradan değil.
 
 /// Beş rounddan birinin saldırı süresindeki payı.
 class AttackRoundConfig {
@@ -64,8 +52,10 @@ class AttackTargetConfig {
     List.generate(roundCount, (index) => roundStepTarget(index)),
   );
 
-  List<Duration> get roundDurations =>
-      List.unmodifiable(roundStepTargets.map(AttackConfig.durationForSteps));
+  /// Bütün roundlar aynı süreyi alır; tempo bant içinde sabit.
+  List<Duration> get roundDurations => List.unmodifiable(
+    List.filled(roundCount, AttackConfig.roundDurationFor(stepTarget)),
+  );
 
   Duration roundDuration(int zeroBasedRoundIndex) {
     RangeError.checkValidIndex(
@@ -73,7 +63,7 @@ class AttackTargetConfig {
       List.filled(roundCount, 0),
       'zeroBasedRoundIndex',
     );
-    return AttackConfig.durationForSteps(roundStepTarget(zeroBasedRoundIndex));
+    return AttackConfig.roundDurationFor(stepTarget);
   }
 
   int roundStepTarget(int zeroBasedRoundIndex) {
@@ -82,10 +72,9 @@ class AttackTargetConfig {
       List.filled(roundCount, 0),
       'zeroBasedRoundIndex',
     );
-    final remaining =
-        stepTarget -
-        (zeroBasedRoundIndex * GameConstants.combatRoundStepTarget);
-    return remaining.clamp(1, GameConstants.combatRoundStepTarget);
+    final roundSteps = AttackConfig.roundStepsFor(stepTarget);
+    final remaining = stepTarget - (zeroBasedRoundIndex * roundSteps);
+    return remaining.clamp(1, roundSteps);
   }
 }
 
@@ -110,18 +99,85 @@ abstract final class AttackConfig {
     AttackTargetConfig(stepTarget: 10000, enemyPowerMultiplier: 2.40),
   ];
 
-  /// Toplam hedeften sabit 1000 adımlık round sayısını türetir.
-  static int roundCountForSteps(int stepTarget) {
-    if (stepTarget <= 0) return 0;
-    return (stepTarget / GameConstants.combatRoundStepTarget).ceil();
+  /// [stepTarget] için geçerli tempo satırı: `minGoal`'ü hedefi aşmayan son
+  /// satır. Tablo `minGoal: 0` ile başladığı için her zaman bir satır döner.
+  static ({
+    int minGoal,
+    int roundSteps,
+    int roundSeconds,
+    double rewardMultiplier,
+  })
+  paceFor(int stepTarget) {
+    var pace = GameConstants.combatRoundPacing.first;
+    for (final row in GameConstants.combatRoundPacing) {
+      if (stepTarget >= row.minGoal) pace = row;
+    }
+    return pace;
   }
 
-  /// Verilen adım hedefinin kaç sabit round sürdüğünü döndürür.
+  /// Bir roundun adım hedefi.
   ///
-  /// Son round 1000 adımdan kısa olsa bile eski sistemde süresi 15 dakikadır.
+  /// Normalde doğrudan tablodan gelir. Yalnızca tablo değeri
+  /// [GameConstants.maxCombatRounds]'tan fazla round üretecekse büyütülür —
+  /// round sayısı tavanda kalsın, roundlar uzasın.
+  static int roundStepsFor(int stepTarget) {
+    if (stepTarget <= 0) return 0;
+    final tableSteps = paceFor(stepTarget).roundSteps;
+    final uncapped = (stepTarget / tableSteps).ceil();
+    if (uncapped <= GameConstants.maxCombatRounds) return tableSteps;
+    return (stepTarget / GameConstants.maxCombatRounds).ceil();
+  }
+
+  /// Bir roundun süresi. Bütün roundlar eşit; tempo bant içinde sabit.
+  ///
+  /// Round boyu tavan yüzünden büyüdüyse süre de aynı oranda büyür, yoksa
+  /// kadans (adım/dakika) bozulurdu.
+  static Duration roundDurationFor(int stepTarget) {
+    if (stepTarget <= 0) return Duration.zero;
+    final pace = paceFor(stepTarget);
+    final actualSteps = roundStepsFor(stepTarget);
+    final seconds = pace.roundSeconds * actualSteps / pace.roundSteps;
+    return Duration(seconds: seconds.round());
+  }
+
+  /// Hedefin kaç rounda bölündüğü. [GameConstants.maxCombatRounds] ile sınırlı.
+  static int roundCountForSteps(int stepTarget) {
+    if (stepTarget <= 0) return 0;
+    final count = (stepTarget / roundStepsFor(stepTarget)).ceil();
+    return count.clamp(1, GameConstants.maxCombatRounds);
+  }
+
+  /// Maceranın **toplam** süresi: round sayısı × round süresi.
   static Duration durationForSteps(int steps) {
     if (steps <= 0) return Duration.zero;
-    return GameConstants.combatRoundDuration * roundCountForSteps(steps);
+    return roundDurationFor(steps) * roundCountForSteps(steps);
+  }
+
+  /// Hedefin bandındaki zafer ödülü çarpanı (aynı tempo tablosundan).
+  static double rewardMultiplierFor(int stepTarget) =>
+      stepTarget <= 0 ? 0 : paceFor(stepTarget).rewardMultiplier;
+
+  /// Zafer altınının çekiliş aralığı: kademe tabanı × bandın ödül çarpanı.
+  ///
+  /// İki eksen bilinçli olarak ayrı: **kademe** hangi düşmanı devirdiğini,
+  /// **bant** ne kadar yürümeyi göze aldığını ödüllendirir. Aynı düşmanı
+  /// daha uzun bir taahhütle devirmek daha çok kazandırır, ama düşman da
+  /// [AttackTargetConfig.enemyPowerMultiplier] ile güçlenir — ödül tek başına
+  /// artmaz.
+  static ({int minimum, int maximum}) victoryCoinRange({
+    required int tier,
+    required int stepGoal,
+  }) {
+    final multiplier = rewardMultiplierFor(stepGoal);
+    final minimum =
+        GameConstants.victoryCoinBase + tier * GameConstants.victoryCoinPerTier;
+    final maximum =
+        GameConstants.victoryCoinSpreadBase +
+        tier * GameConstants.victoryCoinSpreadPerTier;
+    return (
+      minimum: (minimum * multiplier).round(),
+      maximum: (maximum * multiplier).round(),
+    );
   }
 
   /// Değişken round sayısında kullanılacak fitness fazını seçer.

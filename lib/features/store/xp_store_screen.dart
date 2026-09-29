@@ -1174,7 +1174,19 @@ class _PriceButton extends StatelessWidget {
                 children: [
                   const Icon(Icons.monetization_on, size: 15),
                   const SizedBox(width: 4),
-                  Text('$cost', style: const TextStyle(fontSize: 13)),
+                  // Fiyat beş haneye çıkabiliyor (efsanevi 11.600+) ve dar
+                  // ekranda düğmeye sığmıyordu. Kırpmak yerine küçültülüyor:
+                  // fiyatın yarısını göstermek hiç göstermemekle aynı.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '$cost',
+                        maxLines: 1,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ),
                 ],
               ),
     );

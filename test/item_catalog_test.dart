@@ -153,10 +153,12 @@ void main() {
     });
 
     test('efsanevi itemler bandının dışına taşmaz', () {
+      // Bant Faz 2'de geriye itildi (22-29 → 34-41): kilit açıldığında
+      // oyuncunun elinde efsanevi fiyatının yalnızca %42'si oluyordu.
       for (final id in ['scythes/reapers_scythe', 'magic/time_wardens_book']) {
         expect(
           requiredLevelFor(RewardRarity.legendary, id),
-          inInclusiveRange(22, 29),
+          inInclusiveRange(34, 41),
         );
       }
     });

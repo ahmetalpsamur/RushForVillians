@@ -209,7 +209,12 @@ void main() {
       expect(prefs.getString('player_avatar_v1'), 'unchanged-avatar');
       expect(prefs.getString('locale_preference_v1'), 'tr');
       final committed = prefs.getString(key);
-      expect((jsonDecode(committed!) as Map)['schemaVersion'], 25);
+      // Taşıma her zaman güncel sürüme kadar gider; sabit yazmak her şema
+      // artışında testi sahte sebeple kırıyordu.
+      expect(
+        (jsonDecode(committed!) as Map)['schemaVersion'],
+        GameStorage.schemaVersion,
+      );
       await GameStorage.load(avatar: avatar);
       expect(
         prefs.getString(key),

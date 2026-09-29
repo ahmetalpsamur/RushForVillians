@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
+import '../../core/constants/attack_config.dart';
 import '../../core/constants/game_constants.dart';
 import '../../core/localization/locale_preference.dart';
 import '../../core/localization/app_formatters.dart';
@@ -17,6 +18,7 @@ import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../core/utils/item_drop.dart';
 import '../../core/utils/item_rules.dart';
 import '../../core/utils/step_history.dart';
 import '../../core/utils/step_rate_limiter.dart';
@@ -1145,9 +1147,14 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final xp = _awardXp(
       (adventure.enemy.xpReward * _buffs.enemyXpMultiplier * speed).floor(),
     );
-    final tier = adventure.enemy.tier;
-    final minimumCoins = 4 + (tier * 3);
-    final maximumCoins = 10 + (tier * 6);
+    // Aralık tek yerden: kademe tabanı × hedefin bant çarpanı
+    // (`combatRoundPacing`). Buraya gömülü sayı yazma.
+    final range = AttackConfig.victoryCoinRange(
+      tier: adventure.enemy.tier,
+      stepGoal: adventure.stepGoal,
+    );
+    final minimumCoins = range.minimum;
+    final maximumCoins = range.maximum;
     // Tohumlu çekiliş: kalıcı bir ödülü etkileyen rastgelelik `Random()`
     // olamaz (CLAUDE.md §4.4, GD18/GD50).
     final baseCoins =
@@ -1174,7 +1181,38 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (_profile.currentWinStreak > _profile.bestWinStreak) {
       _profile.bestWinStreak = _profile.currentWinStreak;
     }
+    _grantVictoryItemDrop(adventure);
     return xp;
+  }
+
+  /// Zaferden **garanti** bir eşya düşürür (Bölüm C / Faz 2).
+  ///
+  /// `_grantAdventureVictoryXpIfNeeded` içinden, `xpAwarded` kapısının
+  /// **arkasından** çağrılıyor: o kapı zaferin bir kez ödüllendirilmesini
+  /// garanti ediyor, dolayısıyla düşme de macera başına bir kez olur.
+  void _grantVictoryItemDrop(AdventureQuest adventure) {
+    // Havuz sınıfın kuşanabildikleri: düşen eşya işe yaramaz bir şey olmamalı.
+    // Katalog henüz yüklenmediyse (soğuk açılışta eğitim zaferi) sessizce
+    // atlanır — eşya uydurmaktansa vermemek yeğ.
+    if (_equipment.isEmpty) return;
+
+    final dropped = rollItemDrop(
+      tier: adventure.enemy.tier,
+      // Tohum macerayı benzersiz tanımlıyor ve zafer damgasını içeriyor;
+      // kapat-aç aynı eşyayı verir, farklı macera farklı eşya verir.
+      seed:
+          '${adventure.enemy.id}|${adventure.startingSteps}|'
+          '${adventure.stepGoal}|${adventure.combatSeed}',
+      pool: _equipment,
+    );
+    if (dropped == null) return;
+
+    // Envanter dolu diye bir kavram yok: `ownedItems` sınırsız bir liste ve
+    // aynı eşyanın ikinci adedi **isteniyor** (birleştirme onu gerektiriyor,
+    // GD39). Bu yüzden tekrar düşen eşya elenmiyor, yeni bir örnek açılıyor.
+    final instance = _profile.addItem(dropped.id, rarity: dropped.rarity);
+    adventure.droppedItemId = dropped.id;
+    adventure.droppedItemInstanceId = instance.instanceId;
   }
 
   Future<void> _completeFirstTutorialAdventure() async {

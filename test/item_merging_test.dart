@@ -43,11 +43,26 @@ List<OwnedItem> _group(
 
 void main() {
   group('gereken adet', () {
-    test('3\'ten başlar ve her kademede bir artar', () {
+    test('nadirlik yükseldikçe gereken adet artar', () {
+      // Nadir 5→6, epik 6→8: her savaştan garanti eşya düştüğü için kopya
+      // biriktirmek kolaylaştı, birleştirme de aynı oranda zorlaştı.
       expect(mergeCountFor(RewardRarity.common), 3);
       expect(mergeCountFor(RewardRarity.uncommon), 4);
-      expect(mergeCountFor(RewardRarity.rare), 5);
-      expect(mergeCountFor(RewardRarity.epic), 6);
+      expect(mergeCountFor(RewardRarity.rare), 6);
+      expect(mergeCountFor(RewardRarity.epic), 8);
+      // Sıra hiç bozulmamalı.
+      const ordered = [
+        RewardRarity.common,
+        RewardRarity.uncommon,
+        RewardRarity.rare,
+        RewardRarity.epic,
+      ];
+      for (var i = 1; i < ordered.length; i++) {
+        expect(
+          mergeCountFor(ordered[i])!,
+          greaterThan(mergeCountFor(ordered[i - 1])!),
+        );
+      }
     });
 
     test('efsanevinin adedi yok — birleştirilemez', () {
@@ -184,20 +199,21 @@ void main() {
       expect(result.target, RewardRarity.uncommon);
       expect(result.requiredCount, 3);
       expect(result.consumedInstanceIds, hasLength(3));
-      expect(result.reason(RewardRarity.common), isNull);
+      expect(result.block, MergeBlock.none);
     });
 
     test('adet yetmezse sebebi söylenir ve tüketilecek liste boş', () {
       final result = quote(count: 2);
       expect(result.block, MergeBlock.notEnough);
       expect(result.consumedInstanceIds, isEmpty);
-      expect(result.reason(RewardRarity.common), contains('3 adet gerekiyor'));
+      expect(result.requiredCount, 3);
+      expect(result.availableCount, 2);
     });
 
     test('para yetmezse sebebi söylenir', () {
       final result = quote(count: 3, coins: 0);
       expect(result.block, MergeBlock.coins);
-      expect(result.reason(RewardRarity.common), contains('coin'));
+      expect(result.cost, greaterThan(0));
       // Adet yeterli olduğu için tüketilecek liste yine de gösterilir.
       expect(result.consumedInstanceIds, hasLength(3));
     });
@@ -207,10 +223,6 @@ void main() {
       expect(result.block, MergeBlock.maxRarity);
       expect(result.target, isNull);
       expect(result.cost, 0);
-      expect(
-        result.reason(RewardRarity.legendary),
-        contains('en üst nadirlik'),
-      );
     });
 
     test('kuşanılı örnek harcanacaksa önceden bildirilir', () {

@@ -1,49 +1,72 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/attack_config.dart';
+import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/utils/enemy_stats.dart';
 import 'package:rush_for_villains/models/combat_stats.dart';
 
 void main() {
   group('AttackConfig tek doğruluk kaynağı', () {
-    test('altı hedef sabit 1000 adım ve 15 dakikalık roundlara bölünür', () {
+    test('altı hedef tempo tablosunun verdiği rounda bölünür', () {
       expect(
         AttackConfig.targets
             .map(
               (config) => (
                 config.stepTarget,
+                config.roundCount,
                 config.totalAttackDuration.inMinutes,
                 config.enemyPowerMultiplier,
               ),
             )
             .toList(),
         [
-          (500, 15, 1.00),
-          (1000, 15, 1.15),
-          (2000, 30, 1.35),
-          (3000, 45, 1.55),
-          (5000, 75, 1.85),
-          (10000, 150, 2.40),
+          (500, 2, 5, 1.00),
+          (1000, 2, 10, 1.15),
+          (2000, 4, 20, 1.35),
+          (3000, 3, 30, 1.55),
+          (5000, 5, 50, 1.85),
+          (10000, 5, 100, 2.40),
         ],
       );
     });
 
-    test('round sayısı sabit 1000 adım hedefine göre türetilir', () {
+    test('kadans bütün bantlarda stepsPerMinute ile aynı', () {
+      // Tablonun asıl vaadi bu: bant değişince round büyür ama oyuncudan
+      // istenen tempo değişmez.
+      for (final row in GameConstants.combatRoundPacing) {
+        expect(
+          row.roundSteps / (row.roundSeconds / 60),
+          closeTo(GameConstants.stepsPerMinute, 0.001),
+          reason: 'bant ${row.minGoal}',
+        );
+      }
+    });
+
+    test('round sayısı tempo tablosundan türetilir ve tavanla sınırlı', () {
       expect(AttackConfig.rounds, hasLength(5));
       expect(AttackConfig.hasValidRoundPercentages, isTrue);
       expect(AttackConfig.roundPercentageTotal, closeTo(1, 0.000000001));
-      expect(AttackConfig.roundCountForSteps(500), 1);
-      expect(AttackConfig.roundCountForSteps(1000), 1);
-      expect(AttackConfig.roundCountForSteps(1500), 2);
-      expect(AttackConfig.roundCountForSteps(10000), 10);
+      expect(AttackConfig.roundCountForSteps(500), 2);
+      expect(AttackConfig.roundCountForSteps(1000), 2);
+      expect(AttackConfig.roundCountForSteps(1500), 3);
+      expect(AttackConfig.roundCountForSteps(10000), 5);
+      // Hiçbir hedef tavanı aşamaz; eski kayıttan gelen devasa hedefte round
+      // sayısı tavanda kalır, roundun kendisi büyür.
+      for (final steps in [500, 1500, 10000, 15000, 100000]) {
+        expect(
+          AttackConfig.roundCountForSteps(steps),
+          lessThanOrEqualTo(GameConstants.maxCombatRounds),
+        );
+      }
+      expect(AttackConfig.roundStepsFor(100000), greaterThan(2000));
     });
 
     test('round adımları ve süreleri toplam hedefi eksiksiz paylaşır', () {
       final short = AttackConfig.forStepTarget(500);
-      expect(short.roundStepTargets, [500]);
-      expect(short.roundDurations.map((duration) => duration.inMinutes), [15]);
+      expect(short.roundStepTargets, [250, 250]);
+      expect(short.roundDurations.map((d) => d.inSeconds), [150, 150]);
       final medium = AttackConfig.forStepTarget(1000);
-      expect(medium.roundStepTargets, [1000]);
-      expect(medium.roundDurations.map((duration) => duration.inMinutes), [15]);
+      expect(medium.roundStepTargets, [500, 500]);
+      expect(medium.roundDurations.map((d) => d.inMinutes), [5, 5]);
       for (final target in AttackConfig.targets) {
         expect(
           target.roundStepTargets.reduce((a, b) => a + b),
@@ -59,12 +82,13 @@ void main() {
       }
     });
 
-    test('faz sırası ve aktif recovery açıklaması sabittir', () {
+    test('faz sırası round sayısına göre sabittir', () {
       expect(AttackConfig.roundConfig(0, 2).phase, AttackPhase.attack);
       expect(AttackConfig.roundConfig(1, 2).phase, AttackPhase.finalRush);
+      // Beş roundda bütün fazlar sırayla geçer.
       expect(
-        AttackPhase.recovery.fitnessDescription.toLowerCase(),
-        contains('durma'),
+        [for (var i = 0; i < 5; i++) AttackConfig.roundConfig(i, 5).phase],
+        AttackPhase.values,
       );
     });
 

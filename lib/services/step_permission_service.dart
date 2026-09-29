@@ -26,21 +26,10 @@ enum StepPermissionStatus {
 extension StepPermissionStatusX on StepPermissionStatus {
   bool get isGranted => this == StepPermissionStatus.granted;
 
-  /// Kullanıcıya gösterilecek açıklama. Devre dışı bir kontrol sessiz kalmaz.
-  String get description => switch (this) {
-    StepPermissionStatus.unknown => 'Adım sayacı izni henüz kontrol edilmedi.',
-    StepPermissionStatus.granted => 'Adım sayacı çalışıyor.',
-    StepPermissionStatus.denied =>
-      'Adımlarını sayabilmemiz için hareket verisi iznine ihtiyacımız var. '
-          'İzin vermeden oyunun geri kalanı çalışmaya devam eder, ama '
-          'adımların kaydedilmez.',
-    StepPermissionStatus.permanentlyDenied =>
-      'Hareket verisi izni kapalı. Adımların sayılabilmesi için sistem '
-          'ayarlarından "Fiziksel aktivite" iznini açman gerekiyor.',
-    StepPermissionStatus.unavailable =>
-      'Bu cihazda adım sayacı bulunamadı. Oyunun geri kalanı çalışır; '
-          'adımları demo kontrollerinden simüle edebilirsin.',
-  };
+  /// Kullanıcıya gösterilecek açıklama `home_screen.dart` içinde ARB'den
+  /// okunuyor (`permissionDenied`, `permissionUnavailable`, …). Burada sabit
+  /// Türkçe bir ikinci sürüm **tutulmuyor**: iki metin kaynağı ayrışır ve
+  /// ikincisi İngilizce seçiliyken sessizce Türkçe sızdırırdı.
 }
 
 /// Adım sayacı ve bildirim izinlerini yöneten servis.

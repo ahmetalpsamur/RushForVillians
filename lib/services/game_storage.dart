@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/base_combat_stats.dart';
 import '../core/constants/game_constants.dart';
+import '../core/constants/timed_combat_config.dart';
 import '../data/enemy_catalog.dart';
 
 import '../models/avatar_profile.dart';
@@ -25,7 +26,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 25;
+  static const int schemaVersion = 27;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -328,6 +329,33 @@ class GameStorage {
       }
       return state;
     },
+    // v25 -> v26: kademe güç çarpanı (×1,00–×2,40) artık gerçekten
+    // uygulanıyor ve round temposu tabloya bağlandı. Yarım bir macerada
+    // `enemyHealth` eski (çarpansız) tavana göre yazılmıştı; olduğu gibi
+    // bırakılsa düşman yeni tavanın yanında **yarı canlı** görünürdü.
+    //
+    // Oranı koruyarak taşıyoruz: kalan can yüzdesi neyse, yeni tavanda da
+    // o. Oyuncunun verdiği hasar boşa gitmiyor, savaş da kilitlenmiyor.
+    // `roundDurationSeconds` bilerek **silinmiyor**: `AdventureQuest.fromJson`
+    // onu güncel round süresiyle karşılaştırıp eşleşmezse geri sayımı
+    // kendisi tazeliyor (eski 15 dakikalık sayaç taşınmıyor).
+    25: (state) {
+      final adventure = state['adventure'];
+      if (adventure is! Map<String, dynamic>) return state;
+      final health = adventure['enemyHealth'];
+      final stepGoal = adventure['stepGoal'];
+      if (health is! int || health <= 0 || stepGoal is! int) return state;
+      final multiplier = TimedCombatConfig.difficultyMultiplierForSteps(
+        stepGoal,
+      );
+      adventure['enemyHealth'] = (health * multiplier).round();
+      return state;
+    },
+    // v26 -> v27: zaferden garanti eşya düşüyor (`droppedItemId`,
+    // `droppedItemInstanceId`). Eski kayıtta alan yok; `null` doğru
+    // varsayılan — bitmiş bir maceraya geriye dönük eşya **verilmiyor**,
+    // ödül zaten bir kez dağıtılmış sayılıyor (`xpAwarded`).
+    26: (state) => state,
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde
