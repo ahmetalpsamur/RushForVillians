@@ -35,6 +35,7 @@
   "safetyTimeLimitNotice": "Round'un süre sınırı var",
   "safetyReady": "Adım hedefin tamamlandı. Canavar seni bekliyor; güvenli olduğunda savaşabilirsin.",
   "endlessTitle": "Sonsuz Koşu",
+  "endlessSafeWhileWalking": "Yürüdüğün sürece güvendesin. Durursan canavar vurmaya başlar, ve her kesimde daha sert vurur.",
   "endlessSubtitle": "Yürüdükçe çarpan büyür. Ne zaman duracağına sen karar verirsin.",
   "endlessStart": "Sonsuz Koşuya Başla",
   "endlessFinish": "Macerayı bitir",

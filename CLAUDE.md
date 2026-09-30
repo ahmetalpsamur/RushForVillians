@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD81)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD99)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -715,8 +715,8 @@ ve seviye kilidi zaten 784 item'ı uzun bir ilerlemeye yayıyor.
 | Sıradan | 371 | 1–3 | 100–125 | 10 | 3 | ×6 |
 | Az Bulunur | 271 | 4–7 | 300–350 | 20 | 4 | ×7 |
 | Nadir | 81 | 8–12 | 775–875 | 30 | **6** | ×8 |
-| Epik | 43 | **22–27** | **3.575–4.000** | 40 | **8** | ×10 |
-| Efsanevi | 18 | **34–41** | **10.800–12.400** | 50 | — | ×13 |
+| Epik | 43 | **22–27** | **3.575–4.000** | 40 | **8** | ×7 |
+| Efsanevi | 18 | **34–41** | **10.800–12.400** | 50 | — | ×4,5 |
 
 ⚠️ **Epik ve efsanevi kilitleri Faz 2'de geriye itildi** (14→22, 22→34) ve
 fiyat tabanları yükseldi (1400→1700, 3600→4000). Ölçülen sorun: seviye
@@ -895,19 +895,25 @@ büyüseydi denge çökerdi.
 Bir seviyenin payı `itemUpgradeEarlyWeight + seviye / tavan`; ağırlıkların
 toplamı tam olarak `tavan − 1` ettiği için toplam katla birebir tutar.
 
-| Nadirlik | Kat | 1→tavan maliyet | *(eski)* |
-|---|---|---|---|
-| Sıradan | ×6 | **600** | *675* |
-| Az Bulunur | ×7 | **2.425** | *2.300* |
-| Nadir | ×8 | **6.575** | *5.775* |
-| Epik | ×10 | **38.175** | *18.225* |
-| Efsanevi | ×13 | **150.750** | *59.200* |
+| Nadirlik | Kat | Fiyat | 1→tavan maliyet | **Gün** |
+|---|---|---|---|---|
+| Sıradan | ×6 | 100 | **600** | 2 |
+| Az Bulunur | ×7 | 350 | **2.425** | 8 |
+| Nadir | ×8 | 825 | **6.575** | 22 |
+| Epik | ×7 | 3.825 | **26.775** | 89 |
+| Efsanevi | ×4,5 | 11.600 | **52.200** | 174 |
 
-Kat bir dönem bütün nadirliklerde tek bir sayıydı (×7). Artık nadirlik
-yalnızca **tavanı** değil, o tavana çıkmanın **maliyetini** de belirliyor:
-sıradan bir eşyayı sonuna kadar götürmek ucuzladı, efsaneviyi götürmek iki
-katından fazla pahalandı. İkinci tavan (oyuncunun kendi seviyesi) zaten
-efsaneviyi Sv. 50'ye kadar bağlıyor.
+*(Gün = bağlı oyuncunun ≈300 coin/gün geliriyle.)*
+
+⚠️ **Kat nadirlikle monoton değil — bilerek** (GD94). Bağlayıcı ölçüt kat
+değil **gün**. Fiyat zaten nadirlikle ×116 artıyor (100 → 11.600); katı da
+artırmak aynı şeyi iki kez saymaktı ve efsaneviyi **503 güne** çıkarıyordu —
+bir hedef değil, bir duvar. Oyuncu o eşyayı hiç yükseltmemeye karar
+verdiğinde sistem ölür. Toplam maliyet ve gün sayısı **hâlâ kesin artan**
+(600 → 52.200 · 2 → 174 gün); tersine dönen tek şey oranın kendisi.
+
+İkinci tavan (oyuncunun kendi seviyesi) zaten efsaneviyi Sv. 50'ye kadar
+bağlıyor.
 
 Yükseltme her zaman grubun **en gelişmiş** adedine uygulanır; oyuncu yatırımını
 tek eşyada toplasın.
@@ -1029,6 +1035,55 @@ bedel (eksi değerli ikinci etki), birden çok etki, ya da kendine ait bir metin
 
 Nadirlik etki sayısını büyütür (ort. 1,7 → 3,8). En az beş ünvan çift etkili.
 Yedi tetikleyicinin hepsi katalogda gerçekten kullanılıyor.
+
+### Savaş bonusları nadirliğe göre ölçeklendi (GD98)
+
+| Nadirlik | Çarpan |
+|---|---|
+| Sıradan | ×1,20 |
+| Az Bulunur | ×1,25 |
+| Nadir | ×1,30 |
+| Epik | ×1,35 |
+| Efsanevi | ×1,40 |
+
+**Neden nadirliğe göre, düz bir oran değil:** düşman gücü artık hedefe göre
+×1,00 → ×2,40 büyüyor (§6.11). Sıradan ünvanlar erken hedeflerde
+(çarpan ×1,00–1,15), efsaneviler geç hedeflerde (×1,85–2,40) takılıyor. Tek
+bir düz oran ya erken oyunu şişirirdi ya geç oyunu yetersiz bırakırdı.
+
+**75 savaş etkisi değişti. Ekonomi statlarına hiç dokunulmadı** — yalnızca
+ekonomi statı taşıyan **20 ünvan tamamen el değmeden** kaldı.
+
+⚠️ **Bedeller de aynı oranda büyüdü** (ör. `rust_eater` sıyrılma
+−%15 → −%20). Yalnızca bonusu büyütmek bedeli göreli olarak
+önemsizleştirirdi ve GD69'un "her ünvanın bir bedeli olmalı" kuralı erirdi.
+
+**Etiketler de güncellendi.** Değer değişip `customLabel` / `customLabelEn`
+eski sayıyı göstermesi, oyuncuyu yanlış bilgilendiren bir hata olurdu.
+
+**Ölçülen sonuç:** kademeye göre makul bir ünvanla yük oranı 0,22–0,47
+bandında kaldı; yükseltme hiçbir hedefi 0,3'ün altına **indirmedi**
+(2.000 hedefindeki 0,22 ekipman kaynaklı ve Faz 2'den beri var).
+
+### Cam Top — iki sayı tek kaynaktan
+
+`GameConstants.glassCannonPercent = 90`. Ünvan bu tek sayıdan **iki etki**
+üretiyor: `attack +%90` ve `maxHealth -%90`; iki dildeki etiket de aynı
+sabitten. Ayrı yazıldığında biri değişip diğeri unutulmuştu (+%70 saldırıya
+karşılık yalnızca −%30 can, yani "cam" tarafı hiç yoktu).
+
+Yüzde **tam sayı** tutuluyor çünkü `const` string interpolasyonu `double`
+kabul etmiyor ama `int` kabul ediyor — etiket böylece değerle asla
+çelişemiyor.
+
+**Ölçülen:** altı hedefin hepsinde **tam kaçırılan tek bir round öldürüyor**
+(can normalin onda biri). Saldırı ise iki katına yakın. High risk, high
+reward — yumuşatılmadı.
+
+⚠️ **Uç durum:** 10.000 hedefinde can **1**'e iniyor
+(`CombatStats.sanitized()` "can en az 1" kırpması) — o kademedeki ekipmanın
+kendi negatif can etkisi −%90 ile birleşince toplam çarpan sıfırın altına
+düşüyor. Orada Cam Top fiilen "her türlü tek vuruşta öl" demek.
 
 ### Başarım koşulları
 
@@ -1604,6 +1659,36 @@ tablosunda 5–9 bandı epik ve efsanevi içermiyor. **Sonsuz koşu para modu,
 boss savaşı nadir eşya modu** — çarpan bankayı büyütür, eşyanın kalitesini
 değil.
 
+### ⚠️ Tam tamamlanan round **sıfır** düşman hasarı verir — kasıtlı
+
+**Yürürken güvende olmak bu modun sözleşmesidir. Taban hasar
+eklenmeyecek.**
+
+Her roundun 100 adımını tamamlayan oyuncu hiç hasar almaz, yani düzenli
+yürüyen biri pratikte ölmez. Bu bir boşluk değil, tasarımın kendisi:
+**yürüyen oyuncu güvende, duran oyuncu risk alıyor.** Hasar artışı tam da bu
+yüzden anlamlı — kesim sayısı yükseldikçe **durmanın bedeli** büyüyor.
+
+Taban hasar eklenseydi oyuncu canını takip etmek zorunda kalır, telefona
+bakardı ve modun varlık sebebi ölürdü.
+
+Oyuncu bunu **başlamadan önce** öğreniyor: giriş kartında
+`endlessSafeWhileWalking` satırı — *"Yürüdüğün sürece güvendesin. Durursan
+canavar vurmaya başlar, ve her kesimde daha sert vurur."*
+
+### Beam: 15. kesimde açılan görsel tırmanış
+
+`endlessAttackAssets(enemy, cut)` erken kesimlerde katalogdaki
+`Attack01-03`'ü, [`endlessBeamUnlockCut`] = **15**'ten sonra havuza **Beam**'i
+de katıyor.
+
+**Neden 15:** eğrilerin karakteri tam orada değişiyor — can tavana vuruyor,
+hasar tek başına büyümeye devam ediyor, yani mod "bu uzuyor"dan "bu
+tehlikeli"ye geçiyor. Beam o dönüşün görsel sinyali: oyuncu canavarın
+yalnızca büyümediğini, farklı bir şey de yaptığını görüyor.
+
+`Idle` **kullanılmıyor** — normal macerada da kullanılmıyor, aynı kaldı.
+
 ### Tek karar: bitir ya da devam et
 
 Ekranda **tek dokunulabilir şey** "Macerayı bitir" düğmesi. Kesimler, çarpan
@@ -1866,8 +1951,8 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**830 test** (`flutter test --no-test-assets`). Test, bu projede dokümantasyonun
-bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
+**955 test** (`flutter test`), bunların **911'i yeşil**. Test, bu projede
+dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
 
@@ -1945,7 +2030,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD87)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD99)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2050,6 +2135,8 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD95 | Sonsuz Koşu **ayrı bir model** (`EndlessRun`), `AdventureQuest`'e hiç dokunulmadı | Macera `stepGoal`'a, `AttackConfig`'e ve zafer damgasına bağlı; sonsuz koşuda bunların hiçbiri yok. Aynı sınıfa sığdırmak hem modeli hem ona dayanan ~15 testi riske atardı. İki mod **karşılıklı dışlıyor** — aynı adım partisini paylaşsalardı hem ödül hem hasar iki kez sayılırdı |
 | GD96 | Sonsuz Koşu yenilgisi bankanın **yarısını** öder; normal macera yenilgisi ödülü tamamen siler | Bilerek ayrışıyor. Sıfır ödeme, oyuncuyu canını takip etmek için telefona bakmaya iter — bu modun varlık sebebi tam olarak telefona **bakmamak**. Kural kodla zorlanıyor: banka boş değilse ödeme en az 1 (`floor(1 × 0,5)` sıfır ediyordu) |
 | GD97 | Sonsuz Koşu kesimleri çarka ve başarım sayaçlarına **yazılmıyor**, seriye **yazılıyor** | Kesim 200 adımda bir oluyor. "Günün ilk zaferi" sayılsaydı çark kilidi 3.000 adımdan 200'e düşerdi; `enemiesDefeated` sayılsaydı "1000 düşman devir" ünvanı bir saatte alınırdı. Seri ise zaten **adım** kapısından geçiyor, ayrı koda gerek yok |
+| GD98 | Ünvanların **savaş** etkileri nadirliğe göre ölçeklendi (×1,20 · ×1,25 · ×1,30 · ×1,35 · ×1,40); ekonomi etkilerine **hiç dokunulmadı** | Ölçülen sorun: tek ünvan takılıyor ama 3–5 eşya kuşanılıyordu, yani ünvanın savaş katkısı tek bir eşyanın altında kalıyordu. Ekonomi tarafı kullanıcının açık talimatıyla dışarıda bırakıldı: `maxTitleEconomyBonus` +%25 tavanı ölçülmüş bir dengeye bağlı (GD70) ve yalnızca ekonomi etkisi taşıyan 20 ünvan olduğu gibi duruyor. Etiketler değerle birlikte güncellendi — `customLabel` yalan söylemesin |
+| GD99 | Cam Top'un iki sayısı tek kaynaktan: `GameConstants.glassCannonPercent` | Etki değeri, negatif eşi ve iki dildeki etiket dört ayrı yerde elle yazılıydı; GD98 boost'u birini değiştirip üçünü bırakabilirdi. “sayfada aynı sayı dört kez” bir denge kararı değil, bir hata kaynağı |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
@@ -2069,18 +2156,36 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-2026-09-04 yerelleştirme Faz 1 sonunda `flutter test --no-test-assets` →
-**865 başarılı, 15 başarısız.** Başarısızların tamamı oturum başındaki kirli
-çalışma ağacında zaten değişmiş ekranlara ait mevcut **golden** farklarıdır;
-yerelleştirme davranış testleri (5), açılış testleri (4) ve yeni dil seçici
-golden'ları (4) geçiyor.
+Bölüm C sonunda `flutter test` → **911 başarılı, 44 başarısız.**
 
-- `character_creation_test` — sınıf ızgarası/tanıtım ekranı
-- mevcut `golden/` ekranları — demirci, ünvan, pet yerleşimi vb.
+⚠️ **Bu 44 test Bölüm C'den önce de kırmızıydı.** Bölüm C'nin dört fazı da
+`HEAD`'e karşı ölçüldü (ayrı bir `git worktree` içinde temiz baseline) ve
+hiçbirinde **yeni kırılan test olmadı**; tersine üç tanesi düzeldi
+(47 → 44). Bunlar **düzeltilmedi, dokunulmadı** — başka birinin alanı.
 
-Test asset paketi bu oturumda normal `flutter test` ile yenilendi ve shader
-tekrar yerine kondu; kalan farklar bayat asset paketinden kaynaklanmıyor.
-Yerelleştirme dışı oldukları için golden ana görüntüleri güncellenmedi.
+Alan alan dağılım:
+
+| Dosya | Adet | Konu |
+|---|---:|---|
+| `store_purchase_test` | 7 | Satın alma, tüketilen yükseltmeler (2× XP), çark ödülü, diske yazma |
+| `app_boot_test` | 4 | Açılış dayanıklılığı: kayıt okunamayınca uyarma / güvenlik onayı hatırlama |
+| `golden/walk_phase_golden_test` | 4 | Yürüyüş fazı sahnesi golden'ları |
+| `titles_test` | 4 | Ünvan buff'ının paraya yansıması, başarım ünvanının verilmesi |
+| `golden/titles_golden_test` | 3 | Ünvan ekranı golden'ları (TR 320/390 + EN 390) |
+| `adventure_progress_test` | 3 | Zafer sahnesi ve macera ilerlemesi golden'ları |
+| `golden/forge_golden_test` | 2 | Demirci ekranı golden'ları |
+| `golden/store_card_golden_test` | 2 | Mağaza ekipman kartı golden'ları |
+| `golden/streak_bonus_golden_test` | 2 | Seri bonusu paneli golden'ları |
+| `golden/pet_companion_golden_test` | 2 | Ana çember pet düğmesi golden'ları |
+| `inventory_test` | 2 | Adım-para bonusunun paraya yansıması |
+| `reward_collection_test` | 2 | Koleksiyon ekranı ve boş vitrin |
+| `phase3_content_localization_test` | 2 | İngilizce içerik golden'ları |
+| `character_creation_test` | 0–2 | *(ikisi Bölüm C sırasında düzeldi)* |
+| `blacksmith_test` · `combat_persistence_test` · `daily_notifications_test` · `revival_walk_test` · `safety_flow_test` | 1'er | Tekil davranış testleri |
+
+Kabaca **20'si golden** (ekran görüntüsü farkı), **24'ü davranış**. Davranış
+tarafında iki küme öne çıkıyor: `RootShell` üzerinden çalışan satın
+alma/buff/ödül zinciri ve açılış/kalıcılık.
 
 ## Zaman güvenliği
 

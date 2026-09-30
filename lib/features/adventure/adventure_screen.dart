@@ -1753,6 +1753,18 @@ class _AdventureScreenState extends State<AdventureScreen>
                     height: 1.35,
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Modun sözleşmesi: yürürken güvendesin, durursan değil.
+                // Oyuncu bunu **başlamadan önce** bilmeli.
+                Text(
+                  context.l10n.endlessSafeWhileWalking,
+                  key: const ValueKey('endless-safe-while-walking'),
+                  style: const TextStyle(
+                    color: AppColors.streak,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 FilledButton.tonal(
                   key: const ValueKey('endless-run-start'),

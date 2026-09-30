@@ -290,6 +290,12 @@ abstract class AppLocalizations {
   /// **'Sonsuz Koşu'**
   String get endlessTitle;
 
+  /// No description provided for @endlessSafeWhileWalking.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yürüdüğün sürece güvendesin. Durursan canavar vurmaya başlar, ve her kesimde daha sert vurur.'**
+  String get endlessSafeWhileWalking;
+
   /// No description provided for @endlessSubtitle.
   ///
   /// In tr, this message translates to:

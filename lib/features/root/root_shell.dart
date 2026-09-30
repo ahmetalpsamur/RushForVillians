@@ -2687,6 +2687,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           avatar: _profile.avatar,
           onFinish: _bankEndlessRun,
           onClose: _closeEndlessRun,
+          onSimulateSteps:
+              kDebugMode && !_stepSource.isPhysical
+                  ? () => _simulateSteps(200)
+                  : null,
         )
       else
       AdventureScreen(

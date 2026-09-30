@@ -122,6 +122,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get endlessTitle => 'Endless Run';
 
   @override
+  String get endlessSafeWhileWalking =>
+      'You are safe while you keep walking. Stop, and the monster starts hitting back, harder with every kill.';
+
+  @override
   String get endlessSubtitle =>
       'The multiplier grows while you walk. You decide when to stop.';
 

@@ -125,6 +125,30 @@ class GameConstants {
   /// Yenilgide bankanın ödenen oranı. **Asla sıfır olmamalı.**
   static const double endlessDefeatPayoutRatio = 0.5;
 
+  /// "Cam Top" ünvanının saldırı bonusu — **yüzde**, tam sayı.
+  ///
+  /// Ünvan bu tek sayıdan iki etki üretiyor: `attack +%N` ve
+  /// `maxHealth -%N`. **İkisi aynı sayıdan türemek zorunda** — ayrı ayrı
+  /// yazıldığında biri değişip diğeri unutuluyordu (saldırı +%70 iken can
+  /// yalnızca −%30'du, yani "cam" tarafı hiç yoktu).
+  ///
+  /// %90 ile can normalin **onda birine** iniyor: tek vuruşta ölmek gerçek
+  /// bir ihtimal. High risk, high reward — yumuşatılmadı.
+  ///
+  /// Tam sayı tutulmasının sebebi teknik: `const` string interpolasyonu
+  /// `double` kabul etmiyor ama `int` kabul ediyor, yani etiket de aynı
+  /// sabitten üretilebiliyor ve metin hiçbir zaman değerle çelişemiyor.
+  static const int glassCannonPercent = 90;
+
+  /// Beam saldırısının saldırı havuzuna katıldığı kesim.
+  ///
+  /// **15 seçildi çünkü eğrilerin karakteri tam orada değişiyor:** can bu
+  /// kesimde tavana vuruyor ([endlessMaxHealthSteps]) ve hasar tek başına
+  /// büyümeye devam ediyor — yani mod "bu uzuyor"dan "bu tehlikeli"ye
+  /// geçiyor. Beam o dönüşün **görsel sinyali**: oyuncu ekrana baktığında
+  /// canavarın yalnızca büyümediğini, farklı bir şey de yaptığını görüyor.
+  static const int endlessBeamUnlockCut = 15;
+
   /// Sonsuz koşuda düşen eşyanın en yüksek kademesi.
   ///
   /// 9 seçildi çünkü Faz 2'nin düşme tablosunda 5–9 bandı **epik ve

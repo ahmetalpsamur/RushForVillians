@@ -322,7 +322,12 @@ void main() {
       // bir çarpana dönüşmemeli.
       expect(healthy.defense, statsAt(0.5).defense);
       expect(wounded.defense, greaterThan(healthy.defense));
-      expect(wounded.defense, closeTo(healthy.defense * 1.60, 1e-6));
+      // Çarpan **katalogdan** okunuyor; sabit kopyalamak bonus her
+      // dengelemede testi sahte sebeple kırıyordu.
+      final bonus = lowHealthTitle.effects
+          .firstWhere((effect) => effect.stat == ItemStat.defense)
+          .value;
+      expect(wounded.defense, closeTo(healthy.defense * (1 + bonus), 1e-6));
     });
 
     test('koşullu ekonomi etkisi pasif çarpana girmez', () {

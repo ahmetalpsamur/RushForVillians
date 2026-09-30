@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/game_constants.dart';
 import '../../core/constants/safety_messages.dart';
+import '../../core/utils/endless_rules.dart';
 import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -32,6 +33,8 @@ class EndlessRunScreen extends StatelessWidget {
 
   /// Sonuç ekranını kapatır.
   final VoidCallback onClose;
+  
+  final VoidCallback? onSimulateSteps;
 
   const EndlessRunScreen({
     super.key,
@@ -39,6 +42,7 @@ class EndlessRunScreen extends StatelessWidget {
     required this.avatar,
     required this.onFinish,
     required this.onClose,
+    this.onSimulateSteps,
   });
 
   @override
@@ -49,7 +53,7 @@ class EndlessRunScreen extends StatelessWidget {
         child:
             run.isFinished
                 ? _EndlessResult(run: run, onClose: onClose)
-                : _EndlessActive(run: run, avatar: avatar, onFinish: onFinish),
+                : _EndlessActive(run: run, avatar: avatar, onFinish: onFinish, onSimulateSteps: onSimulateSteps),
       ),
     );
   }
@@ -59,11 +63,13 @@ class _EndlessActive extends StatelessWidget {
   final EndlessRun run;
   final AvatarProfile avatar;
   final VoidCallback onFinish;
+  final VoidCallback? onSimulateSteps;
 
   const _EndlessActive({
     required this.run,
     required this.avatar,
     required this.onFinish,
+    this.onSimulateSteps,
   });
 
   Future<void> _confirmFinish(BuildContext context) async {
@@ -179,7 +185,14 @@ class _EndlessActive extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // Ekrandaki TEK dokunulabilir şey.
+        if (onSimulateSteps != null) ...[
+        OutlinedButton(
+          key: const ValueKey('endless-simulate-200'),
+          onPressed: onSimulateSteps,
+          child: const Text('+200 Steps'),
+        ),
+        const SizedBox(height: 8),
+        ],
         FilledButton(
           key: const ValueKey('endless-finish'),
           onPressed: () => _confirmFinish(context),
@@ -256,6 +269,18 @@ class _EndlessScene extends StatelessWidget {
 
   const _EndlessScene({required this.run, required this.avatar});
 
+  /// Canavarın o anki karesi.
+  ///
+  /// Havuz `endlessAttackAssets` ile geliyor: 15. kesimden sonra **Beam** de
+  /// giriyor. Seçim tohumlu (`enemyAttackSerial`), yani aynı vuruş her
+  /// çizimde aynı animasyonu gösteriyor — normal maceradaki "bir öncekiyle
+  /// aynı olmasın" kuralının deterministik karşılığı.
+  String _monsterAsset(EndlessRun run) {
+    if (run.lastEnemyDamage <= 0) return run.enemy.walkAsset;
+    final pool = endlessAttackAssets(run.enemy, run.cutCount);
+    return pool[run.enemyAttackSerial % pool.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -292,12 +317,18 @@ class _EndlessScene extends StatelessWidget {
                   height: 190,
                   child: PixelSprite(
                     key: const ValueKey('endless-monster'),
-                    asset: run.enemy.walkAsset,
+                    asset: _monsterAsset(run),
                     // Güçlenmenin görsel karşılığı. Taban macerayla aynı
                     // oran; üstüne kesim ölçeği biniyor.
                     scale: 2.4 * run.spriteScale,
                     offset: const Offset(-8, 0),
-                    imageKey: ValueKey('endless-cut-${run.cutSerial}'),
+                    // Macerayla aynı desen: durum değişince GIF baştan
+                    // oynasın diye anahtar duruma bağlı.
+                    imageKey: ValueKey(
+                      run.lastEnemyDamage > 0
+                          ? 'endless-attack-${run.enemyAttackSerial}'
+                          : 'endless-cut-${run.cutSerial}',
+                    ),
                   ),
                 ),
               ],

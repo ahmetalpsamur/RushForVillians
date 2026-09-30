@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../../models/enemy.dart';
 import '../constants/game_constants.dart';
 
 /// Sonsuz Koşu modunun **saf** kuralları (Bölüm C / Faz 3).
@@ -124,3 +125,19 @@ Duration endlessCutDuration(int cutCount) => Duration(
 /// bankayı büyütür, eşyanın kalitesini değil.
 int endlessDropTierFor(int cutCount) =>
     (1 + cutCount ~/ 2).clamp(1, GameConstants.endlessMaxDropTier);
+
+/// Kesim *n*'de kullanılabilecek saldırı animasyonları.
+///
+/// Erken kesimlerde katalogdaki `Attack01-03`;
+/// [GameConstants.endlessBeamUnlockCut]'tan sonra havuza **Beam** de
+/// katılıyor. Yeni bir gösterim yazılmadı — seçim, `GifTiming.cycle` ve
+/// `imageKey` mantığı normal maceradakiyle aynı.
+List<String> endlessAttackAssets(Enemy enemy, int cutCount) {
+  if (cutCount < GameConstants.endlessBeamUnlockCut) return enemy.attackAssets;
+  final beam = enemy.attackAssets.first.replaceFirst(
+    RegExp(r'_Attack\d+\.gif$'),
+    '_Beam.gif',
+  );
+  if (beam == enemy.attackAssets.first) return enemy.attackAssets;
+  return [...enemy.attackAssets, beam];
+}

@@ -118,6 +118,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get endlessTitle => 'Sonsuz Koşu';
 
   @override
+  String get endlessSafeWhileWalking =>
+      'Yürüdüğün sürece güvendesin. Durursan canavar vurmaya başlar, ve her kesimde daha sert vurur.';
+
+  @override
   String get endlessSubtitle =>
       'Yürüdükçe çarpan büyür. Ne zaman duracağına sen karar verirsin.';
 
