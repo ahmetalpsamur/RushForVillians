@@ -192,37 +192,42 @@ class GameConstants {
   /// 20 rounda bölerdi.
   static const int maxCombatRounds = 10;
 
-  /// Düşman canının adım ölçeği: **kaç adımlık taahhüt bir "round payı"
-  /// hasar eder** (GD100).
+  /// Düşmanın canı, **planlanan round sayısının** ne kadarına denk hasar
+  /// kadar (GD100).
   ///
-  /// `enemyBaseStatsForGoal` canı `stepGoal / enemyHealthStepsPerRound` ile
-  /// kuruyor, yani can hedefin **adım taahhüdüyle** birlikte kesin artıyor.
-  /// Bir dönem can maceranın planlanan **round sayısından** geliyordu; tempo
-  /// tablosu round sayısını hedefte monoton yapmadığı için 3.000 hedefinin
-  /// düşmanı 2.000'inkinden zayıf çıkıyordu (ödülü ×2,0 vs ×1,4 olmasına
-  /// rağmen) — 2.000'i seçmek için sebep kalmamıştı.
+  /// `enemyBaseStatsForGoal` canı `plananRound × enemyHealthRoundShare` ile
+  /// kuruyor. Sonuç: **yük oranı hedeften bağımsız** — her hedefte oyuncu
+  /// taahhüdünün aynı oranında düşmanı deviriyor.
   ///
-  /// ## Değer nasıl seçildi
+  /// ## Neden adım taahhüdü değil
   ///
-  /// **Yük oranı** = düşman canı / (ölçüt oyuncunun round başına hasarı
-  /// × planlanan round). Hedef bant: **çıplak 0,90–1,00** (zor bitirsin ama
-  /// bitirsin) ve **ekipmanlı 0,60–0,85** (savaş maceranın büyük kısmını
-  /// kaplasın, yürüyüş fazı bir ödül olsun).
+  /// Bir dönem can doğrudan `stepGoal / sabit` ile kuruluyordu ve **ham can
+  /// hedefte monotondu**. Ama yük oranı `roundBoyu / (sabit × hasar)`
+  /// olduğu için yalnızca **round boyuna** bağlıydı; [combatRoundPacing]
+  /// iki round boyu taşıdığından (500 ve 1.000) iki bandin yükü tanımı
+  /// gereği **1:2** oluyordu. Ölçüldü: 3.000+ hedeflerde ekipmanlı yük
+  /// 0,68 iken 3.000'in altında 0,34 — alt bantta çıplak oyuncu bile tek
+  /// roundda deviriyordu. Tek bir sabitle ikisini birden banda sokmak
+  /// matematiksel olarak imkânsızdı.
   ///
-  /// 1.600 ile 3.000+ hedeflerde **ikisi de tutuyor**: çıplak 0,91,
-  /// ekipmanlı 0,68. 20 düşman × 6 hedef = 120 kombinasyonda taşma 0.
+  /// **Seçim: eşit zorluk kazandı, ham can monotonluğu düştü** (GD107).
+  /// 3.000 hedefinin düşmanı 2.000'inkinden daha **az cana** sahip
+  /// olabiliyor — çünkü oyuncunun da daha az roundu var (3 vs 4).
+  /// Göreceli zorluk aynı. Ham canın kendisi bir oyuncu deneyimi değil;
+  /// oyuncunun hissettiği şey "taahhüdümün ne kadarında bitirdim".
   ///
-  /// ⚠️ **3.000'in altındaki hedefler bandin yarısında kalıyor** (çıplak
-  /// 0,45 · ekipmanlı 0,34) ve bu **tek bir sabitle düzeltilemez**. Sebep
-  /// [combatRoundPacing]'in kendisi: yük oranı `stepGoal / plananRound`
-  /// ile doğru orantılı ve bu değer tam olarak **round boyuna** eşit —
-  /// alt bantta 500, üst bantta 1.000. Yani iki bandin yükü tanımı gereği
-  /// **1:2**. Alt bandi banda oturtan değer (≈800) üst bandi 1,8'e
-  /// çıkarır ve oyuncu taahhüdünden fazla yürür.
+  /// Yerine geçen değişmez **dominans yokluğu**: aynı oyun kalitesinde
+  /// daha büyük hedef hem daha kolay hem daha çok ödüllü olamaz.
+  /// `combat_balance_test` bunu balıyor.
   ///
-  /// İkinci bir çarpan **icat edilmedi**: tek sabit kalması bilinçli.
-  /// `combat_balance_test` hem bandi hem taşmayı balıyor.
-  static const int enemyHealthStepsPerRound = 1600;
+  /// ## Değer
+  ///
+  /// Hedef: **ekipmanlı oyuncu planlanan roundların yaklaşık üçte
+  /// ikisinde bitirsin** — savaş maceranın büyük kısmını kaplasın, geriye
+  /// anlamlı bir bonus yürüyüş kalsın (GD104'ün 20 adım/altın oranı tam
+  /// olarak bunun karşılığı). Tek roundda bitmesin, son rounda da
+  /// kalmasın.
+  static const double enemyHealthRoundShare = 0.65;
 
   /// Eksik round hasar eğrisinin üssü.
   ///

@@ -9,7 +9,9 @@ import '../models/avatar_profile.dart';
 import '../models/adventure_quest.dart';
 import '../models/collection_reward.dart';
 import '../models/enemy.dart';
+import '../data/mail_catalog.dart';
 import '../models/game_title.dart';
+import '../models/mail_message.dart';
 import '../models/item.dart';
 import '../models/item_effect.dart';
 import '../models/reward_rarity.dart';
@@ -171,6 +173,7 @@ extension ContentLocalizations on AppLocalizations {
     ItemStat.dodge => statDodge,
     ItemStat.speed => statSpeed,
     ItemStat.luck => statLuck,
+    ItemStat.shopDiscount => 'shop discount',
     ItemStat.stepCoin => statStepCoin,
     ItemStat.stepXp => statStepXp,
     ItemStat.wheelXp => statWheelXp,
@@ -269,11 +272,42 @@ extension ContentLocalizations on AppLocalizations {
         MergeBlock.coins => coinsRequired(quote.cost),
       };
 
+  /// Postanın başlığı — kimlikten çözülür.
+  ///
+  /// Düşman, ünvan ve rehber metinleriyle **aynı desen** (Faz 3): katalog
+  /// yalnızca kalıcı kimliği taşır, metin ARB'den gelir. Bilinmeyen bir
+  /// kimlik (eski kayıt ya da ileride sunucudan gelen yeni posta) sessizce
+  /// kimliğin kendisine düşmez — jenerik bir başlık alır, yani ekran
+  /// hiçbir zaman ham `mail_...` kimliği göstermez.
+  String mailTitle(String id) => switch (id) {
+    MailCatalog.closedBetaThanksId => mailClosedBetaThanksTitle,
+    MailCatalog.heroesCodeRewardId => mailCodeWeNeedHeroesTitle,
+    _ => mailboxTitle,
+  };
+
+  /// Postanın gövdesi — kimlikten çözülür.
+  String mailBody(String id) => switch (id) {
+    MailCatalog.closedBetaThanksId => mailClosedBetaThanksBody,
+    MailCatalog.heroesCodeRewardId => mailCodeWeNeedHeroesBody,
+    _ => '',
+  };
+
+  /// Kod girme sonucunun kullanıcıya dönük mesajı. Her durum **ayrı**.
+  String codeResultMessage(CodeRedemptionResult result) => switch (result) {
+    CodeRedemptionResult.success => codeSuccess,
+    CodeRedemptionResult.invalid => codeErrorInvalid,
+    CodeRedemptionResult.alreadyUsed => codeErrorAlreadyUsed,
+    CodeRedemptionResult.expired => codeErrorExpired,
+    CodeRedemptionResult.empty => codeErrorEmpty,
+    CodeRedemptionResult.throttled => codeErrorThrottled,
+  };
+
   String titleSourceName(TitleSource source) => switch (source) {
     TitleSource.purchase => titleSourcePurchase,
     TitleSource.achievement => titleSourceAchievement,
     TitleSource.wheel => titleSourceWheel,
     TitleSource.milestone => titleSourceMilestone,
+    TitleSource.mail => titleSourceMail,
   };
 
   /// English asset IDs are stable and already curated, so they provide a
@@ -319,6 +353,7 @@ extension ContentLocalizations on AppLocalizations {
       TitleSource.achievement => titleLoreAchievement(name),
       TitleSource.wheel => titleLoreWheel(name),
       TitleSource.milestone => titleLoreMilestone(name),
+      TitleSource.mail => titleLoreMail,
     };
   }
 
@@ -328,6 +363,7 @@ extension ContentLocalizations on AppLocalizations {
       TitleSource.purchase => titleUnlockPurchase(title.cost),
       TitleSource.wheel => titleUnlockWheel,
       TitleSource.milestone => titleUnlockMilestone(title.milestoneDay),
+      TitleSource.mail => titleUnlockMail,
       TitleSource.achievement =>
         title.condition == null
             ? titleUnlockPlaying

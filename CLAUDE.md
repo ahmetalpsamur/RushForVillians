@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD106)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD108)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -109,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v29 + migration | Firebase |
+| Yerel kalıcılık, şema v31 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -1895,6 +1895,89 @@ bulanıklaşmıyor, pikselleşiyor.
 | Çark | ❌ — kesim "günün ilk zaferi" değil (GD97) |
 | `enemiesDefeated` · `flawlessWins` · `currentWinStreak` · `villainDefeatCounts` | ❌ (GD97) |
 
+## 6.18 Posta kutusu ve kodlar
+
+`models/mail_message.dart` + `data/mail_catalog.dart` +
+`features/mail/mailbox_screen.dart`.
+
+**Yalnızca bizim gönderdiklerimiz.** Telafi ödülü, teşekkür ödülü,
+duyuru ve kod ödülü. Macera zaferi, çark, eşya düşmesi ve başarım
+ünvanları **bugünkü yerlerinde** kalır — onları buraya taşımak oyuncuyu
+her ödül için ikinci bir ekrana gönderirdi.
+
+### Firebase'siz ama Firebase'e hazır
+
+| Katman | Bugün | Firebase gelince |
+|---|---|---|
+| İçerik | `MailCatalog.all` (sabit veri) | Aynı şekilli liste sunucudan |
+| Metin | Kimlikten çözülüyor (`l10n.mailTitle/mailBody`) | Değişmez |
+| Oyuncu durumu | `UserProfile.claimedMailIds` vb. | `GameState.toJson()` zaten bir doküman (§7) |
+
+Değişmesi gereken tek şey **listenin kaynağı**. Model, kalıcı alanlar ve
+ekran olduğu gibi kalır. Üç kural bunu mümkün kılıyor:
+1. `MailMessage.id` kalıcı ve asla değişmez (§10 #6),
+2. metin modelde **taşınmıyor** — düşman/ünvan kataloglarıyla aynı desen,
+3. ödül düz `int`/`String` (Model Kuralları #1 temiz).
+
+### İki kez alma koruması
+
+`UserProfile.claimMail(id)` kimliği **ödülden önce** işaretler ve ikisi
+aynı `setState` içinde, aynı `_persist()` turunda diske gider. Yarım kalan
+bir alım ne ödülü kaybeder ne iki kez verir: kayıt ya ikisini birden
+taşır ya hiçbirini.
+
+Ana sayfadaki rozet **"alınmamış ödül"** sayısını gösterir, "okunmamış
+posta" değil: bir duyuru oyuncuyu ekrana çağırmamalı.
+
+⚠️ **Çark hakkı ödülü stok tavanını aşıyor.** Mağazadan alınan jeton
+`grantExtraWheelSpin` ile tavana kırpılıyor ama posta ödülü kırpılmıyor —
+bizim gönderdiğimiz bir ödül sessizce eksilmemeli.
+
+### Kodlar
+
+`WENEEDHEROES2026` → 1.000 altın + 5 çark hakkı. Süresiz (`expiresAt`
+bilerek boş).
+
+- **Büyük/küçük harf duyarsız, boşluklar temizlenir**:
+  `MailCatalog.canonicalize` hem aramada hem kayıtta kullanılıyor, yoksa
+  aynı kod iki farklı yazımla iki kez kullanılabilirdi.
+- **Kod doğrudan ödül vermez, bir posta açar.** Böylece ödül dağıtımının
+  **tek yolu** posta kutusu olur ve "iki kez verme" koruması tek yerde
+  kalır. İki ayrı yol olsaydı korumayı da iki kez yazmak gerekirdi.
+- Altı sonuç durumunun hepsi **ayrı** mesaj alır (geçerli, geçersiz, zaten
+  kullanılmış, süresi dolmuş, boş, yavaşlatıldı).
+- **Yavaşlatma**: 10 dakikalık pencerede 5 yanlış deneme. Doğru kod
+  sayacı sıfırlıyor — doğru kod giren oyuncu cezalanmaz.
+
+### ⚠️ Güvenlik — kodlar APK'nın içinde
+
+`MailCatalog.codes` derlenmiş uygulamanın içinde duruyor. **APK'yı açan
+biri bütün kodları görebilir.** Kapalı beta için kabul edilebilir: kod
+başına ödül sabit, oyuncu başına bir kez ve ödül ekonomiyi bozacak
+büyüklükte değil.
+
+**Firebase geldiğinde kod doğrulaması sunucuya taşınmalı** (§13): istemci
+yalnızca kodu gönderir, sunucu geçerliliğini ve kullanım sayısını
+doğrular, postayı sunucu açar. O zamana kadar buradaki yavaşlatma kaba
+kuvvetle kod aramayı yalnızca **sıkıcı** hale getirir, imkânsız değil.
+
+### Kapalı Beta ünvanı
+
+`title_closed_beta` — **yalnızca postadan**. `TitleSource.mail` yeni bir
+kaynak değeri: mağazada satilmaz, çarktan çıkmaz, başarımla kazanılmaz.
+"Mağaza" deyip fiyatı 0 bırakmak onu rafa götürürdü.
+
+Etkisi **yeni bir stat**: `ItemStat.shopDiscount` (+%25). Ne [isCombat] ne
+[isEconomyRate] — kazancı büyütmüyor, harcamayı küçültüyor. Bu yüzden
+`maxTitleEconomyBonus` / `maxEquippedEconomyBonus` tavanlarına girmiyor
+(onlar adım kazancı için ölçülmüştü) ve seri bonusu havuzunda da yok
+(GD65). Faz 4 kuralı korunuyor: **`stepCoin` ve `stepXp` taşımıyor.**
+
+⚠️ **İndirimin tetikleyicisi henüz bağlanmadı.** Etki katalogda tanımlı
+ama "ne kadar süre açık kalır, tek alışverişlik mi" kararı kullanıcıya
+soruldu (Bölüm D / Faz 3, İş 3). Karar gelince uygulama noktası
+yazılacak.
+
 ## 6.14 Taverna
 
 `features/team/team_screen.dart`. Eski "Takım" sekmesinin yeni adı
@@ -2056,9 +2139,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v29**
+## Şema — **güncel sürüm v31**
 
-`GameStorage.schemaVersion = 29` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 31` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -2084,6 +2167,8 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 26 → 27 | Zaferden garanti eşya düşmesi (`droppedItemId`, `droppedItemInstanceId`). Bitmiş maceraya geriye dönük eşya verilmiyor |
 | 27 → 28 | Sonsuz Koşu (`endlessRun`). Eski kayıtta `null` — hiç başlamamış koşu |
 | 28 → 29 | Tempo tablosu ve düşman canının kaynağı değişti; yarım maceranın `enemyHealth`'i **harcanan adım oranından** yeni tavana taşınıyor (v13 ile aynı desen) |
+| 29 → 30 | Can artık **planlanan round sayısıyla** orantılı (GD107); aynı yeniden-çapalama (`_reanchorEnemyHealth`) |
+| 30 → 31 | Posta kutusu ve kodlar (`claimedMailIds`, `readMailIds`, `pendingMailIds`, `redeemedCodes`, `codeAttempts`). Eski kayıtta boş liste — hiç posta alınmamış, hiç kod girilmemiş |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,
@@ -2099,6 +2184,7 @@ Seviye, XP, coin, `lifetimeCoins`, seri (`streakDays`, `lastActiveDay`,
 `longestStreak`, `streakFreezes`, `lastFreezeUsedOn`), seri stat birikimi ve
 tohumu, `totalSteps` ve üç adım işaretçisi, ham sensör okuması, `lastSeenAt`,
 envanter (`ownedItems` — örnek başına seviye/nadirlik/kuşanma),
+posta kutusu (`claimedMailIds`, `readMailIds`, `pendingMailIds`, `redeemedCodes`, kod deneme sayacı),
 `ownedUpgradeIds`, `nextItemInstanceId`, ünvanlar (`ownedTitleIds`,
 `equippedTitleId`), çark (`lastWheelSpinAt`, `extraWheelSpins`, `wheelSeed`),
 `xpBoostUntil`, eğitim durumu ve rehber seçimi, `petCompanionEnabled`, başarım
@@ -2155,7 +2241,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**999 test** (`flutter test`), bunların **955'i yeşil**. Test, bu projede
+**1.022 test** (`flutter test`), bunların **975'i yeşil**. Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2174,6 +2260,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Kalıcılık ve açılış | `game_storage_test`, `app_boot_test` |
 | Ekonomi ölçümü | `economy_pacing_test` |
 | Round geri bildirimi | `round_outcome_test` |
+| Posta kutusu ve kodlar | `mailbox_test` — iki kez alma, yarım alma, şema göçü, kod durumları, yavaşlatma |
 | Sonsuz Koşu ekranı | `endless_screen_test` — paylaşılan HUD, navigasyon kilidi, gizli sayaç, iki dilde 320/390 golden |
 | Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
 | Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü), **düşen eşya kartı** (TR/EN × 320/390), **para yağmuru** (320/390) |
@@ -2237,7 +2324,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD106)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD108)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2348,6 +2435,8 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD101 | Güç çarpanı yalnızca **saldırıya** uygulanıyor, cana değil | GD100'den sonra hedef cana iki kez giriyordu (bir kez adım taahhüdüyle, bir kez çarpanla) ve yük oranı 500→10.000 arasında **4,8 kat** açılıyordu: tek bir `enemyHealthStepsPerRound` değeri ya kısa hedefleri olaysız bırakıyor ya uzun hedefleri planlanan rounda sığdıramıyordu. Ayrışma temiz: **can = ne kadar sürer**, **saldırı = kaçırırsan ne kadar acır**. `scaleEnemyCombatStats` yardımcısı değişmedi, değişen çağrı noktası |
 | GD102 | Round sonucu **tek** bir bildirimde: hasar + kalan can + (varsa) mükemmel round; süre 7 sn; zafer/yenilgide hiç gösterilmiyor | Round süresi dolarak kazanıldığında oyuncu hiçbir şey görmüyordu — sahnedeki hasar sayısı yalnızca macera ekranı açıkken oynuyor. İki ayrı SnackBar kuyruğa girip birbirini kapatırdı (GD46). 7 sn keyfi değil: yürüyen oyuncunun telefonu cebinden çıkarması varsayılan 4 sn'yi aşıyor |
 | GD104 | Yürüyüş fazı oranı 30 → **20** adım/coin (normalin ×2,5'i) | Yük oranı banda çekilince (GD100/GD101) erken devirmek gerçek bir ekipman yatırımı istemeye başladı; karşılığında açılan faz da büyüdüğü için oranın büyümesi gerekiyordu — yoksa "erken bitir" ödülü uzun ama zayıf bir sayaca dönüşüyordu. Kazanım yapısal olarak sınırlı: faz en fazla `stepGoal` adım sürüyor, üst sınır `stepGoal / 20` (GD58) |
+| GD107 | Düşman canı **planlanan round sayısıyla** orantılı; ham canın hedefte monoton olması değişmezi **kaldırıldı**, yerine "dominans yok" geldi | Yük oranı `roundBoyu / (sabit × hasar)` olduğu için yalnızca round boyuna bağlıydı; tempo tablosu iki round boyu taşıdığından (500 ve 1.000) iki bandin yükü tanımı gereği **1:2** oluyordu — ölçüldü: 3.000+ hedeflerde ekipmanlı 0,68, altında 0,34 ve çıplak oyuncu bile tek roundda deviriyordu. Tek sabitle ikisini birden banda sokmak imkânsızdı. **Eşit zorluk kazandı**: 3.000'in düşmanı 2.000'inkinden daha az **cana** sahip olabilir çünkü oyuncunun da daha az roundu var. Ham can bir oyuncu deneyimi değil; hissedilen şey "taahhüdümün ne kadarında bitirdim" |
+| GD108 | Posta kutusu **tek ödül dağıtım yolu**; kod doğrudan ödül vermez, posta açar | İki ayrı dağıtım yolu olsaydı "iki kez verme" korumasını da iki kez yazmak gerekirdi. Kod karşılığı posta ayrıca oyuncuya **ne kazandığını okutuyor**: doğrudan verilen bir ödül tek bir SnackBar olurdu ve kaybolurdu |
 | GD106 | Sonsuz Koşu normal macerayla **aynı** savaş ekranını kullanıyor; geri sayan süre yalnızca bu modda **gizli** | İki mod aynı oyunun aynı fiili; ayrı tasarım dili öğrenilmiş her şeyi ikinci kez öğrenmek demekti. Paylaşılan parçalar `widgets/combat_hud.dart`'a **taşındı**, kopyalanmadı — `ValueKey`'ler korunduğu için macera testleri etkilenmedi. Sayaç gizli çünkü bu modun varlık sebebi telefona **bakmamak** (§6.17): geri sayan bir rakam oyuncuyu ekrana bağlar. Mantık aynen duruyor, süresi dolan round hâlâ canavara vurduruyor — oyuncu bunu **sonucundan** anlıyor, sayaçtan değil |
 | GD105 | Yürüyüş fazında **para yağmuru**; dağıtım `stableSpread` değil düşük tutarsızlık dizisi | Bonuslu oran görünür olmalı (GD56 ile aynı fikir). `stableSpread` kalıcı kimlikler için yazıldı; `'rain-x-0'`…`'rain-x-11'` gibi yoğun bir indeks dizisinde dağıtmıyor ve 12 paranın onu aynı noktaya yığılıyordu. Altın oranın kesirli kısmı hem daha basit hem bu iş için daha doğru. Yedek görsel `Icon` değil **çizilen disk** ve `frameBuilder` ile yükleme sırasında da gösteriliyor — çözülmemiş bir `Image` boşluk çiziyor ve golden sessizce boş çıkıyordu |
 | GD103 | Düşen eşya tek bir paylaşılan bileşenle gösteriliyor (`DroppedItemCard`); macera zaferi ve Sonsuz Koşu aynı dili kullanıyor | Garanti ödül (GD93) hiçbir ekranda görünmüyordu; sonsuz koşuda ise ham asset kimliği basılıyordu. İki ayrı kart yazmak aynı ödülü iki farklı şey gibi gösterirdi. Katalogda olmayan kimlikte kart **hiçbir şey çizmiyor**: uydurma ad göstermektense susmak yeğ |
@@ -2370,13 +2459,13 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-Bölüm D / Faz 2 sonunda `flutter test` → **955 başarılı, 44 başarısız.**
+Bölüm D / Faz 3 sonunda `flutter test` → **975 başarılı, 47 başarısız.**
 
-44'ün **tamamı Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
-testi kırmadı. Faz 1 sonunda 47 görünüyordu: ikisi `character_creation_test`
-golden'ı, biri `adventure_progress_test`'in sıra bağımlı testi. Üçü de
-kararsız — değişiklikler `git stash` ile geri alınınca da kırmızıydılar — ve
-Faz 2 ölçümünde kendiliğinden yeşile döndüler.
+47'nin **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
+testi kırmadı. Kalan üçü **kararsız**: `character_creation_test` golden'ı (2)
+ve `adventure_progress_test`'in sıra bağımlı testi (1). Üçü de Bölüm D'nin
+değişiklikleri `git stash` ile geri alınınca da kırmızı; Faz 2 ölçümünde
+kendiliğinden yeşile dönmüş, Faz 3'te yine kırmızılar. **Dokunulmadı.**
 
 ⚠️ `victory_scene_390.png` golden'ı (yukarıdaki 44'ün içinde) **zaten
 kırmızıydı** ve zafer perdesine düşen eşya kartı eklendiği için farkı

@@ -27,7 +27,10 @@ import '../../core/utils/streak_bonus.dart';
 import '../../core/utils/title_rules.dart';
 import '../../core/utils/wheel_rewards.dart';
 import '../../core/utils/xp_calculator.dart';
+import '../../data/mail_catalog.dart';
+import '../../features/mail/mailbox_screen.dart';
 import '../../l10n/l10n_context.dart';
+import '../../models/mail_message.dart';
 import '../../l10n/content_localizations.dart';
 import '../../data/enemy_catalog.dart';
 import '../../data/mock_data.dart';
@@ -2614,6 +2617,121 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
+  // --- Posta kutusu (Bölüm D / Faz 3) ---
+
+  /// Oyuncunun görebileceği postalar, **yeniden eskiye**.
+  ///
+  /// Herkese açık postalar katalogdan doğrudan gelir; `deliveredToEveryone`
+  /// olmayanlar yalnızca oyuncuya açılmışsa (kod karşılığı) listelenir.
+  /// Süresi dolmuş posta hiç gösterilmez.
+  List<MailMessage> get _visibleMail {
+    final now = GameClock.now();
+    final list = MailCatalog.all
+        .where(
+          (mail) =>
+              mail.isAvailableAt(now) &&
+              (mail.deliveredToEveryone ||
+                  _profile.pendingMailIds.contains(mail.id)),
+        )
+        .toList()
+      ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
+    return list;
+  }
+
+  /// Alınmayı bekleyen **ödüllü** posta sayısı.
+  int get _unclaimedMailCount => _visibleMail
+      .where((mail) => mail.hasReward && !_profile.hasClaimedMail(mail.id))
+      .length;
+
+  /// Postanın ödülünü **bir kez** dağıtır.
+  ///
+  /// `claimMail` kimliği ödülden önce işaretliyor ve ikisi aynı
+  /// `setState` içinde, aynı `_persist()` turunda diske gidiyor — yarım
+  /// kalan bir alım ne ödülü kaybeder ne iki kez verir.
+  void _claimMail(MailMessage mail) {
+    if (_profile.hasClaimedMail(mail.id)) return;
+    setState(() {
+      if (!_profile.claimMail(mail.id)) return;
+      final reward = mail.reward;
+      if (reward.coins > 0) {
+        _profile.coins += reward.coins;
+        _profile.lifetimeCoins += reward.coins;
+      }
+      if (reward.wheelSpins > 0) {
+        // Stok tavanı kuşanmadan gelebilir; posta ödülü tavana sığığı
+        // kadarını verir ve kalanı **yakmaz** diye tavan aşılıyor:
+        // bizim gönderdiğimiz bir ödül sessizce kırpılmamalı.
+        _profile.extraWheelSpins += reward.wheelSpins;
+      }
+      if (reward.titleId case final id?) {
+        _profile.grantTitle(id);
+        _refreshEquipment();
+      }
+    });
+    _persist();
+    _revision.value++;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(context.l10n.mailClaimedNotice)),
+      );
+  }
+
+  void _markMailRead(MailMessage mail) {
+    if (_profile.hasReadMail(mail.id)) return;
+    setState(() => _profile.markMailRead(mail.id));
+    _persist();
+  }
+
+  /// Kod dener. Ödül **doğrudan verilmez**: posta açılır, oyuncu oradan
+  /// alır. Böylece ödül dağıtımının tek yolu posta kutusu olur ve
+  /// "iki kez verme" koruması tek yerde kalır.
+  CodeRedemptionResult _redeemCode(String input) {
+    final now = GameClock.now();
+    if (_profile.isCodeEntryThrottled(now)) {
+      return CodeRedemptionResult.throttled;
+    }
+    final canonical = MailCatalog.canonicalize(input);
+    if (canonical.isEmpty) return CodeRedemptionResult.empty;
+
+    final code = MailCatalog.findCode(canonical);
+    if (code == null) {
+      setState(() => _profile.registerFailedCodeAttempt(now));
+      _persist();
+      return CodeRedemptionResult.invalid;
+    }
+    if (_profile.hasRedeemedCode(code.code)) {
+      return CodeRedemptionResult.alreadyUsed;
+    }
+    if (!code.isActiveAt(now)) return CodeRedemptionResult.expired;
+
+    setState(() {
+      _profile.markCodeRedeemed(code.code);
+      _profile.unlockMail(code.mailId);
+      _profile.resetCodeAttempts();
+    });
+    _persist();
+    _revision.value++;
+    return CodeRedemptionResult.success;
+  }
+
+  void _openMailbox() {
+    _push(
+      ValueListenableBuilder<int>(
+        valueListenable: _revision,
+        // GD27: itilen ekran veri tutmaz, her çizimde buradan okur.
+        builder: (context, _, _) => MailboxScreen(
+          messages: _visibleMail,
+          claimedIds: _profile.claimedMailIds.toSet(),
+          onClaim: _claimMail,
+          onRead: _markMailRead,
+          onRedeemCode: _redeemCode,
+        ),
+      ),
+    );
+  }
+
   void _openAdventure() => _selectTab(1);
 
   void _openWheel() {
@@ -2726,6 +2844,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenAdventure: _openAdventure,
         onOpenWheel: _openWheel,
         onOpenRewards: _openRewards,
+        onOpenMailbox: _openMailbox,
+        unclaimedMailCount: _unclaimedMailCount,
         onOpenStore: _openStore,
         onOpenInventory: _openInventory,
         onSimulateSteps: _simulateSteps,

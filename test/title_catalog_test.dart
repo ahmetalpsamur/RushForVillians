@@ -75,6 +75,9 @@ void main() {
           case TitleSource.milestone:
             expect(title.milestoneDay, greaterThan(0), reason: title.id);
           case TitleSource.wheel:
+          // Posta ünvanının dolduracağı bir koşul alanı yok: tek kaynağı
+          // `MailCatalog` ve oradaki kimlikle geliyor.
+          case TitleSource.mail:
             break;
         }
       }

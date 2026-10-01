@@ -49,6 +49,30 @@ abstract final class TitleCatalog {
         ),
       ],
     ),
+    // ---------------------------------------------------------------
+    // POSTA — yalnızca posta kutusundan gelir (Bölüm D / Faz 3)
+    // ---------------------------------------------------------------
+    GameTitle(
+      id: 'title_closed_beta',
+      name: 'Kapalı Beta',
+      lore: 'Oyun henüz yarımıken yanındaydın.',
+      rarity: RewardRarity.legendary,
+      source: TitleSource.mail,
+      effects: [
+        ItemEffect(
+          stat: ItemStat.shopDiscount,
+          value: 0.25,
+          // ⚠️ Tetikleyici **henüz bağlanmadı**: indirimin ne kadar açık
+          // kalacağı kullanıcıya soruldu (Bölüm D / Faz 3, İş 3).
+          // Etki tanımlı ve katalogda duruyor; uygulama noktası karar
+          // geldikten sonra yazılacak.
+          customLabel: 'bir macera tamamlayınca mağazada indirim %25',
+          customLabelEn:
+              'after you finish an adventure, 25% off in the shop',
+          trigger: ItemEffectTrigger.streakActive,
+        ),
+      ],
+    ),
     GameTitle(
       id: 'night_walker',
       name: 'Gece Yürüyüşçüsü',

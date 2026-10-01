@@ -465,6 +465,7 @@ class _FilterBar extends StatelessWidget {
                     TitleSource.purchase => context.l10n.sourceStore,
                     TitleSource.wheel => context.l10n.sourceWheel,
                     TitleSource.milestone => context.l10n.sourceMilestone,
+                    TitleSource.mail => context.l10n.sourceMail,
                   }),
                   selected: source == value,
                   onSelected: (_) => onSource(value),

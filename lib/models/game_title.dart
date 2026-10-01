@@ -18,6 +18,14 @@ enum TitleSource {
 
   /// Seri kilometre taşında verilir.
   milestone,
+
+  /// Yalnızca posta kutusundan gelir (Bölüm D / Faz 3).
+  ///
+  /// Mağazada satilmaz, çarktan çıkmaz, başarımla kazanılmaz. Kaynak
+  /// enum'una ayrı bir değer olarak eklendi çünkü ünvan ekranının
+  /// süzgeci ve çarkın havuzu bu alana bakıyor — "mağaza" deyip fiyatı
+  /// 0 bırakmak onu raf a götürürdü.
+  mail,
 }
 
 /// Başarım ünvanlarının baktığı sayaç.
@@ -143,6 +151,7 @@ class GameTitle {
           : '${condition!.describe(conditionThreshold)}.',
     TitleSource.wheel => 'Günlük çarktan çıkabilir.',
     TitleSource.milestone => '$milestoneDay günlük seri kilometre taşı ödülü.',
+    TitleSource.mail => 'Posta kutusundan gelir.',
   };
 
   /// Kaynağın kısa etiketi. Ünvan listesinde rozet olarak görünür.
@@ -151,5 +160,6 @@ class GameTitle {
     TitleSource.achievement => 'Başarım',
     TitleSource.wheel => 'Çark',
     TitleSource.milestone => 'Kilometre taşı',
+    TitleSource.mail => 'Posta',
   };
 }

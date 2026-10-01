@@ -39,6 +39,16 @@ enum ItemStat {
   streakFreezeCap,
   wheelSpinCap,
   streakRelief,
+
+  /// Mağazada indirim oranı (Bölüm D / Faz 3).
+  ///
+  /// ⚠️ **Adım başına kazanca hiç dokunmaz** — [stepCoin] ve [stepXp]'den
+  /// ayrı bir eksen. Bu yüzden [isEconomyRate] **değil**: kazancı
+  /// büyütmez, harcamayı küçültür; `maxTitleEconomyBonus` ve
+  /// `maxEquippedEconomyBonus` tavanları ona göre ölçülmüş ve bu statla
+  /// ilgisi yok. [isCombat] de değil, yani seri bonusu havuzuna
+  /// girmiyor (GD65).
+  shopDiscount,
 }
 
 extension ItemStatX on ItemStat {
@@ -52,6 +62,7 @@ extension ItemStatX on ItemStat {
     ItemStat.dodge => 'sıyrılma',
     ItemStat.speed => 'hız',
     ItemStat.luck => 'şans',
+    ItemStat.shopDiscount => 'mağaza indirimi',
     ItemStat.stepCoin => 'adım parası',
     ItemStat.stepXp => 'adım XP',
     ItemStat.wheelXp => 'çark XP',

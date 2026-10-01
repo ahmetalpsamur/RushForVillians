@@ -196,6 +196,35 @@ class UserProfile {
 
   List<String> ownedTitleIds;
 
+  // --- Posta kutusu (Bölüm D / Faz 3) ---
+
+  /// Ödülü **alınmış** postaların kimlikleri.
+  ///
+  /// Bir postanın iki kez alınmasını engelleyen tek kayıt bu.
+  /// `claimMail` kimliği ödülü vermeden **önce** ekliyor ve ikisi aynı
+  /// `GameState` yazımında diske gidiyor; uygulama arada kapanırsa ya ikisi
+  /// birden yazılmış olur ya hiçbiri.
+  List<String> claimedMailIds;
+
+  /// Açılıp okunmuş postalar. Ana sayfadaki işaret bunlara bakmıyor —
+  /// işaret **alınmamış ödül** demek, okunmamış duyuru değil.
+  List<String> readMailIds;
+
+  /// Yalnızca bu oyuncuya açılmış postalar (kod karşılığı).
+  ///
+  /// Katalogdaki `deliveredToEveryone: false` postalar yalnızca burada
+  /// kimliği varsa listelenir.
+  List<String> pendingMailIds;
+
+  /// Kullanılmış kodların **kanonik** (büyük harf) yazımı.
+  List<String> redeemedCodes;
+
+  /// Yavaşlatma penceresindeki başarısız deneme sayısı.
+  int codeAttempts;
+
+  /// Yavaşlatma penceresinin başlangıcı (UTC).
+  DateTime? codeAttemptWindowStart;
+
   /// Şu an takılı ünvanın kimliği. `null` = hiçbiri takılı değil.
   ///
   /// **Tek ünvan kuralı veri düzeyinde:** tek bir alan olduğu için iki ünvan
@@ -279,6 +308,12 @@ class UserProfile {
     this.tutorialGuideId = 'mavili',
     this.tutorialStarterItemId,
     List<String>? ownedTitleIds,
+    List<String>? claimedMailIds,
+    List<String>? readMailIds,
+    List<String>? pendingMailIds,
+    List<String>? redeemedCodes,
+    this.codeAttempts = 0,
+    this.codeAttemptWindowStart,
     this.equippedTitleId,
     this.petCompanionEnabled = true,
     this.enemiesDefeated = 0,
@@ -302,6 +337,10 @@ class UserProfile {
        ownedItems = ownedItems ?? <OwnedItem>[],
        ownedUpgradeIds = ownedUpgradeIds ?? <String>[],
        ownedTitleIds = ownedTitleIds ?? <String>[],
+       claimedMailIds = claimedMailIds ?? <String>[],
+       readMailIds = readMailIds ?? <String>[],
+       pendingMailIds = pendingMailIds ?? <String>[],
+       redeemedCodes = redeemedCodes ?? <String>[],
        earnedRewardDates = earnedRewardDates ?? <String, DateTime>{},
        pinnedRewardIds = pinnedRewardIds ?? <String>[],
        villainDefeatCounts = villainDefeatCounts ?? <String, int>{};
@@ -566,6 +605,80 @@ class UserProfile {
   ///
   /// İkinci kez kazanmak sessizce yutulur: aynı ünvan hem çarktan hem
   /// başarımdan gelebilirdi ve mükerrer bildirim gürültü olurdu.
+  // --- Posta kutusu API'si (Bölüm D / Faz 3) ---
+
+  /// Yanlış kod denemelerinin sayıldığı pencere.
+  static const Duration codeAttemptWindow = Duration(minutes: 10);
+
+  /// Pencere içinde izin verilen yanlış deneme sayısı.
+  ///
+  /// Sunucu yok; bu yavaşlatma kaba kuvveti **imkânsız** kılmaz, yalnızca
+  /// sıkıcı hale getirir. Gerçek koruma Firebase geldiğinde sunucu
+  /// tarafina taşınmalı (`MailCatalog` yorumu).
+  static const int maxCodeAttempts = 5;
+
+  /// Bu postanın ödülü alınmış mı.
+  bool hasClaimedMail(String id) => claimedMailIds.contains(id);
+
+  bool hasReadMail(String id) => readMailIds.contains(id);
+
+  /// Postayı okundu olarak işaretler. Ödüle dokunmaz.
+  void markMailRead(String id) {
+    if (!readMailIds.contains(id)) readMailIds.add(id);
+  }
+
+  /// Postanın ödülünü **bir kez** alır.
+  ///
+  /// `false` dönerse hiçbir şey değişmemiştir. Kimlik ödülden **önce**
+  /// işaretleniyor: ikisi aynı kayıt turunda diske gittiği için yarım
+  /// kalan bir alım ne ödülü kaybeder ne iki kez verir.
+  bool claimMail(String id) {
+    if (claimedMailIds.contains(id)) return false;
+    claimedMailIds.add(id);
+    markMailRead(id);
+    return true;
+  }
+
+  /// Kod karşılığı açılan postayı oyuncuya ekler.
+  void unlockMail(String id) {
+    if (!pendingMailIds.contains(id)) pendingMailIds.add(id);
+  }
+
+  bool hasRedeemedCode(String canonicalCode) =>
+      redeemedCodes.contains(canonicalCode);
+
+  void markCodeRedeemed(String canonicalCode) {
+    if (!redeemedCodes.contains(canonicalCode)) {
+      redeemedCodes.add(canonicalCode);
+    }
+  }
+
+  /// Yavaşlatma: pencere içinde çok fazla yanlış deneme varsa `true`.
+  bool isCodeEntryThrottled(DateTime now) {
+    final start = codeAttemptWindowStart;
+    if (start == null) return false;
+    if (now.toUtc().difference(start) >= codeAttemptWindow) return false;
+    return codeAttempts >= maxCodeAttempts;
+  }
+
+  /// Başarısız bir denemeyi kaydeder.
+  void registerFailedCodeAttempt(DateTime now) {
+    final utc = now.toUtc();
+    final start = codeAttemptWindowStart;
+    if (start == null || utc.difference(start) >= codeAttemptWindow) {
+      codeAttemptWindowStart = utc;
+      codeAttempts = 1;
+      return;
+    }
+    codeAttempts++;
+  }
+
+  /// Başarılı kod sayacı sıfırlar: doğru kod giren oyuncu cezalandırılmaz.
+  void resetCodeAttempts() {
+    codeAttempts = 0;
+    codeAttemptWindowStart = null;
+  }
+
   bool grantTitle(String id) {
     if (ownedTitleIds.contains(id)) return false;
     ownedTitleIds.add(id);
@@ -728,6 +841,12 @@ class UserProfile {
     'tutorialGuideId': tutorialGuideId,
     'tutorialStarterItemId': tutorialStarterItemId,
     'ownedTitleIds': ownedTitleIds,
+    'claimedMailIds': claimedMailIds,
+    'readMailIds': readMailIds,
+    'pendingMailIds': pendingMailIds,
+    'redeemedCodes': redeemedCodes,
+    'codeAttempts': codeAttempts,
+    'codeAttemptWindowStart': codeAttemptWindowStart?.toIso8601String(),
     'equippedTitleId': equippedTitleId,
     'petCompanionEnabled': petCompanionEnabled,
     'enemiesDefeated': enemiesDefeated,
@@ -814,6 +933,14 @@ class UserProfile {
       tutorialGuideId: json['tutorialGuideId'] as String? ?? 'mavili',
       tutorialStarterItemId: json['tutorialStarterItemId'] as String?,
       ownedTitleIds: _stringList(json['ownedTitleIds']),
+      claimedMailIds: _stringList(json['claimedMailIds']),
+      readMailIds: _stringList(json['readMailIds']),
+      pendingMailIds: _stringList(json['pendingMailIds']),
+      redeemedCodes: _stringList(json['redeemedCodes']),
+      codeAttempts: (json['codeAttempts'] as int? ?? 0).clamp(0, 1 << 20),
+      codeAttemptWindowStart: DateTime.tryParse(
+        json['codeAttemptWindowStart'] as String? ?? '',
+      ),
       // Katalogda karşılığı olmayan ya da sahip olunmayan bir kimlik takılı
       // gelirse sessizce düşer: elle düzenlenmiş kayıt bilinmeyen bir ünvanın
       // buff'ını uygulayamaz.

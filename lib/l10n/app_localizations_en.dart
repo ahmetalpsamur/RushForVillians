@@ -133,6 +133,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get endlessStart => 'Start Endless Run';
 
   @override
+  String get mailboxTitle => 'Mailbox';
+
+  @override
+  String get mailboxEmpty =>
+      'Your mailbox is empty. Anything we send will show up here.';
+
+  @override
+  String mailboxUnclaimed(int count) {
+    return '$count unclaimed reward';
+  }
+
+  @override
+  String get mailboxOpen => 'Mailbox';
+
+  @override
+  String get mailClaim => 'Claim reward';
+
+  @override
+  String get mailClaimed => 'Claimed';
+
+  @override
+  String mailRewardCoins(int coins) {
+    return '$coins gold';
+  }
+
+  @override
+  String mailRewardSpins(int spins) {
+    return '$spins wheel spins';
+  }
+
+  @override
+  String mailRewardTitle(String name) {
+    return 'Title: $name';
+  }
+
+  @override
+  String get mailClaimedNotice => 'Reward claimed.';
+
+  @override
+  String get mailClosedBetaThanksTitle => 'Thank you for the closed beta';
+
+  @override
+  String get mailClosedBetaThanksBody =>
+      'You are one of the first to play this. Every bug you reported and every note you wrote made a difference.\n\nA small thank you: some gold, a few wheel spins, and a title that comes only from this message.\n\nKeep walking.';
+
+  @override
+  String get mailCodeWeNeedHeroesTitle => 'Code reward';
+
+  @override
+  String get mailCodeWeNeedHeroesBody =>
+      'Your code is valid. Claim the reward below.';
+
+  @override
+  String get codeEntryTitle => 'Enter a code';
+
+  @override
+  String get codeEntryHint => 'Type your code';
+
+  @override
+  String get codeEntrySubmit => 'Redeem';
+
+  @override
+  String get codeErrorEmpty => 'Type a code first.';
+
+  @override
+  String get codeErrorInvalid => 'That code is not valid. Check the spelling.';
+
+  @override
+  String get codeErrorAlreadyUsed => 'You have already used this code.';
+
+  @override
+  String get codeErrorExpired => 'This code has expired.';
+
+  @override
+  String get codeErrorThrottled =>
+      'Too many wrong attempts. Wait a moment and try again.';
+
+  @override
+  String get codeSuccess => 'Code accepted. Your reward is in the mailbox.';
+
+  @override
   String get endlessFinish => 'End the adventure';
 
   @override
@@ -2841,6 +2922,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String titleLorePurchase(String name) {
     return '$name is a mark chosen for the road ahead.';
   }
+
+  @override
+  String get titleSourceMail => 'Mail';
+
+  @override
+  String get sourceMail => 'Mail';
+
+  @override
+  String get titleLoreMail => 'This title comes only from the mailbox.';
+
+  @override
+  String get titleUnlockMail => 'Comes from the mailbox.';
 
   @override
   String titleLoreWheel(String name) {

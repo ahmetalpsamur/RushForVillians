@@ -41,6 +41,15 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenAdventure;
   final VoidCallback onOpenWheel;
   final VoidCallback onOpenRewards;
+
+  /// Posta kutusunu açar (Bölüm D / Faz 3).
+  final VoidCallback onOpenMailbox;
+
+  /// Alınmamış **ödüllü** posta sayısı; 0 ise rozet çizilmez.
+  ///
+  /// Ölçüt "okunmamış" değil **"alınmamış ödül"**: duyuru postası
+  /// oyuncuyu ekrana çağırmamalı, alınmayı bekleyen bir ödül çağırmalı.
+  final int unclaimedMailCount;
   final VoidCallback onOpenStore;
   final VoidCallback onOpenInventory;
   final ValueChanged<int> onSimulateSteps;
@@ -72,6 +81,8 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenAdventure,
     required this.onOpenWheel,
     required this.onOpenRewards,
+    required this.onOpenMailbox,
+    this.unclaimedMailCount = 0,
     required this.onOpenStore,
     required this.onOpenInventory,
     required this.onSimulateSteps,
@@ -252,6 +263,16 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.backpack,
                   label: context.l10n.inventory,
                   onTap: onOpenInventory,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickAction(
+                  key: const ValueKey('home-mailbox'),
+                  icon: Icons.mail,
+                  label: context.l10n.mailboxOpen,
+                  onTap: onOpenMailbox,
+                  badgeCount: unclaimedMailCount,
                 ),
               ),
             ],
@@ -571,13 +592,18 @@ class _QuickAction extends StatelessWidget {
   /// Devre dışı bir kontrol sessiz kalmaz; nedenini söyler.
   final String? disabledReason;
 
+  /// Sağ üst köşede görünen sayı rozeti; 0 ise çizilmez.
+  final int badgeCount;
+
   const _QuickAction({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
     this.enabled = true,
     this.status,
     this.disabledReason,
+    this.badgeCount = 0,
   });
 
   void _explainDisabled(BuildContext context) {
@@ -624,6 +650,34 @@ class _QuickAction extends StatelessWidget {
                     right: -6,
                     bottom: -4,
                     child: Icon(Icons.lock, size: 13, color: AppColors.primary),
+                  ),
+                // Alınmamış ödül rozeti: kilit rozetiyle aynı köşe deseni,
+                // böylece kart kimliğini kaybetmiyor.
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -10,
+                    top: -6,
+                    child: DecoratedBox(
+                      key: const ValueKey('quick-action-badge'),
+                      decoration: const BoxDecoration(
+                        color: AppColors.hp,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),

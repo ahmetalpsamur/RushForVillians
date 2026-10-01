@@ -197,26 +197,105 @@ void main() {
     // Altı hedef `AttackConfig.targets`'tan okunuyor — sabit kopyalanmıyor.
     final goals = AttackConfig.supportedStepTargets;
 
-    test('hedef büyüdükçe düşman canı asla azalmaz', () {
-      // Zorunlu değişmez (GD100). Bir dönem can maceranın planlanan **round
-      // sayısından** türüyordu ve tempo tablosu o sayıyı hedefte monoton
-      // yapmıyordu: 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor,
-      // yani 3.000'in düşmanı 2.000'inkinden **zayıf** çıkıyordu — üstelik
-      // ödülü ×2,0 vs ×1,4'tü. 2.000'i seçmek için sebep kalmıyordu.
-      for (final enemy in EnemyCatalog.enemies) {
-        var previous = 0;
-        for (final goal in goals) {
-          final health =
-              enemyStatsForGoal(enemy: enemy, stepGoal: goal).maxHealth.round();
-          expect(
-            health,
-            greaterThan(previous),
-            reason:
-                '${enemy.name}: $goal hedefinde can $health, '
-                'önceki hedefte $previous',
-          );
-          previous = health;
+    test('DOMİNANS YOK: büyük hedef hem kolay hem çok ödüllü olamaz', () {
+      // **Zorunlu değişmez.** Aynı oyun kalitesinde daha büyük bir hedef,
+      // hem daha kolay hem daha çok ödül veren bir seçenek olamaz — yoksa
+      // küçük hedefleri seçmek için sebep kalmaz.
+      //
+      // Bu test, "ham can hedefte monoton" değişmezinin **yerine geçti**
+      // (GD107). Can artık planlanan round sayısıyla orantılı, yani 3.000
+      // hedefinin düşmanı 2.000'inkinden daha az **cana** sahip olabilir —
+      // çünkü oyuncunun da daha az roundu var. Ölçülmesi gereken şey ham
+      // can değil, **zorluk**.
+      final goals = AttackConfig.supportedStepTargets;
+      final loads = <int, double>{};
+
+      for (final goal in goals) {
+        var worst = 0.0;
+        for (final enemy in EnemyCatalog.enemies) {
+          final player = baseCombatStats(enemy.tier < 1 ? 1 : enemy.tier);
+          final stats = enemyStatsForGoal(enemy: enemy, stepGoal: goal);
+          final planned = AttackConfig.roundCountForSteps(goal);
+          final load =
+              stats.maxHealth /
+              (stats.damageAfterDefense(player.attack) * planned);
+          if (load > worst) worst = load;
         }
+        loads[goal] = worst;
+      }
+
+      // 1) Altı hedefin yükü **aynı**: hiçbiri diğerinden kolay değil.
+      final reference = loads[goals.first]!;
+      for (final goal in goals) {
+        expect(
+          loads[goal],
+          closeTo(reference, 0.02),
+          reason:
+              '$goal hedefinin yükü ${loads[goal]}, '
+              '${goals.first} hedefininki $reference',
+        );
+      }
+
+      // 2) Ödül çarpanı hedef büyüdükçe **asla azalmaz**.
+      var previousReward = 0.0;
+      for (final goal in goals) {
+        final reward = AttackConfig.rewardMultiplierFor(goal);
+        expect(
+          reward,
+          greaterThanOrEqualTo(previousReward),
+          reason: '$goal hedefinin ödül çarpanı geriye gidiyor',
+        );
+        previousReward = reward;
+      }
+
+      // 3) Hiçbir hedef **seçilmeyecek kadar kötü** değil: her hedef kendi
+      //    adım aralığı için en iyi seçenek olmalı. Ölçüt adım başına
+      //    ödül çarpanı: daha büyük hedefi seçen oyuncu daha çok yürüyor,
+      //    karşılığında adım başına en az aynı değeri almalı.
+      for (var i = 1; i < goals.length; i++) {
+        final small = goals[i - 1];
+        final large = goals[i];
+        expect(
+          AttackConfig.rewardMultiplierFor(large) /
+              AttackConfig.rewardMultiplierFor(small),
+          greaterThanOrEqualTo(0.99),
+          reason:
+              '$large hedefi $small ile aynı zorlukta ama daha az ödüllü',
+        );
+      }
+    });
+
+    test('ekipmanlı yük hedef bandinda, çıplak oyuncu taşmıyor', () {
+      // Hedef bant: ekipmanlı **0,60–0,85**. Çıplak oyuncu (hiç eşya
+      // kuşanmamış, kademeye denk seviyede) taşmamalı — taahhüdünden fazla
+      // yürümemeli.
+      //
+      // Ekipmanın gerçek katkısı `ItemCatalog` istiyor ve test ortamında
+      // asset manifesti yok; bu yüzden burada **çıplak** yük ölçülüyor ve
+      // bant, ölçülmüş ekipman avantajının (en kötü durumda ×1,31)
+      // altından türetiliyor.
+      for (final goal in AttackConfig.supportedStepTargets) {
+        var worst = 0.0;
+        for (final enemy in EnemyCatalog.enemies) {
+          final player = baseCombatStats(enemy.tier < 1 ? 1 : enemy.tier);
+          final stats = enemyStatsForGoal(enemy: enemy, stepGoal: goal);
+          final planned = AttackConfig.roundCountForSteps(goal);
+          final load =
+              stats.maxHealth /
+              (stats.damageAfterDefense(player.attack) * planned);
+          if (load > worst) worst = load;
+        }
+        expect(
+          worst,
+          lessThan(1.0),
+          reason: '$goal hedefinde çıplak oyuncu taahhüdünden fazla yürüyor',
+        );
+        // En kötü ekipman avantajı ×1,31 (20. kademe, 3 slot).
+        expect(
+          worst / 1.31,
+          inInclusiveRange(0.55, 0.85),
+          reason: '$goal hedefinde ekipmanlı yük bandin dışında',
+        );
       }
     });
 

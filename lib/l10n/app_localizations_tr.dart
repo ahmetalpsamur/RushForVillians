@@ -129,6 +129,87 @@ class AppLocalizationsTr extends AppLocalizations {
   String get endlessStart => 'Sonsuz Koşuya Başla';
 
   @override
+  String get mailboxTitle => 'Posta Kutusu';
+
+  @override
+  String get mailboxEmpty =>
+      'Kutun boş. Yeni bir şey gönderdiğimizde burada görüneceksin.';
+
+  @override
+  String mailboxUnclaimed(int count) {
+    return '$count alınmamış ödül';
+  }
+
+  @override
+  String get mailboxOpen => 'Posta kutusu';
+
+  @override
+  String get mailClaim => 'Ödülü al';
+
+  @override
+  String get mailClaimed => 'Alındı';
+
+  @override
+  String mailRewardCoins(int coins) {
+    return '$coins altın';
+  }
+
+  @override
+  String mailRewardSpins(int spins) {
+    return '$spins çark hakkı';
+  }
+
+  @override
+  String mailRewardTitle(String name) {
+    return 'Ünvan: $name';
+  }
+
+  @override
+  String get mailClaimedNotice => 'Ödül alındı.';
+
+  @override
+  String get mailClosedBetaThanksTitle => 'Kapalı beta için teşekkürler';
+
+  @override
+  String get mailClosedBetaThanksBody =>
+      'Oyunu ilk deneyenlerden birisin. Bildirdiğin her hata ve yazdığın her yorum işe yaradı.\n\nKüçük bir teşekkür: biraz altın, birkaç çark hakkı ve yalnızca bu postadan çıkan bir ünvan.\n\nYürümeye devam.';
+
+  @override
+  String get mailCodeWeNeedHeroesTitle => 'Kod ödülü';
+
+  @override
+  String get mailCodeWeNeedHeroesBody =>
+      'Kodun geçerli. Ödülünü aşağıdan alabilirsin.';
+
+  @override
+  String get codeEntryTitle => 'Kod gir';
+
+  @override
+  String get codeEntryHint => 'Kodu yaz';
+
+  @override
+  String get codeEntrySubmit => 'Kullan';
+
+  @override
+  String get codeErrorEmpty => 'Önce bir kod yaz.';
+
+  @override
+  String get codeErrorInvalid => 'Bu kod geçerli değil. Yazımını kontrol et.';
+
+  @override
+  String get codeErrorAlreadyUsed => 'Bu kodu zaten kullandın.';
+
+  @override
+  String get codeErrorExpired => 'Bu kodun süresi dolmuş.';
+
+  @override
+  String get codeErrorThrottled =>
+      'Çok fazla yanlış deneme. Biraz bekleyip tekrar dene.';
+
+  @override
+  String get codeSuccess => 'Kod kabul edildi. Ödülün posta kutunda.';
+
+  @override
   String get endlessFinish => 'Macerayı bitir';
 
   @override
@@ -2728,6 +2809,18 @@ class AppLocalizationsTr extends AppLocalizations {
   String titleLorePurchase(String name) {
     return '$name, önündeki yol için seçilmiş bir işarettir.';
   }
+
+  @override
+  String get titleSourceMail => 'Posta';
+
+  @override
+  String get sourceMail => 'Posta';
+
+  @override
+  String get titleLoreMail => 'Bu ünvan yalnızca posta kutusundan gelir.';
+
+  @override
+  String get titleUnlockMail => 'Posta kutusundan gelir.';
 
   @override
   String titleLoreWheel(String name) {

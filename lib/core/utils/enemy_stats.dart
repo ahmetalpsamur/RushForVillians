@@ -135,15 +135,15 @@ double baseEnemyDefense(int tier) => 2 + tier.toDouble();
 /// (önizleme/katalog tabanı).
 ///
 /// ⚠️ **Birim bir round değil, bir round *payı*** (GD100). Değer macerayı
-/// çağıran tarafta `stepGoal / enemyHealthStepsPerRound` ile kuruluyor, yani
-/// kesirli olabilir ve **hedefin adım taahhüdüyle birlikte kesin artar**.
+/// çağıran tarafta `plananRound × enemyHealthRoundShare` ile kuruluyor,
+/// yani kesirli olabilir.
 ///
-/// **Neden round sayısı değil:** bir dönem buraya maceranın gerçekten
-/// planlanan round sayısı veriliyordu. Tempo tablosu round sayısını hedefte
-/// monoton yapmıyor — 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor —
-/// ve sonuç ölçüldü: **3.000 hedefinin düşmanı 2.000'inkinden zayıftı** ama
-/// ödülü ×1,4 yerine ×2,0'dı. 2.000'i seçmek için hiçbir sebep kalmıyordu.
-/// Adım taahhüdü tempo bandından bağımsız ve tanımı gereği monoton.
+/// **Neden planlanan round sayısı:** yük oranı (can / oyuncunun o macerada
+/// verebileceği toplam hasar) böylece **hedeften bağımsız** kalıyor — her
+/// hedefte oyuncu taahhüdünün aynı oranında deviriyor. Alternatifi
+/// (`stepGoal / sabit`) ham canı monoton yapıyordu ama yükü round boyuna
+/// bağlıyor ve iki tempo bandı arasında 1:2 açıyordu; bkz.
+/// [GameConstants.enemyHealthRoundShare] ve GD107.
 CombatStats enemyCombatStats({
   required int tier,
   required EnemyArchetype archetype,
@@ -248,9 +248,10 @@ CombatStats enemyBaseStatsForGoal({
   tier: enemy.tier,
   archetype: enemy.archetype,
   catalogAttackDamage: enemy.attackDamage,
-  // Adım taahhüdü — round sayısı **değil** (GD100). Tempo tablosu round
-  // sayısını hedefte monoton yapmıyor; adım hedefi tanımı gereği yapıyor.
+  // Planlanan round sayısının sabit bir payı (GD100/GD107): yük oranı
+  // böylece hedeften bağımsız kalıyor.
   healthRounds: stepGoal <= 0
       ? 0
-      : stepGoal / GameConstants.enemyHealthStepsPerRound,
+      : AttackConfig.roundCountForSteps(stepGoal) *
+            GameConstants.enemyHealthRoundShare,
 );

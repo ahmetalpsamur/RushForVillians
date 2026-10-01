@@ -308,6 +308,144 @@ abstract class AppLocalizations {
   /// **'Sonsuz Koşuya Başla'**
   String get endlessStart;
 
+  /// No description provided for @mailboxTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Posta Kutusu'**
+  String get mailboxTitle;
+
+  /// No description provided for @mailboxEmpty.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kutun boş. Yeni bir şey gönderdiğimizde burada görüneceksin.'**
+  String get mailboxEmpty;
+
+  /// No description provided for @mailboxUnclaimed.
+  ///
+  /// In tr, this message translates to:
+  /// **'{count} alınmamış ödül'**
+  String mailboxUnclaimed(int count);
+
+  /// No description provided for @mailboxOpen.
+  ///
+  /// In tr, this message translates to:
+  /// **'Posta kutusu'**
+  String get mailboxOpen;
+
+  /// No description provided for @mailClaim.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ödülü al'**
+  String get mailClaim;
+
+  /// No description provided for @mailClaimed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Alındı'**
+  String get mailClaimed;
+
+  /// No description provided for @mailRewardCoins.
+  ///
+  /// In tr, this message translates to:
+  /// **'{coins} altın'**
+  String mailRewardCoins(int coins);
+
+  /// No description provided for @mailRewardSpins.
+  ///
+  /// In tr, this message translates to:
+  /// **'{spins} çark hakkı'**
+  String mailRewardSpins(int spins);
+
+  /// No description provided for @mailRewardTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ünvan: {name}'**
+  String mailRewardTitle(String name);
+
+  /// No description provided for @mailClaimedNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ödül alındı.'**
+  String get mailClaimedNotice;
+
+  /// No description provided for @mailClosedBetaThanksTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kapalı beta için teşekkürler'**
+  String get mailClosedBetaThanksTitle;
+
+  /// No description provided for @mailClosedBetaThanksBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Oyunu ilk deneyenlerden birisin. Bildirdiğin her hata ve yazdığın her yorum işe yaradı.\n\nKüçük bir teşekkür: biraz altın, birkaç çark hakkı ve yalnızca bu postadan çıkan bir ünvan.\n\nYürümeye devam.'**
+  String get mailClosedBetaThanksBody;
+
+  /// No description provided for @mailCodeWeNeedHeroesTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kod ödülü'**
+  String get mailCodeWeNeedHeroesTitle;
+
+  /// No description provided for @mailCodeWeNeedHeroesBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kodun geçerli. Ödülünü aşağıdan alabilirsin.'**
+  String get mailCodeWeNeedHeroesBody;
+
+  /// No description provided for @codeEntryTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kod gir'**
+  String get codeEntryTitle;
+
+  /// No description provided for @codeEntryHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kodu yaz'**
+  String get codeEntryHint;
+
+  /// No description provided for @codeEntrySubmit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kullan'**
+  String get codeEntrySubmit;
+
+  /// No description provided for @codeErrorEmpty.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce bir kod yaz.'**
+  String get codeErrorEmpty;
+
+  /// No description provided for @codeErrorInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu kod geçerli değil. Yazımını kontrol et.'**
+  String get codeErrorInvalid;
+
+  /// No description provided for @codeErrorAlreadyUsed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu kodu zaten kullandın.'**
+  String get codeErrorAlreadyUsed;
+
+  /// No description provided for @codeErrorExpired.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu kodun süresi dolmuş.'**
+  String get codeErrorExpired;
+
+  /// No description provided for @codeErrorThrottled.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çok fazla yanlış deneme. Biraz bekleyip tekrar dene.'**
+  String get codeErrorThrottled;
+
+  /// No description provided for @codeSuccess.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kod kabul edildi. Ödülün posta kutunda.'**
+  String get codeSuccess;
+
   /// No description provided for @endlessFinish.
   ///
   /// In tr, this message translates to:
@@ -4488,6 +4626,30 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'{name}, önündeki yol için seçilmiş bir işarettir.'**
   String titleLorePurchase(String name);
+
+  /// No description provided for @titleSourceMail.
+  ///
+  /// In tr, this message translates to:
+  /// **'Posta'**
+  String get titleSourceMail;
+
+  /// No description provided for @sourceMail.
+  ///
+  /// In tr, this message translates to:
+  /// **'Posta'**
+  String get sourceMail;
+
+  /// No description provided for @titleLoreMail.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu ünvan yalnızca posta kutusundan gelir.'**
+  String get titleLoreMail;
+
+  /// No description provided for @titleUnlockMail.
+  ///
+  /// In tr, this message translates to:
+  /// **'Posta kutusundan gelir.'**
+  String get titleUnlockMail;
 
   /// No description provided for @titleLoreWheel.
   ///
