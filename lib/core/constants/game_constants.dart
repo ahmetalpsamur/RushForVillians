@@ -9,13 +9,14 @@ class GameConstants {
 
   // --- Savaş temposu ve mükemmel round (Bölüm B) ---
 
-  /// Referans yürüyüş temposu — ve [combatRoundPacing]'in **ortak kadansı**.
+  /// Referans yürüyüş temposu — **arayüz etiketi ve yardımcı hesaplar için**.
   ///
-  /// Tablonun dört bandının hepsi tam olarak bu hızı verir:
-  /// 250/2,5dk · 500/5dk · 1.000/10dk · 2.000/20dk = **100 adım/dk**.
-  /// Yani bant değiştikçe roundun boyu ve süresi birlikte iki katına çıkıyor,
-  /// oyuncudan istenen tempo hiç değişmiyor. Bir dönem bu sabit yalnızca
-  /// arayüz etiketiydi ve round hesabına hiç girmiyordu.
+  /// ⚠️ [combatRoundPacing] bu sabitten **türemiyor**. Bir dönem tablonun
+  /// dört bandı da tam 100 adım/dk veriyordu ve bu "ortak kadans" tablonun
+  /// asıl vaadi sayılıyordu. Cihazda oynanınca o tempo fazla bulundu: tablo
+  /// 500/7dk (71 adım/dk) ve 1.000/15dk (67 adım/dk) ile değiştirildi
+  /// (Bölüm D / Faz 1). Tempo artık bir **denge kararı**, bir bölme işlemi
+  /// değil; iki bantın kadansı da birbirinden bağımsız.
   static const int stepsPerMinute = 100;
 
   /// Round temposu tablosu — **sabit, türetilmiyor, kullanıcı değiştiremez**.
@@ -25,34 +26,35 @@ class GameConstants {
   /// satırdır:
   ///
   /// ```
-  ///   hedef  <  1.000 : round  250 adım /  2,5 dk
-  ///   1.000–  2.999   : round  500 adım /  5   dk
-  ///   3.000–  9.999   : round 1.000 adım / 10  dk
-  ///   hedef >= 10.000 : round 2.000 adım / 20  dk
+  ///   hedef  <  3.000 : round   500 adım /  7 dk
+  ///   hedef >= 3.000  : round 1.000 adım / 15 dk
   /// ```
   ///
   /// **Neden tablo, formül değil:** tempo bir denge kararı, matematiksel bir
   /// sonuç değil. Formül her hedefte "doğru" bir sayı üretir ama hiçbirinde
-  /// istenen sayıyı üretmez. Bant sayısı dört; her bandın round boyu bir
-  /// öncekinin iki katı, süresi de öyle — yani kadans bant içinde sabit,
-  /// bantlar arasında iki katına çıkıyor.
+  /// istenen sayıyı üretmez.
   ///
-  /// Bu tablo **sabit 1.000 adım / 15 dakika** düzeninin yerine geçti; eski
-  /// düzende 500 adımlık macera tek roundluk gerilimsiz bir sayaçtı,
-  /// 10.000'lik macera ise 10 rounda dağılıyordu.
+  /// ⚠️ **Round temposu iki bant, ödül çarpanı dört bant.** Tablo dört
+  /// satır taşıyor çünkü 0/1.000 ve 3.000/10.000 çiftleri **aynı** round
+  /// boyunu ama **farklı** ödül çarpanını paylaşıyor. Tempo Bölüm D'de
+  /// değişti, ödül eğrisi Faz 2'de ölçülmüş hâliyle **korundu** — ikisi
+  /// ayrı kararlar ve aynı tabloda yaşamaları onları birbirine bağlamaz.
+  ///
+  /// Kadans bantlar arasında artık sabit **değil** (71 vs 67 adım/dk);
+  /// bkz. [stepsPerMinute].
   /// [rewardMultiplier] aynı bandın **zafer ödülü** çarpanıdır: ödül ile
   /// tempo tek tablodan okunur, ikinci bir kademe tanımı yoktur.
   static const List<
     ({int minGoal, int roundSteps, int roundSeconds, double rewardMultiplier})
   >
   combatRoundPacing = [
-    (minGoal: 0, roundSteps: 250, roundSeconds: 150, rewardMultiplier: 1.0),
-    (minGoal: 1000, roundSteps: 500, roundSeconds: 300, rewardMultiplier: 1.4),
-    (minGoal: 3000, roundSteps: 1000, roundSeconds: 600, rewardMultiplier: 2.0),
+    (minGoal: 0, roundSteps: 500, roundSeconds: 420, rewardMultiplier: 1.0),
+    (minGoal: 1000, roundSteps: 500, roundSeconds: 420, rewardMultiplier: 1.4),
+    (minGoal: 3000, roundSteps: 1000, roundSeconds: 900, rewardMultiplier: 2.0),
     (
       minGoal: 10000,
-      roundSteps: 2000,
-      roundSeconds: 1200,
+      roundSteps: 1000,
+      roundSeconds: 900,
       rewardMultiplier: 3.0,
     ),
   ];
@@ -172,13 +174,40 @@ class GameConstants {
   /// Kısa macerada bile gerilim kurmak için gereken en az round.
   static const int minCombatRounds = 2;
 
-  /// Uzun maceraların tekrar hissine dönüşmemesi için round tavanı.
+  /// Round sayısının **güvenlik sınırı** — bir denge aracı değil.
   ///
-  /// [combatRoundPacing] altı seçilebilir hedefin hepsinde zaten en fazla 5
-  /// round üretiyor; bu tavan **eski kayıtlardan** gelen ya da tabloda
-  /// karşılığı olmayan hedefler için bağlayıcı bir güvence. Tavan devreye
-  /// girerse round boyu büyür, round sayısı 5'te kalır.
-  static const int maxCombatRounds = 5;
+  /// **Round sayısını [combatRoundPacing] belirler.** Bu sabit yalnızca
+  /// tablonun karşılığı olmayan bir hedefte (yalnızca eski kayıtlardan
+  /// gelebilir, ör. 20.000) round sayısının sınırsız büyümesini engeller;
+  /// devreye girerse round **boyu** büyür, sayı tavanda kalır.
+  ///
+  /// Değeri tablonun en büyük üretimine eşit: 10.000 adım / 1.000 =
+  /// **10 round**. Yani desteklenen altı hedefin hiçbirinde bağlamıyor. Bir
+  /// dönem 5'ti ve 10.000'lik hedefi 5 × 2.000 adıma sıkıştırıyordu;
+  /// Bölüm D'de tablo tek doğruluk kaynağı ilan edilince tavan tablonun
+  /// üstüne çıkarıldı.
+  ///
+  /// Sabit **silinmedi**: `roundStepsFor` içindeki büyütme dalı eski
+  /// kayıtların tek koruması ve onu kaldırmak 20.000 adımlık bir kaydı
+  /// 20 rounda bölerdi.
+  static const int maxCombatRounds = 10;
+
+  /// Düşman canının adım ölçeği: **kaç adımlık taahhüt bir "round payı"
+  /// hasar eder** (GD100).
+  ///
+  /// `enemyBaseStatsForGoal` canı `stepGoal / enemyHealthStepsPerRound` ile
+  /// kuruyor, yani can hedefin **adım taahhüdüyle** birlikte kesin artıyor.
+  /// Bir dönem can maceranın planlanan **round sayısından** geliyordu; tempo
+  /// tablosu round sayısını hedefte monoton yapmadığı için 3.000 hedefinin
+  /// düşmanı 2.000'inkinden zayıf çıkıyordu (ödülü ×2,0 vs ×1,4 olmasına
+  /// rağmen) — 2.000'i seçmek için sebep kalmamıştı.
+  ///
+  /// Değer ölçümle seçildi; [combatRoundPacing]'in iki bandının round boyu
+  /// 500 ve 1.000 olduğu için yük oranı bant içinde sabit, bantlar arasında
+  /// iki katına çıkıyor. `combat_balance_test` bütün hedefleri tarıyor:
+  /// hiçbirinde ekipmanlı yük 1,0'ı geçmiyor ve çıplak seviye-uygun oyuncu
+  /// planlanan roundların içinde bitiriyor.
+  static const int enemyHealthStepsPerRound = 2000;
 
   /// Eksik round hasar eğrisinin üssü.
   ///

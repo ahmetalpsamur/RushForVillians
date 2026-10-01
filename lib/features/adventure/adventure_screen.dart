@@ -22,6 +22,7 @@ import '../../models/enemy.dart';
 import '../../services/character_catalog.dart';
 import '../../widgets/pixel_sprite.dart';
 import '../../widgets/scroll_to_top_button.dart';
+import '../../widgets/dropped_item_card.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
 import '../tutorial/tutorial_guide.dart';
@@ -1003,6 +1004,17 @@ class _AdventureScreenState extends State<AdventureScreen>
                         color: AppColors.xp,
                         fontWeight: FontWeight.w900,
                       ),
+                    ),
+                  ],
+                  // Garanti düşen eşya (GD93) bir dönem hiçbir ekranda
+                  // görünmüyordu: kayda yazılıyordu ama oyuncuya
+                  // söylenmiyordu. Ödülün varlığı envanteri açıp saymaya
+                  // bağlıydı.
+                  if (adventure.droppedItemId case final dropped?) ...[
+                    const SizedBox(height: 12),
+                    DroppedItemCard(
+                      itemId: dropped,
+                      label: context.l10n.droppedItemLabel,
                     ),
                   ],
                   if (adventure.isWalkPhaseActive) ...[

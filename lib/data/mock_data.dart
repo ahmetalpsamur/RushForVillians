@@ -16,12 +16,23 @@ class MockData {
     requiredSteps: 20000,
   );
 
+  /// Taverna önizlemesinin demo takımı (GD74 — işlev yazılmadı).
+  ///
+  /// ⚠️ **Üye adları bilerek dilden bağımsız.** Eskiden "Ayşe" ve "Mehmet"
+  /// yazıyordu ve İngilizce modda da öyle görünüyordu. Çözüm olarak mock
+  /// veriye çeviri altyapısı kurmak yanlış yatırım olurdu: bu liste gerçek
+  /// bir özellik değil, yerine çevrimiçi takım gelince tamamen gidecek
+  /// (§13). Nötr adlar sızıntıyı bir satırda kapatıyor ve arkasında bakımı
+  /// gereken bir şey bırakmıyor.
+  ///
+  /// `'Sen'` kimliği **değişmedi**: `TeamScreen` onu `youMemberName` ile
+  /// çeviriyor, yani oyuncunun kendi satırı zaten iki dilde doğru.
   static Team defaultTeam() => Team(
-    name: 'Kızıl Yürüyüşçüler',
+    name: 'Rush Crew',
     members: [
       TeamMember(name: 'Sen', steps: 0, isWalkingNow: false),
-      TeamMember(name: 'Ayşe', steps: 4200, isWalkingNow: true),
-      TeamMember(name: 'Mehmet', steps: 3100, isWalkingNow: false),
+      TeamMember(name: 'Mira', steps: 4200, isWalkingNow: true),
+      TeamMember(name: 'Kano', steps: 3100, isWalkingNow: false),
     ],
   );
 

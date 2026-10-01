@@ -404,11 +404,11 @@ abstract class AppLocalizations {
   /// **'{coins} altın · {xp} XP'**
   String endlessResultReward(int coins, int xp);
 
-  /// No description provided for @endlessResultItem.
+  /// No description provided for @droppedItemLabel.
   ///
   /// In tr, this message translates to:
-  /// **'Düşen eşya: {name}'**
-  String endlessResultItem(String name);
+  /// **'DÜŞEN EŞYA'**
+  String get droppedItemLabel;
 
   /// No description provided for @endlessClose.
   ///
@@ -4050,6 +4050,24 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'{enemy} senin {damage} canını aldı.'**
   String enemyAttackNotice(String enemy, int damage);
+
+  /// No description provided for @roundWonNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Round {round} kazanıldı · {damage} hasar vurdun'**
+  String roundWonNotice(int round, int damage);
+
+  /// No description provided for @roundMissedNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Round {round} kaçtı · {damage} hasar yedin'**
+  String roundMissedNotice(int round, int damage);
+
+  /// No description provided for @roundEnemyHealthNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'{enemy}: {health} / {maxHealth} can'**
+  String roundEnemyHealthNotice(String enemy, String health, String maxHealth);
 
   /// No description provided for @perfectRoundNotice.
   ///

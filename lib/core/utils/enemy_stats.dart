@@ -1,6 +1,7 @@
 import '../../models/combat_stats.dart';
 import '../../models/enemy.dart';
 import '../constants/attack_config.dart';
+import '../constants/game_constants.dart';
 import '../constants/timed_combat_config.dart';
 import 'base_combat_stats.dart';
 
@@ -129,34 +130,37 @@ double baseEnemyDefense(int tier) => 2 + tier.toDouble();
 ///
 /// [catalogAttackDamage] katalogdaki elle yazılmış saldırı değeri;
 ///
-/// [plannedRounds] verilirse can **o maceranın gerçekten planlanan round
-/// sayısından** hesaplanır; verilmezse düşmanın kendi kilit eşiğindeki
-/// beklenti kullanılır (önizleme/katalog tabanı).
+/// [healthRounds] verilirse can **o kadar "round payı" hasar** için kurulur;
+/// verilmezse düşmanın kendi kilit eşiğindeki beklenti kullanılır
+/// (önizleme/katalog tabanı).
 ///
-/// **Neden hedefin round sayısı** (GD49): §6.10'un can formülü zaten
-/// "round başına hasar × **beklenen round sayısı**" ve GD49 `stepGoal`'un
-/// beklenen round sayısını belirlediğini açıkça söylüyor. Kademeden türetilen
-/// vekil kullanılınca tempo bandı değiştiren hedeflerde ikisi ayrışıyordu:
-/// 3.000 adımlık macera 3 round planlıyor ama tier-6 düşmanın canı 5 round
-/// için kuruluyordu — taahhüt bittiğinde düşman hâlâ ayakta kalıyordu
-/// (ölçülen yük oranı 1,81).
+/// ⚠️ **Birim bir round değil, bir round *payı*** (GD100). Değer macerayı
+/// çağıran tarafta `stepGoal / enemyHealthStepsPerRound` ile kuruluyor, yani
+/// kesirli olabilir ve **hedefin adım taahhüdüyle birlikte kesin artar**.
+///
+/// **Neden round sayısı değil:** bir dönem buraya maceranın gerçekten
+/// planlanan round sayısı veriliyordu. Tempo tablosu round sayısını hedefte
+/// monoton yapmıyor — 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor —
+/// ve sonuç ölçüldü: **3.000 hedefinin düşmanı 2.000'inkinden zayıftı** ama
+/// ödülü ×1,4 yerine ×2,0'dı. 2.000'i seçmek için hiçbir sebep kalmıyordu.
+/// Adım taahhüdü tempo bandından bağımsız ve tanımı gereği monoton.
 CombatStats enemyCombatStats({
   required int tier,
   required EnemyArchetype archetype,
   required int catalogAttackDamage,
-  int? plannedRounds,
+  double? healthRounds,
 }) {
   final profile = enemyArchetypeProfile(archetype);
   final player = baseCombatStats(tier);
 
   final defense = baseEnemyDefense(tier) * profile.defense;
 
-  // 1) Can: ölçüt oyuncunun round başına hasarı × planlanan round sayısı.
+  // 1) Can: ölçüt oyuncunun round başına hasarı × round payı.
   final defenseForHealth = CombatStats(defense: defense);
   final playerDamagePerRound = defenseForHealth.damageAfterDefense(
     player.attack,
   );
-  final rounds = plannedRounds ?? expectedRoundsForTier(tier);
+  final rounds = healthRounds ?? expectedRoundsForTier(tier).toDouble();
   final health = playerDamagePerRound * rounds * profile.health;
 
   // 2) Saldırı: kaçırılan roundun oyuncu canından götürdüğü oran sabit.
@@ -209,23 +213,34 @@ CombatStats scaleEnemyCombatStats(
       .sanitized();
 }
 
-/// Bir maceranın düşman statları: canı **o hedefin planlanan round
-/// sayısından** kurar, sonra hedefin güç çarpanını uygular.
+/// Bir maceranın düşman statları: canı **o hedefin adım taahhüdünden**
+/// kurar, sonra hedefin güç çarpanını uygular.
 ///
 /// Savaşın tek stat kaynağı bu. Katalogdaki [Enemy.stats] yalnızca
 /// önizlemenin tabanı; ikisi ayrışmasın diye burada yeniden türetiliyor,
 /// ölçeklenmiş bir değer ikinci kez çarpılmıyor.
-CombatStats enemyStatsForGoal({required Enemy enemy, required int stepGoal}) =>
-    scaleEnemyCombatStats(
-      enemyBaseStatsForGoal(enemy: enemy, stepGoal: stepGoal),
-      TimedCombatConfig.difficultyMultiplierForSteps(stepGoal),
-    );
+///
+/// ⚠️ **Güç çarpanı yalnızca saldırıya uygulanır** (GD101). Hedefin iki
+/// ekseni artık iki ayrı stata bağlı:
+/// - **can** ← adım taahhüdü (hedef uzadıkça savaş uzar),
+/// - **saldırı** ← güç çarpanı (hedef uzadıkça kaçırılan round daha acıtır).
+///
+/// Çarpan cana da uygulandığında hedef cana **iki kez** giriyordu (bir kez
+/// adım taahhüdüyle, bir kez çarpanla) ve yük oranı 500→10.000 arasında
+/// 4,8 kat açılıyordu: ya kısa hedefler olaysız oluyordu ya uzun hedefler
+/// planlanan rounda sığmıyordu. Tek bir `enemyHealthStepsPerRound` değeri
+/// ikisini birden sağlayamıyordu.
+CombatStats enemyStatsForGoal({required Enemy enemy, required int stepGoal}) {
+  final base = enemyBaseStatsForGoal(enemy: enemy, stepGoal: stepGoal);
+  final multiplier = TimedCombatConfig.difficultyMultiplierForSteps(stepGoal);
+  return base.copyWith(attack: base.attack * multiplier).sanitized();
+}
 
 /// [enemyStatsForGoal]'un **güç çarpanı uygulanmamış** hâli.
 ///
-/// Yalnızca çarpanı ayrıca uygulayan çağrı noktaları için: v13 taşıması
-/// kalan can oranını bununla kuruyor, çarpanı v25→v26 taşıması ekliyor.
-/// İkisini birden uygulamak çarpanı **iki kez** saymak olurdu.
+/// Çarpan artık yalnızca saldırıyı ölçeklediği için ikisinin **canı aynı**;
+/// bu sürüm yalnızca saldırıda ayrışır. v13 taşıması kalan can oranını
+/// bununla kuruyor ve can tarafında ikisi arasında fark yok.
 CombatStats enemyBaseStatsForGoal({
   required Enemy enemy,
   required int stepGoal,
@@ -233,5 +248,9 @@ CombatStats enemyBaseStatsForGoal({
   tier: enemy.tier,
   archetype: enemy.archetype,
   catalogAttackDamage: enemy.attackDamage,
-  plannedRounds: AttackConfig.roundCountForSteps(stepGoal),
+  // Adım taahhüdü — round sayısı **değil** (GD100). Tempo tablosu round
+  // sayısını hedefte monoton yapmıyor; adım hedefi tanımı gereği yapıyor.
+  healthRounds: stepGoal <= 0
+      ? 0
+      : stepGoal / GameConstants.enemyHealthStepsPerRound,
 );

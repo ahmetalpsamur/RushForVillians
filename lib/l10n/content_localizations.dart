@@ -286,7 +286,11 @@ extension ContentLocalizations on AppLocalizations {
     var name = _titleCaseIdentifier(identity.baseId.split('/').last)
         .replaceAllMapped(
           RegExp(r' Type ([1-9])$'),
-          (match) => _roman(match[1]!),
+          // Kalıp baştaki boşluğu da tüketiyor; yerine konan metin onu geri
+          // koymazsa kelime rakama yapışıyordu: "Ancient Spell Book Type 1"
+          // → "Ancient Spell BookI". Büyük "I" küçük "l" gibi okunduğu için
+          // sahada "fazladan l harfi" diye görünüyordu (238 İngilizce ad).
+          (match) => ' ${_roman(match[1]!)}',
         )
         .replaceAll(' V2', ' II');
     // İyelik düzeltmesi kelime sınırında yapılır. Eskiden kalıplar iki yanına

@@ -1490,7 +1490,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       if (result.playerDamage > 0) {
         _showEnemyAttackNotice(_adventure!, result.playerDamage);
       }
-      _showPerfectRoundFeedback(result);
+      _showRoundOutcome(result);
     }
     if (revivalCompleted) {
       ScaffoldMessenger.of(
@@ -1730,7 +1730,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     if (resolved != null && resolved.playerDamage > 0) {
       _showEnemyAttackNotice(adventure, resolved.playerDamage);
     }
-    if (resolved != null) _showPerfectRoundFeedback(resolved);
+    if (resolved != null) _showRoundOutcome(resolved);
     if (adventure.isBattleCompleted) {
       unawaited(AdventureNotificationService.cancelAdventureReminders());
     }
@@ -1871,50 +1871,114 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     );
   }
 
-  void _showPerfectRoundFeedback(CombatRoundResult result) {
-    if (!result.perfect && !(_adventure?.lastPerfectStreakBroken ?? false)) {
-      return;
-    }
+  /// Bir round çözüldüğünde gösterilen **tek** bildirim (Bölüm D / Faz 1).
+  ///
+  /// Bir dönem buradan yalnızca "mükemmel round" duyurusu çıkıyordu ve
+  /// round **süresi dolarak** kazanıldığında hiçbir şey görünmüyordu:
+  /// oyuncu vurduğu hasarı ve düşmanın kalan canını hiçbir yerde
+  /// okuyamıyordu. Sahnedeki animasyonlu hasar sayısı ise yalnızca macera
+  /// ekranı açıkken oynuyor.
+  ///
+  /// Üç tasarım kısıtı:
+  /// 1. **Tek bildirim.** Mükemmel round satırı ayrı bir SnackBar değil,
+  ///    aynı kutunun üçüncü satırı — iki kutu kuyruğa girip birbirini
+  ///    kapatıyordu (GD46 ile aynı hata sınıfı).
+  /// 2. **Okunmadan kaybolmasın.** Bu oyun yürürken oynanıyor; telefona
+  ///    bakış gecikmeli oluyor, bu yüzden süre 4 sn yerine
+  ///    [_roundNoticeDuration].
+  /// 3. **Akışı kesmesin.** Diyalog değil, kayıt edilebilir bir SnackBar;
+  ///    ve zafer/yenilgi roundunda **hiç gösterilmiyor** — ikisinin de
+  ///    kendi tam ekran perdesi var, üstlerine kutu koymak gürültü olurdu.
+  /// [_showRoundOutcome] bildiriminin ekranda kalma süresi.
+  ///
+  /// Varsayılan SnackBar süresi 4 sn; yürüyen bir oyuncunun telefonu
+  /// cebinden çıkarıp okuması için kısa.
+  static const Duration _roundNoticeDuration = Duration(seconds: 7);
+
+  void _showRoundOutcome(CombatRoundResult result) {
+    final adventure = _adventure;
+    if (adventure == null) return;
+    // Zafer ve yenilginin kendi perdesi var.
+    if (result.enemyDefeated || result.playerDefeated) return;
+
+    final l10n = context.l10n;
+    final headline =
+        result.walkedSteps >= result.targetSteps
+            ? l10n.roundWonNotice(result.roundNumber, result.enemyDamage)
+            : l10n.roundMissedNotice(result.roundNumber, result.playerDamage);
+    final won = result.walkedSteps >= result.targetSteps;
+    final maxHealth = adventure.scaledEnemyMaxHealth;
     final perfect = result.perfect;
-    final message =
-        perfect
-            ? context.l10n.perfectRoundNotice(
-              result.perfectStreak,
-              AppFormatters.decimal(
-                context,
-                result.perfectDamageMultiplier,
-                digits: 2,
-              ),
-            )
-            : context.l10n.perfectRoundBrokenNotice;
+    final streakBroken = adventure.lastPerfectStreakBroken;
+
+    final lines = <Widget>[
+      Text(
+        headline,
+        key: const ValueKey('round-outcome-headline'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      Text(
+        l10n.roundEnemyHealthNotice(
+          l10n.enemyName(adventure.enemy),
+          AppFormatters.integer(context, adventure.enemyHealth),
+          AppFormatters.integer(context, maxHealth),
+        ),
+        key: const ValueKey('round-outcome-enemy-health'),
+        style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+      ),
+      if (perfect || streakBroken)
+        Text(
+          perfect
+              ? l10n.perfectRoundNotice(
+                result.perfectStreak,
+                AppFormatters.decimal(
+                  context,
+                  result.perfectDamageMultiplier,
+                  digits: 2,
+                ),
+              )
+              : l10n.perfectRoundBrokenNotice,
+          key: const ValueKey('round-outcome-perfect'),
+          style: TextStyle(
+            color: perfect ? AppColors.primary : AppColors.hp,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+    ];
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        key: const ValueKey('round-outcome-notice'),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-        backgroundColor: perfect ? AppColors.surface : AppColors.hp,
-        shape:
-            perfect
-                ? RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: AppColors.primary.withValues(alpha: 0.75),
-                  ),
-                )
-                : null,
+        duration: _roundNoticeDuration,
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: (won ? AppColors.primary : AppColors.hp).withValues(
+              alpha: 0.75,
+            ),
+          ),
+        ),
         content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              perfect ? Icons.local_fire_department : Icons.heart_broken,
-              color: perfect ? AppColors.primary : Colors.white,
+              won
+                  ? (perfect ? Icons.local_fire_department : Icons.bolt)
+                  : Icons.heart_broken,
+              color: won ? AppColors.primary : AppColors.hp,
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: lines,
               ),
             ),
           ],

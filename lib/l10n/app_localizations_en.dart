@@ -197,9 +197,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String endlessResultItem(String name) {
-    return 'Item dropped: $name';
-  }
+  String get droppedItemLabel => 'ITEM DROPPED';
 
   @override
   String get endlessClose => 'Close';
@@ -2544,6 +2542,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String enemyAttackNotice(String enemy, int damage) {
     return '$enemy took $damage HP from you.';
+  }
+
+  @override
+  String roundWonNotice(int round, int damage) {
+    return 'Round $round won · you dealt $damage damage';
+  }
+
+  @override
+  String roundMissedNotice(int round, int damage) {
+    return 'Round $round missed · you took $damage damage';
+  }
+
+  @override
+  String roundEnemyHealthNotice(String enemy, String health, String maxHealth) {
+    return '$enemy: $health / $maxHealth HP';
   }
 
   @override

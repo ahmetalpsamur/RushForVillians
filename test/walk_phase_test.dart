@@ -393,6 +393,63 @@ void main() {
       await tester.pump();
     }
 
+    testWidgets('canlı savaş yolundan erken zafer yürüyüş fazını açar', (
+      tester,
+    ) async {
+      // Bölüm D / Faz 1 — kapatılan boşluk: bu grubun diğer bütün
+      // testleri `_victorious(...)` ile zaferi **elle damgalıyor**. Yani
+      // "düşmanı gerçekten öldür → faz açılsın" geçişi hiç
+      // ölçülmüyordu; `stampVictory` yanlış adımı damgalasa ya da hiç
+      // çağrılmasa testler sessiz kalırdı.
+      final quest = _quest(stepGoal: 2000, startedAt: now);
+      final profile = await pumpShell(
+        tester,
+        // Yüksek seviye: düşman ilk roundda devrilsin, hedefin büyük
+        // bölümü yürüyüş fazına kalsın.
+        profile: UserProfile(avatar: _avatar, level: 40),
+        adventure: quest,
+      );
+
+      expect(quest.isWalkPhaseActive, isFalse, reason: 'savaş henüz sürüyor');
+      expect(quest.hasVictoryStamp, isFalse);
+
+      // Tek round hedefi kadar yürü: motor roundu çözer ve düşman düşer.
+      final roundSteps = quest.roundTargetSteps;
+      await addSteps(tester, roundSteps);
+
+      expect(
+        quest.isEnemyDefeated,
+        isTrue,
+        reason: '40. seviye oyuncu ilk roundda devirmeli',
+      );
+      expect(quest.hasVictoryStamp, isTrue);
+      expect(
+        quest.victorySteps,
+        roundSteps,
+        reason: 'damga harcanan macera adımını göstermeli',
+      );
+      expect(quest.victoryRounds, 1);
+      expect(quest.walkTargetSteps, 2000 - roundSteps);
+      expect(quest.isWalkPhaseActive, isTrue);
+      expect(quest.isAdventureCompleted, isFalse);
+      // Harcanmayan her adım hız çarpanına da yazılır (GD56).
+      expect(quest.speedRewardMultiplier, greaterThan(1.0));
+
+      // Zaferin geldiği partide yürüyüş adımı **birikmez**: o parti
+      // savaş adımıydı, bonus almamalı.
+      expect(quest.walkSteps, 0);
+
+      // Sonraki parti bonuslu orandan saymalı.
+      final coinsBefore = profile.coins;
+      await addSteps(tester, 300);
+      expect(quest.walkSteps, 300);
+      expect(
+        profile.coins - coinsBefore,
+        greaterThanOrEqualTo(300 ~/ GameConstants.walkPhaseStepsPerCoin),
+        reason: 'yürüyüş fazında 30 adım 1 coin etmeli',
+      );
+    });
+
     testWidgets('yürüyüş fazında adımlar 30/1 oranıyla paraya döner', (
       tester,
     ) async {

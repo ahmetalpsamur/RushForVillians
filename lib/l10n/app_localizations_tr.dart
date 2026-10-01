@@ -193,9 +193,7 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String endlessResultItem(String name) {
-    return 'Düşen eşya: $name';
-  }
+  String get droppedItemLabel => 'DÜŞEN EŞYA';
 
   @override
   String get endlessClose => 'Kapat';
@@ -2432,6 +2430,21 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String enemyAttackNotice(String enemy, int damage) {
     return '$enemy senin $damage canını aldı.';
+  }
+
+  @override
+  String roundWonNotice(int round, int damage) {
+    return 'Round $round kazanıldı · $damage hasar vurdun';
+  }
+
+  @override
+  String roundMissedNotice(int round, int damage) {
+    return 'Round $round kaçtı · $damage hasar yedin';
+  }
+
+  @override
+  String roundEnemyHealthNotice(String enemy, String health, String maxHealth) {
+    return '$enemy: $health / $maxHealth can';
   }
 
   @override

@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../l10n/l10n_context.dart';
 import '../../models/avatar_profile.dart';
 import '../../models/endless_run.dart';
+import '../../widgets/dropped_item_card.dart';
 import '../../widgets/pixel_sprite.dart';
 import '../../widgets/section_card.dart';
 
@@ -389,10 +390,13 @@ class _EndlessResult extends StatelessWidget {
                 ),
               ),
               if (run.rewardItemId != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  l10n.endlessResultItem(run.rewardItemId!.split('/').last),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                const SizedBox(height: 10),
+                // Normal macera zaferiyle **aynı** bileşen: iki modın ödül
+                // dili ayrışmamalı. Eskiden burada ham asset kimliği
+                // basılıyordu ("fire_sword_variant_03") — iki dilde de bozuk.
+                DroppedItemCard(
+                  itemId: run.rewardItemId!,
+                  label: l10n.droppedItemLabel,
                 ),
               ],
               if (defeated) ...[

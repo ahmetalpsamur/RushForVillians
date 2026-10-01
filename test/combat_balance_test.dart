@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/attack_config.dart';
 import 'package:rush_for_villains/core/utils/base_combat_stats.dart';
 import 'package:rush_for_villains/core/utils/combat_engine.dart';
 import 'package:rush_for_villains/core/utils/effective_stats.dart';
@@ -39,6 +40,37 @@ void main() {
         playerHealth: playerHp,
         enemyHealth: enemyHp,
         completion: completion,
+        seed: currentSeed,
+      );
+      playerHp = outcome.playerHealthAfter;
+      enemyHp = outcome.enemyHealthAfter;
+      currentSeed = outcome.nextSeed;
+      rounds++;
+    }
+    return rounds;
+  }
+
+  /// [roundsToKill]'in hedefe göre ölçeklenmiş statlarla çalışan eşi.
+  ///
+  /// Katalogdaki [Enemy.stats] yalnızca önizlemenin tabanı; hedef dengesi
+  /// ölçülürken `enemyStatsForGoal` çıktısı kullanılmalı.
+  int roundsToKillStats(
+    CombatStats player,
+    CombatStats enemy,
+    int enemyHealth, {
+    int seed = 12345,
+  }) {
+    var playerHp = player.maxHealth.round();
+    var enemyHp = enemyHealth;
+    var currentSeed = seed;
+    var rounds = 0;
+    while (enemyHp > 0 && playerHp > 0 && rounds < 400) {
+      final outcome = resolveCombatRound(
+        player: player,
+        enemy: enemy,
+        playerHealth: playerHp,
+        enemyHealth: enemyHp,
+        completion: 1,
         seed: currentSeed,
       );
       playerHp = outcome.playerHealthAfter;
@@ -158,6 +190,122 @@ void main() {
         catalogAttackDamage: expectedCatalogAttack(weak.tier).round(),
       );
       expect(weak.stats.attack, lessThan(reference.attack));
+    });
+  });
+
+  group('hedef dengesi (Bölüm D / Faz 1)', () {
+    // Altı hedef `AttackConfig.targets`'tan okunuyor — sabit kopyalanmıyor.
+    final goals = AttackConfig.supportedStepTargets;
+
+    test('hedef büyüdükçe düşman canı asla azalmaz', () {
+      // Zorunlu değişmez (GD100). Bir dönem can maceranın planlanan **round
+      // sayısından** türüyordu ve tempo tablosu o sayıyı hedefte monoton
+      // yapmıyordu: 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor,
+      // yani 3.000'in düşmanı 2.000'inkinden **zayıf** çıkıyordu — üstelik
+      // ödülü ×2,0 vs ×1,4'tü. 2.000'i seçmek için sebep kalmıyordu.
+      for (final enemy in EnemyCatalog.enemies) {
+        var previous = 0;
+        for (final goal in goals) {
+          final health =
+              enemyStatsForGoal(enemy: enemy, stepGoal: goal).maxHealth.round();
+          expect(
+            health,
+            greaterThan(previous),
+            reason:
+                '${enemy.name}: $goal hedefinde can $health, '
+                'önceki hedefte $previous',
+          );
+          previous = health;
+        }
+      }
+    });
+
+    test('güç çarpanı yalnızca saldırıya giriyor', () {
+      // GD101: hedef cana **iki kez** girmemeli. Can adım taahhüdünden,
+      // tehlike çarpandan geliyor.
+      for (final enemy in EnemyCatalog.enemies.take(5)) {
+        for (final goal in goals) {
+          final scaled = enemyStatsForGoal(enemy: enemy, stepGoal: goal);
+          final base = enemyBaseStatsForGoal(enemy: enemy, stepGoal: goal);
+          expect(
+            scaled.maxHealth,
+            closeTo(base.maxHealth, 0.001),
+            reason: '${enemy.name} $goal: can çarpandan etkilenmemeli',
+          );
+          final multiplier = scaled.attack / base.attack;
+          expect(
+            multiplier,
+            closeTo(AttackConfig.forStepTarget(goal).enemyPowerMultiplier, 0.01),
+            reason: '${enemy.name} $goal: saldırı çarpanı uygulanmamış',
+          );
+        }
+      }
+    });
+
+    test('çıplak seviye-uygun oyuncu planlanan roundların içinde bitirir', () {
+      // "Seviye-uygun" tanımı can formülünün kendi varsayımı: kademeye
+      // denk seviyedeki ölçüt oyuncu (§6.10). Mükemmel round bonusu
+      // **verilmiyor** — roundu tam ama süresi dolarken bitiren oyuncu.
+      for (final enemy in EnemyCatalog.enemies) {
+        final player = baseCombatStats(enemy.tier < 1 ? 1 : enemy.tier);
+        for (final goal in goals) {
+          final stats = enemyStatsForGoal(enemy: enemy, stepGoal: goal);
+          final planned = AttackConfig.roundCountForSteps(goal);
+          final rounds = roundsToKillStats(
+            player,
+            stats,
+            stats.maxHealth.round(),
+          );
+          expect(
+            rounds,
+            lessThanOrEqualTo(planned),
+            reason:
+                '${enemy.name} $goal hedefinde $rounds round istiyor, '
+                'planlanan $planned — oyuncu taahhüdünden fazla yürüyor',
+          );
+        }
+      }
+    });
+
+    test('yük oranı bandların içinde sabit ve 1,0\'ın altında', () {
+      // Sürekli ölçü: can / (round başına hasar × planlanan round).
+      // Tam sayı round sayan ölçü düşük round sayılarında marjı gizliyor.
+      final worst = <int, double>{};
+      for (final enemy in EnemyCatalog.enemies) {
+        final player = baseCombatStats(enemy.tier < 1 ? 1 : enemy.tier);
+        for (final goal in goals) {
+          final stats = enemyStatsForGoal(enemy: enemy, stepGoal: goal);
+          final planned = AttackConfig.roundCountForSteps(goal);
+          final perRound = stats.damageAfterDefense(player.attack);
+          final load = stats.maxHealth / (perRound * planned);
+          if (load > (worst[goal] ?? 0)) worst[goal] = load;
+        }
+      }
+      for (final goal in goals) {
+        expect(
+          worst[goal],
+          lessThan(1.0),
+          reason: '$goal hedefinde çıplak yük ${worst[goal]}',
+        );
+      }
+      // Tempo tablosunun iki bandı round boyu 500 ve 1.000; yani yük bant
+      // içinde sabit, bantlar arasında iki katına çıkıyor. Sayılar
+      // kopyalanmıyor, tablodan türetiliyor.
+      for (final goal in goals) {
+        final other = goals.firstWhere(
+          (g) =>
+              g != goal &&
+              AttackConfig.roundStepsFor(g) ==
+                  AttackConfig.roundStepsFor(goal),
+          orElse: () => goal,
+        );
+        if (other == goal) continue;
+        expect(
+          worst[goal],
+          closeTo(worst[other]!, 0.06),
+          reason: 'aynı bantta ($goal / $other) yük ayrışıyor',
+        );
+      }
     });
   });
 

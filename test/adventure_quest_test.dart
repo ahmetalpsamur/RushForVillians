@@ -96,11 +96,11 @@ void main() {
       expect(early?.roundNumber, 1);
       expect(early?.targetReached, isTrue);
       expect(quest.currentRound, 2);
-      // 2.000 hedef -> 500 adımlık / 5 dakikalık round bandı.
+      // 2.000 hedef -> 3.000'in altında, yani 500 adım / 7 dakika.
       expect(quest.roundTargetSteps, 500);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(seconds: 107, minutes: 5)),
+        startedAt.add(const Duration(seconds: 107, minutes: 7)),
       );
     });
 
@@ -112,9 +112,10 @@ void main() {
         startedAt: startedAt,
       );
 
+      // Round süresi 7 dakika (2.000 hedef); tam deadline'da çözülüyor.
       final result = quest.resolveExpiredRound(
         0,
-        startedAt.add(const Duration(minutes: 5)),
+        startedAt.add(const Duration(minutes: 7)),
       );
 
       expect(result, isNotNull);
@@ -216,15 +217,15 @@ void main() {
         startedAt: startedAt,
       );
 
-      // 2.500 hedef 1.000-2.999 bandında: round 500 adım / 5 dakika.
+      // 2.500 hedef 3.000'in altında: round 500 adım / 7 dakika.
       expect(quest.roundTargetSteps, 500);
-      expect(quest.currentRoundDuration, const Duration(minutes: 5));
+      expect(quest.currentRoundDuration, const Duration(minutes: 7));
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 5)),
+        startedAt.add(const Duration(minutes: 7)),
       );
       expect(quest.totalRounds, 5);
-      expect(quest.totalAttackDuration, const Duration(minutes: 25));
+      expect(quest.totalAttackDuration, const Duration(minutes: 35));
     });
   });
 
@@ -245,14 +246,14 @@ void main() {
         playerStats: _durablePlayer,
       );
 
-      // 5.000 hedef -> 1.000 adımlık / 10 dakikalık round: 31 dakikada üç
-      // round dolmuş olur.
-      expect(result?.roundNumber, 3);
-      expect(quest.roundOutcomeSerial, 3);
-      expect(quest.currentRound, 4);
+      // 5.000 hedef -> 1.000 adımlık / 15 dakikalık round: 31 dakikada iki
+      // round dolmuş olur (15 ve 30. dakika).
+      expect(result?.roundNumber, 2);
+      expect(quest.roundOutcomeSerial, 2);
+      expect(quest.currentRound, 3);
       expect(
         quest.nextEnemyAttackAt,
-        startedAt.add(const Duration(minutes: 40)),
+        startedAt.add(const Duration(minutes: 45)),
       );
     });
 
@@ -266,9 +267,11 @@ void main() {
         playerStats: _durablePlayer,
       );
 
-      expect(result?.walkedSteps, 2500);
-      expect(result?.targetSteps, 3000);
-      expect(quest.roundStartingSteps, 2500);
+      // İki round doldu, her biri 1.000 adım istiyor: 2.500 adımın 2.000'i
+      // harcanır, kalan 500 üçüncü rounda devreder.
+      expect(result?.walkedSteps, 2000);
+      expect(result?.targetSteps, 2000);
+      expect(quest.roundStartingSteps, 2000);
     });
 
     test('süresi dolmamış ilk round state değiştirmez', () {

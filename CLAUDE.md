@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD99)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD103)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -109,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v28 + migration | Firebase |
+| Yerel kalıcılık, şema v29 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -1295,10 +1295,11 @@ Katalogdaki elle yazılmış `attackDamage` korunur: kademenin doğrusal
 beklentisine oranlanıp çarpan olarak uygulanır — tasarımcının bilerek zayıf
 bıraktığı düşman zayıf kalır.
 
-**Düşmanın canı adımdan koparıldı** (GD49): `stepGoal` artık düşman canı ya da
-kilit eşiği belirlemez; yalnızca round hedefini ve beklenen round sayısını
-belirler. Adım hedefi bitip düşman hâlâ ayaktaysa round hedefi **tam boya**
-döner — eski formül 0 döndürüyordu ve savaş kilitlenirdi.
+**Düşmanın canı "her adım 1 hasar" modelinden koparıldı** (GD49) ama
+`stepGoal` cana girmeye devam ediyor: artık **doğrudan** adım taahhüdünden,
+`stepGoal / enemyHealthStepsPerRound` ile (GD100). Adım hedefi bitip düşman
+hâlâ ayaktaysa round hedefi **tam boya** döner — eski formül 0 döndürüyordu
+ve savaş kilitlenirdi.
 
 **Düşman önizlemesi** savaşa girmeden can/saldırı/savunma ve arketip rozetini
 gösterir + tek cümlelik davranış açıklaması.
@@ -1314,43 +1315,85 @@ Bir macera **bir saldırıdır**. Round boyu ve süresi
 `GameConstants.combatRoundPacing` **tablosundan** gelir — türetilmez,
 kullanıcı değiştiremez:
 
-| Adım hedefi bandı | Round boyu | Round süresi |
-|---|---|---|
-| < 1.000 | 250 adım | 2,5 dk |
-| 1.000 – 2.999 | 500 adım | 5 dk |
-| 3.000 – 9.999 | 1.000 adım | 10 dk |
-| ≥ 10.000 | 2.000 adım | 20 dk |
+| Adım hedefi bandı | Round boyu | Round süresi | Kadans |
+|---|---|---|---|
+| < 3.000 | 500 adım | 7 dk | 71 adım/dk |
+| ≥ 3.000 | 1.000 adım | 15 dk | 67 adım/dk |
 
-**Dört bandın kadansı da tam olarak `stepsPerMinute` = 100 adım/dk.** Bant
-değiştikçe roundun boyu ve süresi birlikte iki katına çıkıyor, oyuncudan
-istenen tempo hiç değişmiyor.
+⚠️ **Kadans artık bantlar arasında sabit değil.** Bir dönem dört bandın
+hepsi tam 100 adım/dk veriyordu ve bu "ortak kadans" tablonun asıl vaadi
+sayılıyordu. Cihazda oynanınca o tempo fazla bulundu; tablo Bölüm D'de
+kullanıcının sabit kararıyla değiştirildi. İki bant da `stepsPerMinute`
+referans temposunun **altında** — yürüyen oyuncu roundu erken bitirip
+mükemmel round bonusu alabiliyor, koşmak zorunda kalmıyor.
 
-`GameConstants.maxCombatRounds = 5` artık **bağlayıcı**: tablonun daha fazla
-round üreteceği bir hedefte (yalnızca eski kayıtlardan gelebilir) round boyu
-büyür, sayı 5'te kalır, kadans korunur.
+⚠️ **Tablo dört satır, tempo iki bant.** `combatRoundPacing` dört satır
+taşımaya devam ediyor çünkü 0/1.000 ve 3.000/10.000 çiftleri aynı round
+boyunu ama **farklı ödül çarpanını** paylaşıyor. Tempo Bölüm D'de değişti,
+ödül eğrisi Faz 2'de ölçülmüş hâliyle korundu.
+
+`GameConstants.maxCombatRounds = 10` artık **bağlamıyor**: değeri tablonun en
+büyük üretimine eşit (10.000 / 1.000). Desteklenen altı hedefin hiçbirinde
+devreye girmiyor; yalnızca tabloda karşılığı olmayan eski bir kayıtta
+(ör. 20.000) round sayısının sınırsız büyümesini engelliyor — o zaman
+round **boyu** büyür, sayı tavanda kalır. Sabit silinmedi: `roundStepsFor`
+içindeki büyütme dalı eski kayıtların tek koruması.
 
 **Altı seçilebilir hedef:**
 
-| Adım hedefi | Round | Round boyu | Toplam süre | Düşman güç çarpanı | Ödül çarpanı |
-|---|---|---|---|---|---|
-| 500 | 2 | 250 | 5 dk | ×1,00 | ×1,0 |
-| 1.000 | 2 | 500 | 10 dk | ×1,15 | ×1,4 |
-| 2.000 | 4 | 500 | 20 dk | ×1,35 | ×1,4 |
-| 3.000 | 3 | 1.000 | 30 dk | ×1,55 | ×2,0 |
-| 5.000 | 5 | 1.000 | 50 dk | ×1,85 | ×2,0 |
-| 10.000 | 5 | 2.000 | 100 dk | ×2,40 | ×3,0 |
+| Adım hedefi | Round | Round boyu | Toplam süre | Güç çarpanı (saldırı) | Ödül çarpanı | Çıplak yük | Ekipmanlı yük |
+|---|---|---|---|---|---|---|---|
+| 500 | 1 | 500 | 7 dk | ×1,00 | ×1,0 | 0,36 | 0,15 |
+| 1.000 | 2 | 500 | 14 dk | ×1,15 | ×1,4 | 0,38 | 0,15 |
+| 2.000 | 4 | 500 | 28 dk | ×1,35 | ×1,4 | 0,36 | 0,15 |
+| 3.000 | 3 | 1.000 | 45 dk | ×1,55 | ×2,0 | 0,72 | 0,30 |
+| 5.000 | 5 | 1.000 | 75 dk | ×1,85 | ×2,0 | 0,72 | 0,30 |
+| 10.000 | 10 | 1.000 | 150 dk | ×2,40 | ×3,0 | 0,73 | 0,30 |
 
-**Düşman güç çarpanı artık gerçekten uygulanıyor**
-(`AdventureQuest.enemyPowerMultiplier`). Bir dönem sabit `1` döndürüyordu:
-tablo yazılıydı ama okunmuyordu, yani 10.000 adımlık hedef 500'lükle aynı
-statlı düşman veriyordu — yüksek kademe *daha uzun* bir savaştı, daha zor
-değil.
+**Yük oranı** = düşman canı / (ölçüt oyuncunun round başına hasarı ×
+planlanan round). 20 düşmanın **en kötüsü** yazılı (her zaman bir
+`tank` arketipi). Bant içinde sabit, bantlar arasında iki katına çıkıyor —
+round boyu 500'den 1.000'e çıktığı için. `combat_balance_test` altı hedefin
+hepsini tarıyor: hiçbirinde 1,0 aşılmıyor ve çıplak seviye-uygun oyuncu
+planlanan roundların içinde bitiriyor.
 
-⚠️ **Düşman canı kademede monoton olmalı.** Tempo tablosu bant sınırında
-round sayısını düşürebiliyor (2.500 → 5 round, 3.000 → 3 round). Can
-`expectedRoundsForTier` üzerinden round sayısından türediği için 6. kademe
-düşman 5. kademeden zayıf çıkıyordu. `expectedRoundsForTier` bu yüzden
-**azalmayan bir zarf** döndürüyor — sayı hâlâ tablodan geliyor.
+### Hedefin iki ekseni iki ayrı stata bağlı (GD100 · GD101)
+
+| Eksen | Nereden | Ne yapar |
+|---|---|---|
+| **Can** | `stepGoal / enemyHealthStepsPerRound` (= 2.000) | Hedef uzadıkça savaş uzar |
+| **Saldırı** | `enemyPowerMultiplier` ×1,00 → ×2,40 | Hedef uzadıkça kaçırılan round daha çok acıtır |
+
+⚠️ **Güç çarpanı cana uygulanmıyor** (GD101). Bir dönem ikisine birden
+giriyordu; can adım taahhüdünden türemeye başlayınca hedef cana **iki kez**
+girer oldu ve yük oranı 500→10.000 arasında 4,8 kat açıldı — tek bir
+`enemyHealthStepsPerRound` değeriyle hem kısa hedefleri olaylı hem uzun
+hedefleri bitirilebilir yapmak imkânsızdı.
+
+⚠️ **Can hedefte monoton olmak zorunda** (GD100). Bir dönem can maceranın
+planlanan **round sayısından** türüyordu; tempo tablosu o sayıyı hedefte
+monoton yapmıyor (2.000 → 4 round, 3.000 → 3 round), yani **3.000 hedefinin
+düşmanı 2.000'inkinden zayıftı** — üstelik ödülü ×2,0 vs ×1,4'tü.
+2.000'i seçmek için hiçbir sebep kalmıyordu. Adım taahhüdü tempo bandından
+bağımsız ve tanımı gereği monoton; `combat_balance_test` altı hedefi
+sırayla tarıyor.
+
+`expectedRoundsForTier` **yalnızca katalog tabanında** kaldı (önizleme) ve
+azalmayan zarf döndürmeye devam ediyor; gerçek savaş onu hiç okumuyor.
+
+### "Savaş kilitlenmesin" koruması ne zaman tetiklenir
+
+Adım taahhüdü bitip düşman hâlâ ayaktaysa round hedefi **tam boya** döner
+ve ek round açılır (`_roundTargetFor(stepGoal, totalRounds)`). Yukarıdaki
+yük oranlarından sonra bu **normal oyunda tetiklenmiyor**. Geriye üç yol
+kalıyor:
+
+1. **Roundları eksik tamamlamak.** Motor hasarı tamamlanma oranıyla
+   ölçekliyor; her roundun yarısını yürüyen oyuncu yarı hasar veriyor ve
+   iki kat round istiyor. Kuralın kendisi, hata değil.
+2. **Seviyesinin çok üstünde bir düşman seçmek** — yük oranı ölçüt
+   oyuncuya göre ölçülüyor.
+3. **Tabloda karşılığı olmayan eski bir hedef** (yalnızca eski kayıt).
 
 ### ⚠️ Bağlanmamış ikinci savaş yolu
 
@@ -1466,6 +1509,42 @@ Yeni asset gerekmedi: `All_Assets/.../<Sınıf>_Walk.gif` zaten var.
 - Round erken tamamlanırsa anında kazanılır; `roundTargetSteps <= 0` koruması
   düşman ölünce döngüyü durdurur.
 - Uygulama arka plana geçince bildirim planlanır, öne gelince iptal edilir.
+
+### Round sonucu bildirimi (GD102)
+
+Bir round çözüldüğünde `RootShell._showRoundOutcome` **tek** bir SnackBar
+gösterir: kaçıncı round, vurulan (ya da yenilen) hasar, düşmanın kalan
+canı ve — varsa — mükemmel round satırı.
+
+Bir dönem buradan yalnızca mükemmel round duyurusu çıkıyordu. Round
+**süresi dolarak** kazanıldığında hiçbir şey görünmüyordu; sahnedeki
+animasyonlu hasar sayısı ise yalnızca macera ekranı açıkken oynuyor. Yani
+oyuncu vurduğu hasarı ve düşmanın kalan canını hiçbir yerde okuyamıyordu.
+
+Üç kısıt, üçü de testle bağlı (`round_outcome_test`):
+
+1. **Tek bildirim.** Mükemmel round ayrı bir SnackBar değil, aynı kutunun
+   üçüncü satırı — iki kutu kuyruğa girip birbirini kapatıyordu (GD46 ile
+   aynı hata sınıfı).
+2. **Okunmadan kaybolmaz.** Süre 4 sn değil `_roundNoticeDuration` = **7 sn**:
+   bu oyun yürürken oynanıyor, telefona bakış gecikmeli.
+3. **Akışı kesmez.** Diyalog değil; ve zafer/yenilgi roundunda **hiç**
+   gösterilmez — ikisinin de kendi tam ekran perdesi var.
+
+### Düşen eşya gösterimi (GD103)
+
+Garanti düşen eşya (GD93) bir dönem **hiçbir ekranda görünmüyordu**:
+`AdventureQuest.droppedItemId` kayda yazılıyordu ama hiçbir widget onu
+okumuyordu. Ödülün varlığı envanteri açıp saymaya bağlıydı.
+
+`widgets/dropped_item_card.dart` tek gösterim dili: görsel + yerelleşmiş ad
+(`l10n.itemName`) + nadirlik hem rozetle hem çerçeve rengiyle. **Normal
+macera zaferi ve Sonsuz Koşu sonucu aynı bileşeni kullanıyor** — iki ayrı
+tasarım yok. Sonsuz koşu tarafında eskiden ham asset kimliği basılıyordu
+("Item dropped: fire_sword_variant_03"), yani **iki dilde de** bozuktu.
+
+Katalogdan kalkmış bir kimlikte kart hiçbir şey çizmez: uydurma ad
+göstermektense susmak yeğ. Golden: TR/EN × 320/390 dp, en uzun adla.
 
 ### İlerleme göstergeleri (GD34)
 
@@ -1793,6 +1872,27 @@ Asset adlarındaki iyelik eki kelime sınırında düzeltiliyor: "Reapers Scythe
 → "Reaper's Scythe", "Blacksmiths Regular" → "Blacksmith's Regular".
 Güvenlik metinleri ARB'ye taşındı ve içerikleri dürüstleştirildi (GD90).
 
+**Bölüm D Faz 1 (üç sızıntı + bir üretici hatası):**
+
+- `itemName` içindeki `RegExp(r' Type ([1-9])$')` kalıbı baştaki boşluğu da
+  tüketiyor ama yerine konan metin onu geri koymuyordu: "Ancient Spell Book
+  Type 1" → **"Ancient Spell BookI"**. Büyük "I" küçük "l" gibi okunduğu
+  için sahada "fazladan l harfi" diye bildirildi. **238 İngilizce ad**
+  bozuktu. Tek satırlık düzeltme.
+- Sonsuz koşu sonucunda ham asset kimliği basılıyordu (GD103).
+- Taverna önizlemesinin mock üye adları ("Ayşe", "Mehmet") İngilizce modda
+  da Türkçeydi. Mock veriye çeviri altyapısı kurmak yanlış yatırım olurdu —
+  bu liste GD74'e göre geçici ve §13 geldiğinde tamamen gidecek. Adlar
+  **dilden bağımsız** hale getirildi; oyuncunun kendi satırı (`'Sen'`) zaten
+  `youMemberName` ile çevriliyordu.
+
+`generated_name_hygiene_test` bu hata sınıfını kalıcı olarak bekliyor: 784
+eşya adı, 65 ünvan adı/hikâyesi/etiketi, 20 düşman adı ve bütün stat/
+nadirlik adları **iki dilde** taranıyor — yutulan boşluk, çift boşluk,
+baş/son boşluğu, değiştirilmemiş ICU yer tutucusu, sızan `snake_case`
+kimlik ve harfe yapışmış rakam. Düzeltme geri alınıp çalıştırıldığında
+test 238 adın hepsini yakalıyor.
+
 **Ölçülen taşma riski düşük:** İngilizce en uzun eşya adı **34** karakter
 (TR 31), en uzun ünvan adı **19** (TR 19), en uzun ünvan etki etiketi **60**
 (TR 49). Ünvan ekranı 320 ve 390 dp'de İngilizce olarak render edildi;
@@ -1853,9 +1953,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v28**
+## Şema — **güncel sürüm v29**
 
-`GameStorage.schemaVersion = 28` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 29` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -1880,6 +1980,7 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 25 → 26 | Kademe güç çarpanı gerçekten uygulanmaya başladı; yarım maceranın `enemyHealth`'i **oranı korunarak** yeni tavana taşındı |
 | 26 → 27 | Zaferden garanti eşya düşmesi (`droppedItemId`, `droppedItemInstanceId`). Bitmiş maceraya geriye dönük eşya verilmiyor |
 | 27 → 28 | Sonsuz Koşu (`endlessRun`). Eski kayıtta `null` — hiç başlamamış koşu |
+| 28 → 29 | Tempo tablosu ve düşman canının kaynağı değişti; yarım maceranın `enemyHealth`'i **harcanan adım oranından** yeni tavana taşınıyor (v13 ile aynı desen) |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
 **Bozuk veri:** `FormatException` / `TypeError` / genel `catch` yakalanır,
@@ -1951,7 +2052,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**955 test** (`flutter test`), bunların **911'i yeşil**. Test, bu projede
+**978 test** (`flutter test`), bunların **931'i yeşil**. Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -1969,7 +2070,9 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Eğitim / rehber | `tutorial_guide_test`, `pet_companion_test`, `character_creation_test`, `character_catalog_test` |
 | Kalıcılık ve açılış | `game_storage_test`, `app_boot_test` |
 | Ekonomi ölçümü | `economy_pacing_test` |
-| Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü) |
+| Round geri bildirimi | `round_outcome_test` |
+| Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
+| Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü), **düşen eşya kartı** (TR/EN × 320/390) |
 
 ## Test desenleri
 
@@ -2030,7 +2133,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD99)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD103)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2121,7 +2224,7 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD81 | Çark altın veriyor; epik/efsanevi ekipman çarktan kalktı | Altın adım ekonomisinden **ayrı** bir kaynak (işaretçiye dokunmuyor). Epik/efsanevi kaldırma GD19'un geri gelmesi |
 | GD82 | Rehber `Scaffold.body` içinde yaşıyor; konumu sabit pikselden çıkmıyor | Body'nin alt kenarı zaten alt gezinme çubuğunun üst kenarı → `bottom: 0` "barın hemen üstü" demek. Ölçüm, tema sorgusu ya da 96 px tahmini gerekmiyor; jest çubuğu olan/olmayan cihazda, bar gizlendiğinde ve klavye açıldığında kendiliğinden doğru |
 | GD83 | Eğitim rehberi ekrandan yürüyerek çıkmıyor, **death** animasyonuyla veda ediyor | Çıkış artık pet'i kapatmakla aynı hissi veriyor. Süre sabit (960 ms): üç rehberin `*_Death_8.gif` dosyası da 8 kare × 120 ms, ve geçişi gerçek dosya okumasına bağlamak hem testlerde sahte saatle ilerletilemez hem asset okunamazsa eğitimi biteceği anda takardı |
-| GD84 | *(kodda uygulanmadı — geri alındı)* Savaş temposunun 100 adım/dk'dan türetilmesi | Kod sabit **1.000 adım / 15 dk** rounda geri dönmüş; `stepsPerMinute` yalnızca arayüz etiketi, `maxCombatRounds` hiç okunmuyor. Tempo tablosu Bölüm C Faz 2'de yeniden ele alınacak |
+| GD84 | *(GD100 ile kapandı)* Savaş temposunun 100 adım/dk'dan türetilmesi | Faz 2'de tablo kuruldu ve dört bandın kadansı tam 100 adım/dk yapıldı. Cihazda oynanınca o tempo fazla bulundu; Bölüm D'de tablo kullanıcının sabit kararıyla 500/7dk · 1.000/15dk'ya geçti ve **ortak kadans vazgeçildi**. `stepsPerMinute` artık bir tavan: iki bant da onun altında kalıyor |
 | GD85 | Yerelleştirme resmî `flutter_localizations` + `intl` + ARB/`gen_l10n` hattında | Flutter SDK ile sürüm uyumlu, üçüncü parti çalışma zamanı ve ayrı anahtar üretim sistemi getirmiyor |
 | GD86 | Dil tercihi `GameState` dışında ayrı SharedPreferences anahtarında | Dil bir oyun ilerlemesi değil cihaz/uygulama tercihidir; oyun kayıt şemasını ve ilerideki Firebase zarfını gereksiz yere değiştirmemeli |
 | GD87 | Türkçe ARB şablon ve eksik çeviri yedeği; desteklenmeyen sistem dili de Türkçe | Mevcut Türkçe hiçbir şey kaybetmez; yarım İngilizce çeviride boş değer veya anahtar adı kullanıcıya görünmez |
@@ -2137,6 +2240,10 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD97 | Sonsuz Koşu kesimleri çarka ve başarım sayaçlarına **yazılmıyor**, seriye **yazılıyor** | Kesim 200 adımda bir oluyor. "Günün ilk zaferi" sayılsaydı çark kilidi 3.000 adımdan 200'e düşerdi; `enemiesDefeated` sayılsaydı "1000 düşman devir" ünvanı bir saatte alınırdı. Seri ise zaten **adım** kapısından geçiyor, ayrı koda gerek yok |
 | GD98 | Ünvanların **savaş** etkileri nadirliğe göre ölçeklendi (×1,20 · ×1,25 · ×1,30 · ×1,35 · ×1,40); ekonomi etkilerine **hiç dokunulmadı** | Ölçülen sorun: tek ünvan takılıyor ama 3–5 eşya kuşanılıyordu, yani ünvanın savaş katkısı tek bir eşyanın altında kalıyordu. Ekonomi tarafı kullanıcının açık talimatıyla dışarıda bırakıldı: `maxTitleEconomyBonus` +%25 tavanı ölçülmüş bir dengeye bağlı (GD70) ve yalnızca ekonomi etkisi taşıyan 20 ünvan olduğu gibi duruyor. Etiketler değerle birlikte güncellendi — `customLabel` yalan söylemesin |
 | GD99 | Cam Top'un iki sayısı tek kaynaktan: `GameConstants.glassCannonPercent` | Etki değeri, negatif eşi ve iki dildeki etiket dört ayrı yerde elle yazılıydı; GD98 boost'u birini değiştirip üçünü bırakabilirdi. “sayfada aynı sayı dört kez” bir denge kararı değil, bir hata kaynağı |
+| GD100 | Düşman canı **adım taahhüdünden** türüyor (`stepGoal / enemyHealthStepsPerRound`), planlanan round sayısından değil | Tempo tablosu round sayısını hedefte monoton yapmıyor: 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor. Sonuç ölçüldü — **3.000 hedefinin düşmanı 2.000'inkinden zayıftı**, üstelik ödülü ×2,0 vs ×1,4'tü; 2.000'i seçmek için sebep kalmıyordu. Adım taahhüdü tempo bandından bağımsız ve tanımı gereği monoton. Birim bir round değil bir round **payı**; değer kesirli olabiliyor |
+| GD101 | Güç çarpanı yalnızca **saldırıya** uygulanıyor, cana değil | GD100'den sonra hedef cana iki kez giriyordu (bir kez adım taahhüdüyle, bir kez çarpanla) ve yük oranı 500→10.000 arasında **4,8 kat** açılıyordu: tek bir `enemyHealthStepsPerRound` değeri ya kısa hedefleri olaysız bırakıyor ya uzun hedefleri planlanan rounda sığdıramıyordu. Ayrışma temiz: **can = ne kadar sürer**, **saldırı = kaçırırsan ne kadar acır**. `scaleEnemyCombatStats` yardımcısı değişmedi, değişen çağrı noktası |
+| GD102 | Round sonucu **tek** bir bildirimde: hasar + kalan can + (varsa) mükemmel round; süre 7 sn; zafer/yenilgide hiç gösterilmiyor | Round süresi dolarak kazanıldığında oyuncu hiçbir şey görmüyordu — sahnedeki hasar sayısı yalnızca macera ekranı açıkken oynuyor. İki ayrı SnackBar kuyruğa girip birbirini kapatırdı (GD46). 7 sn keyfi değil: yürüyen oyuncunun telefonu cebinden çıkarması varsayılan 4 sn'yi aşıyor |
+| GD103 | Düşen eşya tek bir paylaşılan bileşenle gösteriliyor (`DroppedItemCard`); macera zaferi ve Sonsuz Koşu aynı dili kullanıyor | Garanti ödül (GD93) hiçbir ekranda görünmüyordu; sonsuz koşuda ise ham asset kimliği basılıyordu. İki ayrı kart yazmak aynı ödülü iki farklı şey gibi gösterirdi. Katalogda olmayan kimlikte kart **hiçbir şey çizmiyor**: uydurma ad göstermektense susmak yeğ |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
@@ -2156,7 +2263,22 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-Bölüm C sonunda `flutter test` → **911 başarılı, 44 başarısız.**
+Bölüm D / Faz 1 sonunda `flutter test` → **931 başarılı, 47 başarısız.**
+
+47'nin **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo). Kalan üçü de
+Bölüm D'nin işi **değil**, ayrı ayrı doğrulandı:
+
+- **`character_creation_test` golden'ı (2).** Bölüm D'nin değişiklikleri
+  `git stash` ile geri alınıp çalıştırıldığında **yine kırmızı**. Bu ikisi
+  Bölüm C sırasında bir ara yeşile dönmüştü; kararlı değiller.
+- **`adventure_progress_test` (1).** Sıra bağımlı: dosya **tek başına**
+  çalışınca yeşil, tam süitte kırmızı.
+
+⚠️ `victory_scene_390.png` golden'ı (yukarıdaki 44'ün içinde) **zaten
+kırmızıydı** ve zafer perdesine düşen eşya kartı eklendiği için farkı
+büyüdü. **Yenilenmedi**: başkasının incelenmemiş görsel durumunu commit'e
+almak olurdu. Yenilenen tek golden `tavern_320.png` — o Bölüm D'den önce
+**yeşildi** ve yalnızca mock üye adları değiştiği için kırıldı.
 
 ⚠️ **Bu 44 test Bölüm C'den önce de kırmızıydı.** Bölüm C'nin dört fazı da
 `HEAD`'e karşı ölçüldü (ayrı bir `git worktree` içinde temiz baseline) ve

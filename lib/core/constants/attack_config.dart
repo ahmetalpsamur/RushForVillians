@@ -203,8 +203,14 @@ abstract final class AttackConfig {
   static double get roundPercentageTotal =>
       rounds.fold(0, (total, round) => total + round.percentage);
 
+  /// Faz yüzdeleri tam %100 ediyor mu.
+  ///
+  /// Ölçüt [AttackPhase.values]; bir dönem [GameConstants.maxCombatRounds]'a
+  /// bağlıydı ve ikisi tesadüfen 5'ti. Round tavanı 10'a çıkınca o bağ
+  /// `forStepTarget`'ı hata fırlatır hâle getirdi — faz sayısı bir **anlatı**
+  /// kararı (ısınma → atak → final), round sayısı bir **tempo** kararı.
   static bool get hasValidRoundPercentages =>
-      rounds.length == GameConstants.maxCombatRounds &&
+      rounds.length == AttackPhase.values.length &&
       (roundPercentageTotal - 1).abs() < 0.000000001;
 
   static AttackTargetConfig forStepTarget(int stepTarget) {

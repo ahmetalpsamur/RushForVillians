@@ -27,7 +27,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 28;
+  static const int schemaVersion = 29;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -369,6 +369,45 @@ class GameStorage {
     // v27 -> v28: Sonsuz Koşu modu (`endlessRun`). Eski kayıtta alan yok;
     // `null` doğru varsayılan — hiç başlamamış bir koşu.
     27: (state) => state,
+    // v28 -> v29: tempo tablosu (500/7dk · 1.000/15dk) ve düşman canının
+    // kaynağı değişti: can artık **adım taahhüdünden** türüyor (GD100) ve
+    // güç çarpanı yalnızca saldırıya uygulanıyor (GD101). Yarım bir
+    // macerada `enemyHealth` eski tavana göre yazılmıştı.
+    //
+    // v13 ile **aynı desen**: kalan can, harcanan adım oranından yeniden
+    // kuruluyor. Eski tavanı hesaplamak için iki ayrı donmuş formül
+    // (eski round tablosu + eski can formülü) taşımak gerekirdi; onları
+    // kodda tutmak, bir daha hiç çalışmayacak iki fonksiyonu süresiz
+    // bakımda tutmak demekti. Takas açık: düşmanı adımından hızlı eritmiş
+    // oyuncu bir miktar ilerleme kaybediyor, geride kalan oyuncu
+    // kazanıyor — ama savaş hiçbir yönde kilitlenmiyor.
+    28: (state) {
+      final adventure = state['adventure'];
+      if (adventure is! Map<String, dynamic>) return state;
+      final enemyId = adventure['enemyId'];
+      final enemy = enemyId is String ? EnemyCatalog.byId(enemyId) : null;
+      if (enemy == null) return state;
+      final health = adventure['enemyHealth'];
+      // Devrilmiş düşmana dokunulmuyor: biten bir savaş geri açılmaz.
+      if (health is! int || health <= 0) return state;
+
+      final stepGoal = adventure['stepGoal'] as int? ?? enemy.minimumDailySteps;
+      final startingSteps = adventure['startingSteps'] as int? ?? 0;
+      final today = state['today'];
+      final steps =
+          today is Map<String, dynamic> ? (today['steps'] as int? ?? 0) : 0;
+      final questSteps = (steps - startingSteps).clamp(0, stepGoal);
+      final remainingRatio =
+          stepGoal <= 0 ? 1.0 : (stepGoal - questSteps) / stepGoal;
+
+      final newMax =
+          enemyStatsForGoal(enemy: enemy, stepGoal: stepGoal).maxHealth.round();
+      // En az 1: oran sıfıra yuvarlanırsa düşman savaş başlamadan ölmüş
+      // sayılır ve zafer ödülü hiç vurulmadan dağıtılırdı.
+      final moved = (newMax * remainingRatio).round();
+      adventure['enemyHealth'] = moved < 1 ? 1 : moved;
+      return state;
+    },
   };
 
   /// Ardışık yazma isteklerinin diske gitme sıklığı. Her state değişiminde
