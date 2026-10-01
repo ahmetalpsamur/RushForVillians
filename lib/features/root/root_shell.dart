@@ -2829,7 +2829,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     // Aktif macera hangi sekmede kalındığından bağımsız olarak ekranı kilitler.
     // Bu özellikle uygulama altın toplama fazında yeniden açıldığında önemlidir:
     // `_tabIndex` bellekte 0'dan başlasa da kullanıcı Ana Sayfa'ya düşmemeli.
-    final fullscreenAdventure = _adventure != null;
+    // Sonsuz Koşu da **aynı mekanizmayla** kilitliyor (Bölüm D / Faz 2):
+    // iki mod aynı savaş ekranını gösteriyor, aynı şekilde tam ekran
+    // olmalı. Bir dönem yalnızca macera kilitliyordu; sonsuz koşu
+    // sırasında alt çubuk duruyor ve oyuncu sekme değiştirebiliyordu.
+    // Biten bir koşu (sonuç perdesi) kilitlemez: oradan çıkış var.
+    final fullscreenAdventure =
+        _adventure != null || _endlessRun?.isActive == true;
     final visibleTabIndex = fullscreenAdventure ? 1 : _tabIndex;
 
     final dockTutorial =

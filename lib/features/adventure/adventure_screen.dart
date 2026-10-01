@@ -22,6 +22,8 @@ import '../../models/enemy.dart';
 import '../../services/character_catalog.dart';
 import '../../widgets/pixel_sprite.dart';
 import '../../widgets/scroll_to_top_button.dart';
+import '../../widgets/coin_rain.dart';
+import '../../widgets/combat_hud.dart';
 import '../../widgets/dropped_item_card.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/stat_bar.dart';
@@ -2226,7 +2228,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                 left: 0,
                                 bottom: healthBottom,
                                 width: (stage.maxWidth - 18) / 2,
-                                child: _buildHudHealthBar(
+                                child: CombatHudHealthBar(
                                   key: const ValueKey('player-health-hud'),
                                   progressKey: const ValueKey(
                                     'player-health-progress',
@@ -2243,7 +2245,7 @@ class _AdventureScreenState extends State<AdventureScreen>
                                 right: 0,
                                 bottom: healthBottom,
                                 width: (stage.maxWidth - 18) / 2,
-                                child: _buildHudHealthBar(
+                                child: CombatHudHealthBar(
                                   key: const ValueKey('enemy-health-hud'),
                                   progressKey: const ValueKey(
                                     'enemy-health-progress',
@@ -2303,9 +2305,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                                   top: compact ? 58 : 72,
                                   child: FadeTransition(
                                     opacity: _damageMessageOpacity,
-                                    child: _buildHudDamageLabel(
-                                      context.l10n.damageDealt(_pendingDamage),
-                                      AppColors.streak,
+                                    child: CombatHudDamageLabel(
+                                      text: context.l10n.damageDealt(
+                                        _pendingDamage,
+                                      ),
+                                      color: AppColors.streak,
                                     ),
                                   ),
                                 ),
@@ -2316,11 +2320,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                                   top: compact ? 58 : 72,
                                   child: FadeTransition(
                                     opacity: _damageMessageOpacity,
-                                    child: _buildHudDamageLabel(
-                                      context.l10n.healthDamageUpper(
+                                    child: CombatHudDamageLabel(
+                                      text: context.l10n.healthDamageUpper(
                                         _playerDamage,
                                       ),
-                                      AppColors.hp,
+                                      color: AppColors.hp,
                                     ),
                                   ),
                                 ),
@@ -2575,90 +2579,6 @@ class _AdventureScreenState extends State<AdventureScreen>
           },
         );
       },
-    );
-  }
-
-  Widget _buildHudHealthBar({
-    required Key key,
-    required Key progressKey,
-    required String label,
-    required double value,
-    required String valueText,
-    required Color color,
-    required CrossAxisAlignment alignment,
-  }) {
-    return DecoratedBox(
-      key: key,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-        child: Column(
-          crossAxisAlignment: alignment,
-          children: [
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.6,
-                shadows: [Shadow(color: Colors.black, blurRadius: 6)],
-              ),
-            ),
-            const SizedBox(height: 5),
-            LinearProgressIndicator(
-              key: progressKey,
-              value: value.clamp(0, 1),
-              minHeight: 9,
-              borderRadius: BorderRadius.circular(10),
-              color: color,
-              backgroundColor: Colors.white12,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              valueText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHudDamageLabel(String text, Color color) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
-          ),
-        ),
-      ),
     );
   }
 
@@ -3239,15 +3159,24 @@ class _WalkPhaseScene extends StatefulWidget {
 }
 
 class _WalkPhaseSceneState extends State<_WalkPhaseScene>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _travel = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 6),
   )..repeat(reverse: true);
 
+  /// Para yağmurunun döngüsü. Ayrı bir controller: yürüyüş gidip
+  /// gelen (`reverse: true`) bir hareket, yağmur ise tek yönlü ve farklı
+  /// periyotlu — aynı controller'a bağlamak ikisini birbirine kilitlerdi.
+  late final AnimationController _rain = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
+
   @override
   void dispose() {
     _travel.dispose();
+    _rain.dispose();
     super.dispose();
   }
 
@@ -3285,6 +3214,17 @@ class _WalkPhaseSceneState extends State<_WalkPhaseScene>
                     ],
                   ),
                 ),
+              ),
+            ),
+            // Para yağmuru (Bölüm D / Faz 1.5) — **karakterin arkasında**.
+            // Önde olsaydı yürüyen figür sürekli kapanırdı; arkada olunca
+            // sahne derinlik kazanıyor ve sprite okunur kalıyor (GD61'in
+            // tersi değil: orada örtülen şey **ganimetti**, burada ganimet
+            // zaten yağmurun kendisi).
+            Positioned.fill(
+              child: CoinRain(
+                key: const ValueKey('walk-phase-coin-rain'),
+                controller: _rain,
               ),
             ),
             AnimatedBuilder(

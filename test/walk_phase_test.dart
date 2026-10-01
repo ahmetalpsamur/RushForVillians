@@ -225,13 +225,22 @@ void main() {
       );
     });
 
-    test('30 adım = 1 coin, artık adımlar tüketilmez', () {
+    test('bonuslu oran uygulanır, artık adımlar tüketilmez', () {
+      // Sabit kopyalanmıyor: oran değişse de "artan adım yanmaz" kuralı
+      // ölçülmeye devam etsin. 95 adım örneği 20/1'de 4 coin + 15 artan.
+      const pending = 95;
+      final rate = GameConstants.walkPhaseStepsPerCoin;
       final reward = calculateStepCoins(
-        pendingSteps: 95,
-        stepsPerCoin: GameConstants.walkPhaseStepsPerCoin,
+        pendingSteps: pending,
+        stepsPerCoin: rate,
       );
-      expect(reward.coins, 3);
-      expect(reward.consumedSteps, 90);
+      expect(reward.coins, pending ~/ rate);
+      expect(reward.consumedSteps, (pending ~/ rate) * rate);
+      expect(
+        pending - reward.consumedSteps,
+        lessThan(rate),
+        reason: 'artan adım bir sonraki hesaba devretmeli',
+      );
     });
 
     test('oran verilmezse normal oran kullanılır', () {
@@ -241,15 +250,23 @@ void main() {
     });
 
     test('aynı adım yürüyüş oranında daha çok coin eder', () {
-      final normal = calculateStepCoins(pendingSteps: 3000).coins;
+      const pending = 3000;
+      final normal = calculateStepCoins(pendingSteps: pending).coins;
       final walking =
           calculateStepCoins(
-            pendingSteps: 3000,
+            pendingSteps: pending,
             stepsPerCoin: GameConstants.walkPhaseStepsPerCoin,
           ).coins;
-      expect(normal, 60);
-      expect(walking, 100);
+      expect(normal, pending ~/ GameConstants.stepsPerCoin);
+      expect(walking, pending ~/ GameConstants.walkPhaseStepsPerCoin);
       expect(walking, greaterThan(normal));
+      // Bölüm D / Faz 1.5: fark artık belirgin olmalı — erken bitirmenin
+      // ödülü "biraz daha iyi" değil, **katı** olmalı.
+      expect(
+        walking / normal,
+        greaterThanOrEqualTo(2.0),
+        reason: 'bonuslu oran normalin en az iki katı olmalı',
+      );
     });
   });
 
@@ -535,9 +552,17 @@ void main() {
             (4000 ~/ GameConstants.stepsPerCoin),
       );
       // İşaretçi yalnızca **tüketilen** adım kadar ilerler, raporlanan kadar
-      // değil: bonuslu geçiş 990 adım (33 x 30), normal geçiş 4000 adım
-      // (80 x 50) tüketti. Kalan 10 adım yanmaz, sonraki hesaba devreder.
-      expect(profile.lastRewardedStepCount, 4990);
+      // değil. Oran 20/1 olduğu için bonuslu geçiş 1.000 adımın tamamını
+      // tüketiyor (50 x 20), normal geçiş 4.000 (80 x 50). Artık adım
+      // kalmadığı için işaretçi tam 5.000'de. Sabit 30'a dönerse bu sayı
+      // 4.990 olur ve test tabloyu değil **davranışı** ölçmeye devam eder:
+      // tüketilen = bonuslu pay + normal pay.
+      expect(
+        profile.lastRewardedStepCount,
+        (1000 ~/ GameConstants.walkPhaseStepsPerCoin) *
+                GameConstants.walkPhaseStepsPerCoin +
+            (4000 ~/ GameConstants.stepsPerCoin) * GameConstants.stepsPerCoin,
+      );
       expect(profile.totalSteps, 5000);
     });
 
@@ -648,7 +673,13 @@ void main() {
         find.byKey(const ValueKey('gold-collection-large-coin')),
         findsOneWidget,
       );
-      expect(find.text('+33 EK ALTIN'), findsOneWidget);
+      // Sabit kopyalanmıyor: 1.000 adımın bonuslu oranla ettiği altın.
+      expect(
+        find.text(
+          '+${1000 ~/ GameConstants.walkPhaseStepsPerCoin} EK ALTIN',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('XP'), findsNothing);
       expect(find.textContaining(quest.enemy.name), findsNothing);
     });

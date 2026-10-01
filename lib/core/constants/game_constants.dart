@@ -202,12 +202,27 @@ class GameConstants {
   /// düşmanı 2.000'inkinden zayıf çıkıyordu (ödülü ×2,0 vs ×1,4 olmasına
   /// rağmen) — 2.000'i seçmek için sebep kalmamıştı.
   ///
-  /// Değer ölçümle seçildi; [combatRoundPacing]'in iki bandının round boyu
-  /// 500 ve 1.000 olduğu için yük oranı bant içinde sabit, bantlar arasında
-  /// iki katına çıkıyor. `combat_balance_test` bütün hedefleri tarıyor:
-  /// hiçbirinde ekipmanlı yük 1,0'ı geçmiyor ve çıplak seviye-uygun oyuncu
-  /// planlanan roundların içinde bitiriyor.
-  static const int enemyHealthStepsPerRound = 2000;
+  /// ## Değer nasıl seçildi
+  ///
+  /// **Yük oranı** = düşman canı / (ölçüt oyuncunun round başına hasarı
+  /// × planlanan round). Hedef bant: **çıplak 0,90–1,00** (zor bitirsin ama
+  /// bitirsin) ve **ekipmanlı 0,60–0,85** (savaş maceranın büyük kısmını
+  /// kaplasın, yürüyüş fazı bir ödül olsun).
+  ///
+  /// 1.600 ile 3.000+ hedeflerde **ikisi de tutuyor**: çıplak 0,91,
+  /// ekipmanlı 0,68. 20 düşman × 6 hedef = 120 kombinasyonda taşma 0.
+  ///
+  /// ⚠️ **3.000'in altındaki hedefler bandin yarısında kalıyor** (çıplak
+  /// 0,45 · ekipmanlı 0,34) ve bu **tek bir sabitle düzeltilemez**. Sebep
+  /// [combatRoundPacing]'in kendisi: yük oranı `stepGoal / plananRound`
+  /// ile doğru orantılı ve bu değer tam olarak **round boyuna** eşit —
+  /// alt bantta 500, üst bantta 1.000. Yani iki bandin yükü tanımı gereği
+  /// **1:2**. Alt bandi banda oturtan değer (≈800) üst bandi 1,8'e
+  /// çıkarır ve oyuncu taahhüdünden fazla yürür.
+  ///
+  /// İkinci bir çarpan **icat edilmedi**: tek sabit kalması bilinçli.
+  /// `combat_balance_test` hem bandi hem taşmayı balıyor.
+  static const int enemyHealthStepsPerRound = 1600;
 
   /// Eksik round hasar eğrisinin üssü.
   ///
@@ -343,7 +358,18 @@ class GameConstants {
   /// **Neden yalnızca coin, XP değil:** iki kaldıracı birden oynatmak dengeyi
   /// ölçülemez hâle getirir. XP eğrisi (`stepsPerXp`) ayrıca gerekçelendirilmiş
   /// ve `step_xp_test.dart` ile bağlı; ona dokunmuyoruz.
-  static const int walkPhaseStepsPerCoin = 30;
+  ///
+  /// ⚠️ **30 → 20 (Bölüm D / Faz 1.5).** Düşmanı erken devirmek artık
+  /// ölçülebilir bir başarı: yük oranı banda çekilince tek roundda devirmek
+  /// gerçek bir ekipman yatırımı istiyor. Karşılığında açılan yürüyüş fazı
+  /// da büyüdüğünden oranın büyümesi gerekiyordu — yoksa "erken bitir"
+  /// ödülü, uzun ama zayıf bir sayaca dönüşüyordu.
+  ///
+  /// Normal orana göre **×2,5** (50 → 20). Kazanım yapısal olarak sınırlı
+  /// kalıyor: faz en fazla `stepGoal` adım sürüyor, yani üst sınır
+  /// `stepGoal / 20` coin ve bu da yalnızca hiç adım harcamadan devirmekle
+  /// mümkün (GD58).
+  static const int walkPhaseStepsPerCoin = 20;
 
   /// Zafer ödülü hız çarpanının tavanı (Bölüm A.2).
   ///

@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD103)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD106)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -79,7 +79,7 @@ oyunu ilerletir; oturan biri ilerletmez.
 
 ```
 gerçek adım
-   ├─► coin           (50 adım = 1 · yürüyüş fazında 30 adım = 1)
+   ├─► coin           (50 adım = 1 · yürüyüş fazında 20 adım = 1)
    ├─► XP             (2 adım = 1 XP — seviye vermez, bkz. §6.3)
    ├─► seviye         (adımdan: 500·(1+ln sv)^1,5)
    ├─► günlük seri    (2000 adım ya da bir zafer)
@@ -92,7 +92,7 @@ gerçek adım
               ┌──────────────┴───────────────┐
               ▼                              ▼
       zafer ödülü (XP + altın)        YÜRÜYÜŞ FAZI
-      × hız çarpanı (≤ ×1,5)          30 adım = 1 altın
+      × hız çarpanı (≤ ×1,5)          20 adım = 1 altın
                                       taahhüt bitene kadar
 ```
 
@@ -210,6 +210,13 @@ dokunma.
 ### Sekmeler
 
 `NavigationBar`, 5 sekme: **Ana Sayfa · Macera · Mağaza · Taverna · Profil**.
+
+**Savaş sırasında sekme değiştirilemez.** `fullscreenAdventure`
+(`_adventure != null || _endlessRun?.isActive == true`) çubuğu hiç
+çizmiyor, görünen sekmeyi 1'e sabitliyor ve pet katmanını kaldırıyor.
+`_selectTab` içinde ayrı bir koruma **yok** — çubuk ekranda olmadığı
+için gerekmiyor. Sonsuz koşu bir dönem bu bayrağa girmiyordu ve koşu
+sırasında sekme değiştirilebiliyordu (Bölüm D / Faz 2'de kapatıldı).
 İtilen (sekme olmayan) ekranlar: envanter, demirci, ünvanlar, çark,
 koleksiyon, adım geçmişi, karakter düzenleme.
 
@@ -517,7 +524,10 @@ koruması artık `maxStepsPerMinute` fiziksel hız denetimine dayanıyor.
 hesaba kalır. Kapat-aç, gün değişimi, macera seçimi ve aynı değerin tekrar
 bildirilmesi — dördü de testle bağlı.
 
-**Yürüyüş fazında oran 30 adım = 1 coin** (`walkPhaseStepsPerCoin`, §6.11).
+**Yürüyüş fazında oran 20 adım = 1 coin** (`walkPhaseStepsPerCoin`, §6.11)
+— normal oranın **×2,5'i**. Bir dönem 30'du; yük oranı banda çekilip
+erken devirmek gerçek bir ekipman yatırımı isteyince karşılığının da
+büyümesi gerekti (GD104).
 Hesap **iki geçişli**, çünkü bir parti faz sınırını geçebilir: önce bonuslu
 pay 30/1 ile, sonra kalanı 50/1 ile. İşaretçi her geçişte yalnızca tüketilen
 adım kadar ilerler.
@@ -1343,19 +1353,46 @@ içindeki büyütme dalı eski kayıtların tek koruması.
 
 | Adım hedefi | Round | Round boyu | Toplam süre | Güç çarpanı (saldırı) | Ödül çarpanı | Çıplak yük | Ekipmanlı yük |
 |---|---|---|---|---|---|---|---|
-| 500 | 1 | 500 | 7 dk | ×1,00 | ×1,0 | 0,36 | 0,15 |
-| 1.000 | 2 | 500 | 14 dk | ×1,15 | ×1,4 | 0,38 | 0,15 |
-| 2.000 | 4 | 500 | 28 dk | ×1,35 | ×1,4 | 0,36 | 0,15 |
-| 3.000 | 3 | 1.000 | 45 dk | ×1,55 | ×2,0 | 0,72 | 0,30 |
-| 5.000 | 5 | 1.000 | 75 dk | ×1,85 | ×2,0 | 0,72 | 0,30 |
-| 10.000 | 10 | 1.000 | 150 dk | ×2,40 | ×3,0 | 0,73 | 0,30 |
+| 500 | 1 | 500 | 7 dk | ×1,00 | ×1,0 | 0,45 | 0,34 |
+| 1.000 | 2 | 500 | 14 dk | ×1,15 | ×1,4 | 0,45 | 0,34 |
+| 2.000 | 4 | 500 | 28 dk | ×1,35 | ×1,4 | 0,45 | 0,34 |
+| 3.000 | 3 | 1.000 | 45 dk | ×1,55 | ×2,0 | **0,91** | **0,68** |
+| 5.000 | 5 | 1.000 | 75 dk | ×1,85 | ×2,0 | **0,91** | **0,68** |
+| 10.000 | 10 | 1.000 | 150 dk | ×2,40 | ×3,0 | **0,91** | **0,68** |
 
 **Yük oranı** = düşman canı / (ölçüt oyuncunun round başına hasarı ×
 planlanan round). 20 düşmanın **en kötüsü** yazılı (her zaman bir
-`tank` arketipi). Bant içinde sabit, bantlar arasında iki katına çıkıyor —
-round boyu 500'den 1.000'e çıktığı için. `combat_balance_test` altı hedefin
-hepsini tarıyor: hiçbirinde 1,0 aşılmıyor ve çıplak seviye-uygun oyuncu
-planlanan roundların içinde bitiriyor.
+`tank` arketipi). Ekipmanlı sütün oyuncunun **kendi sınıfının** açtığı
+3–5 slotu en iyi itemlerle doldurduğu durum — 10 kategoriyi birden
+kuşanmak mümkün değil ve bir dönem ölçüm bunu yapıyordu, ekipmanı
+olduğundan 2,5 kat güçlü gösteriyordu.
+
+`combat_balance_test` altı hedefi tarıyor; 20 düşman × 6 hedef = 120
+kombinasyonda taşma **0**, monotonluk ihlali **0**.
+
+⚠️ **3.000'in altındaki üç hedef hedef bandın yarısında** ve bu
+**tek bir sabitle düzeltilemez** — bkz. [GameConstants.enemyHealthStepsPerRound].
+Sebep tempo tablosunun kendisi: yük `stepGoal / planlananRound` ile doğru
+orantılı ve bu değer tam olarak **round boyuna** eşit (alt bantta 500,
+üst bantta 1.000), yani iki bandın yükü tanımı gereği **1:2**.
+
+### Tek roundda devirmek
+
+Ortalama kaç round sürüyor (20 düşmanın ortalaması):
+
+| Hedef | Planlanan | Çıplak | Medyan ekipman | En iyi ekipman |
+|---|---|---|---|---|
+| 500 | 1 | 1,0 | 1,0 | 1,0 |
+| 1.000 | 2 | 1,0 | 1,0 | 1,0 |
+| 2.000 | 4 | 1,5 | 1,1 | 1,1 |
+| 3.000 | 3 | 2,2 | 1,8 | 1,5 |
+| 5.000 | 5 | 3,7 | 2,6 | 2,2 |
+| 10.000 | 10 | 6,4 | 4,8 | 4,0 |
+
+**Üst bantta tek atım gerçek bir başarı**: 10.000 hedefinde en iyi
+ekipmanla bile 4 round gerekiyor, yani tek roundda devirmek o dört katı
+hasar demek. **Alt bantta ise çıplak oyuncu bile tek atıyor** — yukarıdaki
+yarım-bant sorununun doğrudan sonucu, ayrı bir karar değil.
 
 ### Hedefin iki ekseni iki ayrı stata bağlı (GD100 · GD101)
 
@@ -1500,6 +1537,30 @@ aynalanır. Tek yönlü sonsuz geçiş daha "yol" gibi dururdu ama karakteri zam
 yarısında ekran dışında bırakırdı.
 
 Yeni asset gerekmedi: `All_Assets/.../<Sınıf>_Walk.gif` zaten var.
+
+**Para yağmuru** (GD105): sahnede 12 para düşüyor (`widgets/coin_rain.dart`).
+Bonuslu oranı görünür kılmak için — görünmeyen bir çarpan kural değil,
+sürprizdir (GD56 ile aynı fikir). Karakterin **arkasında**: önde olsaydı
+yürüyen figür sürekli kapanırdı.
+
+Üç kısıt testle bağlı: `IgnorePointer` ile **hiçbir dokunuşu yutmuyor**,
+konumlar deterministik, ve `pumpAndSettle` zaten bu sahnede kullanılamıyor
+(yürüyüş animasyonu da sonsuz tekrarlı, GD76).
+
+⚠️ **Dağıtım `stableSpread` ile yapılmıyor.** İlk sürüm öyleydi ve
+ölçüldü: `'rain-x-0'` … `'rain-x-11'` gibi kısa ve birbirine çok benzeyen
+anahtarlarda `stableSpread` **dağıtmıyor** — 12 paranın onu aynı sütuna ve
+aynı yüksekliğe düşüyordu, ekranda iki para görünüyordu. Yerine
+**düşük tutarsızlık dizisi** (altın oranın kesirli kısmı): indeks arttıkça
+aralığı eşit doldurur ve asla kümelenmez.
+
+⚠️ **Yedek görsel çizilen bir disk, `Icon` değil** ve `frameBuilder` ile
+**yükleme** sırasında da gösteriliyor. İki ayrı şey ölçüldü: test
+ortamında ikon fontu yok, yani `Icon` yedeği hiçbir şey çizmiyor; asıl
+sorun ise `errorBuilder` bile değildi — GIF **hata vermiyor**, yalnızca
+henüz çözülmemiş oluyor ve o sırada `Image` boşluk çiziyor. Golden bu
+yüzden sessizce bomboş çıkıyordu. (`runAsync` + `precacheImage` denendi:
+animasyonlu GIF çözümü süiti **10 dakikaya** çıkarıyor.)
 
 ### Round çözümü ve zaman
 
@@ -1770,19 +1831,61 @@ yalnızca büyümediğini, farklı bir şey de yaptığını görüyor.
 
 ### Tek karar: bitir ya da devam et
 
-Ekranda **tek dokunulabilir şey** "Macerayı bitir" düğmesi. Kesimler, çarpan
-artışı ve canavar değişimi otomatik; hiçbir karar, seçim, zamanlama ya da
-mini oyun yok. Ekran veri de tutmuyor — durumu `RootShell`'den okuyor.
+Ekranda **tek dokunulabilir şey** "Macerayı bitir" (alt panelde ve sağ
+üstteki × düğmesinde). Kesimler, çarpan artışı ve canavar değişimi
+otomatik; hiçbir karar, seçim, zamanlama ya da mini oyun yok. Ekran veri de
+tutmuyor — durumu `RootShell`'den okuyor.
 
 - **Bitir** → tam banka.
 - **Düş** → bankanın yarısı, **asla sıfır değil** (GD96).
 
+### Ekran normal macerayla **aynı** (Bölüm D / Faz 2)
+
+Bir dönem sonsuz koşu kendi tasarım dilini kullanıyordu: AppBar'lı, düz
+koyu zeminli bir `ListView`, ayrı bir çarpan şeridi, tek taraflı can çubuğu
+ve **canavarın can çubuğu hiç yok**. Artık iki mod aynı savaş ekranını
+gösteriyor.
+
+Paylaşılan parçalar `widgets/combat_hud.dart` içinde — kopyalanmadı,
+**aynı bileşenler**: `CombatHudBackdrop` (arka plan + iki gradyan),
+`CombatHudHealthBar` (iki taraflı can), `CombatHudDamageLabel`,
+`CombatHudPanel` (alt kart). Bunlar `adventure_screen.dart` içindeki
+private yardımcılardan **birebir** taşındı; `ValueKey`'ler korundu, yani
+mevcut macera testleri aynı elemanları bulmaya devam ediyor.
+
+| | Normal macera | Sonsuz Koşu |
+|---|---|---|
+| Alt gezinme çubuğu | kalkıyor | **kalkıyor** (aynı `fullscreenAdventure`) |
+| AppBar | gizli | **gizli** (sonuç perdesinde geri geliyor) |
+| Pet katmanı | gizli | **gizli** |
+| Gövde | tam ekran HUD | **tam ekran HUD** |
+| Can çubukları | oyuncu + düşman | **oyuncu + canavar** |
+| Üst şerit | ROUND n/m + geri sayım | **KESİM n + çarpan** |
+| İlerleme | round + macera çubuğu | **kesim çubuğu** |
+| Çıkış | sağ üst × + alt düğme | **aynı** |
+
+**Canavarın canı adım cinsinden**: kesime kalan adım azaldıkça çubuk
+boşalıyor. Normal maceradaki düşman çubuğuyla aynı yer, aynı renk.
+
+**Çarpan HUD'un içinde**, normal maceranın geri sayımıyla aynı noktada —
+ayrı bir şerit değil. Bu modun imzası olduğu için kaldırılmadı.
+
+⚠️ **Geri sayan süre sonsuz koşuda gösterilmiyor** (GD106). Mantık aynen
+işliyor — `countdownRemaining` hesaplanıyor, süresi dolan round canavara
+vuruyor — yalnızca **çizilmiyor**. Hiçbir sayı değişmedi. Normal macerada
+sayaç görünmeye devam ediyor.
+
+Güvenlik satırı alt panelde **korundu**: normal maceranın alt kartında
+böyle bir satır yok ama bu modun sözleşmesi tam olarak o (GD90).
+
 ### Çizim maceranınkiyle aynı
 
-Aynı `PixelSprite`, aynı 100×100 tuval, aynı `bottom: -22` oturtması, aynı
-animasyon havuzu (`walkAsset` / `hurtAsset`). **Tek fark `scale`**: taban
-orana kesim ölçeği biniyor. `PixelSprite` zaten `ClipRect` içinde ve
-`FilterQuality.none` koruyor — büyüyen sprite bulanıklaşmıyor, pikselleşiyor.
+Aynı `PixelSprite`, aynı `scale: 3.5` tabanı, aynı `offset`, aynı
+`imageKey` deseni, aynı animasyon havuzu. **Tek fark**: canavarın taban
+oranına kesim ölçeği biniyor (`3.5 × spriteScale`). `PixelSprite` zaten
+`ClipRect` içinde ve `FilterQuality.none` koruyor — büyüyen sprite
+bulanıklaşmıyor, pikselleşiyor.
+
 
 ### Seri, çark ve sayaçlar
 
@@ -2052,7 +2155,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**978 test** (`flutter test`), bunların **931'i yeşil**. Test, bu projede
+**999 test** (`flutter test`), bunların **955'i yeşil**. Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2071,8 +2174,9 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Kalıcılık ve açılış | `game_storage_test`, `app_boot_test` |
 | Ekonomi ölçümü | `economy_pacing_test` |
 | Round geri bildirimi | `round_outcome_test` |
+| Sonsuz Koşu ekranı | `endless_screen_test` — paylaşılan HUD, navigasyon kilidi, gizli sayaç, iki dilde 320/390 golden |
 | Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
-| Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü), **düşen eşya kartı** (TR/EN × 320/390) |
+| Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü), **düşen eşya kartı** (TR/EN × 320/390), **para yağmuru** (320/390) |
 
 ## Test desenleri
 
@@ -2133,7 +2237,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD103)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD106)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2243,6 +2347,9 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD100 | Düşman canı **adım taahhüdünden** türüyor (`stepGoal / enemyHealthStepsPerRound`), planlanan round sayısından değil | Tempo tablosu round sayısını hedefte monoton yapmıyor: 2.000 hedefi 4 round, 3.000 hedefi 3 round planlıyor. Sonuç ölçüldü — **3.000 hedefinin düşmanı 2.000'inkinden zayıftı**, üstelik ödülü ×2,0 vs ×1,4'tü; 2.000'i seçmek için sebep kalmıyordu. Adım taahhüdü tempo bandından bağımsız ve tanımı gereği monoton. Birim bir round değil bir round **payı**; değer kesirli olabiliyor |
 | GD101 | Güç çarpanı yalnızca **saldırıya** uygulanıyor, cana değil | GD100'den sonra hedef cana iki kez giriyordu (bir kez adım taahhüdüyle, bir kez çarpanla) ve yük oranı 500→10.000 arasında **4,8 kat** açılıyordu: tek bir `enemyHealthStepsPerRound` değeri ya kısa hedefleri olaysız bırakıyor ya uzun hedefleri planlanan rounda sığdıramıyordu. Ayrışma temiz: **can = ne kadar sürer**, **saldırı = kaçırırsan ne kadar acır**. `scaleEnemyCombatStats` yardımcısı değişmedi, değişen çağrı noktası |
 | GD102 | Round sonucu **tek** bir bildirimde: hasar + kalan can + (varsa) mükemmel round; süre 7 sn; zafer/yenilgide hiç gösterilmiyor | Round süresi dolarak kazanıldığında oyuncu hiçbir şey görmüyordu — sahnedeki hasar sayısı yalnızca macera ekranı açıkken oynuyor. İki ayrı SnackBar kuyruğa girip birbirini kapatırdı (GD46). 7 sn keyfi değil: yürüyen oyuncunun telefonu cebinden çıkarması varsayılan 4 sn'yi aşıyor |
+| GD104 | Yürüyüş fazı oranı 30 → **20** adım/coin (normalin ×2,5'i) | Yük oranı banda çekilince (GD100/GD101) erken devirmek gerçek bir ekipman yatırımı istemeye başladı; karşılığında açılan faz da büyüdüğü için oranın büyümesi gerekiyordu — yoksa "erken bitir" ödülü uzun ama zayıf bir sayaca dönüşüyordu. Kazanım yapısal olarak sınırlı: faz en fazla `stepGoal` adım sürüyor, üst sınır `stepGoal / 20` (GD58) |
+| GD106 | Sonsuz Koşu normal macerayla **aynı** savaş ekranını kullanıyor; geri sayan süre yalnızca bu modda **gizli** | İki mod aynı oyunun aynı fiili; ayrı tasarım dili öğrenilmiş her şeyi ikinci kez öğrenmek demekti. Paylaşılan parçalar `widgets/combat_hud.dart`'a **taşındı**, kopyalanmadı — `ValueKey`'ler korunduğu için macera testleri etkilenmedi. Sayaç gizli çünkü bu modun varlık sebebi telefona **bakmamak** (§6.17): geri sayan bir rakam oyuncuyu ekrana bağlar. Mantık aynen duruyor, süresi dolan round hâlâ canavara vurduruyor — oyuncu bunu **sonucundan** anlıyor, sayaçtan değil |
+| GD105 | Yürüyüş fazında **para yağmuru**; dağıtım `stableSpread` değil düşük tutarsızlık dizisi | Bonuslu oran görünür olmalı (GD56 ile aynı fikir). `stableSpread` kalıcı kimlikler için yazıldı; `'rain-x-0'`…`'rain-x-11'` gibi yoğun bir indeks dizisinde dağıtmıyor ve 12 paranın onu aynı noktaya yığılıyordu. Altın oranın kesirli kısmı hem daha basit hem bu iş için daha doğru. Yedek görsel `Icon` değil **çizilen disk** ve `frameBuilder` ile yükleme sırasında da gösteriliyor — çözülmemiş bir `Image` boşluk çiziyor ve golden sessizce boş çıkıyordu |
 | GD103 | Düşen eşya tek bir paylaşılan bileşenle gösteriliyor (`DroppedItemCard`); macera zaferi ve Sonsuz Koşu aynı dili kullanıyor | Garanti ödül (GD93) hiçbir ekranda görünmüyordu; sonsuz koşuda ise ham asset kimliği basılıyordu. İki ayrı kart yazmak aynı ödülü iki farklı şey gibi gösterirdi. Katalogda olmayan kimlikte kart **hiçbir şey çizmiyor**: uydurma ad göstermektense susmak yeğ |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
@@ -2263,16 +2370,13 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-Bölüm D / Faz 1 sonunda `flutter test` → **931 başarılı, 47 başarısız.**
+Bölüm D / Faz 2 sonunda `flutter test` → **955 başarılı, 44 başarısız.**
 
-47'nin **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo). Kalan üçü de
-Bölüm D'nin işi **değil**, ayrı ayrı doğrulandı:
-
-- **`character_creation_test` golden'ı (2).** Bölüm D'nin değişiklikleri
-  `git stash` ile geri alınıp çalıştırıldığında **yine kırmızı**. Bu ikisi
-  Bölüm C sırasında bir ara yeşile dönmüştü; kararlı değiller.
-- **`adventure_progress_test` (1).** Sıra bağımlı: dosya **tek başına**
-  çalışınca yeşil, tam süitte kırmızı.
+44'ün **tamamı Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
+testi kırmadı. Faz 1 sonunda 47 görünüyordu: ikisi `character_creation_test`
+golden'ı, biri `adventure_progress_test`'in sıra bağımlı testi. Üçü de
+kararsız — değişiklikler `git stash` ile geri alınınca da kırmızıydılar — ve
+Faz 2 ölçümünde kendiliğinden yeşile döndüler.
 
 ⚠️ `victory_scene_390.png` golden'ı (yukarıdaki 44'ün içinde) **zaten
 kırmızıydı** ve zafer perdesine düşen eşya kartı eklendiği için farkı
