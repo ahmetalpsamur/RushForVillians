@@ -35,6 +35,7 @@ class AdventureScreen extends StatefulWidget {
   final AvatarProfile avatar;
   final DailyProgress today;
   final ValueChanged<AdventureQuest> onAdventureSelected;
+
   /// Sonsuz Koşuyu başlatır (Bölüm C / Faz 3).
   ///
   /// Mod normal maceranın **yerine geçmiyor**, yanına ekleniyor: hedef
@@ -89,6 +90,10 @@ class _AdventureScreenState extends State<AdventureScreen>
   ];
 
   int _stepGoal = 500;
+  bool _monsterHuntSelected = false;
+  bool _peekMounted = false;
+  bool _peekVisible = false;
+  Timer? _peekTimer;
   Enemy? _selectedEnemy;
   final ScrollController _scrollController = ScrollController();
   late final AnimationController _damageMessageController;
@@ -578,6 +583,7 @@ class _AdventureScreenState extends State<AdventureScreen>
   @override
   void dispose() {
     _enemyAnimationTimer?.cancel();
+    _peekTimer?.cancel();
     _scrollController.dispose();
     _damageMessageController.dispose();
     _roundAttackController.dispose();
@@ -821,6 +827,97 @@ class _AdventureScreenState extends State<AdventureScreen>
     );
   }
 
+  Future<void> _chooseMode(bool endless) async {
+    final english = context.l10n.localeName.startsWith('en');
+    final proceed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            scrollable: true,
+            title: Text(
+              endless ? context.l10n.endlessTitle : 'Monster Hunt',
+              style: TextStyle(
+                color:
+                    endless ? const Color(0xFFFF477E) : const Color(0xFF9A70FF),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 170,
+                  // AlertDialog measures its content intrinsically. A finite
+                  // width keeps the LayoutBuilder inside _modeArt measurable.
+                  width: min(
+                    320.0,
+                    max(100.0, MediaQuery.sizeOf(dialogContext).width - 128),
+                  ),
+                  child: _modeArt(
+                    endless: endless,
+                    glow:
+                        endless
+                            ? const Color(0xFFFF477E)
+                            : const Color(0xFF9A70FF),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  endless
+                      ? (english
+                          ? 'Cut down monsters as you walk. Your run lasts as long as you choose.'
+                          : 'Yürüdükçe canavarları kes. Koşu, sen bitirene kadar sürer.')
+                      : (english
+                          ? 'Choose a step goal and a monster. Walk, fight, and claim your reward.'
+                          : 'Adım hedefini ve avlayacağın canavarı seç. Yürü, savaş ve ödülünü al.'),
+                  textAlign: TextAlign.center,
+                ),
+                if (endless) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    context.l10n.endlessSafeWhileWalking,
+                    style: const TextStyle(color: AppColors.streak),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(english ? 'Back' : 'Geri'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(english ? 'Continue' : 'Devam et'),
+              ),
+            ],
+          ),
+    );
+    if (proceed != true || !mounted) return;
+    if (endless) {
+      widget.onStartEndlessRun();
+    } else {
+      setState(() {
+        _monsterHuntSelected = true;
+        _peekMounted = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _peekVisible = true);
+      });
+      _peekTimer?.cancel();
+      _peekTimer = Timer(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        setState(() => _peekVisible = false);
+        _peekTimer = Timer(const Duration(milliseconds: 550), () {
+          if (mounted) setState(() => _peekMounted = false);
+        });
+      });
+    }
+  }
+
   Future<void> _showEnemyPreview(Enemy enemy) async {
     HapticFeedback.mediumImpact();
     setState(() => _selectedEnemy = enemy);
@@ -883,6 +980,42 @@ class _AdventureScreenState extends State<AdventureScreen>
       body: Stack(
         children: [
           Positioned.fill(child: content),
+          if (_peekMounted && adventure == null)
+            Positioned(
+              right: 0,
+              top: 100,
+              child: AnimatedSlide(
+                offset: _peekVisible ? Offset.zero : const Offset(1.2, 0),
+                duration: const Duration(milliseconds: 520),
+                curve: Curves.easeOutBack,
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: 185),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          context.l10n.localeName.startsWith('en')
+                              ? 'Are you a monster hunter, or what?'
+                              : 'Sen canavar avcısı mısın yoksa?',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Image.asset(
+                        'lib/Tutorial_Guy/Pinky/Pink_Monster_Idle_4.gif',
+                        width: 76,
+                        height: 90,
+                        filterQuality: FilterQuality.none,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_showRoundVictory &&
               adventure != null &&
               !adventure.isGoldCollectionCompleted)
@@ -1719,6 +1852,29 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Widget _buildSelection(BuildContext context) {
+    if (!widget.tutorialMode && !_monsterHuntSelected) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final cardHeight = max(250.0, (constraints.maxHeight - 104) / 2);
+          return ListView(
+            key: const ValueKey('adventure-mode-selection'),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+            children: [
+              Text(
+                context.l10n.chooseTodaysAdventure,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _modeCard(context, endless: false, height: cardHeight),
+              const SizedBox(height: 14),
+              _modeCard(context, endless: true, height: cardHeight),
+            ],
+          );
+        },
+      );
+    }
     final visibleEnemies =
         widget.tutorialMode
             ? EnemyCatalog.enemies.take(1)
@@ -1730,6 +1886,17 @@ class _AdventureScreenState extends State<AdventureScreen>
           widget.tutorialMode ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
+        if (!widget.tutorialMode)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _monsterHuntSelected = false),
+              icon: const Icon(Icons.arrow_back),
+              label: Text(
+                context.l10n.localeName.startsWith('en') ? 'Modes' : 'Modlar',
+              ),
+            ),
+          ),
         Text(
           context.l10n.chooseTodaysAdventure,
           style: Theme.of(
@@ -1741,54 +1908,6 @@ class _AdventureScreenState extends State<AdventureScreen>
           context.l10n.adventureSelectionDescription,
           style: const TextStyle(color: Colors.white70),
         ),
-        // Sonsuz Koşu **ikinci bir seçenek**, varsayılan değil: normal
-        // macera akışı ve hedef seçimi aynen aşağıda duruyor. Eğitim
-        // sırasında gizli — yeni oyuncu önce ana döngüyü öğreniyor.
-        if (!widget.tutorialMode) ...[
-          const SizedBox(height: 14),
-          SectionCard(
-            key: const ValueKey('endless-run-entry'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.endlessTitle,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  context.l10n.endlessSubtitle,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Modun sözleşmesi: yürürken güvendesin, durursan değil.
-                // Oyuncu bunu **başlamadan önce** bilmeli.
-                Text(
-                  context.l10n.endlessSafeWhileWalking,
-                  key: const ValueKey('endless-safe-while-walking'),
-                  style: const TextStyle(
-                    color: AppColors.streak,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.tonal(
-                  key: const ValueKey('endless-run-start'),
-                  onPressed: widget.onStartEndlessRun,
-                  child: Text(context.l10n.endlessStart),
-                ),
-              ],
-            ),
-          ),
-        ],
         const SizedBox(height: 16),
         _GoalSelectorButton(goal: _stepGoal, onTap: _showGoalPicker),
         const SizedBox(height: 16),
@@ -1836,6 +1955,166 @@ class _AdventureScreenState extends State<AdventureScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _modeCard(
+    BuildContext context, {
+    required bool endless,
+    required double height,
+  }) {
+    final color = endless ? const Color(0xFFFF477E) : const Color(0xFF9A70FF);
+    final english = context.l10n.localeName.startsWith('en');
+    return Container(
+      key: ValueKey(endless ? 'endless-run-entry' : 'monster-hunt-entry'),
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(25),
+        gradient: LinearGradient(
+          colors: [color, color.withValues(alpha: 0.4), color],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.32),
+            blurRadius: 23,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(23),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _chooseMode(endless),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(23),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withValues(alpha: 0.29),
+                  AppColors.surface,
+                  const Color(0xFF12101E),
+                ],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 17),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        endless ? Icons.all_inclusive : Icons.gps_fixed,
+                        color: color,
+                        size: 23,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          endless ? context.l10n.endlessTitle : 'Monster Hunt',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: color,
+                        size: 19,
+                      ),
+                    ],
+                  ),
+                  Expanded(child: _modeArt(endless: endless, glow: color)),
+                  Text(
+                    endless
+                        ? (english
+                            ? 'Slay monsters. Run as long as you choose.'
+                            : 'Canavarları kes. İstediğin kadar koş.')
+                        : (english
+                            ? 'Pick a target. Hunt your monster.'
+                            : 'Hedefini seç. Canavarını avla.'),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _modeArt({required bool endless, required Color glow}) {
+    final eye = EnemyCatalog.byId('eye_of_nothing')!;
+    final hunters = [
+      EnemyCatalog.byId('blood_weaver')!,
+      EnemyCatalog.byId('ash_guardian')!,
+      EnemyCatalog.byId('horned_executioner')!,
+    ];
+    return LayoutBuilder(
+      builder: (context, box) {
+        final h = box.maxHeight;
+        final w = box.maxWidth;
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned.fill(
+              child: Center(
+                child: Container(
+                  width: min(w * 0.68, h * 1.45),
+                  height: min(w * 0.68, h * 1.45),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [glow.withValues(alpha: 0.4), Colors.transparent],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (endless) ...[
+              Positioned(
+                left: w * 0.14,
+                top: 0,
+                width: w * 0.72,
+                height: h,
+                child: PixelSprite(asset: eye.walkAsset, scale: 5.2),
+              ),
+              Positioned(
+                right: 3,
+                top: 8,
+                child: Icon(
+                  Icons.bolt,
+                  size: 34,
+                  color: glow.withValues(alpha: 0.8),
+                ),
+              ),
+            ] else ...[
+              for (var i = 0; i < hunters.length; i++)
+                Positioned(
+                  left: w * (0.02 + i * 0.30),
+                  top: i == 1 ? 0 : h * 0.11,
+                  width: w * 0.36,
+                  height: h * (i == 1 ? 1 : 0.89),
+                  child: PixelSprite(
+                    asset: switch (i) {
+                      0 => hunters[i].attackAssets.first,
+                      1 => hunters[i].idleAsset,
+                      _ => hunters[i].walkAsset,
+                    },
+                    scale: i == 1 ? 5.0 : 4.6,
+                  ),
+                ),
+            ],
+          ],
+        );
+      },
     );
   }
 

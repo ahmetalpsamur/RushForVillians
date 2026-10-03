@@ -15,13 +15,13 @@ import '../../l10n/l10n_context.dart';
 import '../../l10n/content_localizations.dart';
 import '../../widgets/avatar_view.dart';
 import '../../widgets/daily_step_ring.dart';
-import '../../widgets/language_selector_card.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/title_badge.dart';
 import '../../widgets/stat_bar.dart';
 import '../inventory/inventory_screen.dart';
 import 'step_history_screen.dart';
 import '../safety/safety_screen.dart';
+import 'settings_screen.dart';
 import '../../core/constants/safety_messages.dart';
 
 /// Oyuncu profili: seviye, XP, adım geçmişi ve genel istatistikler.
@@ -54,6 +54,7 @@ class ProfileScreen extends StatelessWidget {
   final int ownedTitleCount;
   final LocalePreference localePreference;
   final ValueChanged<LocalePreference> onLocalePreferenceChanged;
+  final VoidCallback? onNotificationsEnabled;
 
   const ProfileScreen({
     super.key,
@@ -72,6 +73,7 @@ class ProfileScreen extends StatelessWidget {
     this.adventure,
     this.localePreference = LocalePreference.system,
     this.onLocalePreferenceChanged = ignoreLocalePreference,
+    this.onNotificationsEnabled,
   });
 
   List<DailyStepRecord> get _recentRecords {
@@ -122,17 +124,30 @@ class ProfileScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(context.l10n.profile),
         actions: [
-          CompactLanguageSelector(
-            value: localePreference,
-            onChanged: onLocalePreferenceChanged,
-          ),
-          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.shield_outlined),
             tooltip: SafetyMessages.of(context).pageTitle,
             onPressed:
                 () => Navigator.of(context).push(
                   MaterialPageRoute<void>(builder: (_) => const SafetyScreen()),
+                ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip:
+                Localizations.localeOf(context).languageCode == 'en'
+                    ? 'Settings'
+                    : 'Ayarlar',
+            onPressed:
+                () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder:
+                        (_) => SettingsScreen(
+                          localePreference: localePreference,
+                          onLocalePreferenceChanged: onLocalePreferenceChanged,
+                          onNotificationsEnabled: onNotificationsEnabled,
+                        ),
+                  ),
                 ),
           ),
         ],

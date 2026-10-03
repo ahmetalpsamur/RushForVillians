@@ -171,7 +171,27 @@ void main() {
       await tester.tap(find.byType(FilledButton).last);
       await tester.pump();
 
+      expect(purchased, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('confirm-purchase')));
+      await tester.pumpAndSettle();
       expect(purchased.single.id, cheapItem.id);
+    });
+
+    testWidgets('vazgeçilen satın alma ekipman eklemez', (tester) async {
+      final purchased = <Item>[];
+      await pumpStore(
+        tester,
+        equipment: [cheapItem],
+        level: 50,
+        onPurchaseEquipment: purchased.add,
+      );
+
+      await tester.tap(find.byType(FilledButton).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+
+      expect(purchased, isEmpty);
     });
 
     testWidgets('sahip olunan item tekrar alınabilir, adet gösterilir', (
@@ -195,6 +215,8 @@ void main() {
       await tester.tap(find.byType(FilledButton).last);
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('confirm-purchase')));
+      await tester.pumpAndSettle();
       expect(purchased, [cheapItem]);
     });
   });
@@ -357,6 +379,8 @@ void main() {
       await tester.tap(find.byType(FilledButton).first);
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('confirm-purchase')));
+      await tester.pumpAndSettle();
       expect(purchased.single.id, 'upgrade_streak_freeze');
     });
 
@@ -633,6 +657,9 @@ void main() {
       await tester.tap(find.byKey(ValueKey('buy-title-${cheapest.id}')));
       await tester.pumpAndSettle();
 
+      expect(bought, isNull);
+      await tester.tap(find.byKey(const ValueKey('confirm-purchase')));
+      await tester.pumpAndSettle();
       expect(bought?.id, cheapest.id);
     });
   });

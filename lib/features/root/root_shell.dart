@@ -2967,6 +2967,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onOpenBlacksmith: _openBlacksmith,
         localePreference: widget.localePreference,
         onLocalePreferenceChanged: widget.onLocalePreferenceChanged,
+        onNotificationsEnabled: () => unawaited(_scheduleDailyReminder(GameClock.now())),
       ),
     ];
 

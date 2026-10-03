@@ -17,6 +17,7 @@ import 'models/tutorial_guide_variant.dart';
 import 'services/adventure_notification_service.dart';
 import 'services/character_storage.dart';
 import 'services/game_storage.dart';
+import 'services/game_settings.dart';
 import 'services/launch_sound.dart';
 import 'services/tutorial_guide_storage.dart';
 import 'l10n/app_localizations.dart';
@@ -66,6 +67,9 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
 
   Future<void> _initializeApp() async {
     final startedAt = DateTime.now();
+    try {
+      await GameSettings.load();
+    } catch (_) {}
     unawaited(LaunchSound.playOnce());
 
     // Bildirim servisi açılış görseli gösterilirken hazırlanır. Böylece native

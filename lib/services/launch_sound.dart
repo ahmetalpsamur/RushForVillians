@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'game_settings.dart';
 
 class LaunchSound {
   LaunchSound._();
@@ -8,6 +9,7 @@ class LaunchSound {
 
   /// Uygulama süreci boyunca açılış sesini yalnızca bir kez çalar.
   static Future<void> playOnce() async {
+    if (!GameSettings.soundEffectsEnabled.value) return;
     if (_hasPlayed) return;
     _hasPlayed = true;
 

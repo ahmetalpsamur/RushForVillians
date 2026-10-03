@@ -218,6 +218,59 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
       );
   }
 
+  Future<void> _confirmPurchase({
+    required String name,
+    required int price,
+    required VoidCallback purchase,
+    String? assetPath,
+  }) async {
+    final english = context.l10n.localeName.startsWith('en');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Text(english ? 'Confirm purchase' : 'Satın almayı onayla'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (assetPath != null) ...[
+                  Image.asset(
+                    assetPath,
+                    height: 88,
+                    filterQuality: FilterQuality.none,
+                    errorBuilder:
+                        (_, _, _) =>
+                            const Icon(Icons.inventory_2_outlined, size: 64),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(dialogContext).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text('$price ${english ? 'coins' : 'altın'}'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(english ? 'Cancel' : 'Vazgeç'),
+              ),
+              FilledButton(
+                key: const ValueKey('confirm-purchase'),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(english ? 'Confirm' : 'Tamam'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed == true && mounted) purchase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final equipment = _visibleEquipment;
@@ -313,11 +366,16 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       key: const ValueKey('store-titles-section'),
                       title: context.l10n.titleStore,
                       child: _TitleShop(
-            discountRate: widget.discountRate,
+                        discountRate: widget.discountRate,
                         titles: widget.titles,
                         coins: widget.coins,
                         ownedTitleIds: widget.ownedTitleIds,
-                        onPurchase: widget.onPurchaseTitle!,
+                        onPurchase:
+                            (title) => _confirmPurchase(
+                              name: context.l10n.titleName(title),
+                              price: widget.payable(title.cost),
+                              purchase: () => widget.onPurchaseTitle!(title),
+                            ),
                         onBlocked: _explain,
                       ),
                     )
@@ -372,7 +430,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   KeyedSubtree(
                     key: ValueKey('tutorial-store-item-${tutorialItem.id}'),
                     child: _EquipmentCard(
-            discountRate: widget.discountRate,
+                      discountRate: widget.discountRate,
                       key: TutorialGuideTargetKeys.shopItem,
                       item: tutorialItem,
                       coins: widget.coins,
@@ -380,7 +438,13 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                       ownedCount:
                           widget.ownedEquipmentCounts[tutorialItem.id] ?? 0,
                       onPurchase:
-                          () => widget.onPurchaseEquipment(tutorialItem),
+                          () => _confirmPurchase(
+                            name: context.l10n.itemName(tutorialItem),
+                            price: widget.payable(tutorialItem.cost),
+                            assetPath: tutorialItem.assetPath,
+                            purchase:
+                                () => widget.onPurchaseEquipment(tutorialItem),
+                          ),
                       onBlocked: _explain,
                     ),
                   ),
@@ -398,12 +462,17 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   children: [
                     for (final item in widget.items)
                       _UpgradeRow(
-            discountRate: widget.discountRate,
+                        discountRate: widget.discountRate,
                         item: item,
                         coins: widget.coins,
                         owned: widget.ownedUpgradeIds.contains(item.id),
                         stockLabel: _stockLabel(item),
-                        onPurchase: () => widget.onPurchase(item),
+                        onPurchase:
+                            () => _confirmPurchase(
+                              name: context.l10n.storeUpgradeName(item),
+                              price: widget.payable(item.cost),
+                              purchase: () => widget.onPurchase(item),
+                            ),
                         onBlocked: _explain,
                       ),
                   ],
@@ -515,12 +584,18 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                     final hasSecond = firstIndex + 1 < equipment.length;
 
                     Widget buildCard(Item item) => _EquipmentCard(
-            discountRate: widget.discountRate,
+                      discountRate: widget.discountRate,
                       item: item,
                       coins: widget.coins,
                       level: widget.level,
                       ownedCount: widget.ownedEquipmentCounts[item.id] ?? 0,
-                      onPurchase: () => widget.onPurchaseEquipment(item),
+                      onPurchase:
+                          () => _confirmPurchase(
+                            name: context.l10n.itemName(item),
+                            price: widget.payable(item.cost),
+                            assetPath: item.assetPath,
+                            purchase: () => widget.onPurchaseEquipment(item),
+                          ),
                       onBlocked: _explain,
                     );
 
@@ -595,20 +670,23 @@ class _DiscountBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Icon(active ? Icons.local_offer : Icons.lock_clock,
-                  color: color, size: 20),
+              Icon(
+                active ? Icons.local_offer : Icons.lock_clock,
+                color: color,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   active
                       ? context.l10n.shopDiscountActive(
-                          (rate * 100).round(),
-                          minutesLeft,
-                        )
+                        (rate * 100).round(),
+                        minutesLeft,
+                      )
                       : context.l10n.shopDiscountClosed(
-                          percent,
-                          GameConstants.shopDiscountWindow.inMinutes,
-                        ),
+                        percent,
+                        GameConstants.shopDiscountWindow.inMinutes,
+                      ),
                   key: const ValueKey('shop-discount-text'),
                   style: TextStyle(
                     color: active ? Colors.white : Colors.white70,
@@ -854,7 +932,7 @@ class _TitleShopState extends State<_TitleShop> {
         else
           for (final title in visible)
             _TitleRow(
-            discountRate: widget.discountRate,
+              discountRate: widget.discountRate,
               title: title,
               coins: widget.coins,
               owned: widget.ownedTitleIds.contains(title.id),

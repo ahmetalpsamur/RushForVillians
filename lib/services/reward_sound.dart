@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'game_settings.dart';
 
 class RewardSound {
   RewardSound._();
@@ -7,6 +8,7 @@ class RewardSound {
 
   /// Ödül karartısı görünür olduğu anda kazanma sesini bir kez çalar.
   static Future<void> play() async {
+    if (!GameSettings.soundEffectsEnabled.value) return;
     try {
       await _channel.invokeMethod<void>('playReward');
     } on PlatformException {

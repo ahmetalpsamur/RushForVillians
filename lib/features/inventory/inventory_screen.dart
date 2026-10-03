@@ -1252,7 +1252,9 @@ class _SlotTile extends StatelessWidget {
               style: const TextStyle(fontSize: 9.5, color: Colors.white38),
             ),
             Text(
-              equipped?.name ?? context.l10n.empty,
+              equipped == null
+                  ? context.l10n.empty
+                  : context.l10n.itemName(equipped),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

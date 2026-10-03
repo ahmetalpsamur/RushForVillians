@@ -13,6 +13,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../core/utils/game_clock.dart';
 import '../models/adventure_quest.dart';
+import 'game_settings.dart';
 
 class AdventureNotificationCopy {
   final String enemyName;
@@ -155,6 +156,7 @@ class AdventureNotificationService {
     required String channelName,
     required String characterAsset,
   }) => _dailyOperation(() async {
+    if (!GameSettings.notificationsEnabled.value) return;
     for (var i = 0; i < noonReminderCount; i++) {
       await _notifications.cancel(noonReminderId + i);
     }
@@ -183,6 +185,7 @@ class AdventureNotificationService {
     required String channelName,
     required String payload,
   }) => _dailyOperation(() async {
+    if (!GameSettings.notificationsEnabled.value) return;
     await _notifications.show(
       id,
       title,
@@ -258,6 +261,7 @@ class AdventureNotificationService {
   }
 
   static Future<void> requestPermission() async {
+    if (!GameSettings.notificationsEnabled.value) return;
     if (!_initialized) return;
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -288,12 +292,17 @@ class AdventureNotificationService {
     }
   }
 
+  static Future<void> cancelAllReminders() async {
+    if (!_initialized) return;
+    await _notifications.cancelAll();
+  }
+
   static Future<void> scheduleAdventureReminders(
     AdventureQuest adventure,
     int currentSteps,
     AdventureNotificationCopy copy,
   ) async {
-    if (!_initialized) return;
+    if (!_initialized || !GameSettings.notificationsEnabled.value) return;
     await cancelAdventureReminders();
     if (adventure.isBattleCompleted) return;
 
