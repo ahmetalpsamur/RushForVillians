@@ -39,8 +39,12 @@ abstract final class MailCatalog {
   /// `WENEEDHEROES2026` kodunun açtığı postanın kimliği.
   static const String heroesCodeRewardId = 'mail_code_we_need_heroes';
 
-  /// Kapalı beta ünvanının kimliği. **Yalnızca** postadan gelir.
-  static const String closedBetaTitleId = 'title_closed_beta';
+  /// Erken Kalkan ünvanının kimliği. **Yalnızca** postadan gelir.
+  ///
+  /// Oyun çıktıktan sonra ikinci güncellemeye kadar indirenlere de
+  /// verilecek; bu yüzden ad "kapalı beta" değil — kapalı beta yalnızca
+  /// onu dağıtan **ilk** posta.
+  static const String earlyRiserTitleId = 'early_riser';
 
   static final List<MailMessage> all = [
     MailMessage(
@@ -50,7 +54,7 @@ abstract final class MailCatalog {
       reward: MailReward(
         coins: 1000,
         wheelSpins: 5,
-        titleId: closedBetaTitleId,
+        titleId: earlyRiserTitleId,
       ),
     ),
     MailMessage(

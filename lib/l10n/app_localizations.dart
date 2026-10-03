@@ -308,6 +308,18 @@ abstract class AppLocalizations {
   /// **'Sonsuz Koşuya Başla'**
   String get endlessStart;
 
+  /// No description provided for @shopDiscountActive.
+  ///
+  /// In tr, this message translates to:
+  /// **'İndirim açık: %{percent} · {minutes} dk kaldı'**
+  String shopDiscountActive(int percent, int minutes);
+
+  /// No description provided for @shopDiscountClosed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bir macera tamamla ya da sonsuz koşuda bir canavar kes: %{percent} indirim {minutes} dakika açılır.'**
+  String shopDiscountClosed(int percent, int minutes);
+
   /// No description provided for @mailboxTitle.
   ///
   /// In tr, this message translates to:

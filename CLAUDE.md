@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD108)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD109)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -109,7 +109,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v31 + migration | Firebase |
+| Yerel kalıcılık, şema v32 + migration | Firebase |
 | 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -1307,7 +1307,7 @@ bıraktığı düşman zayıf kalır.
 
 **Düşmanın canı "her adım 1 hasar" modelinden koparıldı** (GD49) ama
 `stepGoal` cana girmeye devam ediyor: artık **doğrudan** adım taahhüdünden,
-`stepGoal / enemyHealthStepsPerRound` ile (GD100). Adım hedefi bitip düşman
+`plananRound × enemyHealthRoundShare` ile (GD100/GD107). Adım hedefi bitip
 hâlâ ayaktaysa round hedefi **tam boya** döner — eski formül 0 döndürüyordu
 ve savaş kilitlenirdi.
 
@@ -1353,12 +1353,12 @@ içindeki büyütme dalı eski kayıtların tek koruması.
 
 | Adım hedefi | Round | Round boyu | Toplam süre | Güç çarpanı (saldırı) | Ödül çarpanı | Çıplak yük | Ekipmanlı yük |
 |---|---|---|---|---|---|---|---|
-| 500 | 1 | 500 | 7 dk | ×1,00 | ×1,0 | 0,45 | 0,34 |
-| 1.000 | 2 | 500 | 14 dk | ×1,15 | ×1,4 | 0,45 | 0,34 |
-| 2.000 | 4 | 500 | 28 dk | ×1,35 | ×1,4 | 0,45 | 0,34 |
-| 3.000 | 3 | 1.000 | 45 dk | ×1,55 | ×2,0 | **0,91** | **0,68** |
-| 5.000 | 5 | 1.000 | 75 dk | ×1,85 | ×2,0 | **0,91** | **0,68** |
-| 10.000 | 10 | 1.000 | 150 dk | ×2,40 | ×3,0 | **0,91** | **0,68** |
+| 500 | 1 | 500 | 7 dk | ×1,00 | ×1,0 | 0,94 | 0,70 |
+| 1.000 | 2 | 500 | 14 dk | ×1,15 | ×1,4 | 0,94 | 0,70 |
+| 2.000 | 4 | 500 | 28 dk | ×1,35 | ×1,4 | 0,94 | 0,70 |
+| 3.000 | 3 | 1.000 | 45 dk | ×1,55 | ×2,0 | 0,94 | 0,70 |
+| 5.000 | 5 | 1.000 | 75 dk | ×1,85 | ×2,0 | 0,94 | 0,70 |
+| 10.000 | 10 | 1.000 | 150 dk | ×2,40 | ×3,0 | 0,94 | 0,70 |
 
 **Yük oranı** = düşman canı / (ölçüt oyuncunun round başına hasarı ×
 planlanan round). 20 düşmanın **en kötüsü** yazılı (her zaman bir
@@ -1367,53 +1367,58 @@ planlanan round). 20 düşmanın **en kötüsü** yazılı (her zaman bir
 kuşanmak mümkün değil ve bir dönem ölçüm bunu yapıyordu, ekipmanı
 olduğundan 2,5 kat güçlü gösteriyordu.
 
-`combat_balance_test` altı hedefi tarıyor; 20 düşman × 6 hedef = 120
-kombinasyonda taşma **0**, monotonluk ihlali **0**.
+**Altı hedefin yükü birebir aynı** (GD107): can planlanan round sayısıyla
+orantılı olduğu için oyuncu her hedefte taahhüdünün aynı oranında
+deviriyor. `combat_balance_test` altı hedefi tarıyor; 20 düşman × 6 hedef
+= 120 kombinasyonda taşma **0**.
 
-⚠️ **3.000'in altındaki üç hedef hedef bandın yarısında** ve bu
-**tek bir sabitle düzeltilemez** — bkz. [GameConstants.enemyHealthStepsPerRound].
-Sebep tempo tablosunun kendisi: yük `stepGoal / planlananRound` ile doğru
-orantılı ve bu değer tam olarak **round boyuna** eşit (alt bantta 500,
-üst bantta 1.000), yani iki bandın yükü tanımı gereği **1:2**.
+⚠️ **Ham can hedefte monoton değil ve bu bilinçli.** 3.000 hedefinin
+düşmanı 2.000'inkinden daha **az cana** sahip (20 vs 27) çünkü oyuncunun
+da daha az roundu var (3 vs 4). Yerine geçen değişmez **dominans
+yokluğu**: aynı oyun kalitesinde daha büyük hedef hem daha kolay hem daha
+çok ödüllü olamaz. Bkz. GD107.
 
 ### Tek roundda devirmek
 
 Ortalama kaç round sürüyor (20 düşmanın ortalaması):
 
-| Hedef | Planlanan | Çıplak | Medyan ekipman | En iyi ekipman |
-|---|---|---|---|---|
-| 500 | 1 | 1,0 | 1,0 | 1,0 |
-| 1.000 | 2 | 1,0 | 1,0 | 1,0 |
-| 2.000 | 4 | 1,5 | 1,1 | 1,1 |
-| 3.000 | 3 | 2,2 | 1,8 | 1,5 |
-| 5.000 | 5 | 3,7 | 2,6 | 2,2 |
-| 10.000 | 10 | 6,4 | 4,8 | 4,0 |
+Ortalama kaç roundda devriliyor ve geriye ne kadar bonus yürüyüş kalıyor
+(20 düşmanın ortalaması, en iyi ekipman):
 
-**Üst bantta tek atım gerçek bir başarı**: 10.000 hedefinde en iyi
-ekipmanla bile 4 round gerekiyor, yani tek roundda devirmek o dört katı
-hasar demek. **Alt bantta ise çıplak oyuncu bile tek atıyor** — yukarıdaki
-yarım-bant sorununun doğrudan sonucu, ayrı bir karar değil.
+| Hedef | Planlanan | Ort. round | Bonus yürüyüş |
+|---|---|---|---|
+| 500 | 1 | 1,0 | **0** |
+| 1.000 | 2 | 1,1 | 425 |
+| 2.000 | 4 | 1,9 | 1.050 |
+| 3.000 | 3 | 1,6 | 1.400 |
+| 5.000 | 5 | 2,2 | 2.800 |
+| 10.000 | 10 | 4,0 | 5.950 |
+
+⚠️ **500 hedefinde bonus yürüyüş yok ve bu bir eksik değil.** 500 en
+küçük hedef; tek roundluk, kısa ve tek parça bir savaş olması **tasarım
+kararı**. Bonus yürüyüş daha büyük hedeflerin ödülü: taahhüdünü büyük
+tutan oyuncu, düşmanı erken devirdiğinde kalan yolu 20 adım/altın ile
+yürüyor. 500'de devirecek bir "erken" yok, çünkü tek round zaten tüm
+macera.
+
+**En kötü durum 0,70, ortalama 0,45.** Üçte ikiyi ortalamada tutturmak
+bandı bozmayı gerektiriyordu (çıplak oyuncu 1,40 yüke, yani taşmaya
+girerdi); **bant seçildi**.
 
 ### Hedefin iki ekseni iki ayrı stata bağlı (GD100 · GD101)
 
 | Eksen | Nereden | Ne yapar |
 |---|---|---|
-| **Can** | `stepGoal / enemyHealthStepsPerRound` (= 2.000) | Hedef uzadıkça savaş uzar |
+| **Can** | `plananRound × enemyHealthRoundShare` (= 0,65) | Hedef uzadıkça savaş uzar |
 | **Saldırı** | `enemyPowerMultiplier` ×1,00 → ×2,40 | Hedef uzadıkça kaçırılan round daha çok acıtır |
 
 ⚠️ **Güç çarpanı cana uygulanmıyor** (GD101). Bir dönem ikisine birden
-giriyordu; can adım taahhüdünden türemeye başlayınca hedef cana **iki kez**
-girer oldu ve yük oranı 500→10.000 arasında 4,8 kat açıldı — tek bir
-`enemyHealthStepsPerRound` değeriyle hem kısa hedefleri olaylı hem uzun
-hedefleri bitirilebilir yapmak imkânsızdı.
+giriyordu ve hedef cana **iki kez** giriyordu.
 
-⚠️ **Can hedefte monoton olmak zorunda** (GD100). Bir dönem can maceranın
-planlanan **round sayısından** türüyordu; tempo tablosu o sayıyı hedefte
-monoton yapmıyor (2.000 → 4 round, 3.000 → 3 round), yani **3.000 hedefinin
-düşmanı 2.000'inkinden zayıftı** — üstelik ödülü ×2,0 vs ×1,4'tü.
-2.000'i seçmek için hiçbir sebep kalmıyordu. Adım taahhüdü tempo bandından
-bağımsız ve tanımı gereği monoton; `combat_balance_test` altı hedefi
-sırayla tarıyor.
+⚠️ **Ölçülmesi gereken şey ham can değil zorluk** (GD107). Can planlanan
+round sayısıyla orantılı; yük oranı böylece hedeften bağımsız kalıyor.
+Alternatifi (`stepGoal / sabit`) ham canı monoton yapıyordu ama yükü round
+boyuna bağlıyor ve iki tempo bandı arasında **1:2** açıyordu.
 
 `expectedRoundsForTier` **yalnızca katalog tabanında** kaldı (önizleme) ve
 azalmayan zarf döndürmeye devam ediyor; gerçek savaş onu hiç okumuyor.
@@ -1961,22 +1966,70 @@ yalnızca kodu gönderir, sunucu geçerliliğini ve kullanım sayısını
 doğrular, postayı sunucu açar. O zamana kadar buradaki yavaşlatma kaba
 kuvvetle kod aramayı yalnızca **sıkıcı** hale getirir, imkânsız değil.
 
-### Kapalı Beta ünvanı
+### Erken Kalkan ünvanı ve indirim penceresi
 
-`title_closed_beta` — **yalnızca postadan**. `TitleSource.mail` yeni bir
-kaynak değeri: mağazada satilmaz, çarktan çıkmaz, başarımla kazanılmaz.
+`early_riser` — **yalnızca postadan**. `TitleSource.mail` yeni bir kaynak
+değeri: mağazada satılmaz, çarktan çıkmaz, başarımla kazanılmaz.
 "Mağaza" deyip fiyatı 0 bırakmak onu rafa götürürdü.
 
-Etkisi **yeni bir stat**: `ItemStat.shopDiscount` (+%25). Ne [isCombat] ne
-[isEconomyRate] — kazancı büyütmüyor, harcamayı küçültüyor. Bu yüzden
+**Adı neden "Kapalı Beta" değil:** ünvan yalnızca beta ekibine değil,
+oyun çıktıktan sonra **ikinci güncellemeye kadar indirenlere** de
+verilecek. Kapalı beta yalnızca onu dağıtan **ilk** posta.
+
+⚠️ Kimlikte `title_` öneki **yok**: İngilizce ad kimlikten türetiliyor
+(`_titleCaseIdentifier`), önekli bir kimlik "Title Early Riser" üretirdi.
+Bütün katalog öneksiz.
+
+Etkisi **yeni bir stat**: `ItemStat.shopDiscount` (+%25). Ne `isCombat` ne
+`isEconomyRate` — kazancı büyütmüyor, harcamayı küçültüyor. Bu yüzden
 `maxTitleEconomyBonus` / `maxEquippedEconomyBonus` tavanlarına girmiyor
 (onlar adım kazancı için ölçülmüştü) ve seri bonusu havuzunda da yok
 (GD65). Faz 4 kuralı korunuyor: **`stepCoin` ve `stepXp` taşımıyor.**
 
-⚠️ **İndirimin tetikleyicisi henüz bağlanmadı.** Etki katalogda tanımlı
-ama "ne kadar süre açık kalır, tek alışverişlik mi" kararı kullanıcıya
-soruldu (Bölüm D / Faz 3, İş 3). Karar gelince uygulama noktası
-yazılacak.
+#### İndirim pasif değil: 30 dakikalık pencere (GD109)
+
+| | |
+|---|---|
+| Açan olay | Bir macera **tamamlanınca** ya da sonsuz koşuda bir canavar **kesilince** |
+| Süre | `GameConstants.shopDiscountWindow` = **30 dakika** |
+| Yenileme | Uzatmaz, **sıfırlar** — ikinci macera pencereyi 60 dakikaya çıkarmaz |
+| Saklanan | Bitiş anı (`shopDiscountUntil`, UTC), kalan süre **değil** |
+
+**Neden pencere:** indirim ne sürekli açık olmalı (o zaman ünvan bir ödül
+değil pasif bir çarpan olur) ne tek alışverişlik (o zaman oyuncu pahalı
+eşya için biriktirip indirimi bekletir, ucuz eşyada israf hisseder).
+30 dakika maceradan çıkıp mağazaya bakmaya yetiyor.
+
+⚠️ **Bitiş anı saklanıyor, kalan süre değil.** Kalan süre saklansaydı
+uygulama kapalıyken işlemez ve kapat-aç pencereyi uzatırdı. Mutlak an
+saklanınca kapanıp açılma pencereyi doğru devam ettiriyor;
+`shop_discount_test` bunu kayıt turuyla ölçüyor.
+
+⚠️ **Pencere ünvandan bağımsız açılmaz.** `_openShopDiscountIfEarned`
+önce `_buffs.shopDiscountBonus > 0` kontrol ediyor; aksi hâlde ünvanı
+sonradan takan oyuncu hiç macera yapmadan indirimli alışverişe başlardı.
+
+⚠️ **Etkide `trigger` yok ve bu bilinçli.** Etki tetikleyicileri savaş
+durumuna bakıyor (`CombatConditions`); buradaki kapı bir **zaman
+penceresi**. Tetikleyici verilseydi etki `conditionalEffects`'e düşer ve
+`EquippedBuffs.shopDiscountBonus` hiç dolmazdı — ölçüldü.
+
+#### Fiyat tek yerden
+
+`core/utils/shop_pricing.dart` → `discountedCost(baseCost, rate)`.
+Ekipman kartı, ünvan kartı, yükseltme kartı, "şu kadar altın daha gerek"
+satırı ve `RootShell`'deki üç satın alma yolu **aynı** fonksiyonu
+kullanıyor. Biri unutulsaydı oyuncu gördüğünden farklı bir fiyat öderdi.
+Aşağı yuvarlıyor (oyuncunun lehine) ve **en az 1**: bedava satın alma
+ekonomiyi delecek bir kapı olurdu.
+
+#### Ekranda görünürlük
+
+Mağazanın tepesinde bir şerit (`shop-discount-banner`) **iki durumu da**
+söylüyor: açıkken yüzde ve kalan dakika, kapalıyken nasıl açılacağı.
+Kapalı bir şeyin nedenini söylememek Model Kuralları #5'i ihlal ederdi.
+Ünvan hiç takılı değilse şerit **çizilmiyor** — o oyuncu için ortada bir
+indirim kavramı yok.
 
 ## 6.14 Taverna
 
@@ -2139,9 +2192,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v31**
+## Şema — **güncel sürüm v32**
 
-`GameStorage.schemaVersion = 31` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 32` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -2168,6 +2221,7 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 27 → 28 | Sonsuz Koşu (`endlessRun`). Eski kayıtta `null` — hiç başlamamış koşu |
 | 28 → 29 | Tempo tablosu ve düşman canının kaynağı değişti; yarım maceranın `enemyHealth`'i **harcanan adım oranından** yeni tavana taşınıyor (v13 ile aynı desen) |
 | 29 → 30 | Can artık **planlanan round sayısıyla** orantılı (GD107); aynı yeniden-çapalama (`_reanchorEnemyHealth`) |
+| 31 → 32 | Mağaza indirimi penceresi (`shopDiscountUntil`). Eski kayıtta `null` — pencere kapalı |
 | 30 → 31 | Posta kutusu ve kodlar (`claimedMailIds`, `readMailIds`, `pendingMailIds`, `redeemedCodes`, `codeAttempts`). Eski kayıtta boş liste — hiç posta alınmamış, hiç kod girilmemiş |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
@@ -2241,7 +2295,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**1.022 test** (`flutter test`), bunların **975'i yeşil**. Test, bu projede
+**1.037 test** (`flutter test`), bunların **991'i yeşil**. Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2260,6 +2314,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Kalıcılık ve açılış | `game_storage_test`, `app_boot_test` |
 | Ekonomi ölçümü | `economy_pacing_test` |
 | Round geri bildirimi | `round_outcome_test` |
+| Mağaza indirimi | `shop_discount_test` — fiyat fonksiyonu, pencere, kapat-aç, ünvan etkisi |
 | Posta kutusu ve kodlar | `mailbox_test` — iki kez alma, yarım alma, şema göçü, kod durumları, yavaşlatma |
 | Sonsuz Koşu ekranı | `endless_screen_test` — paylaşılan HUD, navigasyon kilidi, gizli sayaç, iki dilde 320/390 golden |
 | Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
@@ -2324,7 +2379,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD108)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD109)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2436,6 +2491,7 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD102 | Round sonucu **tek** bir bildirimde: hasar + kalan can + (varsa) mükemmel round; süre 7 sn; zafer/yenilgide hiç gösterilmiyor | Round süresi dolarak kazanıldığında oyuncu hiçbir şey görmüyordu — sahnedeki hasar sayısı yalnızca macera ekranı açıkken oynuyor. İki ayrı SnackBar kuyruğa girip birbirini kapatırdı (GD46). 7 sn keyfi değil: yürüyen oyuncunun telefonu cebinden çıkarması varsayılan 4 sn'yi aşıyor |
 | GD104 | Yürüyüş fazı oranı 30 → **20** adım/coin (normalin ×2,5'i) | Yük oranı banda çekilince (GD100/GD101) erken devirmek gerçek bir ekipman yatırımı istemeye başladı; karşılığında açılan faz da büyüdüğü için oranın büyümesi gerekiyordu — yoksa "erken bitir" ödülü uzun ama zayıf bir sayaca dönüşüyordu. Kazanım yapısal olarak sınırlı: faz en fazla `stepGoal` adım sürüyor, üst sınır `stepGoal / 20` (GD58) |
 | GD107 | Düşman canı **planlanan round sayısıyla** orantılı; ham canın hedefte monoton olması değişmezi **kaldırıldı**, yerine "dominans yok" geldi | Yük oranı `roundBoyu / (sabit × hasar)` olduğu için yalnızca round boyuna bağlıydı; tempo tablosu iki round boyu taşıdığından (500 ve 1.000) iki bandin yükü tanımı gereği **1:2** oluyordu — ölçüldü: 3.000+ hedeflerde ekipmanlı 0,68, altında 0,34 ve çıplak oyuncu bile tek roundda deviriyordu. Tek sabitle ikisini birden banda sokmak imkânsızdı. **Eşit zorluk kazandı**: 3.000'in düşmanı 2.000'inkinden daha az **cana** sahip olabilir çünkü oyuncunun da daha az roundu var. Ham can bir oyuncu deneyimi değil; hissedilen şey "taahhüdümün ne kadarında bitirdim" |
+| GD109 | Mağaza indirimi **pasif değil**: 30 dakikalık pencere, macera tamamlanınca ya da sonsuz koşu kesiminde açılır/yenilenir | Sürekli açık bir indirim ünvanı bir ödül değil pasif bir çarpan yapardı; tek alışverişlik olsaydı oyuncu pahalı eşya için biriktirip indirimi bekletir, ucuz eşyada israf hissederdi. 30 dakika maceradan çıkıp mağazaya bakmaya yetiyor. **Bitiş anı** saklanıyor (kalan süre değil): kalan süre uygulama kapalıyken işlemez ve kapat-aç pencereyi uzatırdı. Yenileme uzatma değil **sıfırlama**. Etkide `trigger` kullanılmadı — tetikleyiciler savaş durumuna bakıyor, buradaki kapı bir zaman penceresi; tetikleyici verilince etki `conditionalEffects`'e düşüp `shopDiscountBonus` hiç dolmuyordu |
 | GD108 | Posta kutusu **tek ödül dağıtım yolu**; kod doğrudan ödül vermez, posta açar | İki ayrı dağıtım yolu olsaydı "iki kez verme" korumasını da iki kez yazmak gerekirdi. Kod karşılığı posta ayrıca oyuncuya **ne kazandığını okutuyor**: doğrudan verilen bir ödül tek bir SnackBar olurdu ve kaybolurdu |
 | GD106 | Sonsuz Koşu normal macerayla **aynı** savaş ekranını kullanıyor; geri sayan süre yalnızca bu modda **gizli** | İki mod aynı oyunun aynı fiili; ayrı tasarım dili öğrenilmiş her şeyi ikinci kez öğrenmek demekti. Paylaşılan parçalar `widgets/combat_hud.dart`'a **taşındı**, kopyalanmadı — `ValueKey`'ler korunduğu için macera testleri etkilenmedi. Sayaç gizli çünkü bu modun varlık sebebi telefona **bakmamak** (§6.17): geri sayan bir rakam oyuncuyu ekrana bağlar. Mantık aynen duruyor, süresi dolan round hâlâ canavara vurduruyor — oyuncu bunu **sonucundan** anlıyor, sayaçtan değil |
 | GD105 | Yürüyüş fazında **para yağmuru**; dağıtım `stableSpread` değil düşük tutarsızlık dizisi | Bonuslu oran görünür olmalı (GD56 ile aynı fikir). `stableSpread` kalıcı kimlikler için yazıldı; `'rain-x-0'`…`'rain-x-11'` gibi yoğun bir indeks dizisinde dağıtmıyor ve 12 paranın onu aynı noktaya yığılıyordu. Altın oranın kesirli kısmı hem daha basit hem bu iş için daha doğru. Yedek görsel `Icon` değil **çizilen disk** ve `frameBuilder` ile yükleme sırasında da gösteriliyor — çözülmemiş bir `Image` boşluk çiziyor ve golden sessizce boş çıkıyordu |
@@ -2459,19 +2515,28 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-Bölüm D / Faz 3 sonunda `flutter test` → **975 başarılı, 47 başarısız.**
+Bölüm D sonunda `flutter test` → **991 başarılı, 46 başarısız.**
 
-47'nin **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
-testi kırmadı. Kalan üçü **kararsız**: `character_creation_test` golden'ı (2)
-ve `adventure_progress_test`'in sıra bağımlı testi (1). Üçü de Bölüm D'nin
-değişiklikleri `git stash` ile geri alınınca da kırmızı; Faz 2 ölçümünde
-kendiliğinden yeşile dönmüş, Faz 3'te yine kırmızılar. **Dokunulmadı.**
+46'nın **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
+testi kırmadı. Kalan ikisi `character_creation_test` golden'ı ve
+**kararsız**: Bölüm D'nin değişiklikleri `git stash` ile geri alınınca da
+kırmızı, ölçümden ölçüme yeşile dönüp geri kırılıyorlar. **Dokunulmadı.**
 
-⚠️ `victory_scene_390.png` golden'ı (yukarıdaki 44'ün içinde) **zaten
-kırmızıydı** ve zafer perdesine düşen eşya kartı eklendiği için farkı
-büyüdü. **Yenilenmedi**: başkasının incelenmemiş görsel durumunu commit'e
-almak olurdu. Yenilenen tek golden `tavern_320.png` — o Bölüm D'den önce
-**yeşildi** ve yalnızca mock üye adları değiştiği için kırıldı.
+⚠️ **`victory_scene_390.png` düşen eşya kartından etkilenmiyor** — bir
+dönem bu dosyada öyle yazıyordu, yanlıştı. Ölçüldü: fark kart
+eklenmeden önce de sonra da **%2,38**; izole fark görselinde yalnızca
+**karakter sprite'ının animasyon karesi** değişiyor. Kart o testte hiç
+çizilmiyor çünkü `ItemCatalog` boş ve `DroppedItemCard` o durumda
+bilerek hiçbir şey çizmiyor.
+
+Golden **sıra bağımlı**: dosya tek başına çalışınca geçiyor, tam dosyada
+kırılıyor. **Yenilenmedi**: tam süit karesini commit'lemek kararlı olanı
+kararsız olanla değiştirmek olurdu. Aynı dosyadaki `adventure_320` ve
+`adventure_390` golden'ları da aynı sebepten kırmızı.
+
+Bölüm D'de yenilenen golden'lar: `tavern_320.png` (mock üye adları
+değişti, öncesinde yeşildi) ve yeni üretilenler
+(`dropped_item_*`, `coin_rain_*`, `endless_hud_*`).
 
 ⚠️ **Bu 44 test Bölüm C'den önce de kırmızıydı.** Bölüm C'nin dört fazı da
 `HEAD`'e karşı ölçüldü (ayrı bir `git worktree` içinde temiz baseline) ve
@@ -2501,6 +2566,18 @@ Alan alan dağılım:
 Kabaca **20'si golden** (ekran görüntüsü farkı), **24'ü davranış**. Davranış
 tarafında iki küme öne çıkıyor: `RootShell` üzerinden çalışan satın
 alma/buff/ödül zinciri ve açılış/kalıcılık.
+
+## Açık kalan konular (Bölüm D kapanışı)
+
+| Konu | Durum |
+|---|---|
+| **Faz 1b borcu** | 61 imzalı eşya lore'u İngilizce'de tek jenerik cümleye düşüyor (`signatureItemLore`); 65 ünvanın hikâyesi kaynağa göre 4 şablondan üretiliyor. Toplam **126 cümle**, ayrı bir iş |
+| **3 kararsız test** | `character_creation_test` golden'ı (2) ve `adventure_progress_test`'in sıra bağımlı testi (1). Bölüm D'nin değişiklikleri `git stash` ile geri alınınca da kırmızı; dokunulmadı |
+| **Kod doğrulaması → sunucu** | `MailCatalog.codes` APK'nın içinde ve açan herkes görebilir. Firebase gelince istemci yalnızca kodu göndermeli, **sunucu** geçerliliği ve kullanım sayısını doğrulayıp postayı açmalı (§6.18) |
+| **Posta kataloğu → sunucu** | `MailCatalog.all` bugün sabit veri. Değişmesi gereken tek şey **listenin kaynağı**; model, kalıcı alanlar ve ekran olduğu gibi kalır (§6.18) |
+| **Gün değişiminde macera düşüyor** | Telafi kararı hâlâ verilmedi; seçenek kısmi ödülle sonuçlandırmak |
+| **Bağlanmamış ikinci savaş yolu** | `resolveTimedEncounter` tam yazılmış ve testli ama hiç çağrılmıyor (§6.11). Dokunulmadı |
+| **Release imzası** | Hâlâ debug key (C11) |
 
 ## Zaman güvenliği
 

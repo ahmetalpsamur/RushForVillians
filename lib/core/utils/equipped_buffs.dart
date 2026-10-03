@@ -54,6 +54,18 @@ class EquippedBuffs {
   /// Seri eşiğinden düşülen adım. Tavana kırpılmış.
   final int streakStepRelief;
 
+  /// Mağaza indiriminin **potansiyel** oranı (0.25 = %25).
+  ///
+  /// ⚠️ Bu değer tek başına indirim **uygulamaz**. İndirim bir
+  /// pencereye bağlı (`UserProfile.isShopDiscountActive`) ve iki şey
+  /// birlikte gerekiyor: taşıyan ünvan takılı **ve** pencere açık.
+  /// İkisini ayrı tutmak zorunlu, çünkü ekran "kapalı, şöyle açılır"
+  /// diyebilmek için potansiyeli de bilmek zorunda (Model Kuralları #5).
+  ///
+  /// Ekonomi tavanlarına **girmiyor**: kazancı büyütmüyor, harcamayı
+  /// küçültüyor; `maxTitleEconomyBonus` adım kazancı için ölçülmüştü.
+  final double shopDiscountBonus;
+
   /// Koşullu/tetiklenen etkiler; gösterim için taşınır, çarpana girmez.
   final List<ItemEffect> conditionalEffects;
 
@@ -69,6 +81,7 @@ class EquippedBuffs {
     this.streakFreezeCapBonus = 0,
     this.wheelSpinCapBonus = 0,
     this.streakStepRelief = 0,
+    this.shopDiscountBonus = 0,
     this.conditionalEffects = const [],
     this.combatEffects = const [],
   });
@@ -93,6 +106,7 @@ class EquippedBuffs {
     var freezeCap = 0;
     var spinCap = 0;
     var relief = 0;
+    var shopDiscount = 0.0;
     final conditional = <ItemEffect>[];
     final combat = <ItemEffect>[];
 
@@ -118,6 +132,8 @@ class EquippedBuffs {
           continue;
         }
         switch (effect.stat) {
+          case ItemStat.shopDiscount:
+            shopDiscount += effect.value;
           case ItemStat.stepCoin:
             stepCoin += effect.value;
           case ItemStat.stepXp:
@@ -160,6 +176,9 @@ class EquippedBuffs {
       ),
       wheelSpinCapBonus: spinCap.clamp(0, GameConstants.maxEquippedStockBonus),
       streakStepRelief: relief.clamp(0, GameConstants.maxEquippedStreakRelief),
+      // Ekonomi tavanına girmiyor; `discountedCost` zaten kendi güvenlik
+      // kırpmasını yapıyor (en fazla %90, en az 1 coin).
+      shopDiscountBonus: shopDiscount,
       conditionalEffects: List.unmodifiable(conditional),
       combatEffects: List.unmodifiable(combat),
     );

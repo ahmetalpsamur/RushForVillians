@@ -229,6 +229,26 @@ class GameConstants {
   /// kalmasın.
   static const double enemyHealthRoundShare = 0.65;
 
+  /// Mağaza indirimi penceresinin süresi (Bölüm D / Faz 3).
+  ///
+  /// Kapalı Beta ünvanı takılıyken bir macera tamamlanınca ya da sonsuz
+  /// koşuda bir canavar kesilince açılır ve **yenilenir**.
+  ///
+  /// **Neden pencere, neden 30 dakika:** indirim ne sürekli açık olmalı
+  /// (o zaman ünvan bir ödül değil pasif bir çarpan olur) ne de tek
+  /// alışverişlik (o zaman oyuncu pahalı eşya için biriktirip indirimi
+  /// bekletir, ucuz eşyada israf hisseder). 30 dakika maceradan çıkıp
+  /// mağazaya bakmaya yetiyor, "hep açık" sayılacak kadar uzun değil.
+  static const Duration shopDiscountWindow = Duration(minutes: 30);
+
+  /// Pencere **kapalıyken** "ne kadar indirim açılacak" metninde gösterilen
+  /// oran.
+  ///
+  /// Katalogdaki Erken Kalkan etkisiyle aynı sayı; ayrı yazılmasının tek
+  /// sebebi kapalıyken `EquippedBuffs` üzerinden okunacak canlı bir değer
+  /// olmaması. İkisi ayrışırsa `title_catalog_test` alarm verir.
+  static const double shopDiscountRateForLabel = 0.25;
+
   /// Eksik round hasar eğrisinin üssü.
   ///
   /// `hasar ölçeği = (1 - tamamlama)^1,5`: az kaçıran oyuncu yumuşak,

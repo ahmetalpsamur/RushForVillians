@@ -133,6 +133,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get endlessStart => 'Start Endless Run';
 
   @override
+  String shopDiscountActive(int percent, int minutes) {
+    return 'Discount on: $percent% · $minutes min left';
+  }
+
+  @override
+  String shopDiscountClosed(int percent, int minutes) {
+    return 'Finish an adventure or fell a monster in an endless run: $percent% off opens for $minutes minutes.';
+  }
+
+  @override
   String get mailboxTitle => 'Mailbox';
 
   @override

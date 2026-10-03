@@ -225,6 +225,16 @@ class UserProfile {
   /// Yavaşlatma penceresinin başlangıcı (UTC).
   DateTime? codeAttemptWindowStart;
 
+  /// Mağaza indirimi penceresinin bitiş anı (**UTC**); `null` = kapalı.
+  ///
+  /// Kapalı Beta ünvanı takılıyken bir macera tamamlanınca ya da sonsuz
+  /// koşuda bir canavar kesilince kurulur/yenilenir.
+  ///
+  /// **Neden bitiş anı, neden kalan süre değil:** kalan süre saklansaydı
+  /// uygulama kapalıyken işlemez ve kapat-aç pencereyi uzatırdı. Mutlak
+  /// an saklanınca kapanıp açılma pencereyi **doğru** devam ettiriyor.
+  DateTime? shopDiscountUntil;
+
   /// Şu an takılı ünvanın kimliği. `null` = hiçbiri takılı değil.
   ///
   /// **Tek ünvan kuralı veri düzeyinde:** tek bir alan olduğu için iki ünvan
@@ -314,6 +324,7 @@ class UserProfile {
     List<String>? redeemedCodes,
     this.codeAttempts = 0,
     this.codeAttemptWindowStart,
+    this.shopDiscountUntil,
     this.equippedTitleId,
     this.petCompanionEnabled = true,
     this.enemiesDefeated = 0,
@@ -679,6 +690,30 @@ class UserProfile {
     codeAttemptWindowStart = null;
   }
 
+  // --- Mağaza indirimi penceresi (Bölüm D / Faz 3 kapanışı) ---
+
+  /// Pencereyi açar ya da **yeniler**.
+  ///
+  /// Yenileme uzatma değil sıfırlama: ikinci bir macera pencereyi
+  /// 60 dakikaya çıkarmaz, yeniden 30 dakika yapar. Aksi hâlde arka arkaya
+  /// macera yapan oyuncuda indirim fiilen sürekli açık kalırdı.
+  void openShopDiscountWindow(DateTime now) {
+    shopDiscountUntil = now.toUtc().add(GameConstants.shopDiscountWindow);
+  }
+
+  bool isShopDiscountActive(DateTime now) {
+    final until = shopDiscountUntil;
+    return until != null && now.toUtc().isBefore(until);
+  }
+
+  /// Pencerenin kalan süresi; kapalıysa [Duration.zero].
+  Duration shopDiscountRemaining(DateTime now) {
+    final until = shopDiscountUntil;
+    if (until == null) return Duration.zero;
+    final left = until.difference(now.toUtc());
+    return left.isNegative ? Duration.zero : left;
+  }
+
   bool grantTitle(String id) {
     if (ownedTitleIds.contains(id)) return false;
     ownedTitleIds.add(id);
@@ -847,6 +882,7 @@ class UserProfile {
     'redeemedCodes': redeemedCodes,
     'codeAttempts': codeAttempts,
     'codeAttemptWindowStart': codeAttemptWindowStart?.toIso8601String(),
+    'shopDiscountUntil': shopDiscountUntil?.toIso8601String(),
     'equippedTitleId': equippedTitleId,
     'petCompanionEnabled': petCompanionEnabled,
     'enemiesDefeated': enemiesDefeated,
@@ -940,6 +976,9 @@ class UserProfile {
       codeAttempts: (json['codeAttempts'] as int? ?? 0).clamp(0, 1 << 20),
       codeAttemptWindowStart: DateTime.tryParse(
         json['codeAttemptWindowStart'] as String? ?? '',
+      ),
+      shopDiscountUntil: DateTime.tryParse(
+        json['shopDiscountUntil'] as String? ?? '',
       ),
       // Katalogda karşılığı olmayan ya da sahip olunmayan bir kimlik takılı
       // gelirse sessizce düşer: elle düzenlenmiş kayıt bilinmeyen bir ünvanın

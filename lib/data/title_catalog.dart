@@ -53,23 +53,32 @@ abstract final class TitleCatalog {
     // POSTA — yalnızca posta kutusundan gelir (Bölüm D / Faz 3)
     // ---------------------------------------------------------------
     GameTitle(
-      id: 'title_closed_beta',
-      name: 'Kapalı Beta',
-      lore: 'Oyun henüz yarımıken yanındaydın.',
+      // ⚠️ Kimlikte `title_` öneki **yok**: İngilizce ad kimlikten
+      // türetiliyor (`_titleCaseIdentifier`), önekli bir kimlik
+      // "Title Early Riser" üretirdi. Bütün katalog öneksiz.
+      id: 'early_riser',
+      name: 'Erken Kalkan',
+      lore: 'Daha ortalık ısınmadan yoldaydın.',
       rarity: RewardRarity.legendary,
       source: TitleSource.mail,
       effects: [
         ItemEffect(
           stat: ItemStat.shopDiscount,
-          value: 0.25,
-          // ⚠️ Tetikleyici **henüz bağlanmadı**: indirimin ne kadar açık
-          // kalacağı kullanıcıya soruldu (Bölüm D / Faz 3, İş 3).
-          // Etki tanımlı ve katalogda duruyor; uygulama noktası karar
-          // geldikten sonra yazılacak.
-          customLabel: 'bir macera tamamlayınca mağazada indirim %25',
+          value: GameConstants.shopDiscountRateForLabel,
+          // ⚠️ `trigger` **yok** ve bu bilinçli. Etki tetikleyicisi
+          // savaş durumuna bakar (`CombatConditions`); buradaki kapı ise
+          // bir **zaman penceresi** (`UserProfile.shopDiscountUntil`).
+          // Tetikleyici verilseydi etki `conditionalEffects`'e düşer ve
+          // `EquippedBuffs.shopDiscountBonus` hiç dolmazdı — ölçüldü.
+          //
+          // Yani bu değer indirimin **potansiyeli**; gerçekten uygulanması
+          // için pencerenin de açık olması gerekiyor (GD109).
+          customLabel:
+              'macera bitirince ya da canavar kesince 30 dakika '
+              'mağazada %25 indirim',
           customLabelEn:
-              'after you finish an adventure, 25% off in the shop',
-          trigger: ItemEffectTrigger.streakActive,
+              'finish an adventure or fell a monster for 25% off in the '
+              'shop for 30 minutes',
         ),
       ],
     ),

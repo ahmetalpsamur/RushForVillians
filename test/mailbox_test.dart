@@ -90,7 +90,7 @@ void main() {
       final mail = MailCatalog.byId(MailCatalog.closedBetaThanksId)!;
       expect(mail.reward.coins, 1000);
       expect(mail.reward.wheelSpins, 5);
-      expect(mail.reward.titleId, MailCatalog.closedBetaTitleId);
+      expect(mail.reward.titleId, MailCatalog.earlyRiserTitleId);
     });
   });
 
@@ -240,7 +240,7 @@ void main() {
 
       expect(profile.coins - coinsBefore, 1000);
       expect(profile.extraWheelSpins - spinsBefore, 5);
-      expect(profile.ownsTitle(MailCatalog.closedBetaTitleId), isTrue);
+      expect(profile.ownsTitle(MailCatalog.earlyRiserTitleId), isTrue);
       // Posta listede kalır, düğme "alındı"ya döner.
       expect(find.byKey(claimKey), findsNothing);
       expect(

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
+import '../../core/constants/game_constants.dart';
+import '../../core/utils/shop_pricing.dart';
 import '../../l10n/l10n_context.dart';
 import '../../l10n/content_localizations.dart';
 import '../../models/reward_rarity.dart';
@@ -64,6 +66,19 @@ class XpStoreScreen extends StatefulWidget {
   final void Function(GameTitle title)? onPurchaseTitle;
   final String? tutorialItemId;
 
+  /// Geçerli indirim oranı (0.25 = %25). **Pencere kapalıysa 0.**
+  final double discountRate;
+
+  /// Penceresinin kalan süresi; kapalıysa [Duration.zero].
+  final Duration discountRemaining;
+
+  /// Oyuncu indirim taşıyan bir ünvan takıyor mu.
+  ///
+  /// [discountRate] 0 olsa bile bu `true` olabilir — "ünvan var ama
+  /// pencere kapalı" durumunu açıklayabilmek için (Model Kuralları #5:
+  /// devre dışı bir şey nedenini söyler).
+  final bool hasDiscountTitle;
+
   const XpStoreScreen({
     super.key,
     required this.items,
@@ -81,7 +96,15 @@ class XpStoreScreen extends StatefulWidget {
     this.extraWheelSpins = 0,
     this.xpBoostActive = false,
     this.tutorialItemId,
+    this.discountRate = 0,
+    this.discountRemaining = Duration.zero,
+    this.hasDiscountTitle = false,
   });
+
+  /// Bir fiyatın oyuncunun **ödeyeceği** hâli. Ekranda görünen fiyat da,
+  /// "yetiyor mu" karşılaştırması da bunu kullanır — ikisi ayrışırsa
+  /// oyuncu gördüğünden farklı bir fiyat öderdi.
+  int payable(int baseCost) => discountedCost(baseCost, discountRate);
 
   @override
   State<XpStoreScreen> createState() => _XpStoreScreenState();
@@ -163,7 +186,8 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
       // kez alınabildiği için sahip olduğun bir eşya da "alabileceklerim"
       // listesine ait — birleştirme için ikinci adedi oradan alacaksın.
       if (_onlyAffordable &&
-          !(item.isUnlockedAt(widget.level) && widget.coins >= item.cost)) {
+          !(item.isUnlockedAt(widget.level) &&
+              widget.coins >= widget.payable(item.cost))) {
         return false;
       }
       return true;
@@ -276,12 +300,20 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
           sliver: SliverToBoxAdapter(
-            child:
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _DiscountBanner(
+                  rate: widget.discountRate,
+                  remaining: widget.discountRemaining,
+                  hasTitle: widget.hasDiscountTitle,
+                ),
                 _hasTitleShop
                     ? SectionCard(
                       key: const ValueKey('store-titles-section'),
                       title: context.l10n.titleStore,
                       child: _TitleShop(
+            discountRate: widget.discountRate,
                         titles: widget.titles,
                         coins: widget.coins,
                         ownedTitleIds: widget.ownedTitleIds,
@@ -296,6 +328,8 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                         style: const TextStyle(color: Colors.white70),
                       ),
                     ),
+              ],
+            ),
           ),
         ),
       ],
@@ -338,6 +372,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   KeyedSubtree(
                     key: ValueKey('tutorial-store-item-${tutorialItem.id}'),
                     child: _EquipmentCard(
+            discountRate: widget.discountRate,
                       key: TutorialGuideTargetKeys.shopItem,
                       item: tutorialItem,
                       coins: widget.coins,
@@ -363,6 +398,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   children: [
                     for (final item in widget.items)
                       _UpgradeRow(
+            discountRate: widget.discountRate,
                         item: item,
                         coins: widget.coins,
                         owned: widget.ownedUpgradeIds.contains(item.id),
@@ -479,6 +515,7 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                     final hasSecond = firstIndex + 1 < equipment.length;
 
                     Widget buildCard(Item item) => _EquipmentCard(
+            discountRate: widget.discountRate,
                       item: item,
                       coins: widget.coins,
                       level: widget.level,
@@ -512,6 +549,79 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
           ],
         ],
       ],
+    );
+  }
+}
+
+/// İndirim penceresinin durum şeridi (Bölüm D / Faz 3 kapanışı).
+///
+/// İki durumu da **söyler**: açıkken kalan süreyi, kapalıyken nasıl
+/// açılacağını. Kapalı bir şeyin nedenini söylememek Model Kuralları #5'i
+/// ihlal ederdi — oyuncu indirimi tahmin etmek zorunda kalmamalı.
+///
+/// Ünvan hiç takılı değilse şerit **çizilmez**: o oyuncu için ortada bir
+/// indirim kavramı yok, boş bir vaat göstermek gürültü olurdu.
+class _DiscountBanner extends StatelessWidget {
+  final double rate;
+  final Duration remaining;
+  final bool hasTitle;
+
+  const _DiscountBanner({
+    required this.rate,
+    required this.remaining,
+    required this.hasTitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasTitle) return const SizedBox.shrink();
+    final active = rate > 0 && remaining > Duration.zero;
+    // Kalan süre yukarı yuvarlanıyor: 29 sn kalmışken "0 dk" yazmak
+    // pencereyi kapanmış gibi gösterirdi.
+    final minutesLeft = (remaining.inSeconds / 60).ceil();
+    final percent = (GameConstants.shopDiscountRateForLabel * 100).round();
+    final color = active ? AppColors.streak : Colors.white54;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        key: const ValueKey('shop-discount-banner'),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.55)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(active ? Icons.local_offer : Icons.lock_clock,
+                  color: color, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  active
+                      ? context.l10n.shopDiscountActive(
+                          (rate * 100).round(),
+                          minutesLeft,
+                        )
+                      : context.l10n.shopDiscountClosed(
+                          percent,
+                          GameConstants.shopDiscountWindow.inMinutes,
+                        ),
+                  key: const ValueKey('shop-discount-text'),
+                  style: TextStyle(
+                    color: active ? Colors.white : Colors.white70,
+                    fontSize: 12.5,
+                    fontWeight: active ? FontWeight.w900 : FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -631,7 +741,12 @@ class _TitleShop extends StatefulWidget {
   final void Function(GameTitle title) onPurchase;
   final ValueChanged<String> onBlocked;
 
+  /// Geçerli indirim oranı; 0 ise fiyat birebir. Kartın gösterdiği
+  /// fiyat ve "yetiyor mu" karşılaştırması **aynı** değeri kullanır.
+  final double discountRate;
+
   const _TitleShop({
+    required this.discountRate,
     required this.titles,
     required this.coins,
     required this.ownedTitleIds,
@@ -651,7 +766,9 @@ class _TitleShopState extends State<_TitleShop> {
   List<GameTitle> get _visible => [
     for (final title in widget.titles)
       if ((_rarity == null || title.rarity == _rarity) &&
-          (!_affordableOnly || widget.coins >= title.cost) &&
+          (!_affordableOnly ||
+              widget.coins >=
+                  discountedCost(title.cost, widget.discountRate)) &&
           (!_hideOwned || !widget.ownedTitleIds.contains(title.id)))
         title,
   ];
@@ -737,6 +854,7 @@ class _TitleShopState extends State<_TitleShop> {
         else
           for (final title in visible)
             _TitleRow(
+            discountRate: widget.discountRate,
               title: title,
               coins: widget.coins,
               owned: widget.ownedTitleIds.contains(title.id),
@@ -755,7 +873,12 @@ class _TitleRow extends StatelessWidget {
   final VoidCallback onPurchase;
   final ValueChanged<String> onBlocked;
 
+  /// Geçerli indirim oranı; 0 ise fiyat birebir. Kartın gösterdiği
+  /// fiyat ve "yetiyor mu" karşılaştırması **aynı** değeri kullanır.
+  final double discountRate;
+
   const _TitleRow({
+    required this.discountRate,
     required this.title,
     required this.coins,
     required this.owned,
@@ -765,12 +888,13 @@ class _TitleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final affordable = coins >= title.cost;
+    final price = discountedCost(title.cost, discountRate);
+    final affordable = coins >= price;
     final buyable = !owned && affordable;
     final reason =
         owned
             ? context.l10n.titleAlreadyOwned(context.l10n.titleName(title))
-            : context.l10n.moreGoldNeeded(title.cost - coins);
+            : context.l10n.moreGoldNeeded(price - coins);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -810,7 +934,7 @@ class _TitleRow extends StatelessWidget {
                 label: Text(
                   owned
                       ? context.l10n.ownedUpper
-                      : context.l10n.goldPrice(title.cost),
+                      : context.l10n.goldPrice(price),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -831,7 +955,12 @@ class _UpgradeRow extends StatelessWidget {
   final VoidCallback onPurchase;
   final ValueChanged<String> onBlocked;
 
+  /// Geçerli indirim oranı; 0 ise fiyat birebir. Kartın gösterdiği
+  /// fiyat ve "yetiyor mu" karşılaştırması **aynı** değeri kullanır.
+  final double discountRate;
+
   const _UpgradeRow({
+    required this.discountRate,
     required this.item,
     required this.coins,
     required this.owned,
@@ -843,7 +972,8 @@ class _UpgradeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final alreadyOwned = owned && !item.repeatable;
-    final affordable = coins >= item.cost;
+    final price = discountedCost(item.cost, discountRate);
+    final affordable = coins >= price;
     final enabled = !alreadyOwned && affordable;
 
     return Padding(
@@ -886,7 +1016,7 @@ class _UpgradeRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _PriceButton(
-            cost: item.cost,
+            cost: price,
             enabled: enabled,
             ownedLabel: alreadyOwned ? context.l10n.owned : null,
             onPressed: onPurchase,
@@ -898,7 +1028,7 @@ class _UpgradeRow extends StatelessWidget {
                       )
                       : context.l10n.itemCoinsNeeded(
                         context.l10n.storeUpgradeName(item),
-                        item.cost - coins,
+                        price - coins,
                       ),
                 ),
           ),
@@ -921,7 +1051,12 @@ class _EquipmentCard extends StatelessWidget {
   final VoidCallback onPurchase;
   final ValueChanged<String> onBlocked;
 
+  /// Geçerli indirim oranı; 0 ise fiyat birebir. Kartın gösterdiği
+  /// fiyat ve "yetiyor mu" karşılaştırması **aynı** değeri kullanır.
+  final double discountRate;
+
   const _EquipmentCard({
+    required this.discountRate,
     super.key,
     required this.item,
     required this.coins,
@@ -961,10 +1096,11 @@ class _EquipmentCard extends StatelessWidget {
         level,
       );
     }
-    if (coins < item.cost) {
+    final price = discountedCost(item.cost, discountRate);
+    if (coins < price) {
       return context.l10n.itemCoinsNeeded(
         context.l10n.itemName(item),
-        item.cost - coins,
+        price - coins,
       );
     }
     return null;
@@ -1121,7 +1257,7 @@ class _EquipmentCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: _PriceButton(
-                cost: item.cost,
+                cost: discountedCost(item.cost, discountRate),
                 enabled: reason == null,
                 // Adet bilgisi düğmeyi kapatmıyor; ikinci adet birleştirme
                 // için gerekli olabilir.

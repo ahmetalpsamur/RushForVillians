@@ -27,7 +27,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 31;
+  static const int schemaVersion = 32;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -391,6 +391,11 @@ class GameStorage {
     // hiç posta alınmamış, hiç kod girilmemiş demek. Katalogdaki postalar
     // zaten herkese açık, yani eski oyuncu da ilk açılışta görecek.
     30: (state) => state,
+    // v31 -> v32: mağaza indirimi penceresi (`shopDiscountUntil`). Eski
+    // kayıtta alan yok; `null` doğru varsayılan — pencere kapalı. Kapalı
+    // Beta ünvanı zaten postadan geliyor, yani eski oyuncu da önce postayı
+    // alıp ünvanı takacak.
+    31: (state) => state,
   };
 
   /// Yarım bir maceranın `enemyHealth`'ini **güncel** can tavanına taşır.

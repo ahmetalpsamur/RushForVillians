@@ -14,7 +14,7 @@
         android:name="android.hardware.sensor.stepdetector"
         android:required="false"/>
     <application
-        android:label="rush_for_villains"
+        android:label="Rush For Villains"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

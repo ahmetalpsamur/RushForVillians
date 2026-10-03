@@ -129,6 +129,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get endlessStart => 'Sonsuz Koşuya Başla';
 
   @override
+  String shopDiscountActive(int percent, int minutes) {
+    return 'İndirim açık: %$percent · $minutes dk kaldı';
+  }
+
+  @override
+  String shopDiscountClosed(int percent, int minutes) {
+    return 'Bir macera tamamla ya da sonsuz koşuda bir canavar kes: %$percent indirim $minutes dakika açılır.';
+  }
+
+  @override
   String get mailboxTitle => 'Posta Kutusu';
 
   @override

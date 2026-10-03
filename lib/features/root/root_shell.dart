@@ -16,6 +16,7 @@ import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/effective_stats.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
+import '../../core/utils/shop_pricing.dart';
 import '../../core/utils/item_leveling.dart';
 import '../../core/utils/item_merging.dart';
 import '../../core/utils/endless_rules.dart';
@@ -421,14 +422,15 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       );
       return;
     }
-    if (_profile.coins < title.cost) {
-      _showStoreNotice(
-        context.l10n.coinsStillNeeded(title.cost - _profile.coins),
-      );
+    // Fiyat tek yerden: ekranda görünen ve burada düşülen aynı sayı
+    // olmalı (`shop_pricing.dart`).
+    final price = discountedCost(title.cost, _shopDiscountRate);
+    if (_profile.coins < price) {
+      _showStoreNotice(context.l10n.coinsStillNeeded(price - _profile.coins));
       return;
     }
     setState(() {
-      _profile.coins -= title.cost;
+      _profile.coins -= price;
       _profile.grantTitle(title.id);
     });
     _persist();
@@ -1390,6 +1392,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       // macerayı defalarca sayardı.
       if (walkAccepted > 0 && _adventure?.isAdventureCompleted == true) {
         _profile.adventuresCompleted += 1;
+        _openShopDiscountIfEarned(now);
       }
 
       // XP'nin kendi işaretçisi var; iki ödül ekonomisi birbirine karışmaz.
@@ -1416,6 +1419,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         );
         endlessDefeated = hit.defeated;
         if (endlessDefeated) endless.settleDefeat();
+        // Kesim de pencereyi açar: iki mod aynı ödülü vermeli.
+        if (endlessCuts > 0) _openShopDiscountIfEarned(now);
         // Seri: kesim **zafer kapısını açmaz**, yalnızca adım kapısı çalışır
         // (aşağıdaki `_registerDailyStreak` adım eşiğine bakıyor). Çark da
         // aynı sebeple açılmıyor: kesim 200 adımda bir oluyor, "günün ilk
@@ -1450,6 +1455,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
           // devrildi) burada sayılır; açılanlar para hesabında sayılıyor.
           if (adventure.isAdventureCompleted) {
             _profile.adventuresCompleted += 1;
+            _openShopDiscountIfEarned(now);
           }
         }
       }
@@ -2063,7 +2069,8 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   void _purchase(XpStoreItem item) {
     final alreadyOwned = _profile.ownedUpgradeIds.contains(item.id);
     if (alreadyOwned && !item.repeatable) return;
-    if (_profile.coins < item.cost) return;
+    final price = discountedCost(item.cost, _shopDiscountRate);
+    if (_profile.coins < price) return;
 
     // Tüketilen yükseltmeler: etkiyi **önce** uygula, veremiyorsan sat.
     // Stok doluysa / zaten etkinse satış yapılmaz, para boşa gitmemeli.
@@ -2091,7 +2098,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
 
     setState(() {
-      _profile.coins -= item.cost;
+      _profile.coins -= price;
       if (!alreadyOwned) _profile.ownedUpgradeIds.add(item.id);
     });
     _persist();
@@ -2116,11 +2123,12 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       return;
     }
     if (!item.isUnlockedAt(_profile.level)) return;
-    if (_profile.coins < item.cost) return;
+    final price = discountedCost(item.cost, _shopDiscountRate);
+    if (_profile.coins < price) return;
 
     final count = _profile.ownedCountOf(item.id) + 1;
     setState(() {
-      _profile.coins -= item.cost;
+      _profile.coins -= price;
       _profile.addItem(item.id);
     });
     _persist();
@@ -2617,6 +2625,27 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     }
   }
 
+  // --- Mağaza indirimi penceresi (Bölüm D / Faz 3 kapanışı) ---
+
+  /// Takılı ünvan indirim taşıyorsa pencereyi açar/yeniler.
+  ///
+  /// ⚠️ **Ünvan takılı değilse hiçbir şey olmaz.** Pencere ünvandan
+  /// bağımsız açılsaydı, ünvanı sonradan takan oyuncu hiç macera
+  /// yapmadan indirimli alışverişe başlardı.
+  ///
+  /// `setState` içinden çağrılıyor; ayrı bir `_persist()` yok çünkü
+  /// çağıran parti zaten kaydediyor.
+  void _openShopDiscountIfEarned(DateTime now) {
+    if (_buffs.shopDiscountBonus <= 0) return;
+    _profile.openShopDiscountWindow(now);
+  }
+
+  /// Şu an geçerli indirim oranı: **ünvan takılı ve pencere açıksa**.
+  double get _shopDiscountRate =>
+      _profile.isShopDiscountActive(GameClock.now())
+      ? _buffs.shopDiscountBonus
+      : 0;
+
   // --- Posta kutusu (Bölüm D / Faz 3) ---
 
   /// Oyuncunun görebileceği postalar, **yeniden eskiye**.
@@ -2915,6 +2944,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         onPurchase: _purchase,
         onPurchaseEquipment: _purchaseEquipment,
         onPurchaseTitle: _purchaseTitle,
+        discountRate: _shopDiscountRate,
+        discountRemaining: _profile.shopDiscountRemaining(GameClock.now()),
+        hasDiscountTitle: _buffs.shopDiscountBonus > 0,
       ),
       TeamScreen(team: _team),
       ProfileScreen(
