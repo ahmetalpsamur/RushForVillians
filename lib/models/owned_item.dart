@@ -1,3 +1,4 @@
+import 'forged_effect.dart';
 import 'reward_rarity.dart';
 
 /// Envanterdeki **tek bir eşya örneği**.
@@ -45,12 +46,30 @@ class OwnedItem {
   /// kuralını `RootShell._refreshEquipment` normalleştiriyor.
   final bool equipped;
 
+  /// Demircide yeniden atılmış etkiler (Bölüm E / Faz 4).
+  ///
+  /// **`null` = türetilmiş**: eşya hiç yeniden atılmadı ve buff'ı her
+  /// açılışta katalogdan çözülüyor — E1'in geriye dönük düzeltmesi bu
+  /// eşyalara olduğu gibi ulaşmaya devam ediyor. Dolu olduğunda imzalı
+  /// etkiler **hariç**, yeniden atılabilir yuvaların sırasıyla aynı uzunlukta.
+  final List<ForgedEffect>? forgedEffects;
+
+  /// Bu **örneğe** yapılmış yeniden atma sayısı. Maliyet bununla artıyor ve
+  /// sıfırlanmıyor; eşya türüne değil örneğe bağlı.
+  final int rerollCount;
+
+  /// Atılmış ama karar verilmemiş sonuç; yoksa `null`.
+  final PendingForge? pendingForge;
+
   const OwnedItem({
     required this.instanceId,
     required this.itemId,
     this.level = 1,
     this.rarity,
     this.equipped = false,
+    this.forgedEffects,
+    this.rerollCount = 0,
+    this.pendingForge,
   });
 
   /// Bu örneğin geçerli nadirliği: birleştirilmişse yükseltilmiş nadirlik,
@@ -58,21 +77,39 @@ class OwnedItem {
   RewardRarity effectiveRarity(RewardRarity catalogRarity) =>
       rarity ?? catalogRarity;
 
-  OwnedItem copyWith({int? level, RewardRarity? rarity, bool? equipped}) =>
-      OwnedItem(
-        instanceId: instanceId,
-        itemId: itemId,
-        level: level ?? this.level,
-        rarity: rarity ?? this.rarity,
-        equipped: equipped ?? this.equipped,
-      );
+  /// [clearPending] karar verilmiş atışı siler (`null` ile "değiştirme"
+  /// ayırt edilemediği için ayrı bayrak).
+  OwnedItem copyWith({
+    int? level,
+    RewardRarity? rarity,
+    bool? equipped,
+    List<ForgedEffect>? forgedEffects,
+    int? rerollCount,
+    PendingForge? pendingForge,
+    bool clearPending = false,
+  }) => OwnedItem(
+    instanceId: instanceId,
+    itemId: itemId,
+    level: level ?? this.level,
+    rarity: rarity ?? this.rarity,
+    equipped: equipped ?? this.equipped,
+    forgedEffects: forgedEffects ?? this.forgedEffects,
+    rerollCount: rerollCount ?? this.rerollCount,
+    pendingForge: clearPending ? null : (pendingForge ?? this.pendingForge),
+  );
 
+  /// Yeni alanlar **yalnızca doluysa** yazılır: hiç yeniden atılmamış bir
+  /// örneğin satırı Bölüm E öncesiyle bit bit aynı kalır.
   Map<String, dynamic> toJson() => {
     'instanceId': instanceId,
     'itemId': itemId,
     'level': level,
     'rarity': rarity?.name,
     'equipped': equipped,
+    if (forgedEffects case final effects?)
+      'forgedEffects': [for (final effect in effects) effect.toJson()],
+    if (rerollCount > 0) 'rerollCount': rerollCount,
+    if (pendingForge case final pending?) 'pendingForge': pending.toJson(),
   };
 
   /// Bozuk bir satır `null` döner; çağıran taraf onu atar ve sağlam
@@ -85,6 +122,15 @@ class OwnedItem {
     if (instanceId is! int) return null;
 
     final level = json['level'];
+    final forged = json['forgedEffects'];
+    final parsedForged =
+        forged is List
+            ? [
+              for (final row in forged)
+                if (ForgedEffect.fromJson(row) case final effect?) effect,
+            ]
+            : null;
+    final rerolls = json['rerollCount'];
     return OwnedItem(
       instanceId: instanceId,
       itemId: itemId,
@@ -92,6 +138,14 @@ class OwnedItem {
       level: level is int && level >= 1 ? level : 1,
       rarity: rarityFromName(json['rarity']),
       equipped: json['equipped'] == true,
+      // Bozuk bir satır listeyi kısaltırsa çözümleme uzunluk uyuşmazlığını
+      // görüp türetilmiş buff'a düşer; eşya kaybolmaz.
+      forgedEffects:
+          parsedForged != null && parsedForged.length == (forged as List).length
+              ? parsedForged
+              : null,
+      rerollCount: rerolls is int && rerolls > 0 ? rerolls : 0,
+      pendingForge: PendingForge.fromJson(json['pendingForge']),
     );
   }
 

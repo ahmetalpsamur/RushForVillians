@@ -31,7 +31,9 @@ abstract final class MailCatalog {
   MailCatalog._();
 
   /// Katalog sürümü. Yeni posta eklendiğinde artırılır.
-  static const int version = 1;
+  ///
+  /// 2: birleştirme hatası özür postası (Bölüm E / Faz 5).
+  static const int version = 2;
 
   /// Kapalı beta teşekkür postasının kimliği.
   static const String closedBetaThanksId = 'mail_closed_beta_thanks';
@@ -45,6 +47,14 @@ abstract final class MailCatalog {
   /// verilecek; bu yüzden ad "kapalı beta" değil — kapalı beta yalnızca
   /// onu dağıtan **ilk** posta.
   static const String earlyRiserTitleId = 'early_riser';
+
+  /// Birleştirme hatası özür postası (Bölüm E / Faz 5).
+  ///
+  /// İmzalı eşyalar birleştirilince yeni etki almıyordu (GD110). Düzeltme
+  /// eşyalara geriye dönük ulaştı; bu posta durumu söylüyor ve küçük bir
+  /// telafi veriyor. **Yeni kimlik**: daha önce alınmış postaların kaydı
+  /// (`claimedMailIds`) kimliğe bağlı olduğu için hiçbiri etkilenmiyor.
+  static const String mergeBuffApologyId = 'mail_merge_buff_apology';
 
   static final List<MailMessage> all = [
     MailMessage(
@@ -64,6 +74,12 @@ abstract final class MailCatalog {
       reward: MailReward(coins: 1000, wheelSpins: 5),
       // Kod karşılığı: herkese açık değil, yalnızca kodu giren görür.
       deliveredToEveryone: false,
+    ),
+    MailMessage(
+      id: mergeBuffApologyId,
+      kind: MailKind.reward,
+      sentAt: DateTime.utc(2026, 10, 4),
+      reward: MailReward(coins: 750, wheelSpins: 3),
     ),
   ];
 

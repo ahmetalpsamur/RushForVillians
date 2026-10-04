@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
@@ -11,6 +12,10 @@ import 'package:rush_for_villains/core/utils/wheel_rewards.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/features/store/xp_store_screen.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
+import 'package:rush_for_villains/l10n/app_localizations_en.dart';
+import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
+import 'package:rush_for_villains/l10n/content_localizations.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
@@ -98,6 +103,7 @@ void main() {
     required UserProfile profile,
     List<Item> catalog = const [],
     bool openStoreTab = true,
+    Locale? locale,
   }) async {
     tester.view.physicalSize = const Size(1000, 2400);
     tester.view.devicePixelRatio = 1;
@@ -110,6 +116,22 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
+        // Dil verilmezse eski kurulum: delege yok, `context.l10n` Türkçeye
+        // düşüyor. Dil verilince gerçek yerelleştirme akışı kuruluyor.
+        locale: locale,
+        localizationsDelegates:
+            locale == null
+                ? null
+                : const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+        supportedLocales:
+            locale == null
+                ? const [Locale('en', 'US')]
+                : AppLocalizations.supportedLocales,
         home: RootShell(
           avatar: _avatar,
           initialState: GameState(
@@ -124,7 +146,9 @@ void main() {
     await tester.pump();
 
     if (openStoreTab) {
-      await tester.tap(find.text('Mağaza').last);
+      final storeLabel =
+          locale?.languageCode == 'en' ? AppLocalizationsEn().store : 'Mağaza';
+      await tester.tap(find.text(storeLabel).last);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('store-page-tab-1')));
       await tester.pumpAndSettle();
@@ -157,11 +181,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> tapEquipment(WidgetTester tester, Item item) async {
-    final shown = flavorForClass(item, _avatar.characterClass);
-    await scrollStoreTo(tester, find.text(shown.name));
+  Future<void> tapEquipment(
+    WidgetTester tester,
+    Item item, {
+    AppLocalizations? l10n,
+  }) async {
+    final flavored = flavorForClass(item, _avatar.characterClass);
+    final shown = l10n == null ? flavored.name : l10n.itemName(flavored);
+    await scrollStoreTo(tester, find.text(shown));
     final card = find.ancestor(
-      of: find.text(shown.name),
+      of: find.text(shown),
       matching: find.byType(SectionCard),
     );
     final button = find.descendant(
@@ -188,6 +217,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Satın alma onay penceresini onaylar.
+  ///
+  /// `aca975c` ekipman, yükseltme ve ünvan satın almasının önüne bir onay
+  /// penceresi koydu: düğme artık satın almıyor, pencereyi açıyor. Testler
+  /// pencereyi açan dokunuştan sonra bunu **açıkça** çağırıyor. Pencere
+  /// yoksa adım düşer — onay sessizce atlanmamalı, yoksa pencerenin
+  /// kaybolması da fark edilmezdi.
+  Future<void> confirmPurchase(WidgetTester tester) async {
+    final confirm = find.byKey(const ValueKey('confirm-purchase'));
+    expect(confirm, findsOneWidget, reason: 'onay penceresi açılmadı');
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+  }
+
   /// Demo kontrolüyle adım üretir (manuel kaynak hız kontrolünden muaf).
   Future<void> simulateSteps(WidgetTester tester, int amount) async {
     tester.widget<HomeScreen>(find.byType(HomeScreen)).onSimulateSteps(amount);
@@ -205,6 +248,7 @@ void main() {
       );
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
 
       expect(profile.coins, 5000 - cheapItem.cost);
       expect(ownedIdsOf(profile), [cheapItem.id]);
@@ -222,6 +266,7 @@ void main() {
       expect(find.text('5000'), findsOneWidget);
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
 
       // Bakiye ve adet ekranda görünmeli; itilen rota kullanıldığında
       // ikisi de eski değerde kalıyordu.
@@ -274,8 +319,10 @@ void main() {
       );
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
       final afterFirst = profile.coins;
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
 
       expect(profile.coins, afterFirst - cheapItem.cost);
       expect(ownedIdsOf(profile), [cheapItem.id, cheapItem.id]);
@@ -296,16 +343,23 @@ void main() {
       );
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
+      // İkinci dokunuşta para yetmiyor: düğme pencereyi açmaz, sebebi
+      // söyler. Onaylanacak bir pencere yok.
       await tapEquipment(tester, cheapItem);
+      expect(find.byKey(const ValueKey('confirm-purchase')), findsNothing);
 
       expect(profile.coins, 0);
       expect(ownedIdsOf(profile), [cheapItem.id]);
     });
 
-    testWidgets('hızlı çift dokunma iki satın alma sayılır', (tester) async {
-      // Ekipmanda "aynı kareyi beklemeden iki dokunuş" artık iki adet
-      // demek; para iki kez düşüyor ve iki örnek geliyor. Tüketilen
-      // yükseltmelerde (dondurma hakkı, 2x XP) muhafızlar duruyor.
+    testWidgets('hızlı çift dokunma tek pencere açar, tek satın alma olur', (
+      tester,
+    ) async {
+      // Bölüm E kararı: iki hızlı dokunuş **tek** satın almadır. `aca975c`
+      // onay penceresi getirdi; ilk dokunuş pencereyi açar, ikincisi
+      // pencerenin bariyerine düşer. Yanlışlıkla iki kez para harcamak
+      // böylece imkânsız. (Eskiden bu test iki satın alma bekliyordu.)
       final profile = await pumpShell(
         tester,
         profile: makeProfile(coins: 5000),
@@ -327,8 +381,13 @@ void main() {
       await tester.tap(button.first, warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(profile.coins, 5000 - cheapItem.cost * 2);
-      expect(ownedIdsOf(profile), [cheapItem.id, cheapItem.id]);
+      // Tek pencere.
+      await confirmPurchase(tester);
+      expect(find.byKey(const ValueKey('confirm-purchase')), findsNothing);
+
+      // Tek satın alma, para bir kez gitti.
+      expect(profile.coins, 5000 - cheapItem.cost);
+      expect(ownedIdsOf(profile), [cheapItem.id]);
     });
 
     testWidgets('satın alma atomik: para ve sahiplik birlikte değişir', (
@@ -341,8 +400,114 @@ void main() {
       );
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
 
       expect(profile.coins, 0);
+      expect(ownedIdsOf(profile), [cheapItem.id]);
+    });
+  });
+
+  group('onay penceresi', () {
+    // `aca975c` satın almayı bir onay penceresinin arkasına aldı. Pencerenin
+    // tek işi geri dönüş kapısı olmak: iptal edilen satın alma hiçbir iz
+    // bırakmamalı.
+    testWidgets('ekipman: iptal edilince satın alma olmaz, altın gitmez', (
+      tester,
+    ) async {
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(coins: 5000),
+        catalog: [cheapItem],
+      );
+
+      await tapEquipment(tester, cheapItem);
+      expect(find.byKey(const ValueKey('confirm-purchase')), findsOneWidget);
+      // Pencere fiyatı söylüyor.
+      expect(find.text('${cheapItem.cost} altın'), findsOneWidget);
+
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('confirm-purchase')), findsNothing);
+      expect(profile.coins, 5000);
+      expect(profile.ownedItems, isEmpty);
+      expect(find.text('5000'), findsOneWidget);
+    });
+
+    testWidgets('yükseltme: iptal edilince stok artmaz, altın gitmez', (
+      tester,
+    ) async {
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(coins: 5000),
+      );
+
+      await tapUpgrade(tester, 'Ekstra Çark Hakkı');
+      expect(find.byKey(const ValueKey('confirm-purchase')), findsOneWidget);
+
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+
+      expect(profile.coins, 5000);
+      expect(profile.extraWheelSpins, 0);
+    });
+
+    for (final (locale, title, price, cancel, confirm) in [
+      (
+        const Locale('tr'),
+        'Satın almayı onayla',
+        '{p} altın',
+        'Vazgeç',
+        'Tamam',
+      ),
+      (const Locale('en'), 'Confirm purchase', '{p} coins', 'Cancel', 'Confirm'),
+    ]) {
+      testWidgets('pencere metinleri ARB\'den: ${locale.languageCode}', (
+        tester,
+      ) async {
+        // Bölüm E: metinler `localeName` ile seçilen sabit dizgilerden ARB'ye
+        // taşındı. Sözcükler birebir aynı kalmalı.
+        final l10n =
+            locale.languageCode == 'en'
+                ? AppLocalizationsEn()
+                : AppLocalizationsTr();
+        final profile = await pumpShell(
+          tester,
+          profile: makeProfile(coins: 5000),
+          catalog: [cheapItem],
+          locale: locale,
+        );
+
+        await tapEquipment(tester, cheapItem, l10n: l10n);
+        expect(find.text(title), findsOneWidget);
+        expect(
+          find.text(price.replaceFirst('{p}', '${cheapItem.cost}')),
+          findsOneWidget,
+        );
+        expect(find.text(cancel), findsOneWidget);
+        expect(find.text(confirm), findsOneWidget);
+
+        await tester.tap(find.text(confirm));
+        await tester.pumpAndSettle();
+        expect(profile.coins, 5000 - cheapItem.cost);
+      });
+    }
+
+    testWidgets('iptalden sonra tekrar denenip onaylanabilir', (tester) async {
+      final profile = await pumpShell(
+        tester,
+        profile: makeProfile(coins: 5000),
+        catalog: [cheapItem],
+      );
+
+      await tapEquipment(tester, cheapItem);
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
+
+      // Tek satın alma: iptal edilen deneme sayılmadı.
+      expect(profile.coins, 5000 - cheapItem.cost);
       expect(ownedIdsOf(profile), [cheapItem.id]);
     });
   });
@@ -372,6 +537,7 @@ void main() {
       );
 
       await tapEquipment(tester, lockedItem);
+      await confirmPurchase(tester);
 
       expect(ownedIdsOf(profile), [lockedItem.id]);
     });
@@ -423,6 +589,7 @@ void main() {
       final profile = await pumpShell(tester, profile: makeProfile());
 
       await tapUpgrade(tester, 'Seri Dondurma Hakkı');
+      await confirmPurchase(tester);
 
       expect(profile.streakFreezes, 1);
     });
@@ -437,6 +604,9 @@ void main() {
       );
 
       await tapUpgrade(tester, 'Seri Dondurma Hakkı');
+      // Stok kontrolü pencerede değil, `RootShell`'de: düğme etkin, pencere
+      // açılıyor, onaydan sonra satış reddediliyor ve sebebi söyleniyor.
+      await confirmPurchase(tester);
 
       expect(profile.coins, 5000);
       expect(profile.streakFreezes, GameConstants.maxStreakFreezes);
@@ -447,6 +617,7 @@ void main() {
       final profile = await pumpShell(tester, profile: makeProfile());
 
       await tapUpgrade(tester, 'Ekstra Çark Hakkı');
+      await confirmPurchase(tester);
 
       expect(profile.extraWheelSpins, 1);
     });
@@ -461,6 +632,7 @@ void main() {
       );
 
       await tapUpgrade(tester, 'Ekstra Çark Hakkı');
+      await confirmPurchase(tester);
 
       expect(profile.coins, 5000);
       expect(profile.extraWheelSpins, GameConstants.maxExtraWheelSpins);
@@ -645,6 +817,7 @@ void main() {
       );
 
       await tapEquipment(tester, cheapItem);
+      await confirmPurchase(tester);
       // Yazma [GameStorage.writeInterval] kadar gecikmeli.
       await tester.pump(GameStorage.writeInterval + const Duration(seconds: 1));
 

@@ -3083,4 +3083,248 @@ class AppLocalizationsTr extends AppLocalizations {
   String separateXpBalance(String amount) {
     return 'XP birikimi: $amount';
   }
+
+  @override
+  String get purchaseConfirmTitle => 'Satın almayı onayla';
+
+  @override
+  String purchaseConfirmPrice(int price) {
+    return '$price altın';
+  }
+
+  @override
+  String get purchaseConfirmAction => 'Tamam';
+
+  @override
+  String get forgeFilter => 'Filtrele';
+
+  @override
+  String forgeFilterCount(int count) {
+    return 'Filtrele ($count)';
+  }
+
+  @override
+  String forgeSortLabel(String sort) {
+    return 'Sırala: $sort';
+  }
+
+  @override
+  String get forgeSortRarity => 'Nadirlik';
+
+  @override
+  String get forgeSortLevel => 'Eşya seviyesi';
+
+  @override
+  String get forgeSortName => 'İsim';
+
+  @override
+  String get forgeSortUpgradeCost => 'Yükseltme maliyeti';
+
+  @override
+  String get forgeFilterSheetTitle => 'Demirci süzgeçleri';
+
+  @override
+  String get forgeFilterRarity => 'Nadirlik';
+
+  @override
+  String get forgeFilterCategory => 'Eşya türü';
+
+  @override
+  String get forgeFilterEquip => 'Kuşanma';
+
+  @override
+  String get forgeFilterStatus => 'Durum';
+
+  @override
+  String get forgeEquipAny => 'Hepsi';
+
+  @override
+  String get forgeEquipEquipped => 'Kuşanılı';
+
+  @override
+  String get forgeEquipUnequipped => 'Kuşanılmamış';
+
+  @override
+  String get forgeUpgradable => 'Yükseltilebilir';
+
+  @override
+  String get forgeMergeable => 'Birleştirilebilir';
+
+  @override
+  String get forgeClearFilters => 'Temizle';
+
+  @override
+  String get forgeDone => 'Tamam';
+
+  @override
+  String forgeShowingCount(int shown, int total) {
+    return '$shown / $total eşya gösteriliyor';
+  }
+
+  @override
+  String forgeEmptyBlocked(String filter) {
+    return '\"$filter\" süzgecine uyan hiç eşyan yok.';
+  }
+
+  @override
+  String forgeEmptyCombined(String filters) {
+    return 'Seçili süzgeçlerin hepsine birden uyan eşya yok: $filters.';
+  }
+
+  @override
+  String get forgeEmptyHint =>
+      'Süzgeçleri temizlersen bütün eşyalarını görürsün.';
+
+  @override
+  String buffSummaryTitle(int count) {
+    return 'Etkiler ($count)';
+  }
+
+  @override
+  String get buffSignatureBadge => 'İmza';
+
+  @override
+  String get buffDrawbackBadge => 'Bedel';
+
+  @override
+  String forgeTierRangePercent(String tier, String low, String high) {
+    return 'Kademe $tier · %$low-$high';
+  }
+
+  @override
+  String forgeTierRangeFlat(String tier, String low, String high) {
+    return 'Kademe $tier · $low-$high';
+  }
+
+  @override
+  String forgeTierOnly(String tier) {
+    return 'Kademe $tier';
+  }
+
+  @override
+  String get forgeRerollTooltip => 'Yeniden at';
+
+  @override
+  String get forgeRerollTitle => 'Yeniden döv';
+
+  @override
+  String get forgeRerollCurrent => 'Şimdiki etki';
+
+  @override
+  String forgeRerollCount(int count) {
+    return 'Bu eşyada $count kez yeniden atıldı';
+  }
+
+  @override
+  String forgeRerollRandom(int cost) {
+    return 'Rastgele at · $cost altın';
+  }
+
+  @override
+  String forgeRerollRandomHint(String tier) {
+    return 'Etki türü ve değeri rastgele gelir. Kademe en fazla $tier.';
+  }
+
+  @override
+  String forgeTierLockedHint(String tier, int level) {
+    return 'Kademe $tier için eşya seviyesi $level olmalı.';
+  }
+
+  @override
+  String get forgeCostGrowthHint =>
+      'Her atış bu eşyada sonraki atışı pahalılaştırır (en fazla 3 kat).';
+
+  @override
+  String get forgePickTitle => 'Keşiften seç · 4 kat fiyat';
+
+  @override
+  String get forgePickHint =>
+      'Türü ve kademeyi sen seçersin; aralık içindeki değer yine rastgele.';
+
+  @override
+  String forgePickAction(int cost) {
+    return 'Seçileni at · $cost altın';
+  }
+
+  @override
+  String get forgePickNone =>
+      'Bu yuvaya uyan bir keşfin yok. Rastgele atışlar demirciye yeni etkiler öğretir.';
+
+  @override
+  String get forgePickChooseFirst => 'Önce aşağıdan bir keşif seç.';
+
+  @override
+  String get forgePickConfirmTitle => 'Keşiften seçilsin mi?';
+
+  @override
+  String forgePickConfirmBody(String effect, int cost) {
+    return '$effect için $cost altın harcanacak. Değer aralık içinde rastgele gelecek.';
+  }
+
+  @override
+  String forgeNotEnoughCoins(int missing) {
+    return '$missing altın daha gerekiyor.';
+  }
+
+  @override
+  String get forgeDecisionTitle => 'Yeni sonuç: hangisi kalsın?';
+
+  @override
+  String get forgeDecisionOld => 'Şimdiki';
+
+  @override
+  String get forgeDecisionNew => 'Yeni';
+
+  @override
+  String get forgeKeepOld => 'Eskisini koru';
+
+  @override
+  String get forgeTakeNew => 'Yeniyi al';
+
+  @override
+  String get forgeDecisionPaid =>
+      'Altın atışta ödendi; hangisini seçersen seç geri gelmez.';
+
+  @override
+  String get forgePendingBlocked => 'Önce bekleyen sonuca karar ver.';
+
+  @override
+  String get forgeDiscoveriesTitle => 'Keşfedilen etkiler';
+
+  @override
+  String get forgeDiscoveriesEmpty =>
+      'Henüz keşif yok. Bir etkiyi yeniden attığında demirci sonucu öğrenir.';
+
+  @override
+  String forgeDiscoveriesCount(int count) {
+    return '$count keşif';
+  }
+
+  @override
+  String forgeRolledNotice(String effect) {
+    return 'Atış yapıldı: $effect. Karar senin.';
+  }
+
+  @override
+  String get forgeAppliedNotice => 'Yeni etki uygulandı.';
+
+  @override
+  String get forgeKeptNotice => 'Eski etki korundu.';
+
+  @override
+  String get forgeSignatureLocked => 'İmzalı etki yeniden atılamaz.';
+
+  @override
+  String get forgeSlotInvalid => 'Bu etki artık yeniden atılamıyor.';
+
+  @override
+  String get forgeMergeResetsRolls =>
+      'Yeniden atılmış etkiler birleşince sıfırlanır.';
+
+  @override
+  String get mailMergeBuffApologyTitle => 'Birleştirme hatası için özür';
+
+  @override
+  String get mailMergeBuffApologyBody =>
+      'Bazı eşyalar birleştirilip bir üst nadirliğe çıkınca yeni bir etki kazanmıyordu. Bu bizim hatamızdı.\n\nDüzelttik. Elindeki eşyalara eksik kalan etkiler geriye dönük olarak eklendi, senin bir şey yapmana gerek yok.\n\nKüçük bir telafi olarak 750 altın ve 3 çark hakkı bıraktık. Özür dileriz, iyi yürüyüşler.';
 }

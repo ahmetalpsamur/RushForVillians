@@ -29,6 +29,7 @@ import '../../models/item_effect.dart';
 import '../../models/owned_item.dart';
 import '../../models/reward_rarity.dart';
 import '../constants/game_constants.dart';
+import 'item_forging.dart';
 import 'item_rules.dart';
 
 /// Bu nadirliğin izin verdiği en yüksek eşya seviyesi.
@@ -172,10 +173,13 @@ UpgradeQuote quoteUpgrade({
 /// (GD16) uygulanmaz.
 Item resolveOwnedItem(Item base, OwnedItem instance, {String? characterClass}) {
   final rarity = instance.effectiveRarity(base.rarity);
-  final withNewRarity =
+  final atRarity =
       rarity == base.rarity
           ? base
           : withRarity(base, rarity, characterClass: characterClass);
+  // Demircide yeniden atılmış etkiler (Faz E4). `null` = türetilmiş, eşya
+  // eskisi gibi çözülür. Seviye büyümesinden önce: saklanan değer Sv. 1.
+  final withNewRarity = applyForgedEffects(atRarity, instance);
   if (instance.level <= 1) return withNewRarity;
   return withNewRarity.copyWith(
     buff: scaleForLevel(withNewRarity.buff, instance.level),

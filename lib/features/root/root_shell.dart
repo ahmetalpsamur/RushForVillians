@@ -14,6 +14,8 @@ import '../../core/localization/app_formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/coin_calculator.dart';
 import '../../core/utils/effective_stats.dart';
+import '../../core/utils/forge_filter.dart';
+import '../../core/utils/item_forging.dart';
 import '../../core/utils/equipped_buffs.dart';
 import '../../core/utils/game_clock.dart';
 import '../../core/utils/shop_pricing.dart';
@@ -45,6 +47,7 @@ import '../../models/collection_reward.dart';
 import '../../models/daily_progress.dart';
 import '../../models/daily_step_record.dart';
 import '../../models/endless_run.dart';
+import '../../models/forged_effect.dart';
 import '../../models/game_state.dart';
 import '../../models/game_title.dart';
 import '../../models/item.dart';
@@ -156,6 +159,13 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   /// (bkz. GD11). Envanter canlı state göstermek zorunda olduğu için bu
   /// sayacı dinliyor; [_persist] her anlamlı değişimde artırıyor.
   final ValueNotifier<int> _revision = ValueNotifier(0);
+
+  /// Demircinin süzgeç + sıralama seçimi (Bölüm E / Faz 3). Oturum boyunca
+  /// yaşar — demirci kapanıp açılınca seçim korunur — ama diske yazılmaz:
+  /// bir görünüm tercihi, oyun ilerlemesi değil.
+  final ValueNotifier<ForgeFilter> _forgeFilter = ValueNotifier(
+    const ForgeFilter(),
+  );
 
   /// Adım kaynağı: gerçek pedometer ya da demo kontrolleri.
   ///
@@ -967,6 +977,7 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _rewardNoticeEntry = null;
     _persist();
     _revision.dispose();
+    _forgeFilter.dispose();
     _tutorialStep.dispose();
     unawaited(GameStorage.flush());
     super.dispose();
@@ -1139,6 +1150,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     final source = _stepSource;
     if (source is ManualStepSource) source.add(amount);
   }
+
+  /// Release derlemesinde geliştirici kancalarının yerine geçen işlevsiz
+  /// fonksiyon (Bölüm E / Faz 6).
+  static void _ignoreSimulatedSteps(int _) {}
 
   /// Kesinleşmiş zaferin XP ve kademe bazlı rastgele altınını en fazla bir kez verir.
   ///
@@ -2349,6 +2364,147 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
     _showTitlesEarned(earnedTitles);
   }
 
+  /// Bir etki yuvasını yeniden atar (demirci, Bölüm E / Faz 4).
+  ///
+  /// [stat] + [tier] verilirse "keşiften seç" (4 kat fiyat): tür ve kademe
+  /// kesin, değer yine rastgele. Bütün kontroller **burada da** yapılıyor —
+  /// ekran ne gösterirse göstersin son söz state'in (mağazayla aynı ilke).
+  ///
+  /// Para **atışta** ödenir ve sonuç [OwnedItem.pendingForge] olarak
+  /// saklanır; uygulanması oyuncunun kararına bağlı ([_decideReroll]).
+  /// Önce görüp sonra ödemek bedava bakmak olurdu.
+  void _rerollEffect(int instanceId, int slot, {ItemStat? stat, int? tier}) {
+    final instance = _profile.instanceById(instanceId);
+    if (instance == null) {
+      _showStoreNotice(context.l10n.itemMissingNotice);
+      return;
+    }
+    if (instance.pendingForge != null) {
+      _showStoreNotice(context.l10n.forgePendingBlocked);
+      return;
+    }
+    final resolved = _resolveInstance(instance);
+    if (resolved == null) {
+      _showStoreNotice(context.l10n.itemCatalogMissingNotice);
+      return;
+    }
+    if (slot < 0 || slot >= forgeSlotCount(resolved)) {
+      _showStoreNotice(context.l10n.forgeSlotInvalid);
+      return;
+    }
+
+    final characterClass = _profile.avatar.characterClass;
+    final rarity = resolved.rarity;
+    final picking = stat != null && tier != null;
+    if (picking &&
+        (!_profile.discoveredAffixes.contains(forgeAffixKey(stat, tier)) ||
+            !canPickForSlot(
+              resolved,
+              slot,
+              stat,
+              tier,
+              rarity: rarity,
+              level: instance.level,
+              characterClass: characterClass,
+            ))) {
+      _showStoreNotice(context.l10n.forgeSlotInvalid);
+      return;
+    }
+
+    final cost =
+        picking
+            ? pickCost(rarity, instance.rerollCount)
+            : rerollCost(rarity, instance.rerollCount);
+    if (_profile.coins < cost) {
+      _showStoreNotice(context.l10n.forgeNotEnoughCoins(cost - _profile.coins));
+      return;
+    }
+
+    if (_profile.forgeSeed == 0) {
+      _profile.forgeSeed = initialForgeSeed(
+        '${_profile.avatar.name}|$characterClass',
+      );
+    }
+    final roll = rollForge(
+      seed: _profile.forgeSeed,
+      item: resolved,
+      slot: slot,
+      rarity: rarity,
+      level: instance.level,
+      characterClass: characterClass,
+      chosenStat: picking ? stat : null,
+      chosenTier: picking ? tier : null,
+    );
+
+    setState(() {
+      _profile.coins -= cost;
+      _profile.forgeSeed = roll.nextSeed;
+      // Sonuç reddedilse de öğrenilmiş sayılır: demirci gördüğünü unutmaz.
+      _profile.discoverAffix(roll.effect.affixKey);
+      _profile.replaceInstance(
+        instance.copyWith(
+          rerollCount: instance.rerollCount + 1,
+          pendingForge: PendingForge(slot: slot, effect: roll.effect),
+        ),
+      );
+    });
+    _persist();
+    _showStoreNotice(
+      context.l10n.forgeRolledNotice(
+        context.l10n.itemEffectLabel(forgedToItemEffect(roll.effect)),
+      ),
+    );
+  }
+
+  /// Bekleyen atışa karar verir: yeni etkiyi al ya da eskisini koru.
+  ///
+  /// İlk kabulde eşyanın **bütün** jenerik yuvaları bir kez saklanır
+  /// (dondurulur); atılan yuva dışındakiler türetilmiş değerleriyle aynı
+  /// kalır. Değerler Sv. 1 değeri — seviye büyümesi çözümlemede ayrıca
+  /// uygulanıyor.
+  void _decideReroll(int instanceId, bool accept) {
+    final instance = _profile.instanceById(instanceId);
+    final pending = instance?.pendingForge;
+    if (instance == null || pending == null) return;
+
+    if (!accept) {
+      setState(
+        () => _profile.replaceInstance(instance.copyWith(clearPending: true)),
+      );
+      _persist();
+      _showStoreNotice(context.l10n.forgeKeptNotice);
+      return;
+    }
+
+    final unscaled = _resolveInstance(instance.copyWith(level: 1));
+    if (unscaled == null) return;
+    final current =
+        instance.forgedEffects ??
+        [
+          for (var slot = 0; slot < forgeSlotCount(unscaled); slot++)
+            forgedFromEffect(forgeSlotEffect(unscaled, slot)),
+        ];
+    if (pending.slot >= current.length) {
+      setState(
+        () => _profile.replaceInstance(instance.copyWith(clearPending: true)),
+      );
+      _persist();
+      _showStoreNotice(context.l10n.forgeSlotInvalid);
+      return;
+    }
+    final next = [...current]..[pending.slot] = pending.effect;
+
+    setState(() {
+      _profile.replaceInstance(
+        instance.copyWith(forgedEffects: next, clearPending: true),
+      );
+      // Kuşanılıysa buff'lar hemen değişmeli.
+      _refreshEquipment();
+    });
+    _persist();
+    _showStoreNotice(context.l10n.forgeAppliedNotice);
+  }
+
   /// Aynı kimliğe ve aynı nadirliğe sahip örnekler.
   List<OwnedItem> _mergeGroup(String itemId, RewardRarity rarity) {
     final characterClass = _profile.avatar.characterClass;
@@ -2424,6 +2580,9 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
       readState: _readInventoryState,
       onUpgrade: _upgradeItem,
       onMerge: _mergeItems,
+      filter: _forgeFilter,
+      onReroll: _rerollEffect,
+      onRerollDecision: _decideReroll,
     ),
   );
 
@@ -2877,7 +3036,10 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
         unclaimedMailCount: _unclaimedMailCount,
         onOpenStore: _openStore,
         onOpenInventory: _openInventory,
-        onSimulateSteps: _simulateSteps,
+        // Geliştirici kancası (Bölüm E / Faz 6): gerçek adım üretici yalnızca
+        // `kDebugMode`. Release'de işlevsiz fonksiyon; ana sayfa bu alanı
+        // zaten çizmiyor, testler için duruyor (bkz. `HomeScreen`).
+        onSimulateSteps: kDebugMode ? _simulateSteps : _ignoreSimulatedSteps,
         petGuide: TutorialGuideVariant.fromId(_profile.tutorialGuideId),
         petEnabled: !_tutorialActive && _profile.petCompanionEnabled,
         onTogglePet:

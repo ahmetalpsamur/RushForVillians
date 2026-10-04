@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../core/utils/item_rules.dart';
+import '../data/item_tier_extensions.dart';
 import '../models/item.dart';
 import '../models/reward_rarity.dart';
 
@@ -65,8 +66,18 @@ class ItemCatalog {
   /// mağaza ve envanter listeleri her açılışta aynı sırada gelir.
   static List<Item> fromAssetPaths(Iterable<String> assetPaths) {
     final items = <Item>[];
+    final paths = <String>{};
     for (final path in assetPaths) {
+      paths.add(path);
       final item = buildItemFromAsset(path);
+      if (item != null) items.add(item);
+    }
+    // Ara basamak eşyaları (GD111) görseli **pakette varsa** üretilir: sanat
+    // klasörü doğruluk kaynağı olmaya devam ediyor, tabloda kalmış bir satır
+    // görseli olmayan bir eşya doğuramaz.
+    for (final extension in ItemTierExtensions.all) {
+      if (!paths.contains(extension.assetPath)) continue;
+      final item = buildTierExtensionItem(extension);
       if (item != null) items.add(item);
     }
     items.sort((a, b) {

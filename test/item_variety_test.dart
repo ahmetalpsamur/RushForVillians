@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
+import 'package:rush_for_villains/core/utils/item_merging.dart';
 import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/data/item_archetypes.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
@@ -222,23 +223,41 @@ void main() {
     });
 
     test('hiçbir item tek başına ekonomi tavanını aşmıyor', () {
+      // Bölüm E / Faz 2: tarama **birleştirmeyle ulaşılan** nadirlikleri de
+      // kapsıyor. Bir dönem yalnızca katalog nadirliğine bakıyordu ve
+      // `stepCoin` + `stepCoinMomentum` ikilisi birleştirilmiş efsanevilerde
+      // %18,85'e çıkarken bu test yeşil kalıyordu.
       final offenders = <String>[];
       for (final item in _catalog()) {
         for (final characterClass in [null, ..._allClasses]) {
-          final resolved =
+          final flavored =
               characterClass == null
                   ? item
                   : flavorForClass(item, characterClass);
-          for (final stat in ItemStat.values) {
-            if (!stat.isEconomyRate) continue;
-            var total = 0.0;
-            for (final effect in resolved.buff.effects) {
-              if (effect.stat == stat && effect.isPassive) {
-                total += effect.value;
+          final chain = [
+            flavored,
+            for (
+              var next = nextRarity(flavored.rarity);
+              next != null;
+              next = nextRarity(next)
+            )
+              withRarity(flavored, next, characterClass: characterClass),
+          ];
+          for (final resolved in chain) {
+            for (final stat in ItemStat.values) {
+              if (!stat.isEconomyRate) continue;
+              var total = 0.0;
+              for (final effect in resolved.buff.effects) {
+                if (effect.stat == stat && effect.isPassive) {
+                  total += effect.value;
+                }
               }
-            }
-            if (total > GameConstants.maxSingleItemEconomyBonus + 1e-9) {
-              offenders.add('${item.id}/$characterClass ${stat.name}=$total');
+              if (total > GameConstants.maxSingleItemEconomyBonus + 1e-9) {
+                offenders.add(
+                  '${item.id}/$characterClass/${resolved.rarity.name} '
+                  '${stat.name}=$total',
+                );
+              }
             }
           }
         }

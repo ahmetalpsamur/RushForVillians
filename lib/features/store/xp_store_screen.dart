@@ -224,14 +224,14 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
     required VoidCallback purchase,
     String? assetPath,
   }) async {
-    final english = context.l10n.localeName.startsWith('en');
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black87,
       builder:
           (dialogContext) => AlertDialog(
             backgroundColor: AppColors.surface,
-            title: Text(english ? 'Confirm purchase' : 'Satın almayı onayla'),
+            title: Text(l10n.purchaseConfirmTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -252,18 +252,18 @@ class _XpStoreScreenState extends State<XpStoreScreen> {
                   style: Theme.of(dialogContext).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Text('$price ${english ? 'coins' : 'altın'}'),
+                Text(l10n.purchaseConfirmPrice(price)),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: Text(english ? 'Cancel' : 'Vazgeç'),
+                child: Text(l10n.cancel),
               ),
               FilledButton(
                 key: const ValueKey('confirm-purchase'),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(english ? 'Confirm' : 'Tamam'),
+                child: Text(l10n.purchaseConfirmAction),
               ),
             ],
           ),

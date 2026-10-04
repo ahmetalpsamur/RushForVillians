@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -2424,7 +2425,11 @@ class _AdventureScreenState extends State<AdventureScreen>
                               icon: const Icon(Icons.close),
                             ),
                           ),
-                          if (widget.onSimulateSteps != null)
+                          // Geliştirici kontrolü: yalnızca `kDebugMode`.
+                          // Sabit `false` dal release derlemesinde AOT
+                          // tarafından ağaçtan atılır; panel kodu da başka
+                          // referansı kalmadığı için elenir.
+                          if (kDebugMode && widget.onSimulateSteps != null)
                             Positioned(
                               top: 0,
                               left: 0,
@@ -2753,6 +2758,7 @@ class _AdventureScreenState extends State<AdventureScreen>
   }
 
   Future<void> _showAdventureAdminPanel() async {
+    if (!kDebugMode) return;
     final simulateSteps = widget.onSimulateSteps;
     if (simulateSteps == null) return;
     var useManualSource = widget.useManualSource;

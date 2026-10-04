@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/safety_messages.dart';
@@ -165,7 +166,9 @@ class _EndlessActive extends StatelessWidget {
                             icon: const Icon(Icons.close),
                           ),
                         ),
-                        if (onSimulateSteps != null)
+                        // Geliştirici kontrolü: yalnızca `kDebugMode`;
+                        // release derlemesinde dal ağaçtan atılır.
+                        if (kDebugMode && onSimulateSteps != null)
                           Positioned(
                             top: 0,
                             left: 0,

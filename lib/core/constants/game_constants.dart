@@ -631,4 +631,34 @@ class GameConstants {
   /// erişemeyeceğin bir nadirliği erken kuşanabiliyorsun; ve nadirlik
   /// tavanı yükseldiği için eşya çok daha ileri yükseltilebiliyor.
   static const double itemMergeCostRatio = 0.5;
+
+  // ── Demirci: yeniden atma (Bölüm E / Faz 4, GD112) ──
+
+  /// Bir etkiyi yeniden atmanın **taban** maliyeti, nadirliğe göre.
+  ///
+  /// Yeniden atma bir **altın gideri**: Bölüm C'de para kolaylaştı, bu onun
+  /// dengeleyicisi. Taban kabaca eşya fiyatının sıradanda dörtte biri, üst
+  /// nadirliklerde sekizde biri — fiyat zaten nadirlikle ×116 artıyor ve
+  /// oranı sabit tutmak efsanevide tek atışı bir haftalık gelire çıkarırdı.
+  ///
+  /// Bağlı oyuncunun ≈300 altın/gün geliriyle (bkz.
+  /// [itemUpgradeMultiplierByRarity]) ilk atış: sıradan günde 12, az
+  /// bulunur 5, nadir 2, epik 0,6, efsanevi 0,2.
+  static const Map<RewardRarity, int> forgeRerollBaseCost = {
+    RewardRarity.common: 25,
+    RewardRarity.uncommon: 60,
+    RewardRarity.rare: 150,
+    RewardRarity.epic: 500,
+    RewardRarity.legendary: 1500,
+  };
+
+  /// Aynı **örnekte** her yeniden atma maliyeti tabanın bu kadarı artırır:
+  /// 1× · 1,5× · 2× · 2,5× · 3×. Artış kalıcı, sıfırlanmaz.
+  static const double forgeRerollStep = 0.5;
+
+  /// Artışın tavanı: tabanın 3 katı.
+  static const double forgeRerollCapMultiplier = 3.0;
+
+  /// "Keşiften seç" o anki yeniden atma maliyetinin bu katı.
+  static const int forgePickMultiplier = 4;
 }

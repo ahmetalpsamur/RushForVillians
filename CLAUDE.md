@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD110)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD113)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -38,7 +38,11 @@
 9. **COMMIT ATMA.** `git commit` çağırma, `/commit` çalıştırma. İş bitince:
    değişen dosyaları listele, ne yaptığını özetle, tek satırlık
    conventional-commit mesajı öner. Commit'i kullanıcı atıyor.
-10. **⛔ FIREBASE'E DOKUNMA.** `firebase_options.dart`, Firestore, Auth, Cloud
+10. **GELİŞTİRİCİ KONTROLLERİ YALNIZCA `kDebugMode`.** Adım düğmesi, admin
+    paneli, kayıt silme: release derlemesine sızan hiçbir geliştirici aracı
+    olmayacak. Kapı `if (kDebugMode && ...)` (derleme zamanı), çalışma zamanı
+    gizleme değil (§6.2, GD113).
+11. **⛔ FIREBASE'E DOKUNMA.** `firebase_options.dart`, Firestore, Auth, Cloud
     Functions, `google-services.json`, `GoogleService-Info.plist` — hiçbirine.
     pubspec'e firebase paketi ekleme. Backend arkadaşımın alanı (§13).
 
@@ -109,8 +113,8 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v32 + migration | Firebase |
-| 784 ekipman · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
+| Yerel kalıcılık, şema v33 + migration | Firebase |
+| 789 ekipman (784 görsel + 5 ara basamak) · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
 ---
@@ -280,6 +284,7 @@ yapmalı.
 - Android: `multiDexEnabled`, `coreLibraryDesugaring 2.1.4`,
   `applicationId com.heapchiStudios.rush_for_villains`.
 - Platform klasörleri yalnızca `android/` ve `ios/`.
+- **Release derlemesi bu makinede çalışıyor** (Bölüm E'de ölçüldü): `flutter build apk --release` / `flutter build appbundle --release`. İmza `android/key.properties` ile (git dışında). Adım adım: `ELDE_DOGRULAMA.md` → "Release APK alma". `flutter run` hâlâ çalışmıyor (§5.3).
 
 ## 5.2 ⚠️ TEST ORTAMI — testler `--no-test-assets` ile çalışır
 
@@ -501,11 +506,33 @@ adımları kırpıyordu). `StepSource.isPhysical` false olan demo kaynağı muaf
 
 ### Demo kaynağı
 
-Ana ekrandaki "Adım Kaynağı" kartı aktif kaynağı yazar ve debug'da bir
-anahtarla değiştirir. **Debug varsayılanı manuel** (emülatör kutudan çıkar
-çıkmaz çalışsın), **release varsayılanı pedometer**. Gerçek sensör aktifken
-demo butonları kilitli ve nedenini söylüyor. `ManualStepSource` testlerin ve
-emülatörün tek adım üretme yolu — **kaldırma**.
+"Adım Kaynağı" paneli **macera ekranında** (savaş HUD'unun sol üstündeki
+düğme): aktif kaynağı yazar, kaynağı bir anahtarla değiştirir ve +1.000 /
++5.000 / +20.000 adım düğmeleri taşır. Ana ekranda artık böyle bir kart yok.
+Sonsuz koşuda aynı yerde +200 adım düğmesi var. **Debug varsayılanı manuel**
+(emülatör kutudan çıkar çıkmaz çalışsın), **release varsayılanı pedometer**.
+`ManualStepSource` testlerin ve emülatörün tek adım üretme yolu — **kaldırma**.
+
+> **Geliştirici kontrolleri yalnızca `kDebugMode` içinde yaşar. Release
+> derlemesine sızan hiçbir geliştirici aracı olmayacak.** (Bölüm E / Faz 6,
+> GD113.) Kapı her ekranda `if (kDebugMode && callback != null)`: sabit
+> `false` dal AOT tarafından ağaçtan atılır. Yalnızca `callback != null` ile
+> çalışma zamanında gizlemek kodu ikilide bırakıyordu. Gizli kod, admin
+> paneli, açılış sırrı yok. `GameStorage.clear` da aynı kapıda.
+> **Ölçüldü:** release APK'nın `libapp.so`'sunda `adventure-admin-panel`,
+> `admin-steps-`, `endless-simulate-200` ve `+200 Steps` **0** kez geçiyor
+> (karşılaştırma: `forge-filter-button` 1). `debug_gate_test` kaynağı tarıyor.
+>
+> ⚠️ `HomeScreen.onSimulateSteps` **silinmedi**: arayüzde çizilmiyor ama 13
+> test dosyası ana sekmede adımı oradan üretiyor (yalnızca görünen sekme ağaca
+> kuruluyor). Release'de `RootShell` buraya işlevsiz bir fonksiyon geçiyor;
+> gerçek üretici yalnızca `kDebugMode` dalında.
+>
+> **Bu alan bilerek bırakıldı (kullanıcı kararı, Bölüm E kapanışı).** Sebep
+> test altyapısı: 13 dosyaya (eski kırmızıları içerenler dahil) dokunmak,
+> ölü bir alanın varlığından pahalı. **İleride testler yenilenirse alan
+> onlarla birlikte kaldırılabilir**: önce testlerin adım kancasını ana
+> sekmede de çalışan başka bir debug yoluna taşıyın, sonra alanı silin.
 
 ## 6.3 Ekonomi
 
@@ -713,6 +740,54 @@ lib/Items/swords/fire_sword_variant_03.png
 
 **784 görselin hepsi oyunda.** Toplam 1,8 MB, yani APK maliyeti yok; nadirlik
 ve seviye kilidi zaten 784 item'ı uzun bir ilerlemeye yayıyor.
+
+### Ara basamak eşyaları — kimlik şeması (GD111)
+
+**Katalog 789 eşya: 784 görsel + 5 ara basamak.** Bazı kategorilerde en
+düşük ve en yüksek nadirlik arasında boşluk vardı (tırpan: sıradandan
+doğrudan efsaneviye). Yeni sanat yok; boşluklar **aynı görseli kullanan yeni
+kimliklerle** dolduruldu (`data/item_tier_extensions.dart`).
+
+```
+<görsel kimliği>@<nadirlik adı>
+scythes/scythe_variant_12@uncommon     → lib/Items/scythes/scythe_variant_12.png
+```
+
+- **"Kimlik = görsel yolu" kuralı genişletildi, kırılmadı.** `@` öncesi her
+  zaman var olan bir görselin kimliği, yani görsel hâlâ kimlikten
+  türetilebilir. Görsel kimliklerinde `@` geçmiyor; iki tür asla çakışmıyor
+  (testle bağlı).
+- **Görselin kendi eşyası olduğu gibi duruyor.** `scythes/scythe_variant_12`
+  hâlâ sıradan, Sv. 3, 125 altın. Var olan bir varyantın nadirliğini
+  değiştirmek **seçilmedi**: o eşyayı taşıyan oyuncunun kilidi bir gün sonra
+  22'ye çıkar ve kuşanamazdı.
+- **Özel durum yok.** Kilit, fiyat, arketip ve buff yeni kimlik + nadirlikle
+  aynı kural fonksiyonlarından (`buildTierExtensionItem`). Kuraldan türeyen
+  şeride girerler (2-3-4-5-6).
+- **Ad tablodan.** Görselden türetilse kaynak varyantla aynı adı alırdı.
+  Türkçe ve İngilizce ad satırda; sınıf lakabı uygulanmıyor.
+- **Görsel pakette yoksa eşya üretilmez** — sanat klasörü doğruluk kaynağı
+  olmaya devam ediyor.
+
+| Kimlik | Nadirlik | Ad |
+|---|---|---|
+| `scythes/scythe_variant_12@uncommon` | Az Bulunur | Hasat Tırpanı · Harvest Scythe |
+| `scythes/scythe_variant_13@rare` | Nadir | Kan Tırpanı · Blood Scythe |
+| `scythes/scythe_variant_14@epic` | Epik | Ayaz Tırpanı · Rime Scythe |
+| `maces_hammers/mace_type_2_variant_14@rare` | Nadir | Gece Topuzu · Night Mace |
+| `spears/trident_variant_14@rare` | Nadir | Buz Çatalı · Frost Trident |
+
+**Uçtaki eksikler bilerek dolmadı** (balta ve topuz efsanevisi, Özel'in
+dört basamağı): ilerlemeyi engellemiyorlar. Birleştirme kataloğa bakmıyor,
+örneğin nadirliğini `nextRarity` ile yükseltip eşyayı yeni nadirlikte
+yeniden çözüyor — epik baltalarını birleştiren oyuncu efsanevi balta alıyor.
+Eksik olan yalnızca o basamağın **mağazada ve düşme havuzunda** görünmesi.
+
+**Etki:** düşme önce tablodan nadirlik çekiyor, sonra o nadirlikte eşya;
+18 sınıfın hepsinin havuzunda beş nadirlik zaten vardı, yani nadirlik
+dağılımı değişmedi, yalnızca nadirlik içindeki seçim genişledi (ör. Orc'un
+nadir havuzu 2 → 4). Mağaza sınıf havuzundan okuduğu için yeni eşyalar
+yalnızca o kategoriyi kullanan sınıflarda görünüyor.
 
 **Model Kuralları #1 temiz:** `Item` diske hiç yazılmıyor. Envanter yalnızca
 `String` kimlik + seviye + nadirlik tutar; item her açılışta katalogdan
@@ -1007,13 +1082,79 @@ yapısal olarak imkânsız. Ölçüm testi eski bir v32 kaydını okuyup kaydın
 **bit bit aynı** kaldığını ve 8 eşyadan 4'üne toplam 5 buff eklendiğini
 doğruluyor.
 
-⚠️ **Bilinen ekonomi açığı (E1'den önce de vardı, karar bekliyor):**
+**Tek item tavanı stat toplamına da uygulanıyor** (Bölüm E / Faz 2).
 `ItemBuffType.stepCoinMomentum` da `ItemStat.stepCoin`'e yazıyor, yani
-kuraldan türeyen bir item'da adım parası iki satır olabiliyor. Katalog
-nadirliğinde toplam tavanın altında kalıyor; ama birleştirilip efsaneviye
-çıkmış **170 item × sınıf** kombinasyonunda toplam %15'i aşıyor (en kötüsü
-**%18,85**). Kuşanma toplamı yine `EquippedBuffs` içindeki %50 kırpmasıyla
-sınırlı.
+kuraldan türeyen bir item'da adım parası iki satır olabiliyor — bu
+arkadaşımın katalog çeşitliliği tercihi ve yerinde duruyor. Ama tavan
+yalnızca **etki başına** uygulanıyordu: birleştirilip efsaneviye çıkmış
+**170 item × sınıf** kombinasyonunda iki satırın toplamı %15'i aşıyordu (en
+kötüsü **%18,85**). `capEconomyTotals` artık koşulsuz ekonomi oranlarının
+toplamını item başına %15'e kırpıyor: birincil satır tam değerinde kalır,
+taşan satır kalan paya iner. Hem `buffFor` hem imzalı `withRarity` çıktısı
+ondan geçiyor. Kırpmadan sonra ölçülen en kötü toplam **%15,00**.
+`item_variety_test`'teki tavan taraması bir dönem yalnızca katalog
+nadirliğine bakıyordu ve bu açığı görmüyordu; artık birleştirme zincirini
+de tarıyor.
+
+### Süzgeç ve sıralama (Bölüm E / Faz 3)
+
+Kural `core/utils/forge_filter.dart` içinde, saf. Süzgeçler: nadirlik, eşya
+türü, kuşanılı/kuşanılmamış, yükseltilebilir (altın yeter ve tavan yok —
+kartın düğmesiyle **aynı** `quoteUpgrade`), birleştirilebilir (yeterli kopya).
+Aynı türden ölçütler VEYA, farklı türler VE. Sıralama: nadirlik (varsayılan,
+eski sırayla birebir), eşya seviyesi, ad (`l10n.itemName`, Türkçe alfabe
+anahtarıyla: `toLowerCase` "Çekiç"i "Zırh"tan sonraya atıyordu), yükseltme
+maliyeti (tavandakiler sonda).
+
+Yerleşim: "Filtrele (n)" düğmesi alt pencere açar, yanında sıralama menüsü,
+altında yatay kayan çipler + "Temizle" + "n / m eşya gösteriliyor". Boş sonuçta
+**hangi** süzgecin boşalttığı söylenir (`blockingCriterion`) ve tek dokunuşla
+temizlenir. Seçim `RootShell._forgeFilter` içinde **oturum** boyunca yaşar,
+diske yazılmaz (görünüm tercihi, GD86 ayrımı).
+
+Kartta **bütün etkiler** görünür: imza önde ve "İmza" rozetli, eksi değerli
+bedel kırmızı ve "Bedel" rozetli. Liste katlanabilir, varsayılan açık.
+
+### Yeniden atma ve keşif havuzu (Bölüm E / Faz 4, GD112)
+
+`core/utils/item_forging.dart` + `data/forge_tiers.dart`.
+
+- **Tek yuva.** Oyuncu hangi etkiyi atacağını seçer. **İmzalı etkiler
+  atılamaz**; yalnızca kural havuzundan gelen yuvalar. Yuvanın türü korunur
+  (ekonomi/savaş) ve eşyanın başka yuvasındaki stat gelmez. Havuz kural
+  türetmesinin havuzu: ekonomide `economyTypeWeights`, savaşta arketipin üç
+  statı.
+- **Kademeler:** beş kademe, nadirliklere karşılık. En yüksek kademe
+  nadirliğin kademesi; eşya seviyesi tavanın yarısına ulaşmadan bir altı
+  (`maxForgeTier`). Aralık merkezleri bugünkü ortalama değerler, uniform
+  çekiliş: ortalama güç değişmez (`forge_tiers_test` bağlıyor; iki savaş
+  hücresi bilerek yukarıda: saldırı V +%40, kritik şansı III +%28). Ekonomi
+  oranlarının üst ucu Bölüm E öncesi en yüksek değerde kırpılı.
+- **Maliyet:** `taban × (1 + 0,5n)`, tavan 3×; n örneğe bağlı, sıfırlanmaz.
+  Taban 25 · 60 · 150 · 500 · 1.500. "Keşiften seç" o anki maliyetin 4 katı.
+- **Para atışta ödenir**, sonuç `OwnedItem.pendingForge` olarak saklanır;
+  oyuncu eski ve yeniyi **yan yana** görüp "Yeniyi al" / "Eskisini koru" der.
+  Önce görüp sonra ödemek bedava bakmak olurdu. Karar verilmeden ikinci atış
+  yok; uygulama kapanırsa karar demirci açılınca yeniden sorulur.
+- **Keşif oyuncu çapında** (`UserProfile.discoveredAffixes`, `stat:kademe`):
+  her atış sonucu reddedilse de öğrenilir. Pahalı seçenek yalnızca o yuvaya
+  uygun ve kademesi açık keşifleri listeler; iki adımlı (seç + onay penceresi).
+- **Tohum ayrı akış:** `UserProfile.forgeSeed`, kendi LCG'si.
+- **Saklama:** `OwnedItem.forgedEffects` (`null` = türetilmiş, E1 düzeltmesi
+  aynen geçerli). Değerler Sv. 1 değeri; seviye büyümesi çözümlemede uygulanır.
+  Uzunluk uyuşmazsa türetilmiş buff'a düşülür. %15 tek eşya tavanı atılmış
+  etkilere de uygulanır. Yeni alanlar yalnızca doluysa yazılır: hiç atılmamış
+  örneğin satırı Bölüm E öncesiyle bit bit aynı.
+- **Birleştirme sonucu yeni örnek:** atılmış etkiler taşınmaz; onay ekranı
+  bunu söyler.
+
+| Nadirlik | Taban | Tavan (3×) | Keşiften seç (n=0 / tavan) | Bağlı oyuncu ≈300/gün: ilk atış | tavanda |
+|---|---|---|---|---|---|
+| Sıradan | 25 | 75 | 100 / 300 | 12/gün | 4/gün |
+| Az Bulunur | 60 | 180 | 240 / 720 | 5/gün | 1,7/gün |
+| Nadir | 150 | 450 | 600 / 1.800 | 2/gün | 0,67/gün |
+| Epik | 500 | 1.500 | 2.000 / 6.000 | 0,6/gün | 0,2/gün |
+| Efsanevi | 1.500 | 4.500 | 6.000 / 18.000 | 0,2/gün | 0,067/gün |
 
 ## 6.7 Mağaza
 
@@ -2244,9 +2385,9 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 
 **Kayıt biçimi (zarf):** `{schemaVersion, savedAt, state}` — key `game_state_v1`.
 
-## Şema — **güncel sürüm v32**
+## Şema — **güncel sürüm v33**
 
-`GameStorage.schemaVersion = 32` + `_migrations` haritası ("sürüm N → N+1").
+`GameStorage.schemaVersion = 33` + `_migrations` haritası ("sürüm N → N+1").
 `load()` kayıtlı sürümden güncele kadar adımları **sırayla** uygular.
 
 **Alan eklerken: sürümü artır VE haritaya bir satır ekle** — dönüşüm içerik
@@ -2274,6 +2415,7 @@ değiştirmese bile (disiplin, Model Kuralları #6).
 | 28 → 29 | Tempo tablosu ve düşman canının kaynağı değişti; yarım maceranın `enemyHealth`'i **harcanan adım oranından** yeni tavana taşınıyor (v13 ile aynı desen) |
 | 29 → 30 | Can artık **planlanan round sayısıyla** orantılı (GD107); aynı yeniden-çapalama (`_reanchorEnemyHealth`) |
 | 31 → 32 | Mağaza indirimi penceresi (`shopDiscountUntil`). Eski kayıtta `null` — pencere kapalı |
+| 32 → 33 | Demircide yeniden atma (`forgedEffects`, `rerollCount`, `pendingForge`) ve keşif havuzu (`forgeSeed`, `discoveredAffixes`). İçerik değişmez: yokluk doğru varsayılan (türetilmiş buff, keşif yok). Posta, kod ve indirim alanlarına dokunulmuyor (`mail_preservation_test`) |
 | 30 → 31 | Posta kutusu ve kodlar (`claimedMailIds`, `readMailIds`, `pendingMailIds`, `redeemedCodes`, `codeAttempts`). Eski kayıtta boş liste — hiç posta alınmamış, hiç kod girilmemiş |
 | 24 → 25 | **Seviye XP'den adıma taşındı**: `levelStepProgress` + `lastLevelRewardedStepCount = totalSteps`. Geçmiş adımlar yeni eğriye **yeniden oynatılmaz**, eski seviye korunur |
 
@@ -2347,7 +2489,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**1.037 test** (`flutter test`), bunların **991'i yeşil**. Test, bu projede
+**1.155 test** (`flutter test`), bunların **1.107'si yeşil** (Bölüm E kapanışı). Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2356,7 +2498,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 |---|---|
 | Adım hattı | `pedometer_step_source_test`, `step_rate_limiter_test`, `step_coins_test`, `step_xp_test`, `step_history_test`, `step_history_archive_test` |
 | Gün ve seri | `game_day_test`, `streak_test`, `streak_freeze_test`, `streak_stat_bonus_test`, `streak_bonus_shell_test` |
-| Item | `item_catalog_test`, `item_effects_test`, `item_variety_test`, `item_leveling_test`, `item_merging_test`, `item_comparison_test`, `equipped_buffs_test`, `signature_merge_buff_test` (iki şerit, birleştirme +1, eski kayıt ölçümü) |
+| Item | `item_catalog_test`, `item_effects_test`, `item_variety_test`, `item_leveling_test`, `item_merging_test`, `item_comparison_test`, `equipped_buffs_test`, `signature_merge_buff_test` (iki şerit, birleştirme +1, eski kayıt ölçümü), `item_tier_extension_test` (ara basamaklar, eski kayıt bozulmuyor, kesintisiz zincir) |
 | Mağaza / envanter / demirci | `store_screen_test`, `store_purchase_test`, `inventory_test`, `blacksmith_test` |
 | Ünvan | `title_catalog_test`, `titles_test` |
 | Çark | `wheel_rewards_test`, `daily_wheel_test`, `still_gif_frame_test` |
@@ -2367,6 +2509,10 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Ekonomi ölçümü | `economy_pacing_test` |
 | Round geri bildirimi | `round_outcome_test` |
 | Mağaza indirimi | `shop_discount_test` — fiyat fonksiyonu, pencere, kapat-aç, ünvan etkisi |
+| Demirci süzgeç/sıralama | `forge_filter_test`: saf kurallar, boş sonuç mesajı, oturum hatırlama, buff özeti |
+| Yeniden atma | `forge_tiers_test` (kademe merkezleri ölçülene bağlı, ekonomi tavanı), `item_forging_test` (determinizm, artan maliyet, kademe kilidi, keşif, imza dokunulmaz, göç) |
+| Özür postası | `mail_preservation_test`: v32 → v33 göçünde posta, kod, ünvan ve indirim korunur |
+| Debug kapısı | `debug_gate_test`: debug'da çalışıyor, kaynakta her kontrol `kDebugMode` ile kapılı |
 | Posta kutusu ve kodlar | `mailbox_test` — iki kez alma, yarım alma, şema göçü, kod durumları, yavaşlatma |
 | Sonsuz Koşu ekranı | `endless_screen_test` — paylaşılan HUD, navigasyon kilidi, gizli sayaç, iki dilde 320/390 golden |
 | Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
@@ -2431,7 +2577,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD110)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD113)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2551,6 +2697,11 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 | GD110 | İmzalı itemlerin de basamak başına +1 etkisi var: **iki şerit** (kuraldan 2-3-4-5-6, imzalı nadir 2 · epik 3 · efsanevi 4); eksik yer kural havuzundan, imza önde, var olan stat hariç | Hata: imzalı item birleşince etkileri büyüyor ama sayısı artmıyordu. Tek tablo (2-3-4-5-6) seçilmedi: 43 epik ve 18 efsanevi imzalıya 2–3 jenerik buff eklemek onların karakterini sulandırırdı — imzalı item'ın değeri sayıda değil, o özel etkide. Dolgu sınıfa göre çözülüyor (kullanıcı kararı) ama **imza** sınıfa göre değişmiyor; GD22 bu kadar daraltıldı. Buff diske yazılmadığı için veri göçü yok |
 
+| GD111 | Nadirlik zincirindeki ara boşluklar **aynı görseli kullanan yeni kimliklerle** dolduruldu: `<görsel kimliği>@<nadirlik>` | Var olan bir varyantın nadirliğini değiştirmek oyuncunun envanterindeki eşyanın nadirliğini ve seviye kilidini altından çekerdi (sıradan tırpan bir gün sonra Sv. 22). Bu katalog düzeninden çok daha önemli. "Kimlik = görsel yolu" kırılmadı, genişletildi: kimlik hâlâ görseli söylüyor. Aynı görselin iki nadirlikte görünmesi kabul edildi. Yalnızca aradaki 5 boşluk; uçtaki eksikler ilerlemeyi engellemediği için sonraya bırakıldı |
+
+| GD112 | Yeniden atma: **tek yuva**, imzalı etki dokunulmaz; kademeli aralıklar ortalamaya merkezli; maliyet örnek başına artan (1× → 3×), keşiften seç 4×; para **atışta** ödenir, uygulama oyuncu onayıyla | Tek yuva, artan maliyet ve 4× kullanıcı kararı. Para atışta: önce görüp sonra ödemek bedava bakış olurdu. Aralık merkezleri ölçülen ortalamada: yeniden atma bir altın gideri, güç enflasyonu değil. Kademeler nadirlikten, seviye en üst kademeyi açıyor: düşük nadirlikte üst kademe hiç çıkmaz. Birleştirme yeni örnek ürettiği için atılmış etkiler taşınmaz (GD42 ile aynı ilke) |
+| GD113 | Geliştirici kontrolleri **yalnızca** `kDebugMode`; kapı derleme zamanında | Çalışma zamanı gizleme kodu ikilide bırakıyordu. Ölçüldü: release `libapp.so`'da kontrol dizgileri 0. `HomeScreen.onSimulateSteps` silinmedi: 13 test dosyasının tek adım kancası ve silmek eski kırmızıları içeren dosyalara dokunmayı gerektiriyordu; release'de işlevsiz |
+
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
 | # | Ne | Neden dokunulmadı |
@@ -2569,12 +2720,42 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
+**Bölüm E kapanışı: 1.107 başarılı, 48 başarısız.** 47'si Bölüm E başındaki
+eski listeden; 1'i belgelenmiş kararsız `character_creation` 360 dp golden'ı
+(ölçümden ölçüme yeşile/kırmızıya dönüyor). Yeni kırılan test yok. Bölüm E
+boyunca eski listeden **14** test yeşile döndü: `store_purchase_test`'in 12'si
+(onay penceresi uyarlaması) ve `forge_golden_test`'in 2'si (demirci ekranı
+değişti; PNG'lere bakılıp yenilendi).
+
 Bölüm D sonunda `flutter test` → **991 başarılı, 46 başarısız.**
 
 > **Bölüm E başlangıcında ölçülen (HEAD `9717e61`, temiz ağaç):** **981 başarılı,
-> 61 başarısız.** Bölüm D kapanışındaki 46'dan 15 fazla, sebebi ölçülmedi
-> (artışın çoğu `store_purchase_test`: 7 → 19). Bölüm E karşılaştırmayı bu 61 kişilik
-> listeye karşı yapıyor; hiçbirine dokunulmadı.
+> 61 başarısız.** Bölüm D kapanışındaki 46'dan 15 fazla. Bölüm E karşılaştırmayı
+> bu 61 kişilik listeye karşı yapıyor.
+>
+> **`store_purchase_test` 7 → 19 (Bölüm E / Faz 2'de çözüldü).** Sebep `aca975c`
+> ("final version"): ekipman, yükseltme ve ünvan satın almasının önüne bir onay
+> penceresi geldi (`_confirmPurchase`, onay düğmesi `ValueKey('confirm-purchase')`).
+> `b584e6e`'de bu dosyada 7 kırmızı vardı, `aca975c` 12 tane ekledi. 11 testte
+> dokunuştan sonra açık bir `confirmPurchase` adımı eklendi; doğruladıkları
+> şey değişmedi. Ürün koduna dokunulmadı. Pencereye üç iptal testi eklendi.
+>
+> ⚠️ **Kalan bir tanesi bilerek kırmızı:** "hızlı çift dokunma iki satın alma
+> sayılır". Ölçüldü: iki hızlı dokunuş artık **tek** onay penceresi açıyor,
+> yani tek satın alma. Testin iddiası ürün değişikliğiyle çelişiyor ve
+> iddiayı değiştirmek ürün sahibinin kararı; onay adımı eklendi, iddia
+> korundu.
+>
+> **Bölüm E sonunda (E3–E6 dahil): 1104 başarılı, 51 başarısız.** 49'u eski
+> listeden, 2'si belgelenmiş kararsız test ("ölümcül saldırı" ve
+> `character_creation` 360 dp golden'ı; ikisi de `9717e61`'de ölçümden ölçüme
+> kırılıyor). Yeni kırılan test yok.
+>
+> Faz E2 sonunda: **1024 başarılı, 51 başarısız** — eski 61'den 11'i yeşile
+> döndü; geriye kalan 50'si eski listeden. Fazladan görünen tek kırmızı
+> `character_creation_test` 360 dp golden'ı: `9717e61`'de de tek başına
+> çalıştırınca kırmızı, tam süitte sıraya göre yeşil — belgelenmiş kararsız
+> golden.
 
 46'nın **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
 testi kırmadı. Kalan ikisi `character_creation_test` golden'ı ve
@@ -2606,13 +2787,12 @@ Alan alan dağılım:
 
 | Dosya | Adet | Konu |
 |---|---:|---|
-| `store_purchase_test` | 7 | Satın alma, tüketilen yükseltmeler (2× XP), çark ödülü, diske yazma |
+| `store_purchase_test` | 7 (+1 Bölüm E, bkz. yukarı) | Satın alma, tüketilen yükseltmeler (2× XP), çark ödülü, diske yazma |
 | `app_boot_test` | 4 | Açılış dayanıklılığı: kayıt okunamayınca uyarma / güvenlik onayı hatırlama |
 | `golden/walk_phase_golden_test` | 4 | Yürüyüş fazı sahnesi golden'ları |
 | `titles_test` | 4 | Ünvan buff'ının paraya yansıması, başarım ünvanının verilmesi |
 | `golden/titles_golden_test` | 3 | Ünvan ekranı golden'ları (TR 320/390 + EN 390) |
 | `adventure_progress_test` | 3 | Zafer sahnesi ve macera ilerlemesi golden'ları |
-| `golden/forge_golden_test` | 2 | Demirci ekranı golden'ları |
 | `golden/store_card_golden_test` | 2 | Mağaza ekipman kartı golden'ları |
 | `golden/streak_bonus_golden_test` | 2 | Seri bonusu paneli golden'ları |
 | `golden/pet_companion_golden_test` | 2 | Ana çember pet düğmesi golden'ları |
@@ -2626,17 +2806,20 @@ Kabaca **20'si golden** (ekran görüntüsü farkı), **24'ü davranış**. Davr
 tarafında iki küme öne çıkıyor: `RootShell` üzerinden çalışan satın
 alma/buff/ödül zinciri ve açılış/kalıcılık.
 
-## Açık kalan konular (Bölüm D kapanışı)
+## Açık kalan konular (Bölüm E kapanışı)
 
 | Konu | Durum |
 |---|---|
 | **Faz 1b borcu** | 61 imzalı eşya lore'u İngilizce'de tek jenerik cümleye düşüyor (`signatureItemLore`); 65 ünvanın hikâyesi kaynağa göre 4 şablondan üretiliyor. Toplam **126 cümle**, ayrı bir iş |
-| **3 kararsız test** | `character_creation_test` golden'ı (2) ve `adventure_progress_test`'in sıra bağımlı testi (1). Bölüm D'nin değişiklikleri `git stash` ile geri alınınca da kırmızı; dokunulmadı |
+| **Kararsız testler** | `character_creation_test` golden'ları ve `adventure_progress_test`'in "ölümcül saldırı" testi. `9717e61`'de de tek başına çalıştırınca kırmızı, tam süitte sıraya göre değişiyor; dokunulmadı |
+| **Uçtaki nadirlik eksikleri** | Balta ve topuz efsanevisi, Özel kategorisinin dört basamağı. İlerlemeyi **engellemiyor** (birleştirme kataloğa bakmıyor); yalnızca mağaza ve düşme havuzunda o basamak yok. Sonraki bölüm |
+| **`HomeScreen.onSimulateSteps`** | Bilerek bırakıldı (§6.2). Testler yenilenirse birlikte kaldırılabilir |
+| **Envanterde süzgeç** | Demircinin süzgeç kuralı saf ve envanter de aynı grup modelini kullanıyor; eklenmesi istendi ama bu bölümde yalnızca demirci |
 | **Kod doğrulaması → sunucu** | `MailCatalog.codes` APK'nın içinde ve açan herkes görebilir. Firebase gelince istemci yalnızca kodu göndermeli, **sunucu** geçerliliği ve kullanım sayısını doğrulayıp postayı açmalı (§6.18) |
 | **Posta kataloğu → sunucu** | `MailCatalog.all` bugün sabit veri. Değişmesi gereken tek şey **listenin kaynağı**; model, kalıcı alanlar ve ekran olduğu gibi kalır (§6.18) |
 | **Gün değişiminde macera düşüyor** | Telafi kararı hâlâ verilmedi; seçenek kısmi ödülle sonuçlandırmak |
 | **Bağlanmamış ikinci savaş yolu** | `resolveTimedEncounter` tam yazılmış ve testli ama hiç çağrılmıyor (§6.11). Dokunulmadı |
-| **Release imzası** | Hâlâ debug key (C11) |
+| **Release imzası** | *(çözüldü, `f113f38`)* Release derlemesi `android/key.properties` (git dışında) üzerinden kendi anahtarıyla imzalanıyor. `build.gradle.kts` içindeki "debug keys" yorumu eskimiş; dosyaya dokunulmadı |
 
 ## Zaman güvenliği
 
@@ -2678,7 +2861,7 @@ alma/buff/ödül zinciri ve açılış/kalıcılık.
 | C7 | `nextReminderAt` geçmiş bir zamanla dönerse resume'da anında hatırlatma | Tek seferlik, zararsız |
 | C9 | `lib/Characters/`, `lib/Enemies/`, `lib/GIF Animations/` | pubspec'te değil, APK'ya girmiyor. **Silme onaya tabi** |
 | C10 | `README.md` hâlâ "A new Flutter project." | Şablon artığı |
-| C11 | Release imzası hâlâ debug key | Yayına çıkmadan önce |
+| C11 | *(çözüldü)* Release imzası `key.properties` ile | Gradle yorumu eskimiş |
 | C13 | `RewardRarityX.color` model katmanında `Color` döndürüyor | Extension getter, persist edilmiyor — teknik olarak kural ihlali değil |
 | A7 | `features/boss/boss_battle_screen.dart` hiçbir yerden çağrılmıyor | `models/boss_quest.dart`, `MockData.dailyDragon()`, `reward_calculator.dart` ile birlikte ölü zincir. **Silinmedi** |
 | — | `ios/Podfile` yok | İlk macOS derlemesinde üretilecek; `permission_handler` `PERMISSION_*` makroları kısıtlanmalı, yoksa App Store incelemesinde sorun çıkar |

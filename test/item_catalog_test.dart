@@ -6,6 +6,7 @@ import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/data/item_archetypes.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/data/item_definitions.dart';
+import 'package:rush_for_villains/data/item_tier_extensions.dart';
 import 'package:rush_for_villains/models/item.dart';
 import 'package:rush_for_villains/models/reward_rarity.dart';
 import 'package:rush_for_villains/services/item_catalog.dart';
@@ -506,10 +507,25 @@ void main() {
       final items = ItemCatalog.fromAssetPaths(paths);
 
       expect(paths, isNotEmpty);
+      // Bölüm E / Faz 2 (GD111): katalog artık görsel sayısından **fazla** —
+      // ara basamak eşyaları var olan bir görseli yeni bir kimlikle
+      // kullanıyor. Asıl söz değişmedi: her görselin kendi eşyası katalogda.
+      final ids = items.map((item) => item.id).toSet();
+      for (final path in paths) {
+        expect(
+          ids,
+          contains(parseItemAsset(path)!.id),
+          reason: 'hiçbir görsel sessizce düşmemeli: $path',
+        );
+      }
       expect(
         items,
-        hasLength(paths.length),
-        reason: 'hiçbir görsel sessizce düşmemeli',
+        hasLength(
+          paths.length +
+              ItemTierExtensions.all
+                  .where((extension) => paths.contains(extension.assetPath))
+                  .length,
+        ),
       );
     });
 

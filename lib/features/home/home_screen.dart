@@ -52,6 +52,16 @@ class HomeScreen extends StatelessWidget {
   final int unclaimedMailCount;
   final VoidCallback onOpenStore;
   final VoidCallback onOpenInventory;
+
+  /// Adım üretme kancası — **arayüzde hiçbir yerde çizilmiyor**.
+  ///
+  /// Ana sayfada artık bir adım düğmesi yok (adım kaynağı macera panelinde
+  /// ve yalnızca `kDebugMode`). Alan bilerek duruyor: ana sekmede yalnızca
+  /// görünen sekme ağaca kurulduğu için widget testleri adımı buradan
+  /// üretiyor (13 test dosyası). `RootShell` release derlemesinde buraya
+  /// **işlevsiz** bir fonksiyon geçiyor; gerçek adım üretici yalnızca
+  /// `kDebugMode` dalından bağlanıyor ve release'de ağaçtan atılıyor
+  /// (Bölüm E / Faz 6).
   final ValueChanged<int> onSimulateSteps;
   final TutorialGuideVariant petGuide;
   final bool petEnabled;

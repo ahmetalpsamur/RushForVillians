@@ -1,6 +1,7 @@
 import '../../data/item_archetypes.dart';
 import '../../data/item_definitions.dart';
 import '../../data/item_effects.dart';
+import '../../data/item_tier_extensions.dart';
 import '../../models/item.dart';
 import '../../models/item_effect.dart';
 import '../../models/reward_rarity.dart';
@@ -280,6 +281,17 @@ List<ItemBuffType> economyTypeOrder(
   String? characterClass,
   String id = '',
   int count = 8,
+}) => _weightedDraw(
+  economyTypeWeights(category, characterClass: characterClass),
+  '$id|${characterClass ?? ''}',
+  count,
+);
+
+/// Ekonomi türü çekilişinin ağırlıkları — kural türetmesi ve demircinin
+/// yeniden atması (Faz E4) **aynı** havuzu kullanıyor.
+Map<ItemBuffType, int> economyTypeWeights(
+  ItemCategory category, {
+  String? characterClass,
 }) {
   final signature =
       characterClass == null
@@ -296,8 +308,7 @@ List<ItemBuffType> economyTypeOrder(
   for (var i = 0; i < role.length && i < roleWeights.length; i++) {
     weights[role[i]] = weights[role[i]]! + roleWeights[i];
   }
-
-  return _weightedDraw(weights, '$id|${characterClass ?? ''}', count);
+  return weights;
 }
 
 /// Ağırlıklı, tekrarsız, kararlı çekiliş.
@@ -410,10 +421,57 @@ ItemBuff buffFor(
   ItemArchetype? archetype,
 }) {
   final resolved = archetype ?? archetypeFor(category, id);
-  return ItemBuff([
-    ..._economyEffects(rarity, category, resolved, characterClass, id),
-    ..._combatEffects(rarity, resolved),
-  ]);
+  return ItemBuff(
+    capEconomyTotals([
+      ..._economyEffects(rarity, category, resolved, characterClass, id),
+      ..._combatEffects(rarity, resolved),
+    ]),
+  );
+}
+
+/// Tek item tavanını ([GameConstants.maxSingleItemEconomyBonus]) **stat
+/// toplamına** uygular (Bölüm E / Faz 2).
+///
+/// Tavan bir dönem yalnızca **etki başına** uygulanıyordu. `stepCoin` ve
+/// `stepCoinMomentum` ikisi de adım parasına yazdığı için bir item'da iki
+/// adım parası satırı olabiliyor; katalog nadirliğinde toplam tavanın altında
+/// kalıyordu ama birleştirilip efsaneviye çıkan 170 item × sınıf
+/// kombinasyonunda %18,85'e kadar çıkıyordu. Çeşitlilik tercihi (iki ayrı
+/// tür) yerinde kalıyor; yalnızca var olan tavan eksik uygulandığı yerde de
+/// uygulanıyor.
+///
+/// Yalnızca **koşulsuz** etkiler sayılır — koşullu etki çarpana girmediği
+/// için tavanın da konusu değil. Taşan etki tavana kalan paya indirilir;
+/// sıra korunur, böylece birincil bonus her zaman tam değerinde kalır.
+/// Kalan pay sıfırsa etki düşer (kural türetmesinde bütçe bunu
+/// imkânsız kılıyor: birincil pay efsanevide bile %13).
+List<ItemEffect> capEconomyTotals(List<ItemEffect> effects) {
+  const cap = GameConstants.maxSingleItemEconomyBonus;
+  final totals = <ItemStat, double>{};
+  final result = <ItemEffect>[];
+  for (final effect in effects) {
+    if (!effect.stat.isEconomyRate || !effect.isPassive) {
+      result.add(effect);
+      continue;
+    }
+    final used = totals[effect.stat] ?? 0;
+    final room = cap - used;
+    if (room <= 1e-9) continue;
+    final value = effect.value > room ? room : effect.value;
+    totals[effect.stat] = used + value;
+    result.add(
+      value == effect.value
+          ? effect
+          : ItemEffect(
+            stat: effect.stat,
+            value: (value * 1000).floorToDouble() / 1000,
+            mode: effect.mode,
+            customLabel: effect.customLabel,
+            customLabelEn: effect.customLabelEn,
+          ),
+    );
+  }
+  return result;
 }
 
 List<ItemEffect> _economyEffects(
@@ -573,6 +631,12 @@ Iterable<ItemEffect> _ruleCandidates(
 /// Katalog item'ı imza tablosundaki satırla başlar; dolgu hep arkada
 /// durduğu için ilk N etki imzanın kendisidir. Tabloda karşılığı olmayan
 /// (testlerin elle kurduğu) bir imzalı item'da bütün etkiler imza sayılır.
+/// İmzalı item'da elle yazılmış (dokunulmaz) etki sayısı; kuraldan türeyen
+/// item'da `0`. Arayüz imza rozetini ve yeniden atılabilir yuvaları bununla
+/// ayırıyor.
+int signatureCoreCount(Item item) =>
+    item.hasSignature ? _signatureCore(item).length : 0;
+
 List<ItemEffect> _signatureCore(Item item) {
   final identity = parseItemAsset(item.assetPath);
   final signature =
@@ -832,16 +896,18 @@ Item withRarity(Item base, RewardRarity rarity, {String? characterClass}) {
     rarity: rarity,
     cost: cost,
     buff: ItemBuff(
-      padSignatureEffects(
-        [
-          for (final effect in _signatureCore(base))
-            _scaleSignature(effect, factor),
-        ],
-        rarity: rarity,
-        category: base.category,
-        archetype: base.archetype,
-        id: base.id,
-        characterClass: characterClass,
+      capEconomyTotals(
+        padSignatureEffects(
+          [
+            for (final effect in _signatureCore(base))
+              _scaleSignature(effect, factor),
+          ],
+          rarity: rarity,
+          category: base.category,
+          archetype: base.archetype,
+          id: base.id,
+          characterClass: characterClass,
+        ),
       ),
     ),
   );
@@ -867,6 +933,11 @@ ItemEffect _scaleSignature(ItemEffect effect, double factor) {
 /// - varyantsız item → paylaşılan kategoride sınıf lakabı öne gelir
 ///   (*Esrarlı* Kutsal Asa).
 String _classFlavoredName(Item item, String characterClass) {
+  // Ara basamak eşyası görseli bir varyantla paylaşıyor; adı görselden
+  // türetilseydi kaynak varyantla aynı adı alırdı. Adı tablodan geliyor ve
+  // sınıfa göre değişmiyor (GD111).
+  if (ItemTierExtensions.byId(item.id) != null) return item.name;
+
   final identity = parseItemAsset(item.assetPath);
   if (identity?.variant != null) {
     final definition = ItemDefinitions.of(identity!.baseId);
@@ -897,6 +968,35 @@ String fallbackDisplayName(String baseName) {
                 : '${word[0].toUpperCase()}${word.substring(1)}',
       )
       .join(' ');
+}
+
+/// Bir ara basamak eşyasını ([ItemTierExtension]) üretir (GD111).
+///
+/// Görsel bir varyantla paylaşılıyor ama eşya **kendi kimliğiyle** her
+/// şeyini nadirlik kuralından alıyor: seviye kilidi, fiyat, arketip ve
+/// buff [buildItemFromAsset] ile aynı fonksiyonlardan, yeni kimlik ve yeni
+/// nadirlikle türetiliyor. Özel durum yok; kuraldan türeyen şeride giriyor
+/// (2-3-4-5-6). Görsel çözümlenemezse `null`.
+Item? buildTierExtensionItem(ItemTierExtension extension) {
+  final identity = parseItemAsset(extension.assetPath);
+  if (identity == null) return null;
+
+  final id = extension.id;
+  final rarity = extension.rarity;
+  final requiredLevel = requiredLevelFor(rarity, id);
+  final archetype = archetypeFor(identity.category, id);
+
+  return Item(
+    id: id,
+    name: extension.name,
+    assetPath: extension.assetPath,
+    category: identity.category,
+    rarity: rarity,
+    requiredLevel: requiredLevel,
+    cost: costFor(rarity, requiredLevel),
+    buff: buffFor(rarity, identity.category, id: id, archetype: archetype),
+    archetype: archetype,
+  );
 }
 
 /// Asset yolundan tam bir [Item] üretir. Yol tanınmıyorsa `null`.

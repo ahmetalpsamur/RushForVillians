@@ -3,12 +3,16 @@ import '../core/utils/item_rules.dart';
 import '../core/utils/item_leveling.dart';
 import '../core/utils/item_merging.dart';
 import '../core/utils/item_comparison.dart';
+import '../core/utils/item_forging.dart';
 import '../core/constants/game_constants.dart';
 import '../data/enemy_catalog.dart';
+import '../data/forge_tiers.dart';
+import '../data/item_tier_extensions.dart';
 import '../models/avatar_profile.dart';
 import '../models/adventure_quest.dart';
 import '../models/collection_reward.dart';
 import '../models/enemy.dart';
+import '../models/forged_effect.dart';
 import '../data/mail_catalog.dart';
 import '../models/game_title.dart';
 import '../models/mail_message.dart';
@@ -232,6 +236,45 @@ extension ContentLocalizations on AppLocalizations {
     return '$sign$rounded $stat';
   }
 
+  /// Kademe numarası: I ... V (Faz E4).
+  String forgeTierRoman(int tier) =>
+      const ['I', 'II', 'III', 'IV', 'V'][(tier - 1).clamp(0, 4)];
+
+  /// Bir (stat, kademe) aralığının okunur hâli: "Kademe III · %2,9-4,8".
+  ///
+  /// [scale] savaş statlarında eşya seviyesinin büyümesi
+  /// (`levelMultiplier`): yükseltilmiş bir eşyada gösterilen değer aralığın
+  /// içinde kalsın. Ekonomi statları seviyeyle büyümediği için ölçeklenmez.
+  String forgeTierRange(ItemStat stat, int tier, {double scale = 1}) {
+    final roman = forgeTierRoman(tier);
+    final range = ForgeTiers.rangeFor(stat, tier);
+    if (range == null) return forgeTierOnly(roman);
+    final factor = stat.isCombat ? scale : 1.0;
+    final (low, high) = (range.$1 * factor, range.$2 * factor);
+    final percent =
+        forgedToItemEffect(
+          ForgedEffect(stat: stat, tier: tier, value: low),
+        ).mode ==
+        ItemEffectMode.percent;
+    if (percent) {
+      String text(double value) {
+        final formatted = ItemEffect.formatPercent(value);
+        return _isEnglish ? formatted.replaceAll(',', '.') : formatted;
+      }
+
+      return forgeTierRangePercent(roman, text(low), text(high));
+    }
+    return forgeTierRangeFlat(
+      roman,
+      '${low.round()}',
+      '${high.round()}',
+    );
+  }
+
+  /// Keşif listesindeki ad: "Saldırı · Kademe III".
+  String forgeAffixName(ItemStat stat, int tier) =>
+      '${itemStatName(stat)} · ${forgeTierOnly(forgeTierRoman(tier))}';
+
   List<String> itemBuffLabels(Item item) => [
     for (final effect in item.buff.effects) itemEffectLabel(effect),
   ];
@@ -282,6 +325,7 @@ extension ContentLocalizations on AppLocalizations {
   String mailTitle(String id) => switch (id) {
     MailCatalog.closedBetaThanksId => mailClosedBetaThanksTitle,
     MailCatalog.heroesCodeRewardId => mailCodeWeNeedHeroesTitle,
+    MailCatalog.mergeBuffApologyId => mailMergeBuffApologyTitle,
     _ => mailboxTitle,
   };
 
@@ -289,6 +333,7 @@ extension ContentLocalizations on AppLocalizations {
   String mailBody(String id) => switch (id) {
     MailCatalog.closedBetaThanksId => mailClosedBetaThanksBody,
     MailCatalog.heroesCodeRewardId => mailCodeWeNeedHeroesBody,
+    MailCatalog.mergeBuffApologyId => mailMergeBuffApologyBody,
     _ => '',
   };
 
@@ -315,6 +360,10 @@ extension ContentLocalizations on AppLocalizations {
   /// added. Turkish continues to use the authored canonical name.
   String itemName(Item item) {
     if (!_isEnglish) return item.name;
+    // Ara basamak eşyası görseli bir varyantla paylaşıyor; görselden türeyen
+    // ad kaynak varyantınkiyle aynı olurdu. Adı tablodan (GD111).
+    final extension = ItemTierExtensions.byId(item.id);
+    if (extension != null) return extension.nameEn;
     final identity = parseItemAsset(item.assetPath);
     if (identity == null) return _titleCaseIdentifier(item.id.split('/').last);
     var name = _titleCaseIdentifier(identity.baseId.split('/').last)

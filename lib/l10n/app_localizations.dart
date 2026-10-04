@@ -5010,6 +5010,402 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'XP birikimi: {amount}'**
   String separateXpBalance(String amount);
+
+  /// No description provided for @purchaseConfirmTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Satın almayı onayla'**
+  String get purchaseConfirmTitle;
+
+  /// No description provided for @purchaseConfirmPrice.
+  ///
+  /// In tr, this message translates to:
+  /// **'{price} altın'**
+  String purchaseConfirmPrice(int price);
+
+  /// No description provided for @purchaseConfirmAction.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tamam'**
+  String get purchaseConfirmAction;
+
+  /// No description provided for @forgeFilter.
+  ///
+  /// In tr, this message translates to:
+  /// **'Filtrele'**
+  String get forgeFilter;
+
+  /// No description provided for @forgeFilterCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'Filtrele ({count})'**
+  String forgeFilterCount(int count);
+
+  /// No description provided for @forgeSortLabel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Sırala: {sort}'**
+  String forgeSortLabel(String sort);
+
+  /// No description provided for @forgeSortRarity.
+  ///
+  /// In tr, this message translates to:
+  /// **'Nadirlik'**
+  String get forgeSortRarity;
+
+  /// No description provided for @forgeSortLevel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Eşya seviyesi'**
+  String get forgeSortLevel;
+
+  /// No description provided for @forgeSortName.
+  ///
+  /// In tr, this message translates to:
+  /// **'İsim'**
+  String get forgeSortName;
+
+  /// No description provided for @forgeSortUpgradeCost.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yükseltme maliyeti'**
+  String get forgeSortUpgradeCost;
+
+  /// No description provided for @forgeFilterSheetTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Demirci süzgeçleri'**
+  String get forgeFilterSheetTitle;
+
+  /// No description provided for @forgeFilterRarity.
+  ///
+  /// In tr, this message translates to:
+  /// **'Nadirlik'**
+  String get forgeFilterRarity;
+
+  /// No description provided for @forgeFilterCategory.
+  ///
+  /// In tr, this message translates to:
+  /// **'Eşya türü'**
+  String get forgeFilterCategory;
+
+  /// No description provided for @forgeFilterEquip.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kuşanma'**
+  String get forgeFilterEquip;
+
+  /// No description provided for @forgeFilterStatus.
+  ///
+  /// In tr, this message translates to:
+  /// **'Durum'**
+  String get forgeFilterStatus;
+
+  /// No description provided for @forgeEquipAny.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hepsi'**
+  String get forgeEquipAny;
+
+  /// No description provided for @forgeEquipEquipped.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kuşanılı'**
+  String get forgeEquipEquipped;
+
+  /// No description provided for @forgeEquipUnequipped.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kuşanılmamış'**
+  String get forgeEquipUnequipped;
+
+  /// No description provided for @forgeUpgradable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yükseltilebilir'**
+  String get forgeUpgradable;
+
+  /// No description provided for @forgeMergeable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Birleştirilebilir'**
+  String get forgeMergeable;
+
+  /// No description provided for @forgeClearFilters.
+  ///
+  /// In tr, this message translates to:
+  /// **'Temizle'**
+  String get forgeClearFilters;
+
+  /// No description provided for @forgeDone.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tamam'**
+  String get forgeDone;
+
+  /// No description provided for @forgeShowingCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'{shown} / {total} eşya gösteriliyor'**
+  String forgeShowingCount(int shown, int total);
+
+  /// No description provided for @forgeEmptyBlocked.
+  ///
+  /// In tr, this message translates to:
+  /// **'\"{filter}\" süzgecine uyan hiç eşyan yok.'**
+  String forgeEmptyBlocked(String filter);
+
+  /// No description provided for @forgeEmptyCombined.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçili süzgeçlerin hepsine birden uyan eşya yok: {filters}.'**
+  String forgeEmptyCombined(String filters);
+
+  /// No description provided for @forgeEmptyHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Süzgeçleri temizlersen bütün eşyalarını görürsün.'**
+  String get forgeEmptyHint;
+
+  /// No description provided for @buffSummaryTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Etkiler ({count})'**
+  String buffSummaryTitle(int count);
+
+  /// No description provided for @buffSignatureBadge.
+  ///
+  /// In tr, this message translates to:
+  /// **'İmza'**
+  String get buffSignatureBadge;
+
+  /// No description provided for @buffDrawbackBadge.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bedel'**
+  String get buffDrawbackBadge;
+
+  /// No description provided for @forgeTierRangePercent.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kademe {tier} · %{low}-{high}'**
+  String forgeTierRangePercent(String tier, String low, String high);
+
+  /// No description provided for @forgeTierRangeFlat.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kademe {tier} · {low}-{high}'**
+  String forgeTierRangeFlat(String tier, String low, String high);
+
+  /// No description provided for @forgeTierOnly.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kademe {tier}'**
+  String forgeTierOnly(String tier);
+
+  /// No description provided for @forgeRerollTooltip.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeniden at'**
+  String get forgeRerollTooltip;
+
+  /// No description provided for @forgeRerollTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeniden döv'**
+  String get forgeRerollTitle;
+
+  /// No description provided for @forgeRerollCurrent.
+  ///
+  /// In tr, this message translates to:
+  /// **'Şimdiki etki'**
+  String get forgeRerollCurrent;
+
+  /// No description provided for @forgeRerollCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu eşyada {count} kez yeniden atıldı'**
+  String forgeRerollCount(int count);
+
+  /// No description provided for @forgeRerollRandom.
+  ///
+  /// In tr, this message translates to:
+  /// **'Rastgele at · {cost} altın'**
+  String forgeRerollRandom(int cost);
+
+  /// No description provided for @forgeRerollRandomHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Etki türü ve değeri rastgele gelir. Kademe en fazla {tier}.'**
+  String forgeRerollRandomHint(String tier);
+
+  /// No description provided for @forgeTierLockedHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kademe {tier} için eşya seviyesi {level} olmalı.'**
+  String forgeTierLockedHint(String tier, int level);
+
+  /// No description provided for @forgeCostGrowthHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Her atış bu eşyada sonraki atışı pahalılaştırır (en fazla 3 kat).'**
+  String get forgeCostGrowthHint;
+
+  /// No description provided for @forgePickTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Keşiften seç · 4 kat fiyat'**
+  String get forgePickTitle;
+
+  /// No description provided for @forgePickHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Türü ve kademeyi sen seçersin; aralık içindeki değer yine rastgele.'**
+  String get forgePickHint;
+
+  /// No description provided for @forgePickAction.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçileni at · {cost} altın'**
+  String forgePickAction(int cost);
+
+  /// No description provided for @forgePickNone.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu yuvaya uyan bir keşfin yok. Rastgele atışlar demirciye yeni etkiler öğretir.'**
+  String get forgePickNone;
+
+  /// No description provided for @forgePickChooseFirst.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce aşağıdan bir keşif seç.'**
+  String get forgePickChooseFirst;
+
+  /// No description provided for @forgePickConfirmTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Keşiften seçilsin mi?'**
+  String get forgePickConfirmTitle;
+
+  /// No description provided for @forgePickConfirmBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'{effect} için {cost} altın harcanacak. Değer aralık içinde rastgele gelecek.'**
+  String forgePickConfirmBody(String effect, int cost);
+
+  /// No description provided for @forgeNotEnoughCoins.
+  ///
+  /// In tr, this message translates to:
+  /// **'{missing} altın daha gerekiyor.'**
+  String forgeNotEnoughCoins(int missing);
+
+  /// No description provided for @forgeDecisionTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeni sonuç: hangisi kalsın?'**
+  String get forgeDecisionTitle;
+
+  /// No description provided for @forgeDecisionOld.
+  ///
+  /// In tr, this message translates to:
+  /// **'Şimdiki'**
+  String get forgeDecisionOld;
+
+  /// No description provided for @forgeDecisionNew.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeni'**
+  String get forgeDecisionNew;
+
+  /// No description provided for @forgeKeepOld.
+  ///
+  /// In tr, this message translates to:
+  /// **'Eskisini koru'**
+  String get forgeKeepOld;
+
+  /// No description provided for @forgeTakeNew.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeniyi al'**
+  String get forgeTakeNew;
+
+  /// No description provided for @forgeDecisionPaid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Altın atışta ödendi; hangisini seçersen seç geri gelmez.'**
+  String get forgeDecisionPaid;
+
+  /// No description provided for @forgePendingBlocked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce bekleyen sonuca karar ver.'**
+  String get forgePendingBlocked;
+
+  /// No description provided for @forgeDiscoveriesTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Keşfedilen etkiler'**
+  String get forgeDiscoveriesTitle;
+
+  /// No description provided for @forgeDiscoveriesEmpty.
+  ///
+  /// In tr, this message translates to:
+  /// **'Henüz keşif yok. Bir etkiyi yeniden attığında demirci sonucu öğrenir.'**
+  String get forgeDiscoveriesEmpty;
+
+  /// No description provided for @forgeDiscoveriesCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'{count} keşif'**
+  String forgeDiscoveriesCount(int count);
+
+  /// No description provided for @forgeRolledNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Atış yapıldı: {effect}. Karar senin.'**
+  String forgeRolledNotice(String effect);
+
+  /// No description provided for @forgeAppliedNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeni etki uygulandı.'**
+  String get forgeAppliedNotice;
+
+  /// No description provided for @forgeKeptNotice.
+  ///
+  /// In tr, this message translates to:
+  /// **'Eski etki korundu.'**
+  String get forgeKeptNotice;
+
+  /// No description provided for @forgeSignatureLocked.
+  ///
+  /// In tr, this message translates to:
+  /// **'İmzalı etki yeniden atılamaz.'**
+  String get forgeSignatureLocked;
+
+  /// No description provided for @forgeSlotInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu etki artık yeniden atılamıyor.'**
+  String get forgeSlotInvalid;
+
+  /// No description provided for @forgeMergeResetsRolls.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeniden atılmış etkiler birleşince sıfırlanır.'**
+  String get forgeMergeResetsRolls;
+
+  /// No description provided for @mailMergeBuffApologyTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Birleştirme hatası için özür'**
+  String get mailMergeBuffApologyTitle;
+
+  /// No description provided for @mailMergeBuffApologyBody.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bazı eşyalar birleştirilip bir üst nadirliğe çıkınca yeni bir etki kazanmıyordu. Bu bizim hatamızdı.\n\nDüzelttik. Elindeki eşyalara eksik kalan etkiler geriye dönük olarak eklendi, senin bir şey yapmana gerek yok.\n\nKüçük bir telafi olarak 750 altın ve 3 çark hakkı bıraktık. Özür dileriz, iyi yürüyüşler.'**
+  String get mailMergeBuffApologyBody;
 }
 
 class _AppLocalizationsDelegate

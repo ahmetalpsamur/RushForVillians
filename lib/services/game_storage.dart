@@ -27,7 +27,7 @@ class GameStorage {
 
   /// Kayıt biçiminin güncel sürümü. Alan eklendiğinde/adı değiştiğinde bu
   /// sayı artırılır ve [_migrations] içine bir taşıma adımı eklenir.
-  static const int schemaVersion = 32;
+  static const int schemaVersion = 33;
 
   /// Ardışık taşıma adımları: anahtar = taşınacak sürüm, değer = bir sonraki
   /// sürüme yükselten dönüşüm. `load()` kayıtlı sürümden [schemaVersion]'a
@@ -396,6 +396,14 @@ class GameStorage {
     // Beta ünvanı zaten postadan geliyor, yani eski oyuncu da önce postayı
     // alıp ünvanı takacak.
     31: (state) => state,
+    // v32 -> v33: demircide yeniden atma ve keşif havuzu (Bölüm E / Faz 4).
+    // Yeni alanlar: `OwnedItem.forgedEffects` / `rerollCount` /
+    // `pendingForge`, `UserProfile.forgeSeed` / `discoveredAffixes`. Eski
+    // kayıtta hiçbiri yok ve **yokluk doğru varsayılan**: `forgedEffects`
+    // eksik = türetilmiş buff (E1'in geriye dönük düzeltmesi aynen geçerli),
+    // sayaç 0, keşif yok, tohum ilk atışta kuruluyor. İçerik değişmiyor; posta,
+    // kod ve indirim alanlarına dokunulmuyor (Faz E5 bunu testle bağlıyor).
+    32: (state) => state,
   };
 
   /// Yarım bir maceranın `enemyHealth`'ini **güncel** can tavanına taşır.
@@ -577,7 +585,10 @@ class GameStorage {
 
   /// Kaydı siler. Testler ve ileride "ilerlemeyi sıfırla" için.
   static Future<void> clear() async {
-    if (kReleaseMode) throw StateError('Save reset is disabled in production');
+    // Geliştirici aracı: yalnızca `kDebugMode` (profile derlemesi de kapalı).
+    if (!kDebugMode) {
+      throw StateError('Save reset is disabled outside debug builds');
+    }
     _writeBlocked = false;
     _pendingWrite?.cancel();
     _pendingWrite = null;

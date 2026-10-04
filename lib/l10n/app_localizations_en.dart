@@ -3208,4 +3208,246 @@ class AppLocalizationsEn extends AppLocalizations {
   String separateXpBalance(String amount) {
     return 'XP balance: $amount';
   }
+
+  @override
+  String get purchaseConfirmTitle => 'Confirm purchase';
+
+  @override
+  String purchaseConfirmPrice(int price) {
+    return '$price coins';
+  }
+
+  @override
+  String get purchaseConfirmAction => 'Confirm';
+
+  @override
+  String get forgeFilter => 'Filter';
+
+  @override
+  String forgeFilterCount(int count) {
+    return 'Filter ($count)';
+  }
+
+  @override
+  String forgeSortLabel(String sort) {
+    return 'Sort: $sort';
+  }
+
+  @override
+  String get forgeSortRarity => 'Rarity';
+
+  @override
+  String get forgeSortLevel => 'Item level';
+
+  @override
+  String get forgeSortName => 'Name';
+
+  @override
+  String get forgeSortUpgradeCost => 'Upgrade cost';
+
+  @override
+  String get forgeFilterSheetTitle => 'Forge filters';
+
+  @override
+  String get forgeFilterRarity => 'Rarity';
+
+  @override
+  String get forgeFilterCategory => 'Item type';
+
+  @override
+  String get forgeFilterEquip => 'Equipped';
+
+  @override
+  String get forgeFilterStatus => 'Status';
+
+  @override
+  String get forgeEquipAny => 'All';
+
+  @override
+  String get forgeEquipEquipped => 'Equipped';
+
+  @override
+  String get forgeEquipUnequipped => 'Not equipped';
+
+  @override
+  String get forgeUpgradable => 'Upgradable';
+
+  @override
+  String get forgeMergeable => 'Mergeable';
+
+  @override
+  String get forgeClearFilters => 'Clear';
+
+  @override
+  String get forgeDone => 'Done';
+
+  @override
+  String forgeShowingCount(int shown, int total) {
+    return 'Showing $shown of $total items';
+  }
+
+  @override
+  String forgeEmptyBlocked(String filter) {
+    return 'None of your items match \"$filter\".';
+  }
+
+  @override
+  String forgeEmptyCombined(String filters) {
+    return 'No item matches all selected filters together: $filters.';
+  }
+
+  @override
+  String get forgeEmptyHint => 'Clear the filters to see all your items.';
+
+  @override
+  String buffSummaryTitle(int count) {
+    return 'Effects ($count)';
+  }
+
+  @override
+  String get buffSignatureBadge => 'Signature';
+
+  @override
+  String get buffDrawbackBadge => 'Drawback';
+
+  @override
+  String forgeTierRangePercent(String tier, String low, String high) {
+    return 'Tier $tier · $low-$high%';
+  }
+
+  @override
+  String forgeTierRangeFlat(String tier, String low, String high) {
+    return 'Tier $tier · $low-$high';
+  }
+
+  @override
+  String forgeTierOnly(String tier) {
+    return 'Tier $tier';
+  }
+
+  @override
+  String get forgeRerollTooltip => 'Reroll';
+
+  @override
+  String get forgeRerollTitle => 'Reforge';
+
+  @override
+  String get forgeRerollCurrent => 'Current effect';
+
+  @override
+  String forgeRerollCount(int count) {
+    return 'Rerolled $count times on this item';
+  }
+
+  @override
+  String forgeRerollRandom(int cost) {
+    return 'Random roll · $cost coins';
+  }
+
+  @override
+  String forgeRerollRandomHint(String tier) {
+    return 'Effect type and value are random. Tier up to $tier.';
+  }
+
+  @override
+  String forgeTierLockedHint(String tier, int level) {
+    return 'Tier $tier needs item level $level.';
+  }
+
+  @override
+  String get forgeCostGrowthHint =>
+      'Each roll makes the next one on this item pricier (up to 3x).';
+
+  @override
+  String get forgePickTitle => 'Pick from discoveries · 4x price';
+
+  @override
+  String get forgePickHint =>
+      'You choose type and tier; the value inside the range is still random.';
+
+  @override
+  String forgePickAction(int cost) {
+    return 'Roll selected · $cost coins';
+  }
+
+  @override
+  String get forgePickNone =>
+      'No discovery fits this slot yet. Random rolls teach the forge new effects.';
+
+  @override
+  String get forgePickChooseFirst => 'Pick a discovery below first.';
+
+  @override
+  String get forgePickConfirmTitle => 'Pick from discoveries?';
+
+  @override
+  String forgePickConfirmBody(String effect, int cost) {
+    return '$cost coins will be spent on $effect. The value will be random within the range.';
+  }
+
+  @override
+  String forgeNotEnoughCoins(int missing) {
+    return 'You need $missing more coins.';
+  }
+
+  @override
+  String get forgeDecisionTitle => 'New result: which one stays?';
+
+  @override
+  String get forgeDecisionOld => 'Current';
+
+  @override
+  String get forgeDecisionNew => 'New';
+
+  @override
+  String get forgeKeepOld => 'Keep current';
+
+  @override
+  String get forgeTakeNew => 'Take new';
+
+  @override
+  String get forgeDecisionPaid =>
+      'The coins were paid on the roll; they don\'t come back either way.';
+
+  @override
+  String get forgePendingBlocked => 'Decide on the pending result first.';
+
+  @override
+  String get forgeDiscoveriesTitle => 'Discovered effects';
+
+  @override
+  String get forgeDiscoveriesEmpty =>
+      'No discoveries yet. When you reroll an effect, the forge learns the result.';
+
+  @override
+  String forgeDiscoveriesCount(int count) {
+    return '$count discoveries';
+  }
+
+  @override
+  String forgeRolledNotice(String effect) {
+    return 'Rolled: $effect. Your call.';
+  }
+
+  @override
+  String get forgeAppliedNotice => 'New effect applied.';
+
+  @override
+  String get forgeKeptNotice => 'Kept the current effect.';
+
+  @override
+  String get forgeSignatureLocked => 'Signature effects can\'t be rerolled.';
+
+  @override
+  String get forgeSlotInvalid => 'This effect can no longer be rerolled.';
+
+  @override
+  String get forgeMergeResetsRolls => 'Rerolled effects reset when merged.';
+
+  @override
+  String get mailMergeBuffApologyTitle => 'Sorry about the merge bug';
+
+  @override
+  String get mailMergeBuffApologyBody =>
+      'Some items gained no new effect when you merged them into a higher rarity. That was our mistake.\n\nIt is fixed. The missing effects have been added to the items you already own, so there is nothing you need to do.\n\nTo make up for it, here are 750 gold and 3 wheel spins. Sorry, and happy walking.';
 }

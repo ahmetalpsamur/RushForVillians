@@ -268,16 +268,12 @@ void main() {
               if (effect.stat == ItemStat.stepCoin) coin += effect.value;
               if (effect.stat == ItemStat.stepXp) xp += effect.value;
             }
-            // Tek item tavanı, imzalı eşyada toplam olarak da geçerli: dolgu
-            // var olan statı tekrar etmediği için aynı stata iki pay binemez.
-            //
-            // ⚠️ Kuraldan türeyen şeritte bu toplam bugün de aşılabiliyor
-            // (`stepCoin` + `stepCoinMomentum` ikisi de adım parasına
-            // yazıyor; birleştirilmiş 170 efsanevi × sınıf, en kötüsü
-            // %18,85). Faz E1 o şeride dokunmuyor; karar bekliyor.
-            if (resolved.hasSignature &&
-                (coin > GameConstants.maxSingleItemEconomyBonus + 1e-9 ||
-                    xp > GameConstants.maxSingleItemEconomyBonus + 1e-9)) {
+            // Tek item tavanı **toplam** olarak da geçerli, iki şeritte de.
+            // Kuraldan türeyen şeritte `stepCoin` + `stepCoinMomentum`
+            // birleştirilmiş efsanevide %18,85'e çıkıyordu; Faz E2'den beri
+            // `capEconomyTotals` toplamı kırpıyor.
+            if (coin > GameConstants.maxSingleItemEconomyBonus + 1e-9 ||
+                xp > GameConstants.maxSingleItemEconomyBonus + 1e-9) {
               offenders.add('${resolved.id} ${resolved.rarity} toplam');
             }
           }

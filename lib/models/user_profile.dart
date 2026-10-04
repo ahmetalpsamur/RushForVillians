@@ -163,6 +163,19 @@ class UserProfile {
   /// yani oyuncuya sıra üzerinden bir zar atma yolu açardı.
   int streakBonusSeed;
 
+  /// Demircinin yeniden atma tohumu (Bölüm E / Faz 4). `0` = henüz kurulmadı.
+  ///
+  /// Çark ([wheelSeed]), seri ([streakBonusSeed]) ve savaş tohumlarından
+  /// **ayrı**: paylaşsalardı çarkı çevirmek demircinin zarını kaydırırdı.
+  int forgeSeed;
+
+  /// Demircinin öğrendiği etkiler: `<stat>:<kademe>` (Bölüm E / Faz 4).
+  ///
+  /// **Oyuncu çapında**, eşya çapında değil: A eşyasında öğrenilen bir etki
+  /// B eşyasında da seçilebilir. Her yeniden atma sonucunu ekler; sonuç
+  /// reddedilse bile öğrenilmiş sayılır — demirci gördüğünü unutmaz.
+  List<String> discoveredAffixes;
+
   /// Seri stat bonusunun verildiği son oyun günü.
   ///
   /// Aynı gün ikinci kez çekiliş yapılmamasının dayanağı: uygulamayı kapatıp
@@ -312,6 +325,8 @@ class UserProfile {
     this.xpBoostUntil,
     this.streakStatBonuses = StreakStatBonuses.empty,
     this.streakBonusSeed = 0,
+    this.forgeSeed = 0,
+    List<String>? discoveredAffixes,
     this.lastStreakBonusDay,
     this.hasCompletedTutorial = false,
     this.tutorialStep = 0,
@@ -348,6 +363,7 @@ class UserProfile {
        ownedItems = ownedItems ?? <OwnedItem>[],
        ownedUpgradeIds = ownedUpgradeIds ?? <String>[],
        ownedTitleIds = ownedTitleIds ?? <String>[],
+       discoveredAffixes = discoveredAffixes ?? <String>[],
        claimedMailIds = claimedMailIds ?? <String>[],
        readMailIds = readMailIds ?? <String>[],
        pendingMailIds = pendingMailIds ?? <String>[],
@@ -420,6 +436,25 @@ class UserProfile {
         return;
       }
     }
+  }
+
+  /// Bir örneği **tamamen** yeni hâliyle değiştirir (demircinin yeniden
+  /// atması: atılmış etkiler, sayaç, bekleyen karar). Örnek yoksa hiçbir şey
+  /// yapmaz; kimlik değişmez.
+  void replaceInstance(OwnedItem instance) {
+    for (var i = 0; i < ownedItems.length; i++) {
+      if (ownedItems[i].instanceId == instance.instanceId) {
+        ownedItems[i] = instance;
+        return;
+      }
+    }
+  }
+
+  /// Bir etkiyi keşfedilmiş sayar. Yeniyse `true`.
+  bool discoverAffix(String key) {
+    if (discoveredAffixes.contains(key)) return false;
+    discoveredAffixes.add(key);
+    return true;
   }
 
   /// Kuşanılı örnekler.
@@ -870,6 +905,8 @@ class UserProfile {
     'xpBoostUntil': xpBoostUntil?.toUtc().toIso8601String(),
     'streakStatBonuses': streakStatBonuses.toJson(),
     'streakBonusSeed': streakBonusSeed,
+    'forgeSeed': forgeSeed,
+    'discoveredAffixes': discoveredAffixes,
     'lastStreakBonusDay': lastStreakBonusDay?.toIso8601String(),
     'hasCompletedTutorial': hasCompletedTutorial,
     'tutorialStep': tutorialStep,
@@ -957,6 +994,8 @@ class UserProfile {
       // günler [StreakStatBonuses] içinde sessizce kırpılır.
       streakStatBonuses: StreakStatBonuses.fromJson(json['streakStatBonuses']),
       streakBonusSeed: json['streakBonusSeed'] as int? ?? 0,
+      forgeSeed: json['forgeSeed'] as int? ?? 0,
+      discoveredAffixes: _stringList(json['discoveredAffixes']),
       lastStreakBonusDay: _parseDate(json['lastStreakBonusDay']),
       xpBoostUntil: _parseDate(json['xpBoostUntil']),
       // Alanın eksik olması eski bir kaydı gösterir; mevcut oyunculara tutorialı
