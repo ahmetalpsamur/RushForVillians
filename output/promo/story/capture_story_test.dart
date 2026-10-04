@@ -31,7 +31,7 @@ void main() {
     avatar:const AvatarProfile(name:'Pinky',age:22,weight:60,gender:'Female',characterClass:'Knight',
      characterAsset:'lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Knight/Knight/Knight_Idle.gif'),
     today:DailyProgress(date:DateTime(2026,9,16),steps:0,stepGoal:1000),
-    onAdventureSelected:(_){},onStartRevival:(){},onChooseNewAdventure:(){},onAdventureUpdated:(){},
+    onAdventureSelected:(_){},onStartRevival:(){},onChooseNewAdventure:(){},onAdventureUpdated:(){}, onStartEndlessRun: () {  },
    ),
   ));
   await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:600)));

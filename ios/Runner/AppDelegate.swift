@@ -5,7 +5,7 @@ import CoreMotion
 import AVFoundation
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var stepCounter: StepCountStreamHandler?
   private var launchAudioPlayer: AVAudioPlayer?
   private var rewardAudioPlayer: AVAudioPlayer?
@@ -16,31 +16,39 @@ import AVFoundation
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
-    GeneratedPluginRegistrant.register(with: self)
-    registerStepSensorChannels()
-    registerLaunchSoundChannel()
-    if let controller = window?.rootViewController as? FlutterViewController {
-      FlutterMethodChannel(name: "rush_for_villains/daily_notifications",
-        binaryMessenger: controller.binaryMessenger).setMethodCallHandler { call, result in
-        guard call.method == "configuration" else {
-          result(FlutterMethodNotImplemented)
-          return
-        }
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        result(["timeZone": TimeZone.current.identifier, "directory": directory.path])
-      }
-    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  private func registerLaunchSoundChannel() {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      return
-    }
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    registerStepSensorChannels(with: messenger)
+    registerLaunchSoundChannel(with: messenger)
+    registerDailyNotificationsChannel(with: messenger)
+  }
+
+  private func registerDailyNotificationsChannel(with messenger: FlutterBinaryMessenger) {
+    FlutterMethodChannel(
+      name: "rush_for_villains/daily_notifications",
+      binaryMessenger: messenger
+    ).setMethodCallHandler { call, result in
+      guard call.method == "configuration" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let directory = FileManager.default.urls(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask
+      ).first!
+      result(["timeZone": TimeZone.current.identifier, "directory": directory.path])
+    }
+  }
+
+  private func registerLaunchSoundChannel(with messenger: FlutterBinaryMessenger) {
     FlutterMethodChannel(
       name: "rush_for_villains/launch_sound",
-      binaryMessenger: controller.binaryMessenger
+      binaryMessenger: messenger
     ).setMethodCallHandler { [weak self] call, result in
       switch call.method {
       case "play":
@@ -115,12 +123,7 @@ import AVFoundation
   /// Bu yüzden başlangıç anını Dart tarafı veriyor (son rapor anı). Okunan
   /// değer doğrudan "son rapordan beri atılan adım" olur; uygulama kapalıyken
   /// atılan adımlar da (geçmiş sorgusu) ilk olayda gelir.
-  private func registerStepSensorChannels() {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      return
-    }
-    let messenger = controller.binaryMessenger
-
+  private func registerStepSensorChannels(with messenger: FlutterBinaryMessenger) {
     let handler = StepCountStreamHandler()
     stepCounter = handler
     FlutterEventChannel(name: "rush_for_villains/step_count", binaryMessenger: messenger)
