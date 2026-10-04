@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD109)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD110)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -831,7 +831,37 @@ artış, yüzdesel artış, koşullu (`lowHealth`), tetiklenen (`onHit`), eşikl
 
 **İmzalı itemler sınıfa göre değişmez** (GD22): "Azrailin Tırpanı" her sınıfta
 Azrailin Tırpanı'dır. Zaten bir karakteri var; sınıfa göre yeniden yazmak onu
-silerdi.
+silerdi. *(GD110 ile daraltıldı: değişmeyen şey **imza**; arkasındaki kural
+dolgusu sınıfa göre çözülür.)*
+
+### Buff sayısı — iki şerit, basamak başına +1 (GD110)
+
+| Nadirlik | Kuraldan türeyen | İmzalı |
+|---|---|---|
+| Sıradan | 2 | — |
+| Az Bulunur | 3 | — |
+| Nadir | 4 | 2 |
+| Epik | 5 | 3 |
+| Efsanevi | 6 | 4 |
+
+Kuraldan türeyen şerit `economyCount + combatCount`, imzalı şerit
+`ItemArchetypes.signatureEffectCount`. İmzalı şerit bilerek kısa: imzalı
+item'ın değeri etki **sayısında** değil, o elle yazılmış etkide.
+
+İmzalı item'da eksik kalan yer `padSignatureEffects` ile **kural havuzundan**
+doldurulur — kuraldan türeyen bir item'ın kullandığı aynı sıra, aynı arketip
+ve aynı sınıf. Üç kural, üçü de `signature_merge_buff_test` ile bağlı:
+
+1. **İmza önde.** Elle yazılmış etkiler listenin başında ve sırasıyla kalır;
+   dolgu yalnızca sona eklenir.
+2. **Var olan stat tekrar edilmez** — bedeli taşıyan eksi değerli etki dahil.
+   Bir `+savunma` dolgusu Azrailin Tırpanı'nın `−savunma` bedelini silmemeli.
+3. **Ekonomi tavanı aşılmaz.** Dolgunun değeri `_ruleEffect`'ten geliyor ve
+   tek item tavanına (%15) kırpılı; 2. kural yüzünden aynı stata ikinci pay
+   da binemiyor.
+
+Katalogda bundan etkilenen yalnızca **3 etkili 10 efsanevi** (+1). Nadir
+imzalılar 2, epikler 3 ve dört etkili 8 efsanevi zaten hedefte.
 
 ### Kuşanma
 
@@ -962,6 +992,28 @@ adet harcanacaksa bunu önceden söyler ve "Bu işlem geri alınamaz." der.
 
 **İmzalı itemler karakterini korur** (GD22): elle yazılmış etkileri yeniden
 türetilmez, nadirlik bütçesi oranında ölçeklenir.
+
+**Ve her basamakta +1 etki alır** (GD110). Bir dönem imzalı item
+birleştirilince etkileri yalnızca büyüyordu, sayısı artmıyordu (nadir 2 →
+epik 2 → efsanevi 2); kuraldan türeyen item ise her basamakta +1 alıyordu.
+Şimdi ikisi birden: imza büyür **ve** yeni nadirlikte eksik kalan etki kural
+havuzundan eklenir (2 → 3 → 4). Epikte eklenen dolgu efsanevide de ilk dolgu
+olarak kalır.
+
+**Veri göçü yok.** Buff diske yazılmıyor (`OwnedItem` yalnızca kimlik,
+seviye, nadirlik ve kuşanma tutuyor), her açılışta katalogdan çözülüyor. Yani
+düzeltme eski envantere kendiliğinden ulaşıyor ve iki kez uygulanması
+yapısal olarak imkânsız. Ölçüm testi eski bir v32 kaydını okuyup kaydın
+**bit bit aynı** kaldığını ve 8 eşyadan 4'üne toplam 5 buff eklendiğini
+doğruluyor.
+
+⚠️ **Bilinen ekonomi açığı (E1'den önce de vardı, karar bekliyor):**
+`ItemBuffType.stepCoinMomentum` da `ItemStat.stepCoin`'e yazıyor, yani
+kuraldan türeyen bir item'da adım parası iki satır olabiliyor. Katalog
+nadirliğinde toplam tavanın altında kalıyor; ama birleştirilip efsaneviye
+çıkmış **170 item × sınıf** kombinasyonunda toplam %15'i aşıyor (en kötüsü
+**%18,85**). Kuşanma toplamı yine `EquippedBuffs` içindeki %50 kırpmasıyla
+sınırlı.
 
 ## 6.7 Mağaza
 
@@ -2304,7 +2356,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 |---|---|
 | Adım hattı | `pedometer_step_source_test`, `step_rate_limiter_test`, `step_coins_test`, `step_xp_test`, `step_history_test`, `step_history_archive_test` |
 | Gün ve seri | `game_day_test`, `streak_test`, `streak_freeze_test`, `streak_stat_bonus_test`, `streak_bonus_shell_test` |
-| Item | `item_catalog_test`, `item_effects_test`, `item_variety_test`, `item_leveling_test`, `item_merging_test`, `item_comparison_test`, `equipped_buffs_test` |
+| Item | `item_catalog_test`, `item_effects_test`, `item_variety_test`, `item_leveling_test`, `item_merging_test`, `item_comparison_test`, `equipped_buffs_test`, `signature_merge_buff_test` (iki şerit, birleştirme +1, eski kayıt ölçümü) |
 | Mağaza / envanter / demirci | `store_screen_test`, `store_purchase_test`, `inventory_test`, `blacksmith_test` |
 | Ünvan | `title_catalog_test`, `titles_test` |
 | Çark | `wheel_rewards_test`, `daily_wheel_test`, `still_gif_frame_test` |
@@ -2379,7 +2431,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD109)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD110)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2497,6 +2549,8 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 | GD105 | Yürüyüş fazında **para yağmuru**; dağıtım `stableSpread` değil düşük tutarsızlık dizisi | Bonuslu oran görünür olmalı (GD56 ile aynı fikir). `stableSpread` kalıcı kimlikler için yazıldı; `'rain-x-0'`…`'rain-x-11'` gibi yoğun bir indeks dizisinde dağıtmıyor ve 12 paranın onu aynı noktaya yığılıyordu. Altın oranın kesirli kısmı hem daha basit hem bu iş için daha doğru. Yedek görsel `Icon` değil **çizilen disk** ve `frameBuilder` ile yükleme sırasında da gösteriliyor — çözülmemiş bir `Image` boşluk çiziyor ve golden sessizce boş çıkıyordu |
 | GD103 | Düşen eşya tek bir paylaşılan bileşenle gösteriliyor (`DroppedItemCard`); macera zaferi ve Sonsuz Koşu aynı dili kullanıyor | Garanti ödül (GD93) hiçbir ekranda görünmüyordu; sonsuz koşuda ise ham asset kimliği basılıyordu. İki ayrı kart yazmak aynı ödülü iki farklı şey gibi gösterirdi. Katalogda olmayan kimlikte kart **hiçbir şey çizmiyor**: uydurma ad göstermektense susmak yeğ |
 
+| GD110 | İmzalı itemlerin de basamak başına +1 etkisi var: **iki şerit** (kuraldan 2-3-4-5-6, imzalı nadir 2 · epik 3 · efsanevi 4); eksik yer kural havuzundan, imza önde, var olan stat hariç | Hata: imzalı item birleşince etkileri büyüyor ama sayısı artmıyordu. Tek tablo (2-3-4-5-6) seçilmedi: 43 epik ve 18 efsanevi imzalıya 2–3 jenerik buff eklemek onların karakterini sulandırırdı — imzalı item'ın değeri sayıda değil, o özel etkide. Dolgu sınıfa göre çözülüyor (kullanıcı kararı) ama **imza** sınıfa göre değişmiyor; GD22 bu kadar daraltıldı. Buff diske yazılmadığı için veri göçü yok |
+
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
 | # | Ne | Neden dokunulmadı |
@@ -2516,6 +2570,11 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 ## Şu an kırmızı olan testler
 
 Bölüm D sonunda `flutter test` → **991 başarılı, 46 başarısız.**
+
+> **Bölüm E başlangıcında ölçülen (HEAD `9717e61`, temiz ağaç):** **981 başarılı,
+> 61 başarısız.** Bölüm D kapanışındaki 46'dan 15 fazla, sebebi ölçülmedi
+> (artışın çoğu `store_purchase_test`: 7 → 19). Bölüm E karşılaştırmayı bu 61 kişilik
+> listeye karşı yapıyor; hiçbirine dokunulmadı.
 
 46'nın **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
 testi kırmadı. Kalan ikisi `character_creation_test` golden'ı ve

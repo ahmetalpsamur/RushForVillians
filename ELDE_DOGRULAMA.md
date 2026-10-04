@@ -96,6 +96,19 @@ cihazda denenmedi. Golden'la doğrulananlar işaretli: 🖼
 
 ---
 
+# Bölüm E
+
+## 10. Birleştirme buff'ı (Faz E1)
+
+57. Bölüm E'den **önce** birleştirdiğin imzalı bir eşya varsa (ör. epiğe çıkmış bir Rüzgâr Oku) güncellemeyi kur ve envanterde aç → *Eskisinden **bir** etki fazla; ilk satırlar hâlâ o eşyanın kendi özel etkisi, yeni etki **en altta**.*
+58. Aynı eşyayı kapat-aç → *Etki sayısı değişmedi; ikinci açılış bir etki daha **eklemedi**.*
+59. Katalogdaki bir efsaneviye bak (ör. Yıldız Düşüren) → *4 etki; ilk üçü eski özel etkiler.*
+60. Nadir imzalı bir eşyayı (ör. Su Kılıcı) epiğe birleştir → *2 → 3 etki. Efsaneviye birleştir → 3 → 4.*
+61. Sıradan bir eşyayı az bulunura birleştir → *2 → 3 etki (bu şerit zaten doğruydu, değişmemeli).*
+62. Birleştirilmiş efsanevinin adım parası satırlarına bak → *Tek satır **%15**'i geçmiyor.*
+
+---
+
 ## Bir şey ters giderse
 
 - **Altın iki kez geldi / hiç gelmedi** → posta kutusu; `claimedMailIds` kaydı.

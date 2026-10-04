@@ -471,6 +471,116 @@ ItemEffect _combatEffect(ItemStat stat, double budget) {
   return ItemEffect(stat: stat, value: rounded < 0.01 ? 0.01 : rounded);
 }
 
+/// İmzalı bir item'ın etkilerini, nadirliğinin istediği sayıya
+/// ([ItemArchetypes.signatureEffectCount]) **kural havuzundan** tamamlar
+/// (Bölüm E / Faz 1, GD110).
+///
+/// Bir dönem imzalı item birleştirilince etkileri yalnızca büyüyordu,
+/// sayısı artmıyordu; kuraldan türeyen item ise her basamakta +1 alıyordu.
+/// Bu fonksiyon iki şeridi aynı "basamak başına +1" kuralına bağlıyor.
+///
+/// Üç kural:
+/// 1. **İmzalı etkiler önde ve dokunulmadan kalır.** Dolgu yalnızca listenin
+///    sonuna eklenir; oyuncu önce item'ın kendine özgü etkisini görür.
+/// 2. **Var olan stat tekrar edilmez.** İmzalı etkide geçen stat (bedeli
+///    taşıyan eksi değerli etki dahil) havuzdan elenir: bedeli silen ya da
+///    aynı stata ikinci kez yazan bir dolgu olmamalı.
+/// 3. **Ekonomi tavanı aşılmaz.** Dolgunun değeri [_ruleEffect]'ten geliyor,
+///    yani tek item tavanına ([GameConstants.maxSingleItemEconomyBonus])
+///    zaten kırpılı; 2. kural da aynı stata ikinci bir pay binmesini
+///    engellediği için item başına toplam da tavanı geçemiyor.
+///
+/// Havuz, kuraldan türeyen bir item'ın kullandığı **aynı** sıradır: önce
+/// [buffFor]'un kendi etkileri, sonra o çekilişin devamı. Eksik çıkmaz,
+/// sonuç kararlıdır ve dolgu bir üst nadirlikte **önek olarak korunur**
+/// (epikte eklenen tür efsanevide de ilk sıradadır).
+List<ItemEffect> padSignatureEffects(
+  List<ItemEffect> core, {
+  required RewardRarity rarity,
+  required ItemCategory category,
+  required ItemArchetype archetype,
+  required String id,
+  String? characterClass,
+}) {
+  final target = ItemArchetypes.signatureEffectCount(rarity);
+  if (core.length >= target) return core;
+
+  final taken = {for (final effect in core) effect.stat};
+  final padded = [...core];
+  for (final candidate in _ruleCandidates(
+    rarity,
+    category,
+    archetype,
+    characterClass,
+    id,
+  )) {
+    if (padded.length >= target) break;
+    if (!taken.add(candidate.stat)) continue;
+    padded.add(candidate);
+  }
+  return padded;
+}
+
+/// Kural havuzunun tam sırası: [buffFor]'un ürettiği etkiler, ardından aynı
+/// çekilişin ve arketip sırasının kalanı (en küçük payla).
+Iterable<ItemEffect> _ruleCandidates(
+  RewardRarity rarity,
+  ItemCategory category,
+  ItemArchetype archetype,
+  String? characterClass,
+  String id,
+) sync* {
+  final economyCount = ItemArchetypes.economyCount(rarity);
+  final economyShares = _buffShares(economyCount);
+  final economyTotal =
+      _buffTotal(rarity) * ItemArchetypes.economyTilt[archetype]!;
+  final types = economyTypeOrder(
+    category,
+    characterClass: characterClass,
+    id: id,
+  );
+
+  final combatCount = ItemArchetypes.combatCount(rarity);
+  final combatShares = ItemArchetypes.combatShares(combatCount);
+  final combatBudget =
+      ItemArchetypes.combatBudget(rarity) *
+      ItemArchetypes.combatTilt[archetype]!;
+  final stats = ItemArchetypes.combatStats[archetype]!;
+
+  double share(List<double> shares, int index) =>
+      shares[index < shares.length ? index : shares.length - 1];
+  ItemEffect economy(int i) =>
+      _ruleEffect(types[i], economyTotal * share(economyShares, i));
+  ItemEffect combat(int i) =>
+      _combatEffect(stats[i], combatBudget * share(combatShares, i));
+
+  for (var i = 0; i < economyCount && i < types.length; i++) {
+    yield economy(i);
+  }
+  for (var i = 0; i < combatCount && i < stats.length; i++) {
+    yield combat(i);
+  }
+  for (var i = economyCount; i < types.length; i++) {
+    yield economy(i);
+  }
+  for (var i = combatCount; i < stats.length; i++) {
+    yield combat(i);
+  }
+}
+
+/// İmzalı item'ın **elle yazılmış** etkileri — dolgu hariç.
+///
+/// Katalog item'ı imza tablosundaki satırla başlar; dolgu hep arkada
+/// durduğu için ilk N etki imzanın kendisidir. Tabloda karşılığı olmayan
+/// (testlerin elle kurduğu) bir imzalı item'da bütün etkiler imza sayılır.
+List<ItemEffect> _signatureCore(Item item) {
+  final identity = parseItemAsset(item.assetPath);
+  final signature =
+      identity == null ? null : ItemEffects.of(identity.baseId);
+  final count = signature?.effects.length ?? item.buff.effects.length;
+  return item.buff.effects.take(count).toList();
+}
+
 /// Kural türetmesinin tek bir **ekonomi** bonusunu [ItemEffect]'e çevirir.
 ///
 /// Sayı olarak verilen bonuslar (tavan, eşik) oranla ölçeklenip okunur
@@ -650,10 +760,21 @@ String classEpithet(String characterClass) => switch (characterClass) {
 /// Kimlik **değişmez** (bkz. [Item.copyWith] yorumu): sahiplik kaydı sınıftan
 /// bağımsız durur, oyuncu sınıf değiştirdiğinde envanteri kaybolmaz.
 Item flavorForClass(Item item, String characterClass) {
-  // İmzalı itemler sınıfa göre değişmez: karakterleri elle yazıldı ve o
-  // karakter herkes için aynı olmalı. "Azrailin Tırpanı" her sınıfta
-  // Azrailin Tırpanı'dır (bkz. GD22).
-  if (item.hasSignature) return item;
+  // İmzalı itemlerin **imzası** sınıfa göre değişmez: karakterleri elle
+  // yazıldı ve o karakter herkes için aynı olmalı. "Azrailin Tırpanı" her
+  // sınıfta Azrailin Tırpanı'dır (bkz. GD22). Yalnızca imzanın arkasındaki
+  // kural dolgusu, kuraldan türeyen itemler gibi sınıfa göre çözülür (GD110).
+  if (item.hasSignature) {
+    final padded = padSignatureEffects(
+      _signatureCore(item),
+      rarity: item.rarity,
+      category: item.category,
+      archetype: item.archetype,
+      id: item.id,
+      characterClass: characterClass,
+    );
+    return item.copyWith(buff: ItemBuff(padded));
+  }
 
   // Arketip sınıfa göre **değişmez**: item'ın karakteri onun kendi kimliğinden
   // geliyor, kuşanan kişiden değil. Değişen şey, o karakterin hangi ekonomi
@@ -702,13 +823,27 @@ Item withRarity(Item base, RewardRarity rarity, {String? characterClass}) {
     );
   }
 
+  // İki şey birden (GD110): imzalı etkiler bütçe oranında **büyür** ve
+  // nadirliğin istediği sayıya kadar kural havuzundan **yeni** etki eklenir.
+  // Dolgu yeni nadirlikte baştan çözülür; eski nadirliğin dolgusu
+  // ölçeklenmez, yoksa aynı etki iki kez büyürdü.
   final factor = rarityBudgetRatio(base.rarity, rarity);
   return base.copyWith(
     rarity: rarity,
     cost: cost,
-    buff: ItemBuff([
-      for (final effect in base.buff.effects) _scaleSignature(effect, factor),
-    ]),
+    buff: ItemBuff(
+      padSignatureEffects(
+        [
+          for (final effect in _signatureCore(base))
+            _scaleSignature(effect, factor),
+        ],
+        rarity: rarity,
+        category: base.category,
+        archetype: base.archetype,
+        id: base.id,
+        characterClass: characterClass,
+      ),
+    ),
   );
 }
 
@@ -809,7 +944,15 @@ Item? buildItemFromAsset(String assetPath) {
               id: identity.id,
               archetype: archetype,
             )
-            : ItemBuff(signature.effects),
+            : ItemBuff(
+              padSignatureEffects(
+                signature.effects,
+                rarity: rarity,
+                category: identity.category,
+                archetype: archetype,
+                id: identity.id,
+              ),
+            ),
     archetype: archetype,
     lore: signature?.lore,
   );

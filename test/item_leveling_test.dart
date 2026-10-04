@@ -367,7 +367,11 @@ void main() {
       final resolved = withRarity(base, RewardRarity.legendary);
 
       expect(resolved.lore, base.lore);
-      expect(resolved.buff.effects, hasLength(2));
+      // Bölüm E / Faz 1 (GD110): imzalı efsanevi 4 etki taşır. İki imzalı
+      // etki önde kalır, eksik iki etki kural havuzundan eklenir.
+      expect(resolved.buff.effects, hasLength(4));
+      expect(resolved.buff.effects[0].stat, ItemStat.attack);
+      expect(resolved.buff.effects[1].stat, ItemStat.critChance);
       // Koşullu etki koşullu kalır.
       expect(resolved.buff.effects[1].trigger, ItemEffectTrigger.lowHealth);
       // Etkiler büyür.

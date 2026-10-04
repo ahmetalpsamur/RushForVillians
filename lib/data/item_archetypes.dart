@@ -133,6 +133,27 @@ class ItemArchetypes {
     RewardRarity.legendary => 3,
   };
 
+  /// **İmzalı** bir item'ın bu nadirlikte taşıması gereken en az etki sayısı
+  /// (Bölüm E / Faz 1, GD110).
+  ///
+  /// İki şerit var ve ikisinde de nadirlik basamağı başına **+1** kuralı
+  /// geçerli: kuraldan türeyen itemler [economyCount] + [combatCount] ile
+  /// 2-3-4-5-6, imzalı itemler bu tabloyla nadir 2 · epik 3 · efsanevi 4.
+  /// İmzalı şerit bilerek kısa: imzalı item'ın değeri etki **sayısında**
+  /// değil, o elle yazılmış etkide. Eksik kalan yer kural havuzundan
+  /// doldurulur (`item_rules.dart:padSignatureEffects`); imzalı etkiler hep
+  /// önde kalır.
+  ///
+  /// İmzalı item sıradan ya da az bulunur olmuyor; o iki satır yalnızca
+  /// kuralın sürekli kalması için.
+  static int signatureEffectCount(RewardRarity rarity) => switch (rarity) {
+    RewardRarity.common => 0,
+    RewardRarity.uncommon => 1,
+    RewardRarity.rare => 2,
+    RewardRarity.epic => 3,
+    RewardRarity.legendary => 4,
+  };
+
   /// Nadirliğin soyut savaş gücü bütçesi. Statlara [combatSpec] ile çevrilir.
   ///
   /// Savaş statları bugün **uygulanmıyor** (savaş motoru Aşama 4a), bu yüzden
