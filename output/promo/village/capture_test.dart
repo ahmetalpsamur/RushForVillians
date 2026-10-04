@@ -35,7 +35,7 @@ void main(){
     theme:AppTheme.dark.copyWith(textTheme:AppTheme.dark.textTheme.apply(fontFamily:'Roboto')),
     home:AdventureScreen(key:ValueKey(entry.key),adventure:quest,roundSerial:0,
      avatar:const AvatarProfile(name:'Pinky',age:22,weight:60,gender:'Female',characterClass:'Knight',characterAsset:'lib/All_Assets/Avatars/Classes/Characters(100x100 split)/Knight/Knight/Knight_Idle.gif'),
-     today:DailyProgress(date:now,steps:entry.value,stepGoal:1000),onAdventureSelected:(_){},onStartRevival:(){},onChooseNewAdventure:(){},onAdventureUpdated:(){})));
+     today:DailyProgress(date:now,steps:entry.value,stepGoal:1000),onAdventureSelected:(_){},onStartRevival:(){},onChooseNewAdventure:(){},onAdventureUpdated:(){}, onStartEndlessRun: () {  },)));
    await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:600)));
    if(entry.key=='battle'){
     for(var j=0;j<120;j++){
