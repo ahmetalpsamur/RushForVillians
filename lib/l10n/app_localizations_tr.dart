@@ -1334,7 +1334,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String upgradeToLevel(int level, int cost) {
-    return 'Sv. $level\'e yükselt — $cost coin';
+    return 'Yükselt: Sv. $level — $cost coin';
   }
 
   @override

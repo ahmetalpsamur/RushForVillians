@@ -10,6 +10,7 @@ import 'package:rush_for_villains/core/utils/item_rules.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/item.dart';
@@ -146,6 +147,13 @@ void main() {
           initialState: GameState(
             profile: profile,
             today: DailyProgress(date: GameClock.now()),
+            // Günlük seri/çark penceresi bugün görülmüş sayılıyor: nabız
+            // animasyonu sonsuz tekrarlı ve bariyeri ana ekranı örtüyor.
+            // Pencerenin kendisi `daily_notifications_test.dart` içinde.
+            engagement: DailyEngagement(
+              streakCelebratedOn: GameClock.now(),
+              wheelPromptedOn: GameClock.now(),
+            ),
           ),
           onAvatarChanged: (_) {},
         ),
@@ -615,7 +623,8 @@ void main() {
     /// Envanterde bir örneği açıp "yükselt" düğmesine basar.
     Future<void> tapUpgrade(WidgetTester tester, Item item) async {
       await openItem(tester, item);
-      await tester.tap(find.textContaining('yükselt'));
+      // Düğme `upgradeToLevel`: "Yükselt: Sv. N — X coin".
+      await tester.tap(find.textContaining('Yükselt: Sv.'));
       await tester.pumpAndSettle();
     }
 

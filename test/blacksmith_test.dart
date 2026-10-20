@@ -334,7 +334,9 @@ void main() {
       final profile = profileWith(items: swords(3, levels: const [1, 5, 2]));
       await pumpForge(tester, profile: profile);
 
-      await tester.tap(find.textContaining('Sv. 6 —'));
+      // Düğme yazısı ARB'den (`upgradeToLevel`): en gelişmiş adet Sv. 5,
+      // yani düğme Sv. 6'yı teklif ediyor.
+      await tester.tap(find.textContaining('Yükselt: Sv. 6 —'));
       await tester.pumpAndSettle();
 
       final levels = [for (final i in profile.ownedItems) i.level]..sort();

@@ -17,6 +17,7 @@ import 'package:rush_for_villains/l10n/app_localizations_en.dart';
 import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
 import 'package:rush_for_villains/l10n/content_localizations.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/item.dart';
@@ -45,6 +46,10 @@ const _avatar = AvatarProfile(
 );
 
 const _storageKey = 'game_state_v1';
+
+/// Mağazanın gösterdiği ad ARB'den geliyor ("2× XP", çarpı işaretiyle).
+/// Testte elle yazılmış "2x" bir dönem bu yüzden kartı bulamıyordu.
+final _doubleXpName = AppLocalizationsTr().storeDoubleXpName;
 
 /// Oyun gününün ortasında bir an; sabit saat yazmak yerine gün sınırından
 /// türetiliyor (bkz. `streak_test.dart`).
@@ -137,6 +142,16 @@ void main() {
           initialState: GameState(
             profile: profile,
             today: DailyProgress(date: GameClock.now()),
+            // Günlük seri/çark kutlaması (2.000 / 3.000 adımda açılan tam
+            // ekran pencere) bugün için görülmüş sayılıyor. Pencerenin
+            // nabız animasyonu sonsuz tekrarlı (pumpAndSettle dönmez) ve
+            // bariyeri ana ekranı örtüyor; kendi davranışı
+            // `daily_notifications_test.dart` içinde bağlı. Bu dosyanın
+            // sorusu satın alma zinciri.
+            engagement: DailyEngagement(
+              streakCelebratedOn: GameClock.now(),
+              wheelPromptedOn: GameClock.now(),
+            ),
           ),
           onAvatarChanged: (_) {},
         ),
@@ -580,6 +595,7 @@ void main() {
 
       expect(find.byIcon(Icons.lock), findsNothing);
       await tapEquipment(tester, lockedItem);
+      await confirmPurchase(tester);
       expect(ownedIdsOf(profile), [lockedItem.id]);
     });
   });
@@ -642,7 +658,8 @@ void main() {
     testWidgets('2x XP alınınca etkinleşir', (tester) async {
       final profile = await pumpShell(tester, profile: makeProfile());
 
-      await tapUpgrade(tester, '2x XP Boost (1 gün)');
+      await tapUpgrade(tester, _doubleXpName);
+      await confirmPurchase(tester);
 
       expect(profile.isXpBoostActive, isTrue);
     });
@@ -656,7 +673,10 @@ void main() {
         ),
       );
 
-      await tapUpgrade(tester, '2x XP Boost (1 gün)');
+      await tapUpgrade(tester, _doubleXpName);
+      // Etkinlik kontrolü pencerede değil `RootShell`'de (stok dolu
+      // dalıyla aynı): onaydan sonra satış reddedilir, sebebi söylenir.
+      await confirmPurchase(tester);
 
       expect(profile.coins, 5000);
       expect(find.textContaining('zaten etkin'), findsOneWidget);
@@ -844,7 +864,9 @@ void main() {
       await pumpShell(tester, profile: makeProfile());
 
       await tapUpgrade(tester, 'Ekstra Çark Hakkı');
-      await tapUpgrade(tester, '2x XP Boost (1 gün)');
+      await confirmPurchase(tester);
+      await tapUpgrade(tester, _doubleXpName);
+      await confirmPurchase(tester);
       await tester.pump(GameStorage.writeInterval + const Duration(seconds: 1));
 
       String? raw;

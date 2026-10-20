@@ -39,8 +39,20 @@ void main() {
   test(
     'opening before noon replaces reminders with 30 local-noon dates starting tomorrow',
     () async {
+      // Tarih gerçek saate bağlı: `zonedSchedule` geçmiş bir anı reddediyor
+      // (ArgumentError, servis bunu sessizce yutuyor). Sabit 2026-09-18
+      // yazıldığı gün gelecekteydi; o tarih geçince test 0 çağrı görüyordu.
+      final real = DateTime.now();
+      final opened = DateTime(real.year, real.month, real.day + 1, 9);
+      String noonOn(int dayOffset) {
+        final day = DateTime(opened.year, opened.month, opened.day + dayOffset);
+        final mm = day.month.toString().padLeft(2, '0');
+        final dd = day.day.toString().padLeft(2, '0');
+        return '${day.year}-$mm-${dd}T12:00:00';
+      }
+
       await AdventureNotificationService.scheduleNoonReminder(
-        now: DateTime(2026, 9, 18, 9),
+        now: opened,
         title: 'Hero',
         body: 'Come walk!',
         channelName: 'Daily progress',
@@ -51,12 +63,12 @@ void main() {
       expect(scheduled, hasLength(30));
       expect(calls.where((c) => c.method == 'cancel'), hasLength(30));
       final first = scheduled.first.arguments as Map;
-      expect(first['scheduledDateTime'], startsWith('2026-09-19T12:00:00'));
+      expect(first['scheduledDateTime'], startsWith(noonOn(1)));
       expect(first['timeZoneName'], 'Europe/Istanbul');
       expect(first['matchDateTimeComponents'], isNull);
       expect(
         (scheduled.last.arguments as Map)['scheduledDateTime'],
-        startsWith('2026-10-18T12:00:00'),
+        startsWith(noonOn(30)),
       );
       expect(
         scheduled.map((c) => (c.arguments as Map)['id']).toSet(),

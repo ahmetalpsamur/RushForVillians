@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 ve altı için Auto Backup kuralları (android:fullBackupContent).
+     Android 12+ aynı kuralı data_extraction_rules.xml'den okur; ikisi
+     birlikte değişmeli.
+
+     Sunucu yok: oyuncunun ilerlemesi yalnızca telefonunda. Yedeklenen tek
+     dosya oyun kaydının durduğu SharedPreferences dosyası (kayıt, avatar,
+     rehber, dil, güvenlik onayı, ayarlar). "include" verilince geri kalan
+     her şey kendiliğinden dışarıda kalır:
+       - files/datastore/  : cihaza bağlı kurulum kimliği (InstallIdentity).
+                             Yedeklenirse yedekten dönen kurulumu ayırt
+                             edemeyiz ve önceki telefonun adım sayacı
+                             bedava adım üretir.
+       - scheduled_notifications.xml : bildirim eklentisinin kendi listesi;
+                             uygulama her açılışta yeniden planlıyor.
+       - files/daily_notifications/ : bildirim görseli, yeniden üretilir.
+       - cache/ zaten hiçbir zaman yedeklenmez. -->
+<full-backup-content>
+    <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+</full-backup-content>

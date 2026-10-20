@@ -5,6 +5,7 @@ import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
 import 'package:rush_for_villains/data/enemy_catalog.dart';
 import 'package:rush_for_villains/features/adventure/adventure_screen.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
 import 'package:rush_for_villains/models/adventure_quest.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
@@ -67,6 +68,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
+        // Gerçek uygulamadaki Türkçe yerelleştirme: sayı biçimi
+        // (`AppFormatters`) `Localizations.localeOf`'tan geliyor ve delege
+        // olmadan en-US'e düşüyordu ("1,600").
+        locale: const Locale('tr'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: AdventureScreen(
           adventure: quest,
           roundSerial: 0,
@@ -110,6 +117,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
+        // Gerçek uygulamadaki Türkçe yerelleştirme: sayı biçimi
+        // (`AppFormatters`) `Localizations.localeOf`'tan geliyor ve delege
+        // olmadan en-US'e düşüyordu ("1,600").
+        locale: const Locale('tr'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: AdventureScreen(
           adventure: quest,
           roundSerial: 0,
@@ -151,8 +164,11 @@ void main() {
       find.text('Zafer +62 · yürüyüş +53 altın · toplam +115 altın · +220 XP'),
       findsOneWidget,
     );
+    // Hız çarpanı GD56 ile ×1,5 tavanına çıktı (eskiden ×1,02 yazıyordu,
+    // bir sıfır kaymasıydı) ve metin "savaş verimi" oldu. 1.000 / 5.000
+    // adımda devirmek: 1 + 0,8 × 0,5 = ×1,40.
     expect(
-      find.text('1 round · 1.000 adımda devirdin — hız ödülü ×1.02'),
+      find.text('1 round · 1.000 adım — savaş verimi ×1,40'),
       findsOneWidget,
     );
 

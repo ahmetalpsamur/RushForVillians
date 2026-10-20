@@ -1132,7 +1132,12 @@ class _AdventureScreenState extends State<AdventureScreen>
                       context.l10n.speedRewardSummary(
                         adventure.victoryRounds,
                         AppFormatters.integer(context, adventure.victorySteps),
-                        adventure.speedRewardMultiplier.toStringAsFixed(2),
+                        // Yürüyüş kartıyla aynı biçim: Türkçede "×1,40".
+                        AppFormatters.decimal(
+                          context,
+                          adventure.speedRewardMultiplier,
+                          digits: 2,
+                        ),
                       ),
                       key: const ValueKey('victory-speed-bonus'),
                       textAlign: TextAlign.center,

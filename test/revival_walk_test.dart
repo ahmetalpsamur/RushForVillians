@@ -55,8 +55,11 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('Macera').last);
-    await tester.pump();
+    // Aktif bir macera varken alt gezinme çubuğu hiç çizilmiyor ve görünen
+    // sekme maceraya sabitleniyor (`fullscreenAdventure`, CLAUDE.md §4.2);
+    // "Macera" sekmesine dokunacak bir çubuk yok, ekran zaten açık.
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(AdventureScreen), findsOneWidget);
     expect(find.byKey(const ValueKey('start-revival-walk')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('start-revival-walk')));

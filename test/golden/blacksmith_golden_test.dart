@@ -103,7 +103,9 @@ void main() {
 
         // Panel gerçekten yükseltilebilir durumda olmalı; golden boş bir
         // "yükseltilemiyor" kutusunu doğrulamasın.
-        expect(find.textContaining('yükselt —'), findsOneWidget);
+        // Düğme metni `upgradeToLevel`: "Yükselt: Sv. N — X coin" (eski
+        // "Sv. N'e yükselt" sabit ekle yanlış çekimleniyordu).
+        expect(find.textContaining('Yükselt: Sv.'), findsOneWidget);
 
         await expectLater(
           find.byType(MaterialApp),

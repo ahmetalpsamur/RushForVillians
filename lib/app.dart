@@ -17,6 +17,7 @@ import 'models/tutorial_guide_variant.dart';
 import 'services/adventure_notification_service.dart';
 import 'services/character_storage.dart';
 import 'services/game_storage.dart';
+import 'services/install_identity.dart';
 import 'services/game_settings.dart';
 import 'services/launch_sound.dart';
 import 'services/tutorial_guide_storage.dart';
@@ -92,6 +93,9 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
       // Oyun durumu avatara bağlı okunur; avatar yoksa yeni oyuncu demektir.
       gameState =
           avatar == null ? null : await GameStorage.load(avatar: avatar);
+      // Yedekten dönen kayıtta önceki telefonun ham adım sayacı bu telefonda
+      // anlamsız; referans düşürülür (Bölüm F / Faz 4, `InstallIdentity`).
+      await InstallIdentity.reconcile(gameState);
       _storageFailed =
           GameStorage.writeBlocked || CharacterStorage.writeBlocked;
     } catch (error) {
@@ -129,11 +133,16 @@ class _RushForVilliansAppState extends State<RushForVilliansApp> {
     if (!_storageFailed || _storageWarningShown) return;
     _storageWarningShown = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Dil `MaterialApp`'in içinde kuruluyor; bu state'in kendi `context`'i
+      // onun **üstünde** ve `context.l10n` orada her zaman Türkçeye
+      // düşüyordu. Mesajlaşıcının bağlamı `Localizations`'ın altında.
+      final messengerContext = _messengerKey.currentContext;
+      if (messengerContext == null) return;
       _messengerKey.currentState?.showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 6),
-          content: Text(context.l10n.storageUnavailable),
+          content: Text(messengerContext.l10n.storageUnavailable),
         ),
       );
     });

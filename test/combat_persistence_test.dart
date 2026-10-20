@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/constants/attack_config.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/game_clock.dart';
@@ -174,7 +175,11 @@ void main() {
     });
 
     testWidgets('düşman canı bitince zafer ve XP verilir', (tester) async {
-      // İki raundluk macera her 1.000 adımda ayrı savaş açar.
+      // Tempo tablosu (Bölüm D): 2.000 hedefi 4 × 500 adımlık round. Eskiden
+      // round 1.000 adımdı ve test "ilk 1.000 adımda düşman ayakta" diyordu;
+      // güçlü bir oyuncunun taahhüdün ortasında devirmesi artık tasarımın
+      // kendisi (erken devirme → yürüyüş fazı, GD55/GD107). Bu yüzden adım
+      // round boyunda verilip zaferin **adımdan** geldiği ölçülüyor.
       final profile = UserProfile(avatar: _avatar, level: 40);
       final quest = questFor();
       await pumpShell(tester, profile: profile, adventure: quest);
@@ -183,34 +188,44 @@ void main() {
       final coinsBefore = profile.coins;
       final levelBefore = profile.level;
       now = now.add(quest.totalAttackDuration);
-      await addSteps(tester, 1000);
+      // Adım yokken süresi dolan roundlar zafer vermez.
+      await tester.pump(const Duration(seconds: 1));
       expect(quest.isEnemyDefeated, isFalse);
-      await addSteps(tester, 1000);
+
+      var walked = 0;
+      while (!quest.isEnemyDefeated && walked < quest.stepGoal) {
+        await addSteps(tester, 500);
+        walked += 500;
+      }
       await tester.pump(const Duration(seconds: 1));
 
       expect(quest.isEnemyDefeated, isTrue);
       expect(quest.xpAwarded, isTrue);
       expect(quest.victoryXpReward, greaterThan(0));
-      final minimumCoins = 4 + (quest.enemy.tier * 3);
-      final maximumCoins = 10 + (quest.enemy.tier * 6);
-      // Bölüm A.2: zafer altını artık hız çarpanıyla büyüyebilir. Üst sınır
-      // bu yüzden kademe tavanının [maxVictorySpeedMultiplier] katı.
+      // Aralık tek yerden (`AttackConfig.victoryCoinRange`); zafer altını
+      // hız çarpanıyla büyüyebilir, üst sınır onun katı.
+      final range = AttackConfig.victoryCoinRange(
+        tier: quest.enemy.tier,
+        stepGoal: quest.stepGoal,
+      );
       expect(
         quest.victoryCoinReward,
         inInclusiveRange(
-          minimumCoins,
-          (maximumCoins * GameConstants.maxVictorySpeedMultiplier).floor(),
+          range.minimum,
+          (range.maximum * GameConstants.maxVictorySpeedMultiplier).floor(),
         ),
       );
       expect(
         quest.speedRewardMultiplier,
         inInclusiveRange(1.0, GameConstants.maxVictorySpeedMultiplier),
       );
+      // Zafere kadar yürünen adım normal oranla paraya döner; zaferden sonra
+      // adım verilmedi, yürüyüş fazı bonusu henüz yok.
       expect(
         profile.coins,
         coinsBefore +
             quest.victoryCoinReward +
-            (2000 ~/ GameConstants.stepsPerCoin),
+            (walked ~/ GameConstants.stepsPerCoin),
       );
       expect(
         profile.level > levelBefore || profile.xp > xpBefore,

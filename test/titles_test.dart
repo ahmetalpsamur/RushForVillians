@@ -11,6 +11,7 @@ import 'package:rush_for_villains/data/title_catalog.dart';
 import 'package:rush_for_villains/features/home/home_screen.dart';
 import 'package:rush_for_villains/features/root/root_shell.dart';
 import 'package:rush_for_villains/models/avatar_profile.dart';
+import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'package:rush_for_villains/models/daily_progress.dart';
 import 'package:rush_for_villains/models/game_state.dart';
 import 'package:rush_for_villains/models/game_title.dart';
@@ -107,6 +108,13 @@ void main() {
           initialState: GameState(
             profile: profile,
             today: DailyProgress(date: GameClock.now()),
+            // Günlük seri/çark penceresi bugün görülmüş sayılıyor: nabız
+            // animasyonu sonsuz tekrarlı ve bariyeri ana ekranı örtüyor.
+            // Pencerenin kendisi `daily_notifications_test.dart` içinde.
+            engagement: DailyEngagement(
+              streakCelebratedOn: GameClock.now(),
+              wheelPromptedOn: GameClock.now(),
+            ),
           ),
           onAvatarChanged: (_) {},
         ),
@@ -406,6 +414,9 @@ void main() {
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       await tester.tap(button);
+      await tester.pumpAndSettle();
+      // `aca975c`: satın alma bir onay penceresinin arkasında.
+      await tester.tap(find.byKey(const ValueKey('confirm-purchase')));
       await tester.pumpAndSettle();
 
       expect(profile.ownsTitle(storeTitle.id), isTrue);

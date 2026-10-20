@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/core/utils/title_rules.dart';
+import 'package:rush_for_villains/data/title_catalog.dart';
 import 'package:rush_for_villains/features/titles/titles_screen.dart';
 import 'package:rush_for_villains/l10n/app_localizations.dart';
 
@@ -78,6 +79,23 @@ void main() {
     await expectLater(
       find.byType(TitlesScreen),
       matchesGoldenFile('goldens/titles_en_390.png'),
+    );
+  });
+
+  testWidgets('English title UI at 320 dp: hand-written lore fits', (
+    tester,
+  ) async {
+    // Bölüm F / Faz 3: İngilizce hikâyeler artık kalıp değil, elle yazılmış
+    // ve kalıptan uzun. En dar destek genişliğinde taşma olmamalı (taşma
+    // bir framework hatası olarak testi düşürür) ve takılı ünvanın kendi
+    // cümlesi görünmeli.
+    await pumpTitles(tester, 320, locale: const Locale('en'));
+
+    final equipped = TitleCatalog.byId('coin_sniffer')!;
+    expect(find.text(equipped.loreEn), findsWidgets);
+    await expectLater(
+      find.byType(TitlesScreen),
+      matchesGoldenFile('goldens/titles_en_320.png'),
     );
   });
 

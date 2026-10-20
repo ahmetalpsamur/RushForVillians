@@ -1055,5 +1055,6 @@ Item? buildItemFromAsset(String assetPath) {
             ),
     archetype: archetype,
     lore: signature?.lore,
+    loreEn: signature?.loreEn,
   );
 }

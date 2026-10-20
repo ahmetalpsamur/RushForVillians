@@ -152,7 +152,14 @@ void main() {
   }
 
   Future<void> openAdventure(WidgetTester tester) async {
-    final nav = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    // Aktif bir macera varken çubuk hiç çizilmiyor ve görünen sekme zaten
+    // macera (`fullscreenAdventure`, CLAUDE.md §4.2).
+    final bar = find.byType(NavigationBar);
+    if (bar.evaluate().isEmpty) {
+      expect(find.byType(AdventureScreen), findsOneWidget);
+      return;
+    }
+    final nav = tester.widget<NavigationBar>(bar);
     nav.onDestinationSelected!(1);
     await tester.pump();
     await tester.pump();

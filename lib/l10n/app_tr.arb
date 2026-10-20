@@ -458,7 +458,7 @@
   "upgradeCombatOnly": "Yükseltmek yalnızca savaş istatistiklerini büyütür; ekonomi bonusları sabit kalır.",
   "nextLevelPreview": "Sv. {level}: {preview}",
   "@nextLevelPreview": {"placeholders": {"level": {"type": "int"}, "preview": {"type": "String"}}},
-  "upgradeToLevel": "Sv. {level}'e yükselt — {cost} coin",
+  "upgradeToLevel": "Yükselt: Sv. {level} — {cost} coin",
   "@upgradeToLevel": {"placeholders": {"level": {"type": "int"}, "cost": {"type": "int"}}},
   "cannotUpgrade": "Yükseltilemiyor",
   "emptyForge": "Örs boş. Mağazadan ekipman aldığında burada yükseltebilir, aynı eşyadan birkaç adet biriktirince birleştirebilirsin.",

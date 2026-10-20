@@ -279,8 +279,13 @@ extension ContentLocalizations on AppLocalizations {
     for (final effect in item.buff.effects) itemEffectLabel(effect),
   ];
 
+  /// İmzalı eşyanın hikâyesi. İngilizcesi katalogda veri olarak duruyor;
+  /// [signatureItemLore] yalnızca çevirisi eksik bir satır için yedek ve
+  /// `lore_translation_test` hiçbir satırın oraya düşmediğini bağlıyor.
   String itemLore(Item item) =>
-      _isEnglish && item.lore != null ? signatureItemLore : (item.lore ?? '');
+      _isEnglish && item.lore != null
+          ? (item.loreEn ?? signatureItemLore)
+          : (item.lore ?? '');
 
   String adventurePhaseName(AdventureQuestPhase phase) => switch (phase) {
     AdventureQuestPhase.combat => adventurePhaseCombat,
@@ -394,17 +399,10 @@ extension ContentLocalizations on AppLocalizations {
           ? _applyPossessives(_titleCaseIdentifier(title.id))
           : title.name;
 
-  String titleLore(GameTitle title) {
-    if (!_isEnglish) return title.lore;
-    final name = titleName(title);
-    return switch (title.source) {
-      TitleSource.purchase => titleLorePurchase(name),
-      TitleSource.achievement => titleLoreAchievement(name),
-      TitleSource.wheel => titleLoreWheel(name),
-      TitleSource.milestone => titleLoreMilestone(name),
-      TitleSource.mail => titleLoreMail,
-    };
-  }
+  /// Ünvanın hikâyesi. İngilizcesi katalogda veri olarak duruyor
+  /// ([GameTitle.loreEn]); eskiden kaynağa göre dört kalıptan biri
+  /// üretiliyordu ("{name} is proof of a hard-earned feat.").
+  String titleLore(GameTitle title) => _isEnglish ? title.loreEn : title.lore;
 
   String titleUnlockRequirement(GameTitle title) {
     if (!_isEnglish) return title.unlockHint;

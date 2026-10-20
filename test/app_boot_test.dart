@@ -6,6 +6,8 @@ import 'package:rush_for_villains/services/safety_notice_storage.dart';
 import 'package:rush_for_villains/core/constants/safety_messages.dart';
 import 'package:rush_for_villains/features/start/start_screen.dart';
 import 'package:rush_for_villains/features/tutorial/guide_selection_screen.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
+import 'package:rush_for_villains/services/game_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Açılış akışı hiçbir koşulda ekranı kilitlememeli.
@@ -23,12 +25,40 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   /// Açılışın (minimum açılış süresi dahil) bitmesini bekler.
+  ///
+  /// Açılış artık birden çok **ardışık** kanal çağrısı yapıyor
+  /// (`GameSettings.load`, sonra `CharacterStorage.load`, ...). Her cevap
+  /// gerçek zamanda geliyor ama arkasından gelen kod sahte saatin
+  /// mikro görev kuyruğunda bekliyor ve ancak `pump` ile ilerliyor. Tek bir
+  /// gerçek bekleyiş + tek `pump` yalnızca **ilk** gidiş-dönüşü tamamlıyordu;
+  /// açılış ikinci çağrıda asılı görünüyordu. İkisi sırayla tekrarlanıyor.
   Future<void> settleBoot(WidgetTester tester) async {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 2400)),
-    );
-    await tester.pump(const Duration(seconds: 3));
+    // Toplam sahte süre eskisiyle aynı (3 sn): kayıt uyarısı 6 sn ekranda
+    // kalıyor ve sonraki iddialar onu hâlâ görebilmeli.
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await tester.pump(const Duration(seconds: 1));
     await tester.pump();
+  }
+
+  /// Kayıt okunabilen bir cihaz kurar.
+  ///
+  /// "Okunamayan kayıt" testleri [GameStorage]'ın yazma korumasını açıyor ve
+  /// bu bayrak **statik**: aynı test sürecinde sonraki açılışa sızıyor ve
+  /// okunabilen bir kaydı da "okunamadı" gösteriyordu. Gerçek uygulamada her
+  /// açılış yeni bir süreç, yani sızıntı yalnızca testte var. Bayrağı sıfırlayan
+  /// tek yol `GameStorage.clear` (yalnızca debug).
+  Future<void> mockReadableStorage(
+    WidgetTester tester,
+    Map<String, Object> values,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.runAsync(GameStorage.clear);
+    SharedPreferences.setMockInitialValues(values);
   }
 
   Future<void> bootApp(WidgetTester tester) async {
@@ -53,14 +83,18 @@ void main() {
       await bootApp(tester);
       await tester.pump();
 
-      expect(
-        find.textContaining('Kayıtlı ilerlemene şu an ulaşılamadı'),
-        findsOneWidget,
+      // Metin ARB'de ve bir dönem dürüstleştirildi ("kayıt korunuyor, bu
+      // oturum üzerine yazmayacak"); sabit Türkçe cümle aramak yerine o anki
+      // dildeki ARB değeri aranıyor.
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SafetyScreen)),
       );
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text(l10n.storageUnavailable), findsOneWidget);
     });
 
     testWidgets('kayıt okunabiliyorsa uyarı gösterilmez', (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      await mockReadableStorage(tester, {});
 
       await bootApp(tester);
       await tester.pump();
@@ -70,7 +104,7 @@ void main() {
     });
 
     testWidgets('second launch skips the accepted full notice', (tester) async {
-      SharedPreferences.setMockInitialValues({
+      await mockReadableStorage(tester, {
         SafetyNoticeStorage.key: SafetyMessages.noticeVersion,
       });
       await bootApp(tester);
@@ -79,7 +113,7 @@ void main() {
     });
 
     testWidgets('notice version update gates launch again', (tester) async {
-      SharedPreferences.setMockInitialValues({
+      await mockReadableStorage(tester, {
         SafetyNoticeStorage.key: SafetyMessages.noticeVersion - 1,
       });
       await bootApp(tester);
@@ -87,7 +121,7 @@ void main() {
       expect(find.byType(GuideSelectionScreen), findsNothing);
     });
     testWidgets('açılış görseli hemen kaybolmaz', (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      await mockReadableStorage(tester, {});
 
       await tester.pumpWidget(const RushForVilliansApp());
       await tester.pump(const Duration(milliseconds: 300));

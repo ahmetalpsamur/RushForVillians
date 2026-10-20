@@ -110,6 +110,11 @@ class GameTitle {
   /// Ünvanın karakterini anlatan tek cümle.
   final String lore;
 
+  /// [lore]'un İngilizcesi. Çeviri bir kalıptan üretilmiyor, elle yazılmış
+  /// **veri** (GD89'daki `customLabelEn` ile aynı karar): Bölüm F'ye kadar
+  /// İngilizce oyuncu kaynağa göre dört kalıp cümleden birini görüyordu.
+  final String loreEn;
+
   final RewardRarity rarity;
 
   final TitleSource source;
@@ -130,6 +135,7 @@ class GameTitle {
     required this.id,
     required this.name,
     required this.lore,
+    required this.loreEn,
     required this.rarity,
     required this.source,
     required this.effects,

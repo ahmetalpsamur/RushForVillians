@@ -9,7 +9,7 @@
 > 1. **§1 Çalışma Kuralları** ve **§2 Model Kuralları** — zorunlu, kısa.
 > 2. **§5.2 Test ortamı** — bu bayrak olmadan hiçbir test çalışmaz.
 > 3. Sonra ne üzerinde çalışacaksan onun **§6** alt bölümü.
-> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD113)** içinde
+> 4. Verilmiş bir kararı değiştirmeden önce **§11 (GD1–GD115)** içinde
 >    gerekçesini ara. **Koddaki yorumlar bu numaralara atıf yapıyor**
 >    (`bkz. GD15`, `GD40` gibi) — numaraları değiştirme.
 
@@ -113,7 +113,7 @@ olarak büyütür. Toplanan 1.244 parçalık **ödül koleksiyonu** ve 65 parça
 |---|---|
 | Gerçek pedometer (Android + iOS kanalı) | Backend / çevrimiçi (§13) |
 | Deterministik savaş motoru | Takım savaşı (ekran bir önizleme) |
-| Yerel kalıcılık, şema v33 + migration | Firebase |
+| Yerel kalıcılık, şema v33 + migration, Android Auto Backup (§7) | Firebase |
 | 789 ekipman (784 görsel + 5 ara basamak) · 65 ünvan · 1.244 koleksiyon ödülü · 20 düşman · 18 sınıf | Reklam / IAP |
 | 29 adımlık eğitim + dolaşan rehber | İngilizce çeviri tamamlanmadı (altyapı hazır) |
 
@@ -298,6 +298,26 @@ flutter test
 > alırsan** (`Asset 'shaders/ink_sparkle.frag' not found` gibi) aşağıdaki
 > prosedüre geri dön — makine ya da Smart App Control ayarı değişmiş
 > olabilir. Prosedür bu yüzden silinmedi.
+
+> ⚠️ **İki `flutter test`'i aynı anda çalıştırma (Bölüm F'de ölçüldü).**
+> İkisi de `build/unit_test_assets/shaders/ink_sparkle.frag`'ı yeniden
+> derlemeye kalkıyor; çakışınca `impellerc`'in `--sksl` denemesi düşüyor,
+> araç SkSL'siz tekrar deniyor ve dosya **yalnızca Vulkan** aşamasıyla
+> kalıyor (~6 KB, sağlamı ~13 KB). Belirti: her test dosyasının ilk
+> dokunuşu `Asset 'shaders/ink_sparkle.frag' does not contain appropriate
+> runtime stage data for current backend (SkSL). Found stages: Vulkan` ile
+> düşüyor, yani dosya başına bir sahte kırmızı. Onarım: shader'ı elle
+> derle ve üzerine yaz (`flutter test` güncel saydığı dosyayı tekrar
+> derlemiyor):
+>
+> ```bash
+> E=<flutter>/bin/cache/artifacts/engine/windows-x64
+> SRC=<flutter>/packages/flutter/lib/src/material/shaders/ink_sparkle.frag
+> $E/impellerc.exe --sksl --runtime-stage-vulkan --iplr \
+>   --sl=build/unit_test_assets/shaders/ink_sparkle.frag \
+>   --spirv=<geçici>/ink.spirv --input=$SRC --input-type=frag \
+>   --include=$(dirname $SRC) --include=$E/shader_lib
+> ```
 
 <details><summary>Eski prosedür: <code>--no-test-assets</code></summary>
 
@@ -2330,9 +2350,13 @@ test 238 adın hepsini yakalıyor.
 (TR 49). Ünvan ekranı 320 ve 390 dp'de İngilizce olarak render edildi;
 `RenderFlex` taşma hatası **yok**.
 
-**Faz 1b'ye bırakıldı:** 61 imzalı eşya lore'u İngilizce'de tek jenerik
-cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa göre
-4 şablondan üretiliyor. Toplam 126 cümle; ayrı bir iş.
+**Faz 1b (Bölüm F / Faz 3'te kapandı, GD114):** 61 imzalı eşya ve 66
+ünvanın (Erken Kalkan dahil) hikâyesi İngilizceye **elle** çevrildi, 127
+cümle. Kelime kelime değil, Türkçenin tonu ve iması taşınarak; uzun tire
+yok. Çeviri katalogda veri (`ItemSignature.loreEn`, `GameTitle.loreEn`),
+`customLabelEn` ile aynı desen. Eskiden eşyaların hepsi tek jenerik cümleye
+(`signatureItemLore`), ünvanlar kaynağa göre 4 şablona düşüyordu.
+`lore_translation_test` hiçbir satırın şablona düşmediğini bağlıyor.
 
 ### Faz 0 metin envanteri
 
@@ -2342,7 +2366,7 @@ cümleye düşüyor (`signatureItemLore`) ve 65 ünvanın hikâyesi kaynağa gö
 | Sınıf seçimi | 22 güncel/eski sınıf kimliği + seçim sözü + cinsiyet etiketleri | `AvatarProfile` kanonik değerleri gösterimde `content_localizations.dart` üzerinden çözülüyor | Faz 3 tamamlandı |
 | Koleksiyon ödülleri | 1.244 görsel için 17 koşul türünden üretilen ad, açıklama ve gereksinim | Kalıcı katalog alanları değişmeden koşul türü, hedef ve villain kimliği yerelleştiriliyor | Faz 3 tamamlandı |
 | Item ad üretimi | 166 temel ad + 36 varyant sıfatı + 5 nadirlik | `data/item_definitions.dart`, `core/utils/item_rules.dart`, `models/reward_rarity.dart`; gösterimde sabit asset kimliği, nadirlik ve sıfat yerelleştiriliyor | Faz 3 tamamlandı |
-| Ünvanlar | 65 ad + 65 lore + 121 özel etki etiketi | `data/title_catalog.dart` içine gömülü katalog; adlar sabit kimlikten, etkiler `customLabelEn` ile | Etiketler tamam (C/Faz 1); **lore İngilizce'de şablon** → Faz 1b |
+| Ünvanlar | 65 ad + 65 lore + 121 özel etki etiketi | `data/title_catalog.dart` içine gömülü katalog; adlar sabit kimlikten, etkiler `customLabelEn` ile | Etiketler tamam (C/Faz 1); lore elle çevrildi (F/Faz 3, GD114) |
 | Canavarlar | 20 ad + 20 görev metni + 4 arketip | `data/enemy_catalog.dart`; gösterim sabit `id` ile | Faz 3 tamamlandı |
 | Görev/macera | Round, süre, adım, savaş sonucu, ödül ve kök akış bildirimleri | `adventure_screen.dart`, `root_shell.dart`; modeldeki süre/ad alanları gösterimde locale üzerinden çözülüyor | Faz 3 tamamlandı |
 | Tutorial | 28 dolu frame mesajı + düğme etiketleri | ARB; adım enum'u yalnızca kalıcı akış kimliği | Faz 3 tamamlandı |
@@ -2450,10 +2474,79 @@ hedef, tarih, `coinsEarned`, `xpEarned`, `enemyDefeated`), adım geçmişi
 | Takım, mağaza kataloğu, item/ünvan/ödül katalogları | Sabit veri; her açılışta türetilir |
 | Kuşanılan itemin **çözülmüş hâli** | Kimlik + seviye + nadirlik yeter; buff sınıfa göre her açılışta çözülür |
 
+## Yedekleme — Android Auto Backup (Bölüm F / Faz 4, GD115)
+
+**Sunucu gelene kadar kalıcılık Android Auto Backup ile sağlanıyor.**
+Oyuncunun ilerlemesi yalnızca telefonunda; telefon değişince ya da uygulama
+silinince taşıyan tek mekanizma bu.
+
+| Ne | Nerede |
+|---|---|
+| Açık | `AndroidManifest.xml`: `allowBackup="true"` (zaten varsayılandı, artık açık ve kurallı) |
+| Android 11 ve altı | `res/xml/backup_rules.xml` (`fullBackupContent`) |
+| Android 12+ | `res/xml/data_extraction_rules.xml` (`dataExtractionRules`): `cloud-backup` **ve** `device-transfer` |
+| Yedeklenen | **Yalnızca** `shared_prefs/FlutterSharedPreferences.xml`: kayıt (`game_state_v1` + göç yedeği), avatar, rehber, dil, güvenlik onayı, ayarlar, kurulum kimliğinin yedek kopyası |
+| Yedeklenmeyen | `files/datastore/` (cihaz kimliği), bildirim eklentisinin `scheduled_notifications.xml`'i, `files/daily_notifications/` görseli, `cache/` |
+
+**İki kural dosyası birlikte değişmeli**; `backup_restore_test` ikisini ve
+manifest'i okuyup yalnızca kayıt dosyasının dahil olduğunu bağlıyor.
+
+### Yedekten dönen kayıt ve adım sayacı — `InstallIdentity`
+
+Kayıttaki tek **cihaza bağlı** alan `lastSensorReading` (Android'in
+açılıştan beri saydığı ham sayaç, §6.2). Başka telefonda bu değerle
+karşılaştırma ya farkı adım diye kredilendiriyor (hız denetimi kapalı geçen
+süreye göre izin verdiği için kesmiyor) ya da "kapalıyken yeniden
+başlatılmış" sayıp 10.000 adıma kadar telafi ediyordu: yürünmemiş adım,
+bedava altın. Bu risk Bölüm F'den önce de vardı, çünkü `allowBackup`
+varsayılan olarak açıktı ve kuralsız her şey yedekleniyordu.
+
+`services/install_identity.dart`: kurulum kimliğinin bir kopyası yedeklenen
+XML'de (`install_id_v1`), bir kopyası yedeklenmeyen DataStore'da
+(`SharedPreferencesAsync`, Android'de varsayılan DataStore). Açılışta
+(`app.dart`, kayıt okunduktan hemen sonra) iki kopya eşit değilse sensör
+referansı `null`'a düşer (yalnızca referans kurulur, kredi yok), kayıt
+**önce** diske yazılır, **sonra** yeni kimlik iki yere. Yalnızca Android;
+okunamayan kayıtta (`writeBlocked`) hiçbir şeye dokunulmaz.
+
+**Bilinçli takas:** kimliği olmayan kayıt da sıfırlanıyor. Bu sürümden
+önce alınmış bir yedek ile bu sürüme güncelleyen mevcut oyuncu ayırt
+edilemiyor. Bedel tek seferlik: son açılıştan beri uygulama kapalıyken
+atılan adımlar kredilenmez.
+
+### Sınırlar — ne zaman çalışır, ne zaman çalışmaz
+
+| Durum | Sonuç |
+|---|---|
+| Aynı Google hesabıyla yeni telefona kurulum / telefonu sıfırlayıp geri yükleme | ✅ Kayıt döner, göçten geçer (`backup_restore_test`: v24 → v33) |
+| Telefondan telefona aktarım (Android 12+ kablolu/kablosuz) | ✅ `device-transfer`; kota yok |
+| Uygulamayı silip Play'den yeniden kurmak | ✅ Yalnızca son yedek varsa; geri yükleme kurulum sırasında olur |
+| **Son yedekten sonraki ilerleme** | ❌ Kaybolur. Yedek en fazla **günde bir** ve yalnızca cihaz **boşta + şarjda + Wi-Fi'de** iken alınır |
+| Oyuncu cihaz ayarlarında Google yedeğini kapatmışsa | ❌ Hiç yedek yok |
+| Google hesabı yok / Google Play Hizmetleri yok (bazı Huawei vb.) | ❌ Hiç yedek yok |
+| Farklı Google hesabı | ❌ Yedek başka hesapta |
+| Android → iOS ya da iOS → Android | ❌ Platformlar arası taşıma yok |
+| iOS | ⚠️ Bu kuralların konusu değil. `NSUserDefaults` iCloud yedeğine kendiliğinden girer; doğrulanmadı |
+| Kota | Uygulama başına 25 MB; kayıt KB mertebesinde (adım geçmişi ≤ 400 gün, GD5) |
+| Geri yükleme sonrası ilk açılış | Sensör referansı yeniden kurulur; o ana kadarki toplam adım ve para korunur |
+| Uygulamanın kendi geri yükleme tetiklemesi | Yok. Geri yüklemeyi sistem yapar, oyunda "yedekten dön" düğmesi yok |
+
+**Oyuncu ne yapmalı:** telefon ayarlarında *Google → Yedekle → Google One
+yedeği* açık olmalı; telefon değiştirmeden önce oyunu açıp kapatmak ve
+*Şimdi yedekle* demek son ilerlemeyi yedeğe alır; yeni telefonda aynı
+Google hesabıyla kurulum sırasında geri yüklemeyi seçmek gerekir.
+
+**Elle doğrulama (cihaz gerekli, bu makinede yapılamaz):**
+`adb shell bmgr backupnow com.heapchiStudios.rush_for_villains`, uygulamayı
+sil, yeniden kur (`adb install`), açılışta kaydın döndüğünü gör.
+
 ## Firebase hazırlığı
 
 `GameState.toJson()` çıktısı doğrudan bir doküman. `savedAt` zarfta hazır.
-İleride yerel depo "cache" rolüne geçebilir.
+İleride yerel depo "cache" rolüne geçebilir. **Firebase geldiğinde Auto
+Backup ikinci güvence olarak kalabilir; ama kayıt sunucuda yaşamaya
+başlayınca `InstallIdentity`'nin yaptığı ayrım sunucu tarafında da
+gerekecek** (aynı hesap, iki cihaz).
 
 ---
 
@@ -2489,7 +2582,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**1.155 test** (`flutter test`), bunların **1.107'si yeşil** (Bölüm E kapanışı). Test, bu projede
+**1.171 test** (`flutter test`), **hepsi yeşil** (Bölüm F kapanışı). Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2505,7 +2598,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Savaş ve macera | `combat_engine_test`, `combat_balance_test`, `combat_persistence_test`, `adventure_quest_test`, `adventure_progress_test`, `walk_phase_test`, `revival_walk_test`, `attack_config_test`, `goal_picker_test` |
 | Ödül koleksiyonu | `reward_collection_test` |
 | Eğitim / rehber | `tutorial_guide_test`, `pet_companion_test`, `character_creation_test`, `character_catalog_test` |
-| Kalıcılık ve açılış | `game_storage_test`, `app_boot_test` |
+| Kalıcılık ve açılış | `game_storage_test`, `app_boot_test`, `backup_restore_test` (Auto Backup: yedekten dönen v24 kaydı göçten geçer, sensör referansı düşer, kurallar yalnızca kayıt dosyasını alır) |
 | Ekonomi ölçümü | `economy_pacing_test` |
 | Round geri bildirimi | `round_outcome_test` |
 | Mağaza indirimi | `shop_discount_test` — fiyat fonksiyonu, pencere, kapat-aç, ünvan etkisi |
@@ -2516,6 +2609,7 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
 | Posta kutusu ve kodlar | `mailbox_test` — iki kez alma, yarım alma, şema göçü, kod durumları, yavaşlatma |
 | Sonsuz Koşu ekranı | `endless_screen_test` — paylaşılan HUD, navigasyon kilidi, gizli sayaç, iki dilde 320/390 golden |
 | Üretilen ad hijyeni | `generated_name_hygiene_test` — 784 eşya + 65 ünvan + 20 düşman, iki dilde biçim taraması |
+| İngilizce hikâyeler | `lore_translation_test` — 61 eşya + 66 ünvan elle çevrilmiş, hiçbiri kalıp değil, uzun tire yok, gösterim yolu çeviriye ulaşıyor |
 | Golden | `test/golden/` — mağaza kartı, demirci, örs, ünvan, seri bonusu, yürüyüş fazı, rehber, **rehber yerleşimi** (3 cihaz profili + veda ölümü), **düşen eşya kartı** (TR/EN × 320/390), **para yağmuru** (320/390) |
 
 ## Test desenleri
@@ -2544,6 +2638,36 @@ dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılm
   kontrol et.** Bir kez `character_catalog_test.dart` üzerine yazıldı ve 7
   test kayboldu; toplam sayı beklenenden düşük çıkınca fark edildi. **Her
   birimden sonra toplam test sayısını beklenen değerle karşılaştır.**
+- **Animasyonlu GIF içeren golden: sahte kare + gerçek pencere.** GIF'in
+  sonraki karesi motorda **gerçek** zamanda çözülüyor, kare zamanlayıcısı ise
+  sahte saatte. Tek büyük `pump(1 sn)` ya da arka arkaya sahte kareler,
+  çözümün hangi kareye yetiştiğini şansa bırakıyor ve golden koşudan koşuya
+  başka sprite karesi çekiyordu (Bölüm E'nin "kararsız golden"ları). Desen:
+  ```dart
+  imageCache..clear()..clearLiveImages();   // kurulumdan önce
+  await tester.pumpWidget(...);
+  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 320)));
+  for (var i = 0; i < n; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+  }
+  ```
+  `adventure_progress_test.pumpAdventure` ve `character_creation_test.settle`
+  bunu kullanıyor; ikisi de tek başına ve tam dosyada aynı golden'ı veriyor.
+- **Önbelleklenmiş Future sahte saat bölgesinde ölür.** Bir test başka bir
+  testin başlattığı Future'ı (önbellekte) bekliyorsa sonsuza kadar bekler:
+  o Future'ın mikro görevleri önceki testin bölgesindeydi ve o bölge bir
+  daha ilerlemiyor. `GifTiming` bu yüzden `resetCache()` (yalnızca test)
+  taşıyor; `imageCache.clear()` görüntü akışları için aynı işi görüyor.
+  Belirti: test **tek başına geçiyor, tam dosyada asılı kalıyor** (ya da
+  tersi). `runAsync` içinde önbelleği elle ısıtmak çare değil, dakikalarca
+  kilitliyor.
+- **Platform kanalı zinciri.** Açılış gibi **ardışık** kanal çağrıları yapan
+  akışta tek `runAsync` + tek `pump` yalnızca ilk gidiş-dönüşü tamamlar;
+  ikisini döngüde sırayla tekrarla (`app_boot_test.settleBoot`).
+- **Statik bayraklar testler arası sızar.** `GameStorage.writeBlocked`,
+  `CharacterStorage.writeBlocked` süreç boyunca yaşar; "okunamayan kayıt"
+  testinden sonra okunabilen kayıt testi `GameStorage.clear()` ile başlamalı.
 
 ---
 
@@ -2577,7 +2701,7 @@ uy; aykırı bir şey görürsen muhtemelen bir hatadır.
 
 ---
 
-# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD113)
+# §11 — GERİ DÖNÜLECEK KARARLAR (GD1–GD115)
 
 Gözetimsiz oturumlarda tek başına verilmiş, ileride tartışmaya açık kararlar.
 **Koddaki yorumlar bu numaralara atıf yapıyor — numaraları değiştirme.**
@@ -2701,6 +2825,8 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 | GD112 | Yeniden atma: **tek yuva**, imzalı etki dokunulmaz; kademeli aralıklar ortalamaya merkezli; maliyet örnek başına artan (1× → 3×), keşiften seç 4×; para **atışta** ödenir, uygulama oyuncu onayıyla | Tek yuva, artan maliyet ve 4× kullanıcı kararı. Para atışta: önce görüp sonra ödemek bedava bakış olurdu. Aralık merkezleri ölçülen ortalamada: yeniden atma bir altın gideri, güç enflasyonu değil. Kademeler nadirlikten, seviye en üst kademeyi açıyor: düşük nadirlikte üst kademe hiç çıkmaz. Birleştirme yeni örnek ürettiği için atılmış etkiler taşınmaz (GD42 ile aynı ilke) |
 | GD113 | Geliştirici kontrolleri **yalnızca** `kDebugMode`; kapı derleme zamanında | Çalışma zamanı gizleme kodu ikilide bırakıyordu. Ölçüldü: release `libapp.so`'da kontrol dizgileri 0. `HomeScreen.onSimulateSteps` silinmedi: 13 test dosyasının tek adım kancası ve silmek eski kırmızıları içeren dosyalara dokunmayı gerektiriyordu; release'de işlevsiz |
+| GD114 | İmzalı eşya ve ünvan hikâyelerinin İngilizcesi **veri**: `ItemSignature.loreEn` / `GameTitle.loreEn` (127 cümle, Erken Kalkan dahil) | GD89 ile aynı karar: bunlar katalog verisi, ARB'nin işi arayüz çerçevesi. Bir dönem İngilizce oyuncu 61 eşyada aynı cümleyi, ünvanlarda kaynağa göre 4 kalıptan birini görüyordu. Alan `required`: yeni bir imza/ünvan çevirisiz derlenmez. Eski ARB kalıpları (`signatureItemLore`, `titleLore*`) silinmedi; eşya tarafında yalnızca `loreEn` eksik bir `Item` için yedek. `lore_translation_test` hiçbir satırın kalıba düşmediğini, uzun tire içermediğini ve gösterim yolunun (`itemLore`/`titleLore`, uyarlama ve birleştirme sonrası dahil) çeviriye ulaştığını bağlıyor |
+| GD115 | Auto Backup **yalnızca** kayıt dosyasını alır; yedekten dönen kurulumda ham sensör referansı düşer (`InstallIdentity`) | Kuralsız varsayılan her şeyi yedekliyordu, bildirim eklentisinin listesi dahil. Sensör referansı cihaza bağlı tek alan ve başka telefonda bedava adım üretiyordu. Kimliğin yedeklenmeyen kopyası DataStore'da: yeni paket gerekmedi (`SharedPreferencesAsync` Android'de varsayılan olarak oraya yazıyor). Kimliği olmayan kayıt da sıfırlanır; tek seferlik, sınırlı bir adım kaybı karşılığında eski yedeklerdeki açık kapanıyor. Ayrıntı §7 |
 
 ## Arkadaşımın mimari tercihleri — bilinçli olarak dokunulmadı
 
@@ -2720,98 +2846,34 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-**Bölüm E kapanışı: 1.107 başarılı, 48 başarısız.** 47'si Bölüm E başındaki
-eski listeden; 1'i belgelenmiş kararsız `character_creation` 360 dp golden'ı
-(ölçümden ölçüme yeşile/kırmızıya dönüyor). Yeni kırılan test yok. Bölüm E
-boyunca eski listeden **14** test yeşile döndü: `store_purchase_test`'in 12'si
-(onay penceresi uyarlaması) ve `forge_golden_test`'in 2'si (demirci ekranı
-değişti; PNG'lere bakılıp yenilendi).
+**Yok. Bölüm F kapanışı: 1.171 test, 1.171 yeşil** (`flutter test`, tek
+başına çalıştırılmış tam süit). Bölüm E kapanışındaki 48 kırmızının hepsi
+kapandı; Bölüm F 16 test ekledi (`backup_restore_test` 10,
+`lore_translation_test` 5, İngilizce 320 dp ünvan golden'ı 1).
 
-Bölüm D sonunda `flutter test` → **991 başarılı, 46 başarısız.**
+Kırmızıların gerçek kaynakları, bir daha görülürse diye:
 
-> **Bölüm E başlangıcında ölçülen (HEAD `9717e61`, temiz ağaç):** **981 başarılı,
-> 61 başarısız.** Bölüm D kapanışındaki 46'dan 15 fazla. Bölüm E karşılaştırmayı
-> bu 61 kişilik listeye karşı yapıyor.
->
-> **`store_purchase_test` 7 → 19 (Bölüm E / Faz 2'de çözüldü).** Sebep `aca975c`
-> ("final version"): ekipman, yükseltme ve ünvan satın almasının önüne bir onay
-> penceresi geldi (`_confirmPurchase`, onay düğmesi `ValueKey('confirm-purchase')`).
-> `b584e6e`'de bu dosyada 7 kırmızı vardı, `aca975c` 12 tane ekledi. 11 testte
-> dokunuştan sonra açık bir `confirmPurchase` adımı eklendi; doğruladıkları
-> şey değişmedi. Ürün koduna dokunulmadı. Pencereye üç iptal testi eklendi.
->
-> ⚠️ **Kalan bir tanesi bilerek kırmızı:** "hızlı çift dokunma iki satın alma
-> sayılır". Ölçüldü: iki hızlı dokunuş artık **tek** onay penceresi açıyor,
-> yani tek satın alma. Testin iddiası ürün değişikliğiyle çelişiyor ve
-> iddiayı değiştirmek ürün sahibinin kararı; onay adımı eklendi, iddia
-> korundu.
->
-> **Bölüm E sonunda (E3–E6 dahil): 1104 başarılı, 51 başarısız.** 49'u eski
-> listeden, 2'si belgelenmiş kararsız test ("ölümcül saldırı" ve
-> `character_creation` 360 dp golden'ı; ikisi de `9717e61`'de ölçümden ölçüme
-> kırılıyor). Yeni kırılan test yok.
->
-> Faz E2 sonunda: **1024 başarılı, 51 başarısız** — eski 61'den 11'i yeşile
-> döndü; geriye kalan 50'si eski listeden. Fazladan görünen tek kırmızı
-> `character_creation_test` 360 dp golden'ı: `9717e61`'de de tek başına
-> çalıştırınca kırmızı, tam süitte sıraya göre yeşil — belgelenmiş kararsız
-> golden.
+| Sebep | Belirti | Çare |
+|---|---|---|
+| Günlük seri/çark penceresi (`showDailyProgressDialog`) | 2.000/3.000 adımdan sonra `pumpAndSettle timed out`; pencerenin nabız animasyonu sonsuz ve bariyeri ana ekranı örtüyor | `RootShell` kuran testte `engagement: DailyEngagement(streakCelebratedOn: now, wheelPromptedOn: now)`; pencerenin kendisi `daily_notifications_test`'te |
+| Satın alma onay penceresi (`aca975c`) | Satın alma olmuyor, para düşmüyor | Dokunuştan sonra `ValueKey('confirm-purchase')` |
+| Tam ekran macera (§4.2) | `NavigationBar` / "Macera" sekmesi bulunamıyor | Aktif macerada çubuk yok, ekran zaten açık |
+| Mod seçim ekranı | Hedef seçici bulunamıyor | Önce `monster-hunt-entry`, sonra "Devam et" |
+| ARB'ye taşınan / değişen metin | `find.text('...')` boş | Metni `AppLocalizationsTr()` / `AppLocalizations.of(...)` ile oku |
+| Delege kurulmamış test uygulaması | Türkçe metin ama `1,600` / "August 24" | `locale: Locale('tr')` + `AppLocalizations.localizationsDelegates` |
+| Sabit tarihli zamanlama testi | Tarih geçince 0 bildirim (geçmiş `zonedSchedule` sessizce reddediliyor) | Tarihi `DateTime.now()`'a bağla |
+| SkSL'siz shader | Dosya başına bir sahte kırmızı | §5.2 |
+| GIF karesi / sıra bağımlı golden | Golden tek başına ve tam dosyada farklı kare | Aşağıdaki "Test desenleri" |
 
-46'nın **44'ü Bölüm C'nin de buldukları** (aşağıdaki tablo); Bölüm D hiçbir
-testi kırmadı. Kalan ikisi `character_creation_test` golden'ı ve
-**kararsız**: Bölüm D'nin değişiklikleri `git stash` ile geri alınınca da
-kırmızı, ölçümden ölçüme yeşile dönüp geri kırılıyorlar. **Dokunulmadı.**
-
-⚠️ **`victory_scene_390.png` düşen eşya kartından etkilenmiyor** — bir
-dönem bu dosyada öyle yazıyordu, yanlıştı. Ölçüldü: fark kart
-eklenmeden önce de sonra da **%2,38**; izole fark görselinde yalnızca
-**karakter sprite'ının animasyon karesi** değişiyor. Kart o testte hiç
-çizilmiyor çünkü `ItemCatalog` boş ve `DroppedItemCard` o durumda
-bilerek hiçbir şey çizmiyor.
-
-Golden **sıra bağımlı**: dosya tek başına çalışınca geçiyor, tam dosyada
-kırılıyor. **Yenilenmedi**: tam süit karesini commit'lemek kararlı olanı
-kararsız olanla değiştirmek olurdu. Aynı dosyadaki `adventure_320` ve
-`adventure_390` golden'ları da aynı sebepten kırmızı.
-
-Bölüm D'de yenilenen golden'lar: `tavern_320.png` (mock üye adları
-değişti, öncesinde yeşildi) ve yeni üretilenler
-(`dropped_item_*`, `coin_rain_*`, `endless_hud_*`).
-
-⚠️ **Bu 44 test Bölüm C'den önce de kırmızıydı.** Bölüm C'nin dört fazı da
-`HEAD`'e karşı ölçüldü (ayrı bir `git worktree` içinde temiz baseline) ve
-hiçbirinde **yeni kırılan test olmadı**; tersine üç tanesi düzeldi
-(47 → 44). Bunlar **düzeltilmedi, dokunulmadı** — başka birinin alanı.
-
-Alan alan dağılım:
-
-| Dosya | Adet | Konu |
-|---|---:|---|
-| `store_purchase_test` | 7 (+1 Bölüm E, bkz. yukarı) | Satın alma, tüketilen yükseltmeler (2× XP), çark ödülü, diske yazma |
-| `app_boot_test` | 4 | Açılış dayanıklılığı: kayıt okunamayınca uyarma / güvenlik onayı hatırlama |
-| `golden/walk_phase_golden_test` | 4 | Yürüyüş fazı sahnesi golden'ları |
-| `titles_test` | 4 | Ünvan buff'ının paraya yansıması, başarım ünvanının verilmesi |
-| `golden/titles_golden_test` | 3 | Ünvan ekranı golden'ları (TR 320/390 + EN 390) |
-| `adventure_progress_test` | 3 | Zafer sahnesi ve macera ilerlemesi golden'ları |
-| `golden/store_card_golden_test` | 2 | Mağaza ekipman kartı golden'ları |
-| `golden/streak_bonus_golden_test` | 2 | Seri bonusu paneli golden'ları |
-| `golden/pet_companion_golden_test` | 2 | Ana çember pet düğmesi golden'ları |
-| `inventory_test` | 2 | Adım-para bonusunun paraya yansıması |
-| `reward_collection_test` | 2 | Koleksiyon ekranı ve boş vitrin |
-| `phase3_content_localization_test` | 2 | İngilizce içerik golden'ları |
-| `character_creation_test` | 0–2 | *(ikisi Bölüm C sırasında düzeldi)* |
-| `blacksmith_test` · `combat_persistence_test` · `daily_notifications_test` · `revival_walk_test` · `safety_flow_test` | 1'er | Tekil davranış testleri |
-
-Kabaca **20'si golden** (ekran görüntüsü farkı), **24'ü davranış**. Davranış
-tarafında iki küme öne çıkıyor: `RootShell` üzerinden çalışan satın
-alma/buff/ödül zinciri ve açılış/kalıcılık.
-
-## Açık kalan konular (Bölüm E kapanışı)
+## Açık kalan konular (Bölüm F kapanışı)
 
 | Konu | Durum |
 |---|---|
-| **Faz 1b borcu** | 61 imzalı eşya lore'u İngilizce'de tek jenerik cümleye düşüyor (`signatureItemLore`); 65 ünvanın hikâyesi kaynağa göre 4 şablondan üretiliyor. Toplam **126 cümle**, ayrı bir iş |
-| **Kararsız testler** | `character_creation_test` golden'ları ve `adventure_progress_test`'in "ölümcül saldırı" testi. `9717e61`'de de tek başına çalıştırınca kırmızı, tam süitte sıraya göre değişiyor; dokunulmadı |
+| **Faz 1b borcu** | *(Bölüm F / Faz 3'te kapandı, GD114)* 127 hikâye elle çevrildi |
+| **Kararsız testler** | *(Bölüm F / Faz 2'de kapandı)* Sebep GIF karesinin gerçek zamanda çözülmesi ve önceki testin sahte saat bölgesinde kalan önbellek; desen §9 |
+| **Eski ARB kalıpları** | `signatureItemLore` ve dört `titleLore*` artık hiçbir ünvanda kullanılmıyor (eşya tarafında yalnızca `loreEn`'i olmayan bir `Item` için yedek). Silme onaya tabi (Kural 8) |
+| **Adventure ekranında elle yazılmış iki dil** | `adventure_screen.dart` mod penceresi ve "Modlar" düğmesi `localeName.startsWith('en')` ile sabit dizgi seçiyor (ARB'de değil). İki dilde de doğru görünüyor; arkadaşımın alanı, hata değil, dokunulmadı |
+| **Auto Backup cihazda doğrulanmadı** | Kurallar derleniyor ve birleşmiş manifestte (release) duruyor; gerçek yedek/geri yükleme bu makinede denenemez. Komutlar §7 |
 | **Uçtaki nadirlik eksikleri** | Balta ve topuz efsanevisi, Özel kategorisinin dört basamağı. İlerlemeyi **engellemiyor** (birleştirme kataloğa bakmıyor); yalnızca mağaza ve düşme havuzunda o basamak yok. Sonraki bölüm |
 | **`HomeScreen.onSimulateSteps`** | Bilerek bırakıldı (§6.2). Testler yenilenirse birlikte kaldırılabilir |
 | **Envanterde süzgeç** | Demircinin süzgeç kuralı saf ve envanter de aynı grup modelini kullanıyor; eklenmesi istendi ama bu bölümde yalnızca demirci |

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ için yedek kuralları (android:dataExtractionRules).
+     Android 11 ve altı backup_rules.xml'i okur; gerekçe orada yazılı ve iki
+     dosya birlikte değişmeli.
+
+     cloud-backup   : Google hesabına günlük Auto Backup.
+     device-transfer: yeni telefona kablolu/kablosuz aktarım. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    </device-transfer>
+</data-extraction-rules>

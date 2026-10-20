@@ -18,9 +18,18 @@ void main() {
   /// animasyon (`_equipmentBobController.repeat()`), dolayısıyla ağaç asla
   /// durulmuyor. Sabit kare dizisi hem bekleyişi çözüyor hem golden'ları
   /// tekrarlanabilir kılıyor.
+  ///
+  /// Her sahte kareden sonra kısa bir **gerçek** pencere bırakılıyor: sınıf
+  /// GIF'inin sonraki karesi motorda gerçek zamanda çözülüyor, kare
+  /// zamanlayıcısı ise sahte saatte. Pencere olmadan çözümün hangi kareye
+  /// yetiştiği şansa kalıyordu ve tanıtım golden'ları dosya tek başına
+  /// çalışınca %13-15 farkla kırılıyordu (belgelenmiş kararsız golden).
   Future<void> settle(WidgetTester tester, {int frames = 18}) async {
     for (var i = 0; i < frames; i++) {
       await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 15)),
+      );
     }
   }
 
@@ -34,6 +43,11 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    // Önceki testin sahte saat bölgesinde açılmış görüntü akışları burada
+    // yeniden kullanılırsa kareleri ilerlemiyor; temiz önbellekle başla.
+    imageCache
+      ..clear()
+      ..clearLiveImages();
     await tester.pumpWidget(
       MaterialApp(
         home: CharacterCreationScreen(

@@ -2279,7 +2279,7 @@ abstract class AppLocalizations {
   /// No description provided for @upgradeToLevel.
   ///
   /// In tr, this message translates to:
-  /// **'Sv. {level}\'e yükselt — {cost} coin'**
+  /// **'Yükselt: Sv. {level} — {cost} coin'**
   String upgradeToLevel(int level, int cost);
 
   /// No description provided for @cannotUpgrade.

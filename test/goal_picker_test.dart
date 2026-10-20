@@ -52,6 +52,18 @@ void main() {
       ),
     );
     await tester.pump();
+
+    // Hedef seçici artık bir mod seçim ekranının arkasında: önce
+    // "Canavar Avı" kartı, sonra mod penceresindeki "Devam et".
+    final hunt = find.byKey(const ValueKey('monster-hunt-entry'));
+    await tester.ensureVisible(hunt);
+    await tester.tap(hunt);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Devam et'));
+    await tester.pumpAndSettle();
+    // Mod seçilince açılan ipucu balonu 4 sn'lik bir zamanlayıcıyla
+    // kapanıyor; bekleyen zamanlayıcı testi sonunda düşürmesin.
+    addTearDown(() => tester.pump(const Duration(seconds: 5)));
   }
 
   testWidgets('seçici açılıp seçim yapılabilir', (tester) async {

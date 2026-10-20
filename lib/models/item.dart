@@ -464,6 +464,9 @@ class Item {
   /// dururlar (bkz. GD22).
   final String? lore;
 
+  /// [lore]'un İngilizcesi (`ItemSignature.loreEn`); imzasız itemlerde `null`.
+  final String? loreEn;
+
   const Item({
     required this.id,
     required this.name,
@@ -475,6 +478,7 @@ class Item {
     required this.buff,
     required this.archetype,
     this.lore,
+    this.loreEn,
   });
 
   /// Elle tasarlanmış (imzalı) bir item mi.
@@ -507,6 +511,7 @@ class Item {
     buff: buff ?? this.buff,
     archetype: archetype ?? this.archetype,
     lore: lore,
+    loreEn: loreEn,
   );
 
   /// Bu item'ı [characterClass] sınıfı kuşanabilir mi.

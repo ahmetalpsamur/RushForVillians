@@ -272,6 +272,14 @@ void main() {
     );
     await tester.tap(price);
     await tester.pump(const Duration(milliseconds: 650));
+    // `aca975c`: satın alma onay penceresinin arkasında, eğitimde de. Pencere
+    // eğitim katmanının **üstünde** açılmalı ve dokunulabilir olmalı; yoksa
+    // yeni oyuncu ilk alışverişte kilitlenirdi. Onaydan önce para gitmez.
+    expect(profile.coins, starter.cost);
+    final confirm = find.byKey(const ValueKey('confirm-purchase'));
+    expect(confirm, findsOneWidget);
+    await tester.tap(confirm);
+    await tester.pump(const Duration(milliseconds: 650));
     expect(profile.coins, 0);
     expect(profile.ownsItem(starter.id), isTrue);
     expect(profile.tutorialStep, TutorialGuideStep.itemBought.index);

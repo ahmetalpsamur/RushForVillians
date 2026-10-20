@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Bir GIF'in tek tam oynatım süresini asset karelerinden hesaplar.
@@ -7,6 +8,16 @@ class GifTiming {
   GifTiming._();
 
   static final Map<String, Future<Duration?>> _cache = {};
+
+  /// Önbelleği boşaltır. Yalnızca testler için.
+  ///
+  /// Önbellek sonucu değil **Future**'ı tutuyor. Widget testlerinde her test
+  /// kendi sahte saat bölgesinde koşuyor; bir testin başlattığı ölçüm o test
+  /// bitince bir daha ilerlemiyor ve aynı GIF'i bekleyen sonraki test sonsuza
+  /// kadar bekliyordu (sıraya bağlı kırmızı). Uygulamada tek bölge var, sorun
+  /// yalnızca testte.
+  @visibleForTesting
+  static void resetCache() => _cache.clear();
 
   static Future<Duration> cycle(
     String asset, {

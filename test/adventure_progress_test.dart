@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/core/utils/gif_timing.dart';
 import 'package:rush_for_villains/core/constants/attack_config.dart';
 import 'package:rush_for_villains/models/daily_engagement.dart';
 import 'package:rush_for_villains/core/constants/game_constants.dart';
@@ -87,6 +88,12 @@ void main() {
       quest.presentedRoundOutcomeSerial = quest.roundOutcomeSerial;
     }
 
+    // Önceki testin sahte saat bölgesinde açılmış bir görüntü akışı burada
+    // yeniden kullanılırsa kareleri bir daha ilerlemiyor (GifTiming ile aynı
+    // tuzak). Her kurulum temiz önbellekle başlıyor.
+    imageCache
+      ..clear()
+      ..clearLiveImages();
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
@@ -119,9 +126,19 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 320)),
     );
+    // Animasyonlu GIF'in sonraki karesi motorda **gerçek** zamanda çözülüyor,
+    // kare zamanlayıcısı ise sahte saatte. Çözüm iki sahte kare arasına
+    // denk gelir mi gelmez mi şansa kalıyordu ve golden'daki sprite karesi
+    // koşudan koşuya değişiyordu (ölçülen fark %0,9-%3,2, yalnızca sprite).
+    // Her sahte kareden sonra kısa bir gerçek pencere: bekleyen kare çözümü
+    // her seferinde tamamlanıyor, ekrandaki kare yalnızca sahte süreye bağlı.
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 40)),
+      );
     }
+    await tester.pump();
   }
 
   /// Geri sayım kartındaki **ana** ilerleme çubuğunun değeri.
@@ -257,17 +274,27 @@ void main() {
         roundOutcomeSerial: 1,
       );
 
+      // Saldırı GIF süresi gerçek dosyadan asenkron okunuyor ve perde ancak
+      // ondan sonra açılıyor. [GifTiming] önbelleği sonucu değil Future'ı
+      // tutuyor: önceki bir testin sahte saat bölgesinde başlamış ölçüm o test
+      // bitince bir daha ilerlemiyor ve bu test onu sonsuza kadar bekliyordu
+      // (sıraya bağlı kırmızı). Önbellek boşaltılıyor; ölçüm bu testin
+      // bölgesinde yeniden başlıyor ve perde açılana kadar gerçek bekleyiş +
+      // kare sırayla tekrarlanıyor (tavanlı).
+      GifTiming.resetCache();
       await pumpAdventure(tester, stepGoal: 500, steps: 500, adventure: quest);
 
-      // Saldırı GIF süresi gerçek dosyadan asenkron okunur. Yavaş disklerde
-      // overlay ilk ısınma turundan sonra hazır olabildiği için kısa bir pay
-      // bırakıp animasyonun ilk karesini çizdir.
-      if (find
-          .textContaining('sen vuramadan seni öldürdü')
-          .evaluate()
-          .isEmpty) {
+      for (
+        var i = 0;
+        i < 25 &&
+            find
+                .textContaining('sen vuramadan seni öldürdü')
+                .evaluate()
+                .isEmpty;
+        i++
+      ) {
         await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 420)),
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
         );
         await tester.pump();
       }
@@ -453,6 +480,9 @@ void main() {
         victoryXpReward: 180,
       );
 
+      imageCache
+        ..clear()
+        ..clearLiveImages();
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -473,12 +503,19 @@ void main() {
           ),
         ),
       );
-      await tester.pump(const Duration(seconds: 1));
-      // 250 ms kimi koşuda ölüm karesini çözmeye yetmiyordu; ısınma payı
-      // artırıldı. Aynı gerekçe `pumpAdventure` içinde yazılı.
+      // Ölüm/ceset GIF'i: `pumpAdventure` ile aynı belirlenim deseni. Tek
+      // büyük bir `pump(1 sn)` sırasında kare çözümleri gerçek zamanda
+      // yetişmiyor, golden'daki kare koşudan koşuya değişiyordu (tek başına
+      // %2,45 fark). Isınma + her 50 ms'lik sahte kareden sonra gerçek pencere.
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 420)),
+        () => Future<void>.delayed(const Duration(milliseconds: 320)),
       );
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 40)),
+        );
+      }
       await tester.pump();
 
       expect(find.text('+47 altın'), findsOneWidget);

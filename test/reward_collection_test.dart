@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rush_for_villains/l10n/app_localizations.dart';
+import 'package:rush_for_villains/l10n/app_localizations_tr.dart';
 import 'package:rush_for_villains/core/theme/app_theme.dart';
 import 'package:rush_for_villains/data/reward_catalog.dart';
 import 'package:rush_for_villains/features/rewards/rewards_screen.dart';
@@ -83,6 +85,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
+        // Gerçek uygulamadaki gibi Türkçe yerelleştirme: tarih biçimi
+        // `Localizations.localeOf`'tan geliyor ve delege olmadan en-US'e
+        // düşüyordu ("August 24, 2026").
+        locale: const Locale('tr'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: RewardsScreen(
           rewards: rewards,
           statistics: const RewardStatistics(),
@@ -124,7 +132,8 @@ void main() {
     );
     await tester.tap(find.text('Vitrin'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('İlk villain’ını yenerek'), findsOneWidget);
+    // Metin ARB'de (`noRewardsYet`); "villain" bir dönem "düşman" oldu.
+    expect(find.text(AppLocalizationsTr().noRewardsYet), findsOneWidget);
   });
 
   testWidgets('1.244 kart aynı anda render edilmez ve dar ekranda taşmaz', (
