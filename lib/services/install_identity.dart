@@ -59,6 +59,13 @@ abstract final class InstallIdentity {
   @visibleForTesting
   static DeviceLocalStore deviceStore = const _DataStoreDeviceLocalStore();
 
+  /// Bütün kontrolün üst sınırı. Kontrol açılışın içinde bekleniyor; bir
+  /// platform kanalı hiç cevap vermezse oyun açılış ekranında asılı
+  /// kalırdı. Hata fırlatan kanal zaten yakalanıyordu, **cevap vermeyen**
+  /// kanal yakalanmıyordu.
+  @visibleForTesting
+  static Duration timeout = const Duration(seconds: 2);
+
   /// Saf karar: iki kopyadan kurulumun kökeni.
   static InstallOrigin classify({String? backedUp, String? device}) =>
       device != null && device == backedUp
@@ -75,29 +82,36 @@ abstract final class InstallIdentity {
   /// tarihten sayıyor (§6.2).
   ///
   /// Hiçbir hata açılışı durdurmaz; kimlik okunamazsa hiçbir şey
-  /// değiştirilmez ve bir sonraki açılışta yeniden denenir.
+  /// değiştirilmez ve bir sonraki açılışta yeniden denenir. Kontrol
+  /// [timeout] içinde bitmezse açılış beklemeden devam eder ve `null` döner;
+  /// o ana kadar bellekte düşürülmüş bir sensör referansı düşük kalır
+  /// (güvenli taraf: en fazla bir kez daha referans kurulur).
   static Future<InstallOrigin?> reconcile(GameState? state) async {
     if (defaultTargetPlatform != TargetPlatform.android) return null;
     if (GameStorage.writeBlocked) return null;
     try {
-      final preferences = await SharedPreferences.getInstance();
-      final backedUp = preferences.getString(backedUpKey);
-      final device = await deviceStore.read(deviceKey);
-      final origin = classify(backedUp: backedUp, device: device);
-      if (origin == InstallOrigin.sameInstall) return origin;
-
-      if (state != null) {
-        state.profile.lastSensorReading = null;
-        await GameStorage.save(state);
-      }
-      final id = _newId();
-      await deviceStore.write(deviceKey, id);
-      await preferences.setString(backedUpKey, id);
-      return origin;
+      return await _reconcile(state).timeout(timeout);
     } catch (error) {
       debugPrint('InstallIdentity: kurulum kimliği okunamadı ($error)');
       return null;
     }
+  }
+
+  static Future<InstallOrigin> _reconcile(GameState? state) async {
+    final preferences = await SharedPreferences.getInstance();
+    final backedUp = preferences.getString(backedUpKey);
+    final device = await deviceStore.read(deviceKey);
+    final origin = classify(backedUp: backedUp, device: device);
+    if (origin == InstallOrigin.sameInstall) return origin;
+
+    if (state != null) {
+      state.profile.lastSensorReading = null;
+      await GameStorage.save(state);
+    }
+    final id = _newId();
+    await deviceStore.write(deviceKey, id);
+    await preferences.setString(backedUpKey, id);
+    return origin;
   }
 
   /// Oyun sonucunu etkilemeyen bir kimlik; tohum değil, yalnızca eşitlik

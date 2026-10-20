@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -42,6 +43,15 @@ class _MemoryDeviceStore implements DeviceLocalStore {
 
   @override
   Future<void> write(String key, String value) async => values[key] = value;
+}
+
+/// Hiç cevap vermeyen platform kanalı.
+class _SilentDeviceStore implements DeviceLocalStore {
+  @override
+  Future<String?> read(String key) => Completer<String?>().future;
+
+  @override
+  Future<void> write(String key, String value) => Completer<void>().future;
 }
 
 void main() {
@@ -270,6 +280,31 @@ void main() {
         'old-phone-id',
       );
       await GameStorage.clear();
+    });
+
+    test('cevap vermeyen kanal açılışı kilitlemez', () async {
+      // Hata fırlatan kanal en başından yakalanıyordu; **hiç cevap
+      // vermeyen** kanal yakalanmıyordu ve açılış kontrolü beklediği için
+      // oyun açılış ekranında asılı kalırdı.
+      seedRestoredBackup();
+      final state = await GameStorage.load(avatar: _avatar);
+      InstallIdentity.deviceStore = _SilentDeviceStore();
+      final previousTimeout = InstallIdentity.timeout;
+      InstallIdentity.timeout = const Duration(milliseconds: 50);
+      addTearDown(() => InstallIdentity.timeout = previousTimeout);
+
+      final origin = await InstallIdentity.reconcile(
+        state,
+      ).timeout(const Duration(seconds: 5));
+
+      expect(origin, isNull);
+      // Okuma bitmeden zaman aşımı: hiçbir şeye dokunulmadı.
+      expect(state!.profile.lastSensorReading, 4850000);
+      final preferences = await SharedPreferences.getInstance();
+      expect(
+        preferences.getString(InstallIdentity.backedUpKey),
+        'old-phone-id',
+      );
     });
 
     test('yalnızca Android: iOS\'ta iki dosya da iCloud\'a gider', () async {

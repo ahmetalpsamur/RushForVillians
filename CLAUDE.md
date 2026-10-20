@@ -2507,7 +2507,11 @@ XML'de (`install_id_v1`), bir kopyası yedeklenmeyen DataStore'da
 (`app.dart`, kayıt okunduktan hemen sonra) iki kopya eşit değilse sensör
 referansı `null`'a düşer (yalnızca referans kurulur, kredi yok), kayıt
 **önce** diske yazılır, **sonra** yeni kimlik iki yere. Yalnızca Android;
-okunamayan kayıtta (`writeBlocked`) hiçbir şeye dokunulmaz.
+okunamayan kayıtta (`writeBlocked`) hiçbir şeye dokunulmaz. Kontrol açılışın
+içinde beklendiği için **2 sn üst sınırı** var (`InstallIdentity.timeout`):
+hata fırlatan kanal zaten yakalanıyordu, hiç cevap vermeyen kanal oyunu
+açılış ekranında asılı bırakırdı. Süre dolarsa açılış devam eder, sonraki
+açılışta yeniden denenir.
 
 **Bilinçli takas:** kimliği olmayan kayıt da sıfırlanıyor. Bu sürümden
 önce alınmış bir yedek ile bu sürüme güncelleyen mevcut oyuncu ayırt
@@ -2582,7 +2586,7 @@ grubuyla yakalar.
 
 # §9 — Test
 
-**1.171 test** (`flutter test`), **hepsi yeşil** (Bölüm F kapanışı). Test, bu projede
+**1.172 test** (`flutter test`), **hepsi yeşil** (Bölüm F kapanışı). Test, bu projede
 dokümantasyonun bir parçası: denge sayıları prosa tahmini olarak bırakılmaz, **testle bağlanır**.
 
 ## Test haritası
@@ -2846,9 +2850,9 @@ Bir kararı değiştirmeden önce gerekçesini burada oku.
 
 ## Şu an kırmızı olan testler
 
-**Yok. Bölüm F kapanışı: 1.171 test, 1.171 yeşil** (`flutter test`, tek
+**Yok. Bölüm F kapanışı: 1.172 test, 1.172 yeşil** (`flutter test`, tek
 başına çalıştırılmış tam süit). Bölüm E kapanışındaki 48 kırmızının hepsi
-kapandı; Bölüm F 16 test ekledi (`backup_restore_test` 10,
+kapandı; Bölüm F 17 test ekledi (`backup_restore_test` 11,
 `lore_translation_test` 5, İngilizce 320 dp ünvan golden'ı 1).
 
 Kırmızıların gerçek kaynakları, bir daha görülürse diye:
